@@ -30,6 +30,7 @@ import (
 
 	_ "github.com/nyaruka/mailroom/ivr/nexmo"
 	_ "github.com/nyaruka/mailroom/ivr/twiml"
+	_ "github.com/nyaruka/mailroom/ivr/imimobile"
 )
 
 var version = "Dev"
