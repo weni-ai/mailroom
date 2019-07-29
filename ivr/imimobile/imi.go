@@ -28,17 +28,16 @@ const (
 	phoneNumberConfig = "phone_number"
 	usernameConfig    = "username"
 	passwordConfig    = "password"
-
 )
 
 var indentMarshal = true
 
 type client struct {
-	channel     	*models.Channel
-	sendURL			string
-	phoneNumber		string
-	accountUserName	string
-	accountPassword	string
+	channel         *models.Channel
+	sendURL         string
+	phoneNumber     string
+	accountUserName string
+	accountPassword string
 }
 
 type CallRequest struct {
@@ -70,9 +69,9 @@ func NewClientFromChannel(channel *models.Channel) (ivr.Client, error) {
 	}
 
 	return &client{
-		channel:		 channel,
-		sendURL:		 sendURL,
-		phoneNumber:	 phoneNumber,
+		channel:         channel,
+		sendURL:         sendURL,
+		phoneNumber:     phoneNumber,
 		accountUserName: username,
 		accountPassword: password,
 	}, nil
@@ -107,15 +106,15 @@ func (c *client) PreprocessResume(ctx context.Context, db *sqlx.DB, rp *redis.Po
 func (c *client) RequestCall(client *http.Client, number urns.URN, callbackURL string, statusURL string) (ivr.CallID, error) {
 	url, _ := url.Parse(callbackURL)
 	callRequest := &CallRequest{
-		TransID: url.Query().Get("connection"),
-		To:    formatPhoneNumber(number.Path()),
-		From: formatPhoneNumber(c.channel.Address()),
-		VxmlURL: callbackURL,
+		TransID:  url.Query().Get("connection"),
+		To:       formatPhoneNumber(number.Path()),
+		From:     formatPhoneNumber(c.channel.Address()),
+		VxmlURL:  callbackURL,
 		EventURL: statusURL,
 	}
 
 	resp, err := c.makeRequest(client, http.MethodPost, c.sendURL, callRequest)
-	
+
 	if err != nil {
 		return ivr.NilCallID, errors.Wrapf(err, "error trying to start call")
 	}
@@ -145,10 +144,10 @@ func (c *client) RequestCall(client *http.Client, number urns.URN, callbackURL s
 	return ivr.CallID(call.TransID), nil
 }
 
-func formatPhoneNumber(phoneNumber string) (string) {
+func formatPhoneNumber(phoneNumber string) string {
 	re := regexp.MustCompile(`([^0-9]+)`)
 	return re.ReplaceAllString(phoneNumber, `$2`)
-} 
+}
 
 func (c *client) makeRequest(client *http.Client, method string, sendURL string, body interface{}) (*http.Response, error) {
 	bb, err := json.Marshal(body)
