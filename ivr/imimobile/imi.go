@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"encoding/xml"
 	"io/ioutil"
 	"net/http"
 	"net/url"
@@ -54,6 +55,41 @@ type CallResponse struct {
 	Description string `json:"description"`
 }
 
+type VXMLProperty struct {
+	Text  string `xml:",chardata"`
+	Name  string `xml:"name,attr"`
+	Value string `xml:"value,attr"`
+}
+
+type VXMLVar struct {
+	Text string `xml:",chardata"`
+	Name string `xml:"name,attr"`
+	Expr string `xml:"expr,attr,omitempty"`
+}
+
+type VXMLBase struct {
+	XMLName xml.Name `xml:"xml"`
+	Text    string   `xml:",chardata"`
+	Vxml    struct {
+		Text     string         `xml:",chardata"`
+		Version  string         `xml:"version,attr"`
+		Property []VXMLProperty `xml:"property"`
+		Var      []VXMLVar      `xml:"var"`
+		Form     struct {
+			Text string    `xml:",chardata"`
+			ID   string    `xml:"id,attr"`
+			Var  []VXMLVar `xml:"var"`
+		} `xml:"form"`
+	} `xml:"vxml"`
+}
+
+func initVXMLDocument() *VXMLBase {
+	v := &VXMLBase{}
+	v.Vxml.Version = "2.1"
+	v.Vxml.Form.ID = "AcceptDigits"
+	return v
+}
+
 func init() {
 	ivr.RegisterClientType(imiChannelType, NewClientFromChannel)
 }
@@ -79,6 +115,7 @@ func NewClientFromChannel(channel *models.Channel) (ivr.Client, error) {
 
 func (c *client) CallIDForRequest(r *http.Request) (string, error) {
 	// TODO
+	println("CallIDForRequest")
 	return "", nil
 }
 
@@ -87,18 +124,21 @@ func (c *client) DownloadMedia(url string) (*http.Response, error) {
 }
 
 // HangupCall asks IMIMobile to hang up the call that is passed in
-func (c *client) HangupCall(client *http.Client, callID string) error {
+func (c *client) HangupCall(client *http.Client, callIWriteErrorResponseD string) error {
 	// TODO
+	println("HangupCall")
 	return nil
 }
 
 // InputForRequest returns the input for the passed in request, if any
 func (c *client) InputForRequest(r *http.Request) (string, utils.Attachment, error) {
 	// TODO
+	println("InputForRequest")
 	return "", ivr.NilAttachment, errors.Errorf("unknown wait_type: %s", "")
 }
 
 func (c *client) PreprocessResume(ctx context.Context, db *sqlx.DB, rp *redis.Pool, conn *models.ChannelConnection, r *http.Request) ([]byte, error) {
+	println("PreprocessResume")
 	return nil, nil
 }
 
@@ -166,33 +206,39 @@ func (c *client) makeRequest(client *http.Client, method string, sendURL string,
 // StatusForRequest returns the current call status for the passed in status (and optional duration if known)
 func (c *client) StatusForRequest(r *http.Request) (models.ConnectionStatus, int) {
 	// TODO
+	println("StatusForRequest")
 	return models.ConnectionStatusInProgress, 0
 }
 
 func (c *client) URNForRequest(r *http.Request) (urns.URN, error) {
 	// TODO
+	println("URNForRequest")
 	return "", nil
 }
 
 // ValidateRequestSignature validates the signature on the passed in request, returning an error if it is invaled
 func (c *client) ValidateRequestSignature(r *http.Request) error {
+	println("ValidateRequestSignature")
 	return nil
 }
 
 // WriteEmptyResponse writes an empty (but valid) response
 func (c *client) WriteEmptyResponse(w http.ResponseWriter, msg string) error {
 	// TODO
+	println("WriteEmptyResponse")
 	return nil
 }
 
 // WriteErrorResponse writes an error / unavailable response
 func (c *client) WriteErrorResponse(w http.ResponseWriter, err error) error {
 	// TODO
+	println("WriteErrorResponse")
 	return nil
 }
 
 // WriteSessionResponse writes a TWIML response for the events in the passed in session
 func (c *client) WriteSessionResponse(session *models.Session, resumeURL string, r *http.Request, w http.ResponseWriter) error {
 	// TODO
+	println("WriteSessionResponse")
 	return nil
 }
