@@ -1,6 +1,7 @@
 package imi
 
 import (
+	"fmt"
 	"bytes"
 	"context"
 	"encoding/json"
@@ -13,6 +14,10 @@ import (
 	"github.com/gomodule/redigo/redis"
 	"github.com/jmoiron/sqlx"
 	"github.com/nyaruka/gocommon/urns"
+	"github.com/nyaruka/goflow/flows"
+	"github.com/nyaruka/goflow/flows/events"
+	"github.com/nyaruka/goflow/flows/routers/waits"
+	"github.com/nyaruka/goflow/flows/routers/waits/hints"
 	"github.com/nyaruka/goflow/utils"
 	"github.com/nyaruka/mailroom/ivr"
 	"github.com/nyaruka/mailroom/models"
@@ -68,26 +73,163 @@ type VXMLVar struct {
 }
 
 type VXMLBase struct {
-	XMLName xml.Name `xml:"xml"`
-	Text    string   `xml:",chardata"`
-	Vxml    struct {
-		Text     string         `xml:",chardata"`
-		Version  string         `xml:"version,attr"`
-		Property []VXMLProperty `xml:"property"`
-		Var      []VXMLVar      `xml:"var"`
-		Form     struct {
-			Text string    `xml:",chardata"`
-			ID   string    `xml:"id,attr"`
-			Var  []VXMLVar `xml:"var"`
-		} `xml:"form"`
-	} `xml:"vxml"`
+	XMLName  xml.Name       `xml:"vxml"`
+	Text     string         `xml:",chardata"`
+	Version  string         `xml:"version,attr"`
+	Property []VXMLProperty `xml:"property"`
+	Var      []VXMLVar      `xml:"var"`
+	Form     struct {
+		Text string      `xml:",chardata"`
+		ID   string      `xml:"id,attr"`
+		Var  []VXMLVar   `xml:"var"`
+		Body interface{} `xml:",innerxml"`
+	} `xml:"form"`
 }
 
-func initVXMLDocument() *VXMLBase {
-	v := &VXMLBase{}
-	v.Vxml.Version = "2.1"
-	v.Vxml.Form.ID = "AcceptDigits"
+type Block struct {
+	XMLName string `xml:"block"`
+	Text   string `xml:",chardata"`
+	Prompt struct {
+		XMLName string `xml:"prompt"`
+		Text    string `xml:",chardata"`
+		Bargein bool `xml:"bargein,attr"`
+		Body interface{} `xml:",innerxml"`
+	}
+}
+
+type Audio struct {
+	XMLName string `xml:"audio"`
+	Text string `xml:",chardata"`
+	Src  string `xml:"src,attr"`
+}
+
+type Hangup struct {
+	XMLName string `xml:"exit"`
+}
+
+type Assign struct {
+	Text string `xml:",chardata"`
+	Name string `xml:"name,attr"`
+	Expr string `xml:"expr,attr"`
+}
+
+type Value struct {
+	Text string `xml:",chardata"`
+	Expr string `xml:"expr,attr"`
+}
+
+type Log struct {
+	Text string `xml:",chardata"`
+	Value []Value `xml:"value"`
+}
+
+type Field struct {
+	XMLName string `xml:"field"`
+	Text    string `xml:",chardata"`
+	Name    string `xml:"name,attr"`
+	Type    string `xml:"type,attr"`
+	Filled  struct {
+		Text string `xml:",chardata"`
+		Log []Log `xml:"log"`
+		Assign []Assign `xml:"assign"`
+		Data struct {
+			Text     string `xml:",chardata"`
+			Name     string `xml:"name,attr"`
+			Src      string `xml:"src,attr"`
+			Namelist string `xml:"namelist,attr"`
+			Method   string `xml:"method,attr"`
+			Enctype  string `xml:"enctype,attr"`
+		} `xml:"data"`
+		If struct {
+			Text string   `xml:",chardata"`
+			Cond string   `xml:"cond,attr"`
+			Log  []string `xml:"log"`
+			Goto struct {
+				Text string `xml:",chardata"`
+				Next string `xml:"next,attr"`
+			} `xml:"goto"`
+			Else struct {
+				Text string `xml:",chardata"`
+				Log  struct {
+					Text  string `xml:",chardata"`
+					Value struct {
+						Text string `xml:",chardata"`
+						Expr string `xml:"expr,attr"`
+					} `xml:"value"`
+				} `xml:"log"`
+			} `xml:"else"`
+		} `xml:"if"`
+	} `xml:"filled"`
+}
+
+func VXMLDocument(body interface{}) VXMLBase {
+	v := VXMLBase{}
+	v.Version = "2.1"
+	v.Form.ID = "AcceptDigits"
+
+	p := make([]VXMLProperty, 0)
+	p = append(p, VXMLProperty{Name: "confidencelevel", Value: "0.5"})
+	p = append(p, VXMLProperty{Name: "maxage", Value: "30"})
+	p = append(p, VXMLProperty{Name: "inputmodes", Value: "dtmf"})
+	p = append(p, VXMLProperty{Name: "interdigittimeout", Value: "12s"})
+	p = append(p, VXMLProperty{Name: "timeout", Value: "12s"})
+	p = append(p, VXMLProperty{Name: "termchar", Value: "#"})
+	v.Property = p
+
+	va := make([]VXMLVar, 0)
+	va = append(va, VXMLVar{Name: "recieveddtmf"})
+	va = append(va, VXMLVar{Name: "ExecuteVXML"})
+	v.Var = va
+
+	va = make([]VXMLVar, 0)
+	va = append(va, VXMLVar{Name: "ExecuteVXML"})
+	va = append(va, VXMLVar{Name: "nResult"})
+	va = append(va, VXMLVar{Name: "nResultCode", Expr: "0"})
+	v.Form.Var = va
+	v.Form.Body = body
+
 	return v
+}
+
+func VXMLBlock(body interface{}) Block {
+	b := Block{}
+	b.Prompt.Bargein = true
+	b.Prompt.Body = body
+	return b
+}
+
+func VXMLField(resumeURL string, digits int) Field {
+	f := Field{Name: "Digits", Type: fmt.Sprintf("%s?length=%d", "digits", digits)}
+	f.Filled.Data.Name = "RespJSON"
+	f.Filled.Data.Src = resumeURL
+	f.Filled.Data.Namelist = "namelist"
+	f.Filled.Data.Method = http.MethodPost
+	f.Filled.Data.Enctype = "application/json"
+
+	f.Filled.Assign = append(f.Filled.Assign, Assign{Name: "recieveddtmf", Expr: "Digits"})
+	f.Filled.Assign = append(f.Filled.Assign, Assign{Name: "nResultCode", Expr: "JSON.parse(RespJSON).result"})
+
+	f.Filled.If.Cond = "nResultCode === '1'"
+	f.Filled.If.Goto.Next = resumeURL
+	f.Filled.If.Else.Log.Value.Expr = "nResultCode"
+
+	l := Log{Text: "Digits Value:: "}
+	l.Value = append(l.Value, Value{Expr: "Digits"})
+	f.Filled.Log = append(f.Filled.Log, l)
+
+	l = Log{Text: "Recieveddtmf:: "}
+	l.Value = append(l.Value, Value{Expr: "recieveddtmf"})
+	f.Filled.Log = append(f.Filled.Log, l)
+
+	l = Log{Text: "ExecuteVXML:: "}
+	l.Value = append(l.Value, Value{Expr: "RespJSON"})
+	f.Filled.Log = append(f.Filled.Log, l)
+
+	l = Log{Text: "Response Code:: "}
+	l.Value = append(l.Value, Value{Expr: "nResultCode"})
+	f.Filled.Log = append(f.Filled.Log, l)
+
+	return f
 }
 
 func init() {
@@ -134,7 +276,7 @@ func (c *client) HangupCall(client *http.Client, callIWriteErrorResponseD string
 func (c *client) InputForRequest(r *http.Request) (string, utils.Attachment, error) {
 	// TODO
 	println("InputForRequest")
-	return "", ivr.NilAttachment, errors.Errorf("unknown wait_type: %s", "")
+	return r.Form.Get("recieveddtmf"), utils.Attachment(""), nil
 }
 
 func (c *client) PreprocessResume(ctx context.Context, db *sqlx.DB, rp *redis.Pool, conn *models.ChannelConnection, r *http.Request) ([]byte, error) {
@@ -152,6 +294,10 @@ func (c *client) RequestCall(client *http.Client, number urns.URN, callbackURL s
 		VxmlURL:  callbackURL,
 		EventURL: statusURL,
 	}
+
+	println("REQUEST CALL")
+	println(callbackURL)
+	println(statusURL)
 
 	resp, err := c.makeRequest(client, http.MethodPost, c.sendURL, callRequest)
 
@@ -218,7 +364,6 @@ func (c *client) URNForRequest(r *http.Request) (urns.URN, error) {
 
 // ValidateRequestSignature validates the signature on the passed in request, returning an error if it is invaled
 func (c *client) ValidateRequestSignature(r *http.Request) error {
-	println("ValidateRequestSignature")
 	return nil
 }
 
@@ -231,14 +376,98 @@ func (c *client) WriteEmptyResponse(w http.ResponseWriter, msg string) error {
 
 // WriteErrorResponse writes an error / unavailable response
 func (c *client) WriteErrorResponse(w http.ResponseWriter, err error) error {
-	// TODO
-	println("WriteErrorResponse")
+	r := VXMLDocument(Hangup{})
+
+	body, err := xml.Marshal(r)
+	if err != nil {
+		return err
+	}
+	_, err = w.Write([]byte(xml.Header + string(body)))
+	return err
+}
+
+// WriteSessionResponse writes a VXML response for the events in the passed in session
+func (c *client) WriteSessionResponse(session *models.Session, resumeURL string, r *http.Request, w http.ResponseWriter) error {
+	// for errored sessions we should just output our error body
+	if session.Status() == models.SessionStatusErrored {
+		return errors.Errorf("cannot write IVR response for errored session")
+	}
+
+	// otherwise look for any say events
+	sprint := session.Sprint()
+	if sprint == nil {
+		return errors.Errorf("cannot write IVR response for session with no sprint")
+	}
+
+	// get our response
+	response, err := responseForSprint(resumeURL, session.Wait(), sprint.Events())
+	if err != nil {
+		return errors.Wrap(err, "unable to build response for IVR call")
+	}
+
+	_, err = w.Write([]byte(response))
+	if err != nil {
+		return errors.Wrap(err, "error writing IVR response")
+	}
+
 	return nil
 }
 
-// WriteSessionResponse writes a TWIML response for the events in the passed in session
-func (c *client) WriteSessionResponse(session *models.Session, resumeURL string, r *http.Request, w http.ResponseWriter) error {
-	// TODO
-	println("WriteSessionResponse")
-	return nil
+func responseForSprint(resumeURL string, w flows.ActivatedWait, es []flows.Event) (string, error) {
+	commands := make([]interface{}, 0)
+
+	for _, e := range es {
+		switch event := e.(type) {
+		case *events.IVRCreatedEvent:
+			if len(event.Msg.Attachments()) == 0 {
+				block := VXMLBlock(event.Msg.Text())
+				commands = append(commands, block)
+			} else {
+				for _, a := range event.Msg.Attachments() {
+					a = models.NormalizeAttachment(a)
+					block := VXMLBlock(Audio{Src: a.URL()})
+					commands = append(commands, block)
+				}
+			}
+		}
+	}
+
+	if w != nil {
+		msgWait, isMsgWait := w.(*waits.ActivatedMsgWait)
+		if !isMsgWait {
+			return "", errors.Errorf("unable to use wait of type: %s in IVR call", w.Type())
+		}
+
+		switch hint := msgWait.Hint().(type) {
+		case *hints.DigitsHint:
+			digits := 1
+			if hint.Count == nil {
+				digits = 30
+			}
+			commands = append(commands, VXMLField(resumeURL, digits))
+		case *hints.AudioHint:
+			// TODO
+			println("AUDIO HINT")
+		default:
+			return "", errors.Errorf("unable to use wait in IVR call, unknow type: %s", msgWait.Hint().Type())
+		}
+	} else {
+		// no wait? call is over, hang up
+		commands = append(commands, Hangup{})
+	}
+
+	r := VXMLDocument(commands)
+	var body []byte
+	var err error
+
+	if indentMarshal {
+		body, err = xml.MarshalIndent(r, "", "  ")
+	} else {
+		body, err = xml.Marshal(r)
+	}
+	if err != nil {
+		return "", errors.Wrap(err, "unable to marshal vxml body")
+	}
+
+	return xml.Header + string(body), nil
 }
