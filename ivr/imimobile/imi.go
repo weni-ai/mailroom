@@ -1,11 +1,11 @@
 package imi
 
 import (
-	"fmt"
 	"bytes"
 	"context"
 	"encoding/json"
 	"encoding/xml"
+	"fmt"
 	"io/ioutil"
 	"net/http"
 	"net/url"
@@ -23,13 +23,12 @@ import (
 	"github.com/nyaruka/mailroom/models"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
+	validator "gopkg.in/go-playground/validator.v9"
 )
 
 const (
-	imiChannelType = models.ChannelType("IMI")
-
-	statusFailed = "1"
-
+	imiChannelType    = models.ChannelType("IMI")
+	statusFailed      = "1"
 	sendURLConfig     = "send_url"
 	phoneNumberConfig = "phone_number"
 	usernameConfig    = "username"
@@ -37,6 +36,7 @@ const (
 )
 
 var indentMarshal = true
+var validate = validator.New()
 
 type client struct {
 	channel         *models.Channel
@@ -88,19 +88,19 @@ type VXMLBase struct {
 
 type Block struct {
 	XMLName string `xml:"block"`
-	Text   string `xml:",chardata"`
-	Prompt struct {
-		XMLName string `xml:"prompt"`
-		Text    string `xml:",chardata"`
-		Bargein bool `xml:"bargein,attr"`
-		Body interface{} `xml:",innerxml"`
+	Text    string `xml:",chardata"`
+	Prompt  struct {
+		XMLName string      `xml:"prompt"`
+		Text    string      `xml:",chardata"`
+		Bargein bool        `xml:"bargein,attr"`
+		Body    interface{} `xml:",innerxml"`
 	}
 }
 
 type Audio struct {
 	XMLName string `xml:"audio"`
-	Text string `xml:",chardata"`
-	Src  string `xml:"src,attr"`
+	Text    string `xml:",chardata"`
+	Src     string `xml:"src,attr"`
 }
 
 type Hangup struct {
@@ -119,7 +119,7 @@ type Value struct {
 }
 
 type Log struct {
-	Text string `xml:",chardata"`
+	Text  string  `xml:",chardata"`
 	Value []Value `xml:"value"`
 }
 
@@ -129,10 +129,10 @@ type Field struct {
 	Name    string `xml:"name,attr"`
 	Type    string `xml:"type,attr"`
 	Filled  struct {
-		Text string `xml:",chardata"`
-		Log []Log `xml:"log"`
+		Text   string   `xml:",chardata"`
+		Log    []Log    `xml:"log"`
 		Assign []Assign `xml:"assign"`
-		Data struct {
+		Data   struct {
 			Text     string `xml:",chardata"`
 			Name     string `xml:"name,attr"`
 			Src      string `xml:"src,attr"`
@@ -160,6 +160,32 @@ type Field struct {
 			} `xml:"else"`
 		} `xml:"if"`
 	} `xml:"filled"`
+}
+
+type StatusRequest struct {
+	XMLName  xml.Name `xml:"evt-notification"`
+	Text     string   `xml:",chardata"`
+	EvtID    string   `xml:"evt-id"`
+	EvtDate  string   `xml:"evt-date"`
+	EvtSeqno string   `xml:"evt-seqno"`
+	EvtInfo  struct {
+		Text          string `xml:",chardata"`
+		Tid           string `xml:"tid"`
+		Sid           string `xml:"sid"`
+		Src           string `xml:"src"`
+		Ani           string `xml:"ani"`
+		Dnis          string `xml:"dnis"`
+		CorrelationID string `xml:"correlationid"`
+		OfferedOn     string `xml:"offered-on"`
+		XParams       struct {
+			Text   string `xml:",chardata"`
+			XParam struct {
+				Text  string `xml:",chardata"`
+				Name  string `xml:"name,attr"`
+				Value string `xml:"value,attr"`
+			} `xml:"x-param"`
+		} `xml:"x-params"`
+	} `xml:"evt-info"`
 }
 
 func VXMLDocument(body interface{}) VXMLBase {
@@ -255,10 +281,32 @@ func NewClientFromChannel(channel *models.Channel) (ivr.Client, error) {
 	}, nil
 }
 
+func readBody(r *http.Request) ([]byte, error) {
+	if r.Body == http.NoBody {
+		return nil, nil
+	}
+	body, err := ioutil.ReadAll(r.Body)
+	if err != nil {
+		return nil, nil
+	}
+	r.Body = ioutil.NopCloser(bytes.NewBuffer(body))
+	return body, nil
+}
+
 func (c *client) CallIDForRequest(r *http.Request) (string, error) {
-	// TODO
-	println("CallIDForRequest")
-	return "", nil
+	body, err := readBody(r)
+	status := &StatusRequest{}
+	err = xml.Unmarshal(body, status)
+
+	if err != nil {
+		return "", errors.Wrapf(err, "error reading body from request")
+	}
+
+	callID := status.EvtInfo.CorrelationID
+	if callID == "" {
+		return "", errors.Errorf("no uuid set on call")
+	}
+	return callID, nil
 }
 
 func (c *client) DownloadMedia(url string) (*http.Response, error) {
@@ -267,37 +315,40 @@ func (c *client) DownloadMedia(url string) (*http.Response, error) {
 
 // HangupCall asks IMIMobile to hang up the call that is passed in
 func (c *client) HangupCall(client *http.Client, callIWriteErrorResponseD string) error {
-	// TODO
-	println("HangupCall")
 	return nil
 }
 
 // InputForRequest returns the input for the passed in request, if any
 func (c *client) InputForRequest(r *http.Request) (string, utils.Attachment, error) {
-	// TODO
-	println("InputForRequest")
 	return r.Form.Get("recieveddtmf"), utils.Attachment(""), nil
 }
 
 func (c *client) PreprocessResume(ctx context.Context, db *sqlx.DB, rp *redis.Pool, conn *models.ChannelConnection, r *http.Request) ([]byte, error) {
-	println("PreprocessResume")
 	return nil, nil
 }
 
 // RequestCall causes this client to request a new outgoing call for this provider
 func (c *client) RequestCall(client *http.Client, number urns.URN, callbackURL string, statusURL string) (ivr.CallID, error) {
 	url, _ := url.Parse(callbackURL)
+	conn := url.Query().Get("connection")
+	to := formatPhoneNumber(number.Path())
+	from := formatPhoneNumber(c.channel.Address())
+
 	callRequest := &CallRequest{
-		TransID:  url.Query().Get("connection"),
-		To:       formatPhoneNumber(number.Path()),
-		From:     formatPhoneNumber(c.channel.Address()),
+		TransID:  conn,
+		To:       to,
+		From:     from,
 		VxmlURL:  callbackURL,
 		EventURL: statusURL,
 	}
 
-	println("REQUEST CALL")
-	println(callbackURL)
-	println(statusURL)
+	logrus.WithFields(logrus.Fields{
+		"VxmlURL":  callbackURL,
+		"EventURL": statusURL,
+		"TransID":  conn,
+		"To":       to,
+		"From":     from,
+	}).Info("IMIMobile request call")
 
 	resp, err := c.makeRequest(client, http.MethodPost, c.sendURL, callRequest)
 
@@ -310,7 +361,6 @@ func (c *client) RequestCall(client *http.Client, number urns.URN, callbackURL s
 	}
 
 	body, err := ioutil.ReadAll(resp.Body)
-
 	if err != nil {
 		return ivr.NilCallID, errors.Wrapf(err, "error reading response body")
 	}
@@ -326,7 +376,6 @@ func (c *client) RequestCall(client *http.Client, number urns.URN, callbackURL s
 	}
 
 	logrus.WithField("body", string(body)).WithField("status", resp.StatusCode).Debug("requested call")
-
 	return ivr.CallID(call.TransID), nil
 }
 
@@ -351,14 +400,39 @@ func (c *client) makeRequest(client *http.Client, method string, sendURL string,
 
 // StatusForRequest returns the current call status for the passed in status (and optional duration if known)
 func (c *client) StatusForRequest(r *http.Request) (models.ConnectionStatus, int) {
-	// TODO
-	println("StatusForRequest")
-	return models.ConnectionStatusInProgress, 0
+	if r.Form.Get("action") == "resume" {
+		return models.ConnectionStatusInProgress, 0
+	}
+
+	status := &StatusRequest{}
+	body, err := readBody(r)
+	err = xml.Unmarshal(body, status)
+
+	if err != nil {
+		logrus.WithError(err).Error("error reading status request body")
+		return models.ConnectionStatusErrored, 0
+	}
+
+	switch status.EvtID {
+	case "offer":
+		return models.ConnectionStatusWired, 0
+
+	case "accept", "answer":
+		return models.ConnectionStatusInProgress, 0
+
+	case "release":
+		return models.ConnectionStatusCompleted, 0
+
+	case "drop", "disconnect":
+		return models.ConnectionStatusErrored, 0
+
+	default:
+		logrus.WithField("call_status", status).Error("unknown call status in ivr callback")
+		return models.ConnectionStatusFailed, 0
+	}
 }
 
 func (c *client) URNForRequest(r *http.Request) (urns.URN, error) {
-	// TODO
-	println("URNForRequest")
 	return "", nil
 }
 
@@ -369,15 +443,21 @@ func (c *client) ValidateRequestSignature(r *http.Request) error {
 
 // WriteEmptyResponse writes an empty (but valid) response
 func (c *client) WriteEmptyResponse(w http.ResponseWriter, msg string) error {
-	// TODO
-	println("WriteEmptyResponse")
-	return nil
+	msgBody := map[string]string{
+		"description": msg,
+	}
+	body, err := json.Marshal(msgBody)
+	if err != nil {
+		return errors.Wrapf(err, "error marshalling imi message")
+	}
+
+	_, err = w.Write(body)
+	return err
 }
 
 // WriteErrorResponse writes an error / unavailable response
 func (c *client) WriteErrorResponse(w http.ResponseWriter, err error) error {
 	r := VXMLDocument(Hangup{})
-
 	body, err := xml.Marshal(r)
 	if err != nil {
 		return err
