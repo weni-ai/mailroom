@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"net/url"
 	"regexp"
+	"strings"
 
 	"github.com/gomodule/redigo/redis"
 	"github.com/jmoiron/sqlx"
@@ -235,23 +236,23 @@ func VXMLField(resumeURL string, digits int) Field {
 	f.Filled.Assign = append(f.Filled.Assign, Assign{Name: "recieveddtmf", Expr: "Digits"})
 	f.Filled.Assign = append(f.Filled.Assign, Assign{Name: "nResultCode", Expr: "JSON.parse(RespJSON).result"})
 
-	f.Filled.If.Cond = "nResultCode === '1'"
+	f.Filled.If.Cond = "nResultCode === 1"
 	f.Filled.If.Goto.Next = resumeURL
 	f.Filled.If.Else.Log.Value.Expr = "nResultCode"
 
-	l := Log{Text: "Digits Value:: "}
+	l := Log{Text: "Digits Value::"}
 	l.Value = append(l.Value, Value{Expr: "Digits"})
 	f.Filled.Log = append(f.Filled.Log, l)
 
-	l = Log{Text: "Recieveddtmf:: "}
+	l = Log{Text: "Recieveddtmf::"}
 	l.Value = append(l.Value, Value{Expr: "recieveddtmf"})
 	f.Filled.Log = append(f.Filled.Log, l)
 
-	l = Log{Text: "ExecuteVXML:: "}
+	l = Log{Text: "ExecuteVXML::"}
 	l.Value = append(l.Value, Value{Expr: "RespJSON"})
 	f.Filled.Log = append(f.Filled.Log, l)
 
-	l = Log{Text: "Response Code:: "}
+	l = Log{Text: "Response Code::"}
 	l.Value = append(l.Value, Value{Expr: "nResultCode"})
 	f.Filled.Log = append(f.Filled.Log, l)
 
@@ -549,5 +550,23 @@ func responseForSprint(resumeURL string, w flows.ActivatedWait, es []flows.Event
 		return "", errors.Wrap(err, "unable to marshal vxml body")
 	}
 
-	return xml.Header + string(body), nil
+	vxml := xml.Header + string(body)
+
+	re, err := regexp.Compile(`<\w+( \w+="[\w.#]*")*><(\\|\/)\w+>`)
+	matches := re.FindAllString(vxml, -1)
+
+	if len(matches) > 0 {
+		re, err = regexp.Compile(`<\w+( \w+="[\w.#]*")*>`)
+		for i := 0; i < len(matches); i++ {
+
+			xmlTag := re.FindString(matches[i])
+			xmlTag = strings.Replace(xmlTag, "<", "", -1)
+			xmlTag = strings.Replace(xmlTag, ">", "", -1)
+			vxml = strings.Replace(vxml, matches[i], "<"+xmlTag+" />", -1)
+
+		}
+	}
+	vxml = strings.Replace(vxml, "nResultCode === 1", "nResultCode === '1'", -1)
+
+	return vxml, nil
 }
