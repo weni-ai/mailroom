@@ -38,6 +38,21 @@ const (
 
 var indentMarshal = true
 var validate = validator.New()
+var vxmlResultField = `<log> Digits Value <value expr="Digits" /></log><assign expr="Digits" name="recieveddtmf"  /><log> recieveddtmf :: <value expr="recieveddtmf" /></log><data name="RespJSON" src="%s" namelist="recieveddtmf" method="post" enctype="application/json" /><log> ExecuteVXML :: <value expr="RespJSON" /></log><assign expr="JSON.parse(RespJSON).result" name="nResultCode" /><log>   Response Code:      <value expr="nResultCode" /></log><if cond="nResultCode === '1'"><log>Success Response Code Received. Moving to Next VXML</log><goto next="%s" /><else><log>  Invalid Response Code Received:: <value expr="nResultCode" /></log></else></if>`
+
+type ContentMapping struct {
+	Encoded string
+	Decoded string
+}
+
+var contentMappings = []ContentMapping{
+	{Encoded: `&#34;`, Decoded: `"`},
+	{Encoded: `&lt;`, Decoded: `<`},
+	{Encoded: `&gt;`, Decoded: `>`},
+	{Encoded: `&#39;`, Decoded: `'`},
+	{Encoded: `&#xA;`, Decoded: ``},
+	{Encoded: `&#x9;`, Decoded: ``},
+}
 
 type client struct {
 	channel         *models.Channel
@@ -119,48 +134,12 @@ type Value struct {
 	Expr string `xml:"expr,attr"`
 }
 
-type Log struct {
-	Text  string  `xml:",chardata"`
-	Value []Value `xml:"value"`
-}
-
 type Field struct {
 	XMLName string `xml:"field"`
-	Text    string `xml:",chardata"`
+	Text    string `xml:",innerxml"`
 	Name    string `xml:"name,attr"`
 	Type    string `xml:"type,attr"`
-	Filled  struct {
-		Text   string   `xml:",chardata"`
-		Log    []Log    `xml:"log"`
-		Assign []Assign `xml:"assign"`
-		Data   struct {
-			Text     string `xml:",chardata"`
-			Name     string `xml:"name,attr"`
-			Src      string `xml:"src,attr"`
-			Namelist string `xml:"namelist,attr"`
-			Method   string `xml:"method,attr"`
-			Enctype  string `xml:"enctype,attr"`
-		} `xml:"data"`
-		If struct {
-			Text string   `xml:",chardata"`
-			Cond string   `xml:"cond,attr"`
-			Log  []string `xml:"log"`
-			Goto struct {
-				Text string `xml:",chardata"`
-				Next string `xml:"next,attr"`
-			} `xml:"goto"`
-			Else struct {
-				Text string `xml:",chardata"`
-				Log  struct {
-					Text  string `xml:",chardata"`
-					Value struct {
-						Text string `xml:",chardata"`
-						Expr string `xml:"expr,attr"`
-					} `xml:"value"`
-				} `xml:"log"`
-			} `xml:"else"`
-		} `xml:"if"`
-	} `xml:"filled"`
+	Body    string `xml:"filled"`
 }
 
 type StatusRequest struct {
@@ -195,8 +174,6 @@ func VXMLDocument(body interface{}) VXMLBase {
 	v.Form.ID = "AcceptDigits"
 
 	p := make([]VXMLProperty, 0)
-	p = append(p, VXMLProperty{Name: "confidencelevel", Value: "0.5"})
-	p = append(p, VXMLProperty{Name: "maxage", Value: "30"})
 	p = append(p, VXMLProperty{Name: "inputmodes", Value: "dtmf"})
 	p = append(p, VXMLProperty{Name: "interdigittimeout", Value: "12s"})
 	p = append(p, VXMLProperty{Name: "timeout", Value: "12s"})
@@ -205,7 +182,6 @@ func VXMLDocument(body interface{}) VXMLBase {
 
 	va := make([]VXMLVar, 0)
 	va = append(va, VXMLVar{Name: "recieveddtmf"})
-	va = append(va, VXMLVar{Name: "ExecuteVXML"})
 	v.Var = va
 
 	va = make([]VXMLVar, 0)
@@ -225,36 +201,12 @@ func VXMLBlock(body interface{}) Block {
 	return b
 }
 
-func VXMLField(resumeURL string, digits int) Field {
-	f := Field{Name: "Digits", Type: fmt.Sprintf("%s?length=%d", "digits", digits)}
-	f.Filled.Data.Name = "RespJSON"
-	f.Filled.Data.Src = resumeURL
-	f.Filled.Data.Namelist = "namelist"
-	f.Filled.Data.Method = http.MethodPost
-	f.Filled.Data.Enctype = "application/json"
-
-	f.Filled.Assign = append(f.Filled.Assign, Assign{Name: "recieveddtmf", Expr: "Digits"})
-	f.Filled.Assign = append(f.Filled.Assign, Assign{Name: "nResultCode", Expr: "JSON.parse(RespJSON).result"})
-
-	f.Filled.If.Cond = "nResultCode === 1"
-	f.Filled.If.Goto.Next = resumeURL
-	f.Filled.If.Else.Log.Value.Expr = "nResultCode"
-
-	l := Log{Text: "Digits Value::"}
-	l.Value = append(l.Value, Value{Expr: "Digits"})
-	f.Filled.Log = append(f.Filled.Log, l)
-
-	l = Log{Text: "Recieveddtmf::"}
-	l.Value = append(l.Value, Value{Expr: "recieveddtmf"})
-	f.Filled.Log = append(f.Filled.Log, l)
-
-	l = Log{Text: "ExecuteVXML::"}
-	l.Value = append(l.Value, Value{Expr: "RespJSON"})
-	f.Filled.Log = append(f.Filled.Log, l)
-
-	l = Log{Text: "Response Code::"}
-	l.Value = append(l.Value, Value{Expr: "nResultCode"})
-	f.Filled.Log = append(f.Filled.Log, l)
+func VXMLField(body string, digits int) Field {
+	f := Field{
+		Name: "Digits",
+		Type: fmt.Sprintf("%s?length=%d", "digits", digits),
+	}
+	f.Body = body
 
 	return f
 }
@@ -525,7 +477,9 @@ func responseForSprint(resumeURL string, w flows.ActivatedWait, es []flows.Event
 			if hint.Count == nil {
 				digits = 30
 			}
-			commands = append(commands, VXMLField(resumeURL, digits))
+
+			field := VXMLField(string(fmt.Sprintf(vxmlResultField, resumeURL, resumeURL)), digits)
+			commands = append(commands, field)
 		case *hints.AudioHint:
 			// TODO
 			println("AUDIO HINT")
@@ -566,7 +520,10 @@ func responseForSprint(resumeURL string, w flows.ActivatedWait, es []flows.Event
 
 		}
 	}
-	vxml = strings.Replace(vxml, "nResultCode === 1", "nResultCode === '1'", -1)
+
+	for _, mapping := range contentMappings {
+		vxml = strings.ReplaceAll(vxml, mapping.Encoded, mapping.Decoded)
+	}
 
 	return vxml, nil
 }
