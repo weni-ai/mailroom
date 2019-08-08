@@ -20,6 +20,7 @@ import (
 	"github.com/nyaruka/goflow/flows/routers/waits"
 	"github.com/nyaruka/goflow/flows/routers/waits/hints"
 	"github.com/nyaruka/goflow/utils"
+	"github.com/nyaruka/mailroom"
 	"github.com/nyaruka/mailroom/ivr"
 	"github.com/nyaruka/mailroom/models"
 	"github.com/pkg/errors"
@@ -36,9 +37,10 @@ const (
 	passwordConfig    = "password"
 )
 
-var indentMarshal = true
+var indentMarshal = false
 var validate = validator.New()
-var vxmlResultField = `<log> Digits Value <value expr="Digits" /></log><assign expr="Digits" name="recieveddtmf"  /><log> recieveddtmf :: <value expr="recieveddtmf" /></log><data name="RespJSON" src="%s" namelist="recieveddtmf" method="post" enctype="application/json" /><log> ExecuteVXML :: <value expr="RespJSON" /></log><assign expr="JSON.parse(RespJSON).result" name="nResultCode" /><log>   Response Code:      <value expr="nResultCode" /></log><if cond="nResultCode === '1'"><log>Success Response Code Received. Moving to Next VXML</log><goto next="%s" /><else><log>  Invalid Response Code Received:: <value expr="nResultCode" /></log></else></if>`
+var vxmlResultField = `<log> Digits Value <value expr="Digits" /></log><assign expr="Digits" name="recieveddtmf"  /><log> recieveddtmf :: <value expr="recieveddtmf" /></log><data name="RespJSON" src="%s" namelist="recieveddtmf" method="post" enctype="application/json" /><log> ExecuteVXML :: <value expr="RespJSON" /></log><assign expr="JSON.parse(RespJSON).result" name="nResultCode" /><log>   Response Code:      <value expr="nResultCode" /></log><if cond="nResultCode === '1'"><log>This is get method API</log><log>Success Response Code Received. Moving to Next VXML</log><goto next="%s" /><else><log>  Invalid Response Code Received:: <value expr="nResultCode" /></log></else></if>`
+var rc = redis.Pool{}
 
 type ContentMapping struct {
 	Encoded string
@@ -174,6 +176,8 @@ func VXMLDocument(body interface{}) VXMLBase {
 	v.Form.ID = "AcceptDigits"
 
 	p := make([]VXMLProperty, 0)
+	p = append(p, VXMLProperty{Name: "confidencelevel", Value: "0.5"})
+	p = append(p, VXMLProperty{Name: "maxage", Value: "30"})
 	p = append(p, VXMLProperty{Name: "inputmodes", Value: "dtmf"})
 	p = append(p, VXMLProperty{Name: "interdigittimeout", Value: "12s"})
 	p = append(p, VXMLProperty{Name: "timeout", Value: "12s"})
@@ -182,6 +186,7 @@ func VXMLDocument(body interface{}) VXMLBase {
 
 	va := make([]VXMLVar, 0)
 	va = append(va, VXMLVar{Name: "recieveddtmf"})
+	va = append(va, VXMLVar{Name: "ExecuteVXML"})
 	v.Var = va
 
 	va = make([]VXMLVar, 0)
@@ -213,6 +218,12 @@ func VXMLField(body string, digits int) Field {
 
 func init() {
 	ivr.RegisterClientType(imiChannelType, NewClientFromChannel)
+	mailroom.AddInitFunction(StartRedisPool)
+}
+
+func StartRedisPool(mr *mailroom.Mailroom) error {
+	rc = *mr.RP
+	return nil
 }
 
 func NewClientFromChannel(channel *models.Channel) (ivr.Client, error) {
@@ -277,6 +288,15 @@ func (c *client) InputForRequest(r *http.Request) (string, utils.Attachment, err
 }
 
 func (c *client) PreprocessResume(ctx context.Context, db *sqlx.DB, rp *redis.Pool, conn *models.ChannelConnection, r *http.Request) ([]byte, error) {
+	connection := r.URL.Query().Get("connection")
+
+	vxmlKey := fmt.Sprintf("imimobile_call_%s", connection)
+	vxmlResponse, _ := redis.String(rc.Get().Do("GET", vxmlKey))
+
+	if vxmlResponse != "" && r.Method == "GET" {
+		return []byte(vxmlResponse), nil
+	}
+
 	return nil, nil
 }
 
@@ -433,12 +453,45 @@ func (c *client) WriteSessionResponse(session *models.Session, resumeURL string,
 	}
 
 	// get our response
-	response, err := responseForSprint(resumeURL, session.Wait(), sprint.Events())
+	// url, _ := url.Parse(resumeURL)
+	// conn := url.Query().Get("connection")
+
+	// vxmlKey := fmt.Sprintf("imimobile_call_%s", conn)
+	// vxmlResponse, _ := redis.String(rc.Get().Do("GET", vxmlKey))
+
+	// if vxmlResponse != "" && r.Method == "GET" {
+	// 	_, err := w.Write([]byte(vxmlResponse))
+	// 	if err != nil {
+	// 		return errors.Wrap(err, "unable to get response for IVR call in cache")
+	// 	}
+	// 	return nil
+	// }
+
+	url, _ := url.Parse(resumeURL)
+	conn := url.Query().Get("connection")
+	vxmlKey := fmt.Sprintf("imimobile_call_%s", conn)
+
+	responseToSave, err := responseForSprint(resumeURL, session.Wait(), sprint.Events())
+	rc.Get().Do("SET", vxmlKey, string(responseToSave))
+
 	if err != nil {
 		return errors.Wrap(err, "unable to build response for IVR call")
 	}
 
-	_, err = w.Write([]byte(response))
+	recieveddtmf := r.Form.Get("recieveddtmf")
+	if recieveddtmf != "" {
+		msgBody := map[string]string{
+			"result": "1",
+		}
+		msgResponse, _ := json.Marshal(msgBody)
+		response := string(msgResponse)
+
+		_, err = w.Write([]byte(response))
+		return nil
+	}
+
+	_, err = w.Write([]byte(responseToSave))
+
 	if err != nil {
 		return errors.Wrap(err, "error writing IVR response")
 	}
@@ -495,11 +548,12 @@ func responseForSprint(resumeURL string, w flows.ActivatedWait, es []flows.Event
 	var body []byte
 	var err error
 
-	if indentMarshal {
-		body, err = xml.MarshalIndent(r, "", "  ")
-	} else {
-		body, err = xml.Marshal(r)
-	}
+	// if indentMarshal {
+	// 	body, err = xml.MarshalIndent(r, "", "  ")
+	// } else {
+	//
+	body, err = xml.Marshal(r)
+	// }
 	if err != nil {
 		return "", errors.Wrap(err, "unable to marshal vxml body")
 	}
