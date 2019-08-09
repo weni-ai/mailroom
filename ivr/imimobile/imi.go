@@ -548,32 +548,32 @@ func responseForSprint(resumeURL string, w flows.ActivatedWait, es []flows.Event
 	var body []byte
 	var err error
 
-	// if indentMarshal {
-	// 	body, err = xml.MarshalIndent(r, "", "  ")
-	// } else {
-	//
-	body, err = xml.Marshal(r)
-	// }
+	if indentMarshal {
+		body, err = xml.MarshalIndent(r, "", "  ")
+	} else {
+	
+		body, err = xml.Marshal(r)
+	}
 	if err != nil {
 		return "", errors.Wrap(err, "unable to marshal vxml body")
 	}
 
 	vxml := xml.Header + string(body)
 
-	re, err := regexp.Compile(`<\w+( \w+="[\w.#]*")*><(\\|\/)\w+>`)
-	matches := re.FindAllString(vxml, -1)
+	// re, err := regexp.Compile(`<\w+( \w+="[\w.#]*")*><(\\|\/)\w+>`)
+	// matches := re.FindAllString(vxml, -1)
 
-	if len(matches) > 0 {
-		re, err = regexp.Compile(`<\w+( \w+="[\w.#]*")*>`)
-		for i := 0; i < len(matches); i++ {
+	// if len(matches) > 0 {
+	// 	re, err = regexp.Compile(`<\w+( \w+="[\w.#]*")*>`)
+	// 	for i := 0; i < len(matches); i++ {
 
-			xmlTag := re.FindString(matches[i])
-			xmlTag = strings.Replace(xmlTag, "<", "", -1)
-			xmlTag = strings.Replace(xmlTag, ">", "", -1)
-			vxml = strings.Replace(vxml, matches[i], "<"+xmlTag+" />", -1)
+	// 		xmlTag := re.FindString(matches[i])
+	// 		xmlTag = strings.Replace(xmlTag, "<", "", -1)
+	// 		xmlTag = strings.Replace(xmlTag, ">", "", -1)
+	// 		vxml = strings.Replace(vxml, matches[i], "<"+xmlTag+" />", -1)
 
-		}
-	}
+	// 	}
+	// }
 
 	for _, mapping := range contentMappings {
 		vxml = strings.ReplaceAll(vxml, mapping.Encoded, mapping.Decoded)
