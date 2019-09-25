@@ -393,10 +393,10 @@ func (c *client) StatusForRequest(r *http.Request) (models.ConnectionStatus, int
 	case "accept", "answer":
 		return models.ConnectionStatusInProgress, 0
 
-	case "release":
+	case "drop", "release":
 		return models.ConnectionStatusCompleted, 0
 
-	case "drop", "disconnect":
+	case "disconnect":
 		return models.ConnectionStatusErrored, 0
 
 	default:
