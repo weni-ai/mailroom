@@ -40,7 +40,7 @@ const (
 var indentMarshal = false
 var validate = validator.New()
 var vxmlResultField = `<log> Digits Value <value expr="Digits" /></log><assign expr="Digits" name="recieveddtmf"  /><log> recieveddtmf :: <value expr="recieveddtmf" /></log><data name="RespJSON" src="%s" namelist="recieveddtmf" method="post" enctype="application/json" /><log> ExecuteVXML :: <value expr="RespJSON" /></log><assign expr="JSON.parse(RespJSON).result" name="nResultCode" /><log>   Response Code:      <value expr="nResultCode" /></log><if cond="nResultCode === '1'"><log>This is get method API</log><log>Success Response Code Received. Moving to Next VXML</log><goto next="%s" /><else><log>  Invalid Response Code Received:: <value expr="nResultCode" /></log></else></if>`
-var rc = redis.Pool{}
+var rp = redis.Pool{}
 
 type ContentMapping struct {
 	Encoded string
@@ -222,7 +222,7 @@ func init() {
 }
 
 func StartRedisPool(mr *mailroom.Mailroom) error {
-	rc = *mr.RP
+	rp = *mr.RP
 	return nil
 }
 
@@ -291,7 +291,8 @@ func (c *client) PreprocessResume(ctx context.Context, db *sqlx.DB, rp *redis.Po
 	connection := r.URL.Query().Get("connection")
 
 	vxmlKey := fmt.Sprintf("imimobile_call_%s", connection)
-	vxmlResponse, _ := redis.String(rc.Get().Do("GET", vxmlKey))
+	rc := rp.Get()
+	vxmlResponse, _ := redis.String(rc.Do("GET", vxmlKey))
 	defer rc.Close()
 
 	if vxmlResponse != "" && r.Method == "GET" {
@@ -473,7 +474,8 @@ func (c *client) WriteSessionResponse(session *models.Session, resumeURL string,
 	vxmlKey := fmt.Sprintf("imimobile_call_%s", conn)
 
 	responseToSave, err := responseForSprint(resumeURL, session.Wait(), sprint.Events())
-	rc.Get().Do("SET", vxmlKey, string(responseToSave))
+	rc := rp.Get()
+	rc.Do("SET", vxmlKey, string(responseToSave))
 	defer rc.Close()
 
 	if err != nil {
