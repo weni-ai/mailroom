@@ -292,6 +292,7 @@ func (c *client) PreprocessResume(ctx context.Context, db *sqlx.DB, rp *redis.Po
 
 	vxmlKey := fmt.Sprintf("imimobile_call_%s", connection)
 	vxmlResponse, _ := redis.String(rc.Get().Do("GET", vxmlKey))
+	defer rc.Close()
 
 	if vxmlResponse != "" && r.Method == "GET" {
 		return []byte(vxmlResponse), nil
@@ -473,6 +474,7 @@ func (c *client) WriteSessionResponse(session *models.Session, resumeURL string,
 
 	responseToSave, err := responseForSprint(resumeURL, session.Wait(), sprint.Events())
 	rc.Get().Do("SET", vxmlKey, string(responseToSave))
+	defer rc.Close()
 
 	if err != nil {
 		return errors.Wrap(err, "unable to build response for IVR call")
