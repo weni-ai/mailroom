@@ -454,21 +454,6 @@ func (c *client) WriteSessionResponse(session *models.Session, resumeURL string,
 		return errors.Errorf("cannot write IVR response for session with no sprint")
 	}
 
-	// get our response
-	// url, _ := url.Parse(resumeURL)
-	// conn := url.Query().Get("connection")
-
-	// vxmlKey := fmt.Sprintf("imimobile_call_%s", conn)
-	// vxmlResponse, _ := redis.String(rc.Get().Do("GET", vxmlKey))
-
-	// if vxmlResponse != "" && r.Method == "GET" {
-	// 	_, err := w.Write([]byte(vxmlResponse))
-	// 	if err != nil {
-	// 		return errors.Wrap(err, "unable to get response for IVR call in cache")
-	// 	}
-	// 	return nil
-	// }
-
 	url, _ := url.Parse(resumeURL)
 	conn := url.Query().Get("connection")
 	vxmlKey := fmt.Sprintf("imimobile_call_%s", conn)
@@ -563,21 +548,6 @@ func responseForSprint(resumeURL string, w flows.ActivatedWait, es []flows.Event
 	}
 
 	vxml := xml.Header + string(body)
-
-	// re, err := regexp.Compile(`<\w+( \w+="[\w.#]*")*><(\\|\/)\w+>`)
-	// matches := re.FindAllString(vxml, -1)
-
-	// if len(matches) > 0 {
-	// 	re, err = regexp.Compile(`<\w+( \w+="[\w.#]*")*>`)
-	// 	for i := 0; i < len(matches); i++ {
-
-	// 		xmlTag := re.FindString(matches[i])
-	// 		xmlTag = strings.Replace(xmlTag, "<", "", -1)
-	// 		xmlTag = strings.Replace(xmlTag, ">", "", -1)
-	// 		vxml = strings.Replace(vxml, matches[i], "<"+xmlTag+" />", -1)
-
-	// 	}
-	// }
 
 	for _, mapping := range contentMappings {
 		vxml = strings.ReplaceAll(vxml, mapping.Encoded, mapping.Decoded)
