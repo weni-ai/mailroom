@@ -1,3 +1,460 @@
+v5.5.17
+----------
+ * Send email when reopening mailgun ticket
+
+v5.5.16
+----------
+ * Implement closing of tickets in zendesk from mailroom
+
+v5.5.15
+----------
+ * Send close notification emails in mailgun tickets
+ * Reply back to users who replies aren't permitted to go to the ticket
+ * Simplify sharing of HTTP configuration between services
+ * Add simulator ticket service to fake creating tickets
+ * Fix verifying sender when receiving mailgun reply
+
+v5.5.14
+----------
+ * Basic handling of tickets (mailgun and zendesk ticketer types)
+
+v5.5.13
+----------
+ * Update to goflow v0.85.0
+ * Use go 1.14 and do some minor dep updatse
+ * Bump max request bytes to 32MB for web server
+ * Implement hooks for status modifier events
+
+v5.5.12
+----------
+ * Update to goflow v0.83.1
+
+v5.5.11
+----------
+ * Update to goflow v0.83.0
+ * Don't blow up if flow is deleted during simulation
+
+v5.5.10
+----------
+ * Update to goflow v0.82.0
+ * Populate flows_flowstart.start_type
+
+v5.5.9
+----------
+ * Set org on new flow starts
+ * Allow for seeded UUID generation in testing environments with -uuid-seed switch
+ * Set language attribute from ivr_created_event on TwiML say action
+
+v5.5.8
+----------
+ * Update flow start modified_on when making changes
+ * Add method to set modified_by on contacts
+
+v5.5.7
+----------
+ * Update to latest goflow v0.81.0
+
+v5.5.6
+----------
+ * Update to latest goflow v0.79.1
+
+v5.5.5
+----------
+ * Update mailroom test db
+ * Only Prometheus group can access metrics
+
+v5.5.4
+----------
+ * Drop no longer used validate_with_org_id param on inspect endpoint
+ * Add endpoints to export and import PO files from flows
+
+v5.5.3
+----------
+ * Add decode_html Excellent function
+
+v5.5.2
+----------
+ * Change to using basic auth for org specific prom metrics endpoint
+
+v5.5.1
+----------
+ * Update to latest goflow v0.78.0
+
+v5.5.0
+----------
+ * Add prometheus endpoint for org level metrics
+
+v5.4.4
+----------
+ * Update to latest goflow v0.77.4
+
+v5.4.3
+----------
+ * Update to goflow v0.77.1
+
+v5.4.2
+----------
+ * Add noop handler for failure events
+ * Update to latest goflow v0.77.0
+
+v5.4.1
+----------
+ * Fix @legacy_extra NPE on router operands
+
+v5.4.0
+----------
+ * Touch readme for 5.4 release
+
+v5.3.44
+----------
+ * Update to goflow v0.76.2
+
+v5.3.43
+----------
+ * Update to goflow v0.76.1
+
+v5.3.42
+----------
+ * Contact search endpoint should also return whether query can be used as group
+
+v5.3.41
+----------
+ * Update to goflow v0.76.0
+ * Add support for searching by group
+
+v5.3.40
+----------
+ * Update to goflow v0.74.0
+
+v5.3.39
+----------
+ * Update to goflow v0.72.2
+ * Add modify contact endpoint
+ * Refactor hooks to allow session-less use
+
+v5.3.38
+----------
+ * Update to goflow v0.72.0
+
+v5.3.37
+----------
+ * Better asset caching
+ * Convert flow and expression endpoint testing to be snapshot based
+
+v5.3.36
+----------
+ * allow globals with empty values
+
+v5.3.35
+----------
+ * Update to goflow v0.71.2
+
+v5.3.34
+----------
+ * Read allow_international from channel config
+ * Add elastic query to parse query responses
+ * Update to goflow v0.71.1
+
+v5.3.33
+----------
+ * add != operator for numbers, dates, created_on
+
+v5.3.32
+----------
+ * Update to goflow v0.70.0
+
+v5.3.31
+----------
+ * Add urn =, !=, ~ support
+ * Fix name sorting on queries
+ * Update to latest goflow v0.69.0
+
+v5.3.30
+----------
+ * Sort locations fields by keyword value
+ * Update to latest goflow
+
+v5.3.29
+----------
+ * Fix > query on numbers, never use cached orgs
+ * Update gocommon for v1.2.0
+ * Remove superfulous legacy_definition fields on endpoints
+
+v5.3.28
+----------
+ * Allow dynamic group population within mailroom
+
+v5.3.27
+----------
+ * Update to latest goflow v0.67.0
+
+v5.3.26
+----------
+ * Update to goflow v0.66.3
+
+v5.3.25
+----------
+ * Update to latest goflow
+
+v5.3.24
+----------
+ * Update to latest goflow v0.66.0
+
+v5.3.23
+----------
+ * Update to latest goflow v0.65.0
+
+v5.3.22
+----------
+ * Make default for MaxBodyBytes 1MB
+ * Allow search endpoint to return results without a query
+ * Add endpoint to parse contactql query
+ * Add config option to max bytes of a webhook call response body
+
+v5.3.21
+----------
+ * Return field dependencies with queries on contact search endpoint
+ * Latest goflow, larger webhook bodies, trim expressions
+
+v5.3.20
+----------
+ * Update to latest goflow v0.64.9
+ * Add contact search web endpoint
+
+v5.3.19
+----------
+ * Update to goflow v0.64.8
+
+v5.3.18
+----------
+ * Update to goflow v0.64.7
+
+v5.3.17
+----------
+ * Include evaluation context with simulation requests
+
+v5.3.16
+----------
+ * Update to goflow v0.64.2
+
+v5.3.15
+----------
+ * Update to new goreleaser.yml format
+
+v5.3.14
+----------
+ * Make webhooks timeout configurable
+ * Update to goflow v0.64.0
+ * Fix elastic query evaluation when contact field doesn't exist
+
+v5.3.13
+----------
+ * Update to latest goflow v0.63.1
+
+v5.3.12
+----------
+ * Still do validation even when migrating to less than the current engine version
+
+v5.3.11
+----------
+ * Update to latest goflow to add support for flow migrations
+
+v5.3.10
+----------
+ * Update CreateBroadcastMessages to include globals in context
+
+v5.3.9
+----------
+ * Update to goflow v0.61.0 and provide email service to engine
+
+v5.3.8
+----------
+ * Update to goflow v0.60.1
+
+v5.3.7
+----------
+ * Add support for message topics
+
+v5.3.6
+----------
+ * Load global assets from database
+
+v5.3.5
+----------
+ * Update to goflow v0.59.0
+
+v5.3.4
+----------
+ * Update to goflow v0.58.0
+
+v5.3.3
+----------
+ * Update to goflow v0.56.3
+
+v5.3.2
+----------
+ * Update to goflow v0.56.2
+
+v5.3.1
+----------
+ * Update to latest goflow
+
+v5.3.0
+----------
+ * Use github actions
+
+v5.2.4
+----------
+ * Add new dump file with bothub instead of bh
+
+v5.2.3
+----------
+ * collect queue size 15 seconds after the minute
+
+v5.2.2
+----------
+ * Update to goflow v0.55.0
+
+v5.2.1
+----------
+ * Fix NPE when IVR channel not found
+
+v5.2.0
+----------
+ * RapidPro 5.2 release
+
+v2.1.0
+----------
+ * Update to goflow v0.54.1
+
+v2.0.44
+----------
+ * fail calls that have missing channels when retrying them
+
+v2.0.43
+----------
+ * Simulation should use a different engine instance with a fake airtime service
+ * Add bothub classifier service factory
+
+v2.0.42
+----------
+ * Update to goflow v0.54.0
+
+v2.0.41
+----------
+ * only release on PG10
+
+v2.0.40
+----------
+ * Implement hook for airtime_transferred event
+ * Use DTOne for airtime service if configured
+
+v2.0.39
+----------
+ * Update to latest Librato library
+ * Audit closing HTTP bodies
+ * Add smtp-test command
+
+v2.0.38
+----------
+ * Latest GoFlow
+ * Add Classifier / NLU support for LUIS and Wit.ai
+
+v2.0.37
+----------
+ * Schedules fired in Mailroom
+
+v2.0.36
+----------
+ * Fire schedules from Mailroom
+
+v2.0.35
+----------
+ * Log query execution and elapsed time
+ * Update to goflow v0.50.4
+
+v2.0.34
+----------
+ * Update to latest goflow v0.50.2
+ * Add support for triggering sessions via query within a flow
+
+v2.0.33
+----------
+ * Stop writing to legacy engine fields on flows_flowrun
+ * Move tasks into their own package
+ * Add ElasticSearch URL to README
+
+v2.0.32
+----------
+ * Add expression/migrate endpoint
+
+v2.0.31
+----------
+ * Allow interrupting sessions by flow
+ * Update to goflow v0.49.0
+
+v2.0.30
+----------
+ * Update to goflow v0.47.3
+
+v2.0.29
+----------
+ * Expire runs and sessions in a transaction to guarantee they are always in sync
+
+v2.0.28
+----------
+ * Remove debug error message
+
+v2.0.27
+----------
+ * Remove references to trigger_count in unit tests
+ * Fix create contact failing to start
+
+v2.0.26
+----------
+ * Start writing flows_flowrun.status alongside exit_type
+
+v2.0.25
+----------
+ * Handle FlowRun having nil Flow, use FlowReference instead
+
+v2.0.24
+----------
+ * Enable interrupt_sessions task
+
+v2.0.23
+----------
+ * Use ExitSession when stopping a session due to missing flow
+ * Add new interrupt sessions task, use more specific exit for missing flows
+ * Deal with handles for contacts that no longer have a URN
+
+v2.0.22
+----------
+ * Populate context with urns and fields when evaluating broadcast templates
+
+v2.0.21
+----------
+ * Change default port for Elastic to 9200 and use HTTP.
+ * Don't try to sniff cluster (doesn't with with cloud elastic)
+
+v2.0.20
+----------
+ * fix empty starts not being marked as complete
+ * allow flow starts to specify query for contacts to start
+
+v2.0.19
+----------
+ * Update to goflow v0.45.2
+
+v2.0.18
+----------
+ * Make FlowSession.uuid nullable for now
+
+v2.0.17
+----------
+ * Update to goflow v0.45.0
+ * Write UUID field on flows_flowsession
+
 v2.0.16
 ----------
  * write/read parent summary on flow starts

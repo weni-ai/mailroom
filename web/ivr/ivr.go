@@ -16,9 +16,9 @@ import (
 	"github.com/nyaruka/gocommon/urns"
 	"github.com/nyaruka/goflow/assets"
 	"github.com/nyaruka/mailroom/config"
-	"github.com/nyaruka/mailroom/handler"
 	"github.com/nyaruka/mailroom/ivr"
 	"github.com/nyaruka/mailroom/models"
+	"github.com/nyaruka/mailroom/tasks/handler"
 	"github.com/nyaruka/mailroom/web"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
@@ -109,12 +109,6 @@ func handleIncomingCall(ctx context.Context, s *web.Server, r *http.Request, raw
 		return client.WriteErrorResponse(w, errors.Wrapf(err, "request failed signature validation"))
 	}
 
-	// build our session assets
-	sa, err := models.GetSessionAssets(org)
-	if err != nil {
-		return client.WriteErrorResponse(w, errors.Wrapf(err, "unable to load assets"))
-	}
-
 	// lookup the URN of the caller
 	urn, err := client.URNForRequest(r)
 	if err != nil {
@@ -122,7 +116,7 @@ func handleIncomingCall(ctx context.Context, s *web.Server, r *http.Request, raw
 	}
 
 	// get the contact id for this URN
-	ids, err := models.ContactIDsFromURNs(ctx, s.DB, org, sa, []urns.URN{urn})
+	ids, err := models.ContactIDsFromURNs(ctx, s.DB, org, []urns.URN{urn})
 	if err != nil {
 		return client.WriteErrorResponse(w, errors.Wrapf(err, "unable to load contact by urn"))
 	}
@@ -172,7 +166,7 @@ func handleIncomingCall(ctx context.Context, s *web.Server, r *http.Request, raw
 		resumeURL := buildResumeURL(channel, conn, urn)
 
 		// have our client output our session status
-		err = client.WriteSessionResponse(session, resumeURL, r, w)
+		err = client.WriteSessionResponse(session, urn, resumeURL, r, w)
 		if err != nil {
 			return errors.Wrapf(err, "error writing ivr response for start")
 		}
@@ -276,7 +270,7 @@ func handleFlow(ctx context.Context, s *web.Server, r *http.Request, rawW http.R
 	// and our channel
 	channel := org.ChannelByID(conn.ChannelID())
 	if channel == nil {
-		return writeClientError(w, errors.Wrapf(err, "no active channel with id: %d", conn.ChannelID()))
+		return writeClientError(w, errors.Errorf("no active channel with id: %d", conn.ChannelID()))
 	}
 
 	// create a channel log for this request and connection

@@ -16,7 +16,7 @@ import (
 )
 
 func TestBroadcastCreated(t *testing.T) {
-	testsuite.ResetRP()
+	testsuite.Reset()
 
 	// TODO: test contacts, groups
 
@@ -24,11 +24,11 @@ func TestBroadcastCreated(t *testing.T) {
 		HookTestCase{
 			Actions: ContactActionMap{
 				models.CathyID: []flows.Action{
-					actions.NewSendBroadcastAction(newActionUUID(), "hello world", nil, nil, []urns.URN{urns.URN("tel:+12065551212")}, nil, nil, nil),
+					actions.NewSendBroadcast(newActionUUID(), "hello world", nil, nil, []urns.URN{urns.URN("tel:+12065551212")}, nil, nil, nil),
 				},
 			},
 			SQLAssertions: []SQLAssertion{
-				SQLAssertion{
+				{
 					SQL:   "select count(*) from flows_flowrun where contact_id = $1 AND is_active = FALSE",
 					Args:  []interface{}{models.CathyID},
 					Count: 1,
@@ -51,5 +51,5 @@ func TestBroadcastCreated(t *testing.T) {
 		},
 	}
 
-	RunActionTestCases(t, tcs)
+	RunHookTestCases(t, tcs)
 }

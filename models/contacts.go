@@ -2,20 +2,25 @@ package models
 
 import (
 	"context"
+	"database/sql"
 	"database/sql/driver"
 	"fmt"
+	"io"
 	"net/url"
 	"strconv"
 	"time"
 
 	"github.com/nyaruka/gocommon/urns"
 	"github.com/nyaruka/goflow/assets"
+	"github.com/nyaruka/goflow/contactql"
 	"github.com/nyaruka/goflow/envs"
 	"github.com/nyaruka/goflow/excellent/types"
 	"github.com/nyaruka/goflow/flows"
 	"github.com/nyaruka/goflow/utils"
 	"github.com/nyaruka/goflow/utils/uuids"
+	"github.com/nyaruka/mailroom/search"
 	"github.com/nyaruka/null"
+	"github.com/olivere/elastic"
 
 	"github.com/jmoiron/sqlx"
 	"github.com/lib/pq"
@@ -37,11 +42,23 @@ const (
 	NilContactID = ContactID(0)
 )
 
+// LoadContact loads a contact from the passed in id
+func LoadContact(ctx context.Context, db Queryer, org *OrgAssets, id ContactID) (*Contact, error) {
+	contacts, err := LoadContacts(ctx, db, org, []ContactID{id})
+	if err != nil {
+		return nil, err
+	}
+	if len(contacts) == 0 {
+		return nil, nil
+	}
+	return contacts[0], nil
+}
+
 // LoadContacts loads a set of contacts for the passed in ids
 func LoadContacts(ctx context.Context, db Queryer, org *OrgAssets, ids []ContactID) ([]*Contact, error) {
 	start := time.Now()
 
-	rows, err := db.QueryxContext(ctx, selectContactSQL, pq.Array(ids))
+	rows, err := db.QueryxContext(ctx, selectContactSQL, pq.Array(ids), org.OrgID())
 	if err != nil {
 		return nil, errors.Wrap(err, "error selecting contacts")
 	}
@@ -116,6 +133,27 @@ func LoadContacts(ctx context.Context, db Queryer, org *OrgAssets, ids []Contact
 	return contacts, nil
 }
 
+// GetNewestContactModifiedOn returns the newest modified_on for a contact in the passed in org
+func GetNewestContactModifiedOn(ctx context.Context, db *sqlx.DB, org *OrgAssets) (*time.Time, error) {
+	rows, err := db.QueryxContext(ctx, "SELECT modified_on FROM contacts_contact WHERE org_id = $1 ORDER BY modified_on DESC LIMIT 1", org.OrgID())
+	if err != nil && err != sql.ErrNoRows {
+		return nil, errors.Wrapf(err, "error selecting most recently changed contact for org: %d", org.OrgID())
+	}
+	defer rows.Close()
+	if err != sql.ErrNoRows {
+		rows.Next()
+		var newest time.Time
+		err = rows.Scan(&newest)
+		if err != nil {
+			return nil, errors.Wrapf(err, "error scanning most recent contact modified_on for org: %d", org.OrgID())
+		}
+
+		return &newest, nil
+	}
+
+	return nil, nil
+}
+
 // ContactIDsFromReferences queries the contacts for the passed in org, returning the contact ids for the references
 func ContactIDsFromReferences(ctx context.Context, tx Queryer, org *OrgAssets, refs []*flows.ContactReference) ([]ContactID, error) {
 	// build our list of UUIDs
@@ -145,26 +183,175 @@ func ContactIDsFromReferences(ctx context.Context, tx Queryer, org *OrgAssets, r
 	return ids, nil
 }
 
+// BuildElasticQuery turns the passed in contact ql query into an elastic query
+func BuildElasticQuery(org *OrgAssets, group assets.GroupUUID, query *contactql.ContactQuery) (elastic.Query, error) {
+	// filter by org and active contacts
+	eq := elastic.NewBoolQuery().Must(
+		elastic.NewTermQuery("org_id", org.OrgID()),
+		elastic.NewTermQuery("is_active", true),
+	)
+
+	// our group if present
+	if group != "" {
+		eq = eq.Must(elastic.NewTermQuery("groups", group))
+	}
+
+	// and by our query if present
+	if query != nil {
+		q, err := search.ToElasticQuery(org.Env(), org.SessionAssets(), query)
+		if err != nil {
+			return nil, errors.Wrapf(err, "error converting contactql to elastic query: %s", query)
+		}
+
+		eq = eq.Must(q)
+	}
+
+	return eq, nil
+}
+
+// ContactIDsForQueryPage returns the ids of the contacts for the passed in query page
+func ContactIDsForQueryPage(ctx context.Context, client *elastic.Client, org *OrgAssets, group assets.GroupUUID, query string, sort string, offset int, pageSize int) (*contactql.ContactQuery, []ContactID, int64, error) {
+	start := time.Now()
+	var parsed *contactql.ContactQuery
+	var err error
+
+	if client == nil {
+		return nil, nil, 0, errors.Errorf("no elastic client available, check your configuration")
+	}
+
+	if query != "" {
+		parsed, err = search.ParseQuery(org.Env(), org.SessionAssets(), query)
+		if err != nil {
+			return nil, nil, 0, errors.Wrapf(err, "error parsing query: %s", query)
+		}
+	}
+
+	eq, err := BuildElasticQuery(org, group, parsed)
+	if err != nil {
+		return nil, nil, 0, errors.Wrapf(err, "error parsing query: %s", query)
+	}
+
+	fieldSort, err := search.ToElasticFieldSort(org.SessionAssets(), sort)
+	if err != nil {
+		return nil, nil, 0, errors.Wrapf(err, "error parsing sort")
+	}
+
+	s := client.Search("contacts").Routing(strconv.FormatInt(int64(org.OrgID()), 10))
+	s = s.Size(pageSize).From(offset).Query(eq).SortBy(fieldSort).FetchSource(false)
+
+	results, err := s.Do(ctx)
+	if err != nil {
+		// Get *elastic.Error which contains additional information
+		ee, ok := err.(*elastic.Error)
+		if !ok {
+			return nil, nil, 0, errors.Wrapf(err, "error performing query")
+		}
+
+		return nil, nil, 0, errors.Wrapf(err, "error performing query: %s", ee.Details.Reason)
+	}
+
+	ids := make([]ContactID, 0, pageSize)
+	for _, hit := range results.Hits.Hits {
+		id, err := strconv.Atoi(hit.Id)
+		if err != nil {
+			return nil, nil, 0, errors.Wrapf(err, "unexpected non-integer contact id: %s for search: %s", hit.Id, query)
+		}
+		ids = append(ids, ContactID(id))
+	}
+
+	logrus.WithFields(logrus.Fields{
+		"org_id":      org.OrgID(),
+		"parsed":      parsed,
+		"group_uuid":  group,
+		"query":       query,
+		"elapsed":     time.Since(start),
+		"page_count":  len(ids),
+		"total_count": results.Hits.TotalHits,
+	}).Debug("paged contact query complete")
+
+	return parsed, ids, results.Hits.TotalHits, nil
+}
+
+// ContactIDsForQuery returns the ids of all the contacts that match the passed in query
+func ContactIDsForQuery(ctx context.Context, client *elastic.Client, org *OrgAssets, query string) ([]ContactID, error) {
+	start := time.Now()
+
+	if client == nil {
+		return nil, errors.Errorf("no elastic client available, check your configuration")
+	}
+
+	// turn into elastic query
+	parsed, err := search.ParseQuery(org.Env(), org.SessionAssets(), query)
+	if err != nil {
+		return nil, errors.Wrapf(err, "error parsing query: %s", query)
+	}
+
+	eq, err := BuildElasticQuery(org, "", parsed)
+	if err != nil {
+		return nil, errors.Wrapf(err, "error converting contactql to elastic query: %s", query)
+	}
+
+	// only include unblocked and unstopped contacts
+	eq = elastic.NewBoolQuery().Must(
+		eq,
+		elastic.NewTermQuery("is_blocked", false),
+		elastic.NewTermQuery("is_stopped", false),
+	)
+
+	ids := make([]ContactID, 0, 100)
+
+	// iterate across our results, building up our contact ids
+	scroll := client.Scroll("contacts").Routing(strconv.FormatInt(int64(org.OrgID()), 10))
+	scroll = scroll.KeepAlive("15m").Size(10000).Query(eq).FetchSource(false)
+	for {
+		results, err := scroll.Do(ctx)
+		if err == io.EOF {
+			logrus.WithFields(logrus.Fields{
+				"org_id":      org.OrgID(),
+				"query":       query,
+				"elapsed":     time.Since(start),
+				"match_count": len(ids),
+			}).Debug("contact query complete")
+
+			return ids, nil
+		}
+		if err != nil {
+			return nil, errors.Wrapf(err, "error scrolling through results for search: %s", query)
+		}
+
+		for _, hit := range results.Hits.Hits {
+			id, err := strconv.Atoi(hit.Id)
+			if err != nil {
+				return nil, errors.Wrapf(err, "unexpected non-integer contact id: %s for search: %s", hit.Id, query)
+			}
+
+			ids = append(ids, ContactID(id))
+		}
+	}
+}
+
 // FlowContact converts our mailroom contact into a flow contact for use in the engine
-func (c *Contact) FlowContact(org *OrgAssets, session flows.SessionAssets) (*flows.Contact, error) {
-	// convert our groups to a list of asset groups
-	groups := make([]assets.Group, len(c.groups))
+func (c *Contact) FlowContact(org *OrgAssets) (*flows.Contact, error) {
+	// convert our groups to a list of references
+	groups := make([]*assets.GroupReference, len(c.groups))
 	for i, g := range c.groups {
-		groups[i] = g
+		groups[i] = assets.NewGroupReference(g.UUID(), g.Name())
 	}
 
 	// create our flow contact
 	contact, err := flows.NewContact(
-		session,
+		org.SessionAssets(),
 		c.uuid,
 		flows.ContactID(c.id),
 		c.name,
 		c.language,
+		c.Status(),
 		org.Env().Timezone(),
 		c.createdOn,
 		c.urns,
 		groups,
 		c.fields,
+		assets.IgnoreMissing,
 	)
 	if err != nil {
 		return nil, errors.Wrapf(err, "error creating flow contact")
@@ -221,6 +408,15 @@ func (c *Contact) URNs() []urns.URN                { return c.urns }
 func (c *Contact) ModifiedOn() time.Time           { return c.modifiedOn }
 func (c *Contact) CreatedOn() time.Time            { return c.createdOn }
 
+func (c *Contact) Status() flows.ContactStatus {
+	if c.isBlocked {
+		return flows.ContactStatusBlocked
+	} else if c.isStopped {
+		return flows.ContactStatusStopped
+	}
+	return flows.ContactStatusActive
+}
+
 // fieldValueEnvelope is our utility struct for the value of a field
 type fieldValueEnvelope struct {
 	Text     types.XText        `json:"text"`
@@ -272,17 +468,17 @@ func (u *ContactURN) AsURN(org *OrgAssets) (urns.URN, error) {
 
 // contactEnvelope is our JSON structure for a contact as read from the database
 type contactEnvelope struct {
-	ID         ContactID                         `json:"id"`
-	UUID       flows.ContactUUID                 `json:"uuid"`
-	Name       string                            `json:"name"`
-	Language   envs.Language                     `json:"language"`
-	IsStopped  bool                              `json:"is_stopped"`
-	IsBlocked  bool                              `json:"is_blocked"`
-	Fields     map[FieldUUID]*fieldValueEnvelope `json:"fields"`
-	GroupIDs   []GroupID                         `json:"group_ids"`
-	URNs       []ContactURN                      `json:"urns"`
-	ModifiedOn time.Time                         `json:"modified_on"`
-	CreatedOn  time.Time                         `json:"created_on"`
+	ID         ContactID                                `json:"id"`
+	UUID       flows.ContactUUID                        `json:"uuid"`
+	Name       string                                   `json:"name"`
+	Language   envs.Language                            `json:"language"`
+	IsStopped  bool                                     `json:"is_stopped"`
+	IsBlocked  bool                                     `json:"is_blocked"`
+	Fields     map[assets.FieldUUID]*fieldValueEnvelope `json:"fields"`
+	GroupIDs   []GroupID                                `json:"group_ids"`
+	URNs       []ContactURN                             `json:"urns"`
+	ModifiedOn time.Time                                `json:"modified_on"`
+	CreatedOn  time.Time                                `json:"created_on"`
 }
 
 const selectContactSQL = `
@@ -336,13 +532,14 @@ LEFT JOIN (
 ) u ON c.id = u.contact_id
 WHERE 
 	c.id = ANY($1) AND
-	is_active = TRUE
+	is_active = TRUE AND
+	c.org_id = $2
 ) r;
 `
 
 // ContactIDsFromURNs will fetch or create the contacts for the passed in URNs, returning a map the same length as
 // the passed in URNs with the ids of the contacts.
-func ContactIDsFromURNs(ctx context.Context, db *sqlx.DB, org *OrgAssets, assets flows.SessionAssets, us []urns.URN) (map[urns.URN]ContactID, error) {
+func ContactIDsFromURNs(ctx context.Context, db *sqlx.DB, org *OrgAssets, us []urns.URN) (map[urns.URN]ContactID, error) {
 	// build a map of our urns to contact id
 	urnMap := make(map[urns.URN]ContactID, len(us))
 
@@ -394,7 +591,7 @@ func ContactIDsFromURNs(ctx context.Context, db *sqlx.DB, org *OrgAssets, assets
 		// create the contacts that are missing
 		for _, u := range us {
 			if urnMap[u] == NilContactID {
-				id, err := CreateContact(ctx, db, org, assets, u)
+				id, err := CreateContact(ctx, db, org, u)
 				if err != nil {
 					return nil, errors.Wrapf(err, "error while creating contact")
 				}
@@ -413,7 +610,7 @@ func ContactIDsFromURNs(ctx context.Context, db *sqlx.DB, org *OrgAssets, assets
 }
 
 // CreateContact creates a new contact for the passed in org with the passed in URNs
-func CreateContact(ctx context.Context, db *sqlx.DB, org *OrgAssets, assets flows.SessionAssets, urn urns.URN) (ContactID, error) {
+func CreateContact(ctx context.Context, db *sqlx.DB, org *OrgAssets, urn urns.URN) (ContactID, error) {
 	// we have a URN, first try to look up the URN
 	tx, err := db.BeginTxx(ctx, nil)
 	if err != nil {
@@ -442,7 +639,7 @@ func CreateContact(ctx context.Context, db *sqlx.DB, org *OrgAssets, assets flow
 		if pqErr, ok := err.(*pq.Error); ok {
 			// if this was a duplicate URN, we should be able to select this contact instead
 			if pqErr.Code.Name() == "unique_violation" {
-				ids, err := ContactIDsFromURNs(ctx, db, org, assets, []urns.URN{urn})
+				ids, err := ContactIDsFromURNs(ctx, db, org, []urns.URN{urn})
 				if err != nil || len(ids) == 0 {
 					return NilContactID, errors.Wrapf(err, "unable to load contact for urn: %s", urn)
 				}
@@ -476,7 +673,7 @@ func CreateContact(ctx context.Context, db *sqlx.DB, org *OrgAssets, assets flow
 		return NilContactID, errors.Wrapf(err, "error loading new contact")
 	}
 
-	flowContact, err := contacts[0].FlowContact(org, assets)
+	flowContact, err := contacts[0].FlowContact(org)
 	if err != nil {
 		tx.Rollback()
 		return NilContactID, errors.Wrapf(err, "error creating flow contact")
@@ -561,7 +758,7 @@ func GetOrCreateURN(ctx context.Context, tx Queryer, org *OrgAssets, contactID C
 }
 
 // URNForID will return a URN for the passed in ID including all the special query parameters
-// set that goflow and mailroom depend on. Generally this URN is build when loading a contact
+// set that goflow and mailroom depend on. Generally this URN is built when loading a contact
 // but occasionally we need to load URNs one by one and this accomplishes that
 func URNForID(ctx context.Context, tx Queryer, org *OrgAssets, urnID URNID) (urns.URN, error) {
 	urn := &ContactURN{}
@@ -589,8 +786,7 @@ func URNForID(ctx context.Context, tx Queryer, org *OrgAssets, urnID URNID) (urn
 // CalculateDynamicGroups recalculates all the dynamic groups for the passed in contact, recalculating
 // campaigns as necessary based on those group changes.
 func CalculateDynamicGroups(ctx context.Context, tx Queryer, org *OrgAssets, contact *flows.Contact) error {
-	orgGroups, _ := org.Groups()
-	added, removed, errs := contact.ReevaluateDynamicGroups(org.Env(), flows.NewGroupAssets(orgGroups))
+	added, removed, errs := contact.ReevaluateDynamicGroups(org.Env())
 	if len(errs) > 0 {
 		return errors.Wrapf(errs[0], "error calculating dynamic groups")
 	}
@@ -1076,3 +1272,85 @@ func (i *ContactID) Scan(value interface{}) error {
 func ContactLock(orgID OrgID, contactID ContactID) string {
 	return fmt.Sprintf("c:%d:%d", orgID, contactID)
 }
+
+// UpdateContactModifiedBy updates modified by the passed user id on the passed in contacts
+func UpdateContactModifiedBy(ctx context.Context, tx Queryer, contactIDs []ContactID, userID UserID) error {
+	if userID == NilUserID || len(contactIDs) == 0 {
+		return nil
+	}
+	_, err := tx.ExecContext(ctx, `UPDATE contacts_contact SET modified_on = NOW(), modified_by_id = $2 WHERE id = ANY($1)`, pq.Array(contactIDs), userID)
+	return err
+}
+
+// ContactStatusChange struct used for our contact status change
+type ContactStatusChange struct {
+	ContactID ContactID
+	Status    flows.ContactStatus
+}
+
+type contactStatusUpdate struct {
+	ContactID ContactID `db:"id"`
+	Blocked   bool      `db:"is_blocked"`
+	Stopped   bool      `db:"is_stopped"`
+}
+
+// UpdateContactStatus updates the contacts status as the passed changes
+func UpdateContactStatus(ctx context.Context, tx Queryer, changes []*ContactStatusChange) error {
+
+	contactTriggersIDs := make([]interface{}, 0, len(changes))
+	statusUpdates := make([]interface{}, 0, len(changes))
+
+	for _, ch := range changes {
+		blocked := ch.Status == flows.ContactStatusBlocked
+		stopped := ch.Status == flows.ContactStatusStopped
+
+		if blocked || stopped {
+			contactTriggersIDs = append(contactTriggersIDs, ch.ContactID)
+		}
+
+		statusUpdates = append(
+			statusUpdates,
+			&contactStatusUpdate{
+				ContactID: ch.ContactID,
+				Blocked:   blocked,
+				Stopped:   stopped,
+			},
+		)
+
+	}
+
+	// remove triggers for contact we'll stop/block
+	_, err := tx.ExecContext(ctx, deleteAllContactTriggersForIDsSQL, pq.Array(contactTriggersIDs))
+	if err != nil {
+		return errors.Wrapf(err, "error removing contact from triggers")
+	}
+
+	// do our status update
+	err = BulkSQL(ctx, "updating contact statuses", tx, updateContactStatusSQL, statusUpdates)
+	if err != nil {
+		return errors.Wrapf(err, "error updating contact statuses")
+	}
+	return err
+}
+
+const updateContactStatusSQL = `
+	UPDATE
+		contacts_contact c
+	SET
+		is_blocked = r.is_blocked::boolean,
+		is_stopped = r.is_stopped::boolean,
+		modified_on = NOW()
+	FROM (
+		VALUES(:id, :is_blocked, :is_stopped)
+	) AS
+		r(id, is_blocked, is_stopped)
+	WHERE
+		c.id = r.id::int
+`
+
+const deleteAllContactTriggersForIDsSQL = `
+DELETE FROM
+	triggers_trigger_contacts
+WHERE
+	contact_id = ANY($1)
+`

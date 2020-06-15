@@ -18,33 +18,33 @@ func TestContactGroupsChanged(t *testing.T) {
 		HookTestCase{
 			Actions: ContactActionMap{
 				models.CathyID: []flows.Action{
-					actions.NewAddContactGroupsAction(newActionUUID(), []*assets.GroupReference{doctors}),
-					actions.NewAddContactGroupsAction(newActionUUID(), []*assets.GroupReference{doctors}),
-					actions.NewRemoveContactGroupsAction(newActionUUID(), []*assets.GroupReference{doctors}, false),
-					actions.NewAddContactGroupsAction(newActionUUID(), []*assets.GroupReference{testers}),
+					actions.NewAddContactGroups(newActionUUID(), []*assets.GroupReference{doctors}),
+					actions.NewAddContactGroups(newActionUUID(), []*assets.GroupReference{doctors}),
+					actions.NewRemoveContactGroups(newActionUUID(), []*assets.GroupReference{doctors}, false),
+					actions.NewAddContactGroups(newActionUUID(), []*assets.GroupReference{testers}),
 				},
 				models.GeorgeID: []flows.Action{
-					actions.NewRemoveContactGroupsAction(newActionUUID(), []*assets.GroupReference{doctors}, false),
-					actions.NewAddContactGroupsAction(newActionUUID(), []*assets.GroupReference{testers}),
+					actions.NewRemoveContactGroups(newActionUUID(), []*assets.GroupReference{doctors}, false),
+					actions.NewAddContactGroups(newActionUUID(), []*assets.GroupReference{testers}),
 				},
 			},
 			SQLAssertions: []SQLAssertion{
-				SQLAssertion{
+				{
 					SQL:   "select count(*) from contacts_contactgroup_contacts where contact_id = $1 and contactgroup_id = $2",
 					Args:  []interface{}{models.CathyID, models.DoctorsGroupID},
 					Count: 0,
 				},
-				SQLAssertion{
+				{
 					SQL:   "select count(*) from contacts_contactgroup_contacts where contact_id = $1 and contactgroup_id = $2",
 					Args:  []interface{}{models.CathyID, models.TestersGroupID},
 					Count: 1,
 				},
-				SQLAssertion{
+				{
 					SQL:   "select count(*) from contacts_contactgroup_contacts where contact_id = $1 and contactgroup_id = $2",
 					Args:  []interface{}{models.GeorgeID, models.TestersGroupID},
 					Count: 1,
 				},
-				SQLAssertion{
+				{
 					SQL:   "select count(*) from contacts_contactgroup_contacts where contact_id = $1 and contactgroup_id = $2",
 					Args:  []interface{}{models.BobID, models.TestersGroupID},
 					Count: 0,
@@ -53,5 +53,5 @@ func TestContactGroupsChanged(t *testing.T) {
 		},
 	}
 
-	RunActionTestCases(t, tcs)
+	RunHookTestCases(t, tcs)
 }

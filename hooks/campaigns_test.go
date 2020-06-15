@@ -38,34 +38,34 @@ func TestCampaigns(t *testing.T) {
 		HookTestCase{
 			Actions: ContactActionMap{
 				models.CathyID: []flows.Action{
-					actions.NewRemoveContactGroupsAction(newActionUUID(), []*assets.GroupReference{doctors}, false),
-					actions.NewAddContactGroupsAction(newActionUUID(), []*assets.GroupReference{doctors}),
-					actions.NewSetContactFieldAction(newActionUUID(), joined, "2029-09-15T12:00:00+00:00"),
-					actions.NewSetContactFieldAction(newActionUUID(), joined, ""),
+					actions.NewRemoveContactGroups(newActionUUID(), []*assets.GroupReference{doctors}, false),
+					actions.NewAddContactGroups(newActionUUID(), []*assets.GroupReference{doctors}),
+					actions.NewSetContactField(newActionUUID(), joined, "2029-09-15T12:00:00+00:00"),
+					actions.NewSetContactField(newActionUUID(), joined, ""),
 				},
 				models.BobID: []flows.Action{
-					actions.NewAddContactGroupsAction(newActionUUID(), []*assets.GroupReference{doctors}),
-					actions.NewSetContactFieldAction(newActionUUID(), joined, "2029-09-15T12:00:00+00:00"),
-					actions.NewSetContactFieldAction(newActionUUID(), joined, "2029-09-15T12:00:00+00:00"),
+					actions.NewAddContactGroups(newActionUUID(), []*assets.GroupReference{doctors}),
+					actions.NewSetContactField(newActionUUID(), joined, "2029-09-15T12:00:00+00:00"),
+					actions.NewSetContactField(newActionUUID(), joined, "2029-09-15T12:00:00+00:00"),
 				},
 				models.GeorgeID: []flows.Action{
-					actions.NewAddContactGroupsAction(newActionUUID(), []*assets.GroupReference{doctors}),
-					actions.NewSetContactFieldAction(newActionUUID(), joined, "2029-09-15T12:00:00+00:00"),
-					actions.NewRemoveContactGroupsAction(newActionUUID(), []*assets.GroupReference{doctors}, false),
+					actions.NewAddContactGroups(newActionUUID(), []*assets.GroupReference{doctors}),
+					actions.NewSetContactField(newActionUUID(), joined, "2029-09-15T12:00:00+00:00"),
+					actions.NewRemoveContactGroups(newActionUUID(), []*assets.GroupReference{doctors}, false),
 				},
 			},
 			SQLAssertions: []SQLAssertion{
-				SQLAssertion{
+				{
 					SQL:   `select count(*) FROM campaigns_eventfire WHERE contact_id = $1`,
 					Args:  []interface{}{models.CathyID},
 					Count: 1,
 				},
-				SQLAssertion{
+				{
 					SQL:   `select count(*) FROM campaigns_eventfire WHERE contact_id = $1`,
 					Args:  []interface{}{models.BobID},
 					Count: 3,
 				},
-				SQLAssertion{
+				{
 					SQL:   `select count(*) FROM campaigns_eventfire WHERE contact_id = $1`,
 					Args:  []interface{}{models.GeorgeID},
 					Count: 0,
@@ -74,5 +74,5 @@ func TestCampaigns(t *testing.T) {
 		},
 	}
 
-	RunActionTestCases(t, tcs)
+	RunHookTestCases(t, tcs)
 }

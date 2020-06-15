@@ -23,37 +23,37 @@ func TestAddContactURN(t *testing.T) {
 		HookTestCase{
 			Actions: ContactActionMap{
 				models.CathyID: []flows.Action{
-					actions.NewAddContactURNAction(newActionUUID(), "tel", "12065551212"),
-					actions.NewAddContactURNAction(newActionUUID(), "tel", "12065551212"),
-					actions.NewAddContactURNAction(newActionUUID(), "telegram", "11551"),
-					actions.NewAddContactURNAction(newActionUUID(), "tel", "250700000001"),
+					actions.NewAddContactURN(newActionUUID(), "tel", "12065551212"),
+					actions.NewAddContactURN(newActionUUID(), "tel", "12065551212"),
+					actions.NewAddContactURN(newActionUUID(), "telegram", "11551"),
+					actions.NewAddContactURN(newActionUUID(), "tel", "+16055741111"),
 				},
 				models.GeorgeID: []flows.Action{},
 			},
 			SQLAssertions: []SQLAssertion{
-				SQLAssertion{
+				{
 					SQL:   "select count(*) from contacts_contacturn where contact_id = $1 and scheme = 'telegram' and path = '11551' and priority = 998",
 					Args:  []interface{}{models.CathyID},
 					Count: 1,
 				},
-				SQLAssertion{
+				{
 					SQL:   "select count(*) from contacts_contacturn where contact_id = $1 and scheme = 'tel' and path = '+12065551212' and priority = 999 and identity = 'tel:+12065551212'",
 					Args:  []interface{}{models.CathyID},
 					Count: 1,
 				},
-				SQLAssertion{
-					SQL:   "select count(*) from contacts_contacturn where contact_id = $1 and scheme = 'tel' and path = '+250700000001' and priority = 1000",
+				{
+					SQL:   "select count(*) from contacts_contacturn where contact_id = $1 and scheme = 'tel' and path = '+16055741111' and priority = 1000",
 					Args:  []interface{}{models.CathyID},
 					Count: 1,
 				},
 				// evan lost his 206 URN
-				SQLAssertion{
+				{
 					SQL:   "select count(*) from contacts_contacturn where contact_id = $1",
 					Args:  []interface{}{models.GeorgeID},
 					Count: 1,
 				},
 				// two contacts updated, both cathy and evan since their URNs changed
-				SQLAssertion{
+				{
 					SQL:   "select count(*) from contacts_contact where modified_on > $1",
 					Args:  []interface{}{now},
 					Count: 2,
@@ -62,5 +62,5 @@ func TestAddContactURN(t *testing.T) {
 		},
 	}
 
-	RunActionTestCases(t, tcs)
+	RunHookTestCases(t, tcs)
 }

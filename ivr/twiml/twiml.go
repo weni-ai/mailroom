@@ -9,6 +9,8 @@ import (
 	"encoding/json"
 	"encoding/xml"
 	"fmt"
+	"github.com/nyaruka/goflow/envs"
+	"io"
 	"io/ioutil"
 	"net/http"
 	"net/url"
@@ -64,6 +66,34 @@ const (
 	</Response>
 	`
 )
+var validLanguageCodes = map[string]bool{
+	"da-DK": true,
+	"de-DE": true,
+	"en-AU": true,
+	"en-CA": true,
+	"en-GB": true,
+	"en-IN": true,
+	"en-US": true,
+	"ca-ES": true,
+	"es-ES": true,
+	"es-MX": true,
+	"fi-FI": true,
+	"fr-CA": true,
+	"fr-FR": true,
+	"it-IT": true,
+	"ja-JP": true,
+	"ko-KR": true,
+	"nb-NO": true,
+	"nl-NL": true,
+	"pl-PL": true,
+	"pt-BR": true,
+	"pt-PT": true,
+	"ru-RU": true,
+	"sv-SE": true,
+	"zh-CN": true,
+	"zh-HK": true,
+	"zh-TW": true,
+}
 
 var indentMarshal = true
 
@@ -154,8 +184,10 @@ func (c *client) RequestCall(client *http.Client, number urns.URN, callbackURL s
 	if err != nil {
 		return ivr.NilCallID, errors.Wrapf(err, "error trying to start call")
 	}
+	defer resp.Body.Close()
 
 	if resp.StatusCode != 201 {
+		io.Copy(ioutil.Discard, resp.Body)
 		return ivr.NilCallID, errors.Errorf("received non 201 status for call start: %d", resp.StatusCode)
 	}
 
@@ -191,6 +223,8 @@ func (c *client) HangupCall(client *http.Client, callID string) error {
 	if err != nil {
 		return errors.Wrapf(err, "error trying to hangup call")
 	}
+	defer resp.Body.Close()
+	io.Copy(ioutil.Discard, resp.Body)
 
 	if resp.StatusCode != 200 {
 		return errors.Errorf("received non 204 trying to hang up call: %d", resp.StatusCode)
@@ -288,10 +322,10 @@ func (c *client) ValidateRequestSignature(r *http.Request) error {
 }
 
 // WriteSessionResponse writes a TWIML response for the events in the passed in session
-func (c *client) WriteSessionResponse(session *models.Session, resumeURL string, r *http.Request, w http.ResponseWriter) error {
+func (c *client) WriteSessionResponse(session *models.Session, number urns.URN, resumeURL string, r *http.Request, w http.ResponseWriter) error {
 	// for errored sessions we should just output our error body
-	if session.Status() == models.SessionStatusErrored {
-		return errors.Errorf("cannot write IVR response for errored session")
+	if session.Status() == models.SessionStatusFailed {
+		return errors.Errorf("cannot write IVR response for failed session")
 	}
 
 	// otherwise look for any say events
@@ -301,7 +335,7 @@ func (c *client) WriteSessionResponse(session *models.Session, resumeURL string,
 	}
 
 	// get our response
-	response, err := responseForSprint(resumeURL, session.Wait(), sprint.Events())
+	response, err := responseForSprint(number, resumeURL, session.Wait(), sprint.Events())
 	if err != nil {
 		return errors.Wrap(err, "unable to build response for IVR call")
 	}
@@ -382,8 +416,9 @@ func twCalculateSignature(url string, form url.Values, authToken string) ([]byte
 // TWIML building utilities
 
 type Say struct {
-	XMLName string `xml:"Say"`
-	Text    string `xml:",chardata"`
+	XMLName  string `xml:"Say"`
+	Text     string `xml:",chardata"`
+	Language string `xml:"language,attr,omitempty"`
 }
 
 type Play struct {
@@ -422,7 +457,7 @@ type Response struct {
 	Commands []interface{} `xml:",innerxml"`
 }
 
-func responseForSprint(resumeURL string, w flows.ActivatedWait, es []flows.Event) (string, error) {
+func responseForSprint(number urns.URN, resumeURL string, w flows.ActivatedWait, es []flows.Event) (string, error) {
 	r := &Response{}
 	commands := make([]interface{}, 0)
 
@@ -430,7 +465,13 @@ func responseForSprint(resumeURL string, w flows.ActivatedWait, es []flows.Event
 		switch event := e.(type) {
 		case *events.IVRCreatedEvent:
 			if len(event.Msg.Attachments()) == 0 {
-				commands = append(commands, Say{Text: event.Msg.Text()})
+				country := envs.DeriveCountryFromTel(number.Path())
+				languageCode := event.Msg.TextLanguage.ToISO639_2(country)
+
+				if _, valid := validLanguageCodes[languageCode]; !valid {
+					languageCode = ""
+				}
+				commands = append(commands, Say{Text: event.Msg.Text(), Language: languageCode})
 			} else {
 				for _, a := range event.Msg.Attachments() {
 					a = models.NormalizeAttachment(a)
