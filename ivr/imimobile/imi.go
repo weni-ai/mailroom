@@ -303,9 +303,9 @@ func (c *client) PreprocessResume(ctx context.Context, db *sqlx.DB, rp *redis.Po
 }
 
 // RequestCall causes this client to request a new outgoing call for this provider
-func (c *client) RequestCall(client *http.Client, number urns.URN, callbackURL string, statusURL string) (ivr.CallID, error) {
-	url, _ := url.Parse(callbackURL)
-	conn := url.Query().Get("connection")
+func (c *client) RequestCall(client *http.Client, number urns.URN, handleURL string, statusURL string) (ivr.CallID, error) {
+	parseUrl, _ := url.Parse(handleURL)
+	conn := parseUrl.Query().Get("connection")
 	to := formatPhoneNumber(number.Path())
 	from := formatPhoneNumber(c.channel.Address())
 
@@ -313,12 +313,12 @@ func (c *client) RequestCall(client *http.Client, number urns.URN, callbackURL s
 		TransID:  conn,
 		To:       to,
 		From:     from,
-		VxmlURL:  callbackURL,
+		VxmlURL:  handleURL,
 		EventURL: statusURL,
 	}
 
 	logrus.WithFields(logrus.Fields{
-		"VxmlURL":  callbackURL,
+		"VxmlURL":  handleURL,
 		"EventURL": statusURL,
 		"TransID":  conn,
 		"To":       to,
@@ -442,9 +442,9 @@ func (c *client) WriteErrorResponse(w http.ResponseWriter, err error) error {
 }
 
 // WriteSessionResponse writes a VXML response for the events in the passed in session
-func (c *client) WriteSessionResponse(session *models.Session, resumeURL string, r *http.Request, w http.ResponseWriter) error {
+func (c *client) WriteSessionResponse(session *models.Session, number urns.URN, resumeURL string, r *http.Request, w http.ResponseWriter) error {
 	// for errored sessions we should just output our error body
-	if session.Status() == models.SessionStatusErrored {
+	if session.Status() == models.SessionStatusFailed {
 		return errors.Errorf("cannot write IVR response for errored session")
 	}
 
