@@ -68,11 +68,11 @@ func retryCalls(ctx context.Context, config *config.Config, db *sqlx.DB, rp *red
 		log = log.WithField("connection_id", conn.ID())
 
 		// if the channel for this connection is throttled, move on
-		if throttledChannels[conn.ChannelID()] {
+		/* if throttledChannels[conn.ChannelID()] {
 			conn.MarkThrottled(ctx, db, time.Now())
 			log.WithField("channel_id", conn.ChannelID()).Info("skipping connection, throttled")
 			continue
-		}
+		} */
 
 		// load the org for this connection
 		oa, err := models.GetOrgAssets(ctx, db, conn.OrgID())
