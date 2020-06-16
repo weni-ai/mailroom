@@ -29,7 +29,7 @@ func init() {
 func StartIVRCron(mr *mailroom.Mailroom) error {
 	cron.StartCron(mr.Quit, mr.RP, retryIVRLock, time.Minute,
 		func(lockName string, lockValue string) error {
-			ctx, cancel := context.WithTimeout(context.Background(), time.Minute*5)
+			ctx, cancel := context.WithTimeout(context.Background(), time.Minute*10)
 			defer cancel()
 			return retryCalls(ctx, mr.Config, mr.DB, mr.RP, retryIVRLock, lockValue)
 		},
@@ -37,7 +37,7 @@ func StartIVRCron(mr *mailroom.Mailroom) error {
 
 	cron.StartCron(mr.Quit, mr.RP, expireIVRLock, time.Minute,
 		func(lockName string, lockValue string) error {
-			ctx, cancel := context.WithTimeout(context.Background(), time.Minute*5)
+			ctx, cancel := context.WithTimeout(context.Background(), time.Minute*10)
 			defer cancel()
 			return expireCalls(ctx, mr.Config, mr.DB, mr.RP, expireIVRLock, lockValue)
 		},
@@ -52,10 +52,10 @@ func retryCalls(ctx context.Context, config *config.Config, db *sqlx.DB, rp *red
 	start := time.Now()
 
 	// find all calls that need restarting
-	ctx, cancel := context.WithTimeout(ctx, time.Minute*5)
+	ctx, cancel := context.WithTimeout(ctx, time.Minute*10)
 	defer cancel()
 
-	conns, err := models.LoadChannelConnectionsToRetry(ctx, db, 100)
+	conns, err := models.LoadChannelConnectionsToRetry(ctx, db, 200)
 	if err != nil {
 		return errors.Wrapf(err, "error loading connections to retry")
 	}
@@ -114,7 +114,7 @@ func expireCalls(ctx context.Context, config *config.Config, db *sqlx.DB, rp *re
 	log := logrus.WithField("comp", "ivr_cron_expirer").WithField("lock", lockValue)
 	start := time.Now()
 
-	ctx, cancel := context.WithTimeout(ctx, time.Minute*5)
+	ctx, cancel := context.WithTimeout(ctx, time.Minute*10)
 	defer cancel()
 
 	// select our expired runs
