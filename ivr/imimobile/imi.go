@@ -374,7 +374,7 @@ func (c *client) makeRequest(client *http.Client, method string, sendURL string,
 }
 
 // StatusForRequest returns the current call status for the passed in status (and optional duration if known)
-func (c *client) StatusForRequest(r *http.Request) (models.ConnectionStatus, int) {
+func (c *client) StatusForRequest(r *http.Request, current models.ConnectionStatus) (models.ConnectionStatus, int) {
 	if r.Form.Get("action") == "resume" {
 		return models.ConnectionStatusInProgress, 0
 	}
@@ -390,6 +390,9 @@ func (c *client) StatusForRequest(r *http.Request) (models.ConnectionStatus, int
 
 	switch status.EvtID {
 	case "offer":
+		if current == models.ConnectionStatusCompleted {
+			return models.ConnectionStatusCompleted, 0
+		}
 		return models.ConnectionStatusWired, 0
 
 	case "accept", "answer":
