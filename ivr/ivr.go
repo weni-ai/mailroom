@@ -87,7 +87,7 @@ type Client interface {
 
 	InputForRequest(r *http.Request) (string, utils.Attachment, error)
 
-	StatusForRequest(r *http.Request) (models.ConnectionStatus, int)
+	StatusForRequest(r *http.Request, current models.ConnectionStatus) (models.ConnectionStatus, int)
 
 	PreprocessResume(ctx context.Context, db *sqlx.DB, rp *redis.Pool, conn *models.ChannelConnection, r *http.Request) ([]byte, error)
 
@@ -561,7 +561,7 @@ func ResumeIVRFlow(
 	}
 
 	// make sure our call is still happening
-	status, _ := client.StatusForRequest(r)
+	status, _ := client.StatusForRequest(r, conn.Status())
 	if status != models.ConnectionStatusInProgress {
 		err := conn.UpdateStatus(ctx, db, status, 0, time.Now())
 		if err != nil {
@@ -596,7 +596,7 @@ func ResumeIVRFlow(
 // ended for some reason and update the state of the call and session if so
 func HandleIVRStatus(ctx context.Context, db *sqlx.DB, rp *redis.Pool, org *models.OrgAssets, client Client, conn *models.ChannelConnection, r *http.Request, w http.ResponseWriter) error {
 	// read our status and duration from our client
-	status, duration := client.StatusForRequest(r)
+	status, duration := client.StatusForRequest(r, conn.Status())
 
 	// if we errored schedule a retry if appropriate
 	if status == models.ConnectionStatusErrored {
