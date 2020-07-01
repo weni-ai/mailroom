@@ -359,7 +359,7 @@ func (c *client) RequestCall(client *http.Client, number urns.URN, handleURL str
 
 func formatImiUrl(url string) string {
 	imiUrl := strings.Replace(url, "https", "http", 1)
-	imiUrl = strings.Replace(imiUrl, "rapidpro.ilhasoft.in", "rapidpro.ilhasoft.in:5345", 1)
+	imiUrl = strings.Replace(imiUrl, "rapidpro.ilhasoft.in", "rapidpro.ilhasoft.in:2454", 1)
 	return imiUrl
 }
 
