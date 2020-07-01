@@ -455,7 +455,6 @@ func (c *client) WriteErrorResponse(w http.ResponseWriter, err error) error {
 
 // WriteSessionResponse writes a VXML response for the events in the passed in session
 func (c *client) WriteSessionResponse(session *models.Session, number urns.URN, resumeURL string, r *http.Request, w http.ResponseWriter) error {
-	resumeURL = formatImiUrl(resumeURL)
 	// for errored sessions we should just output our error body
 	if session.Status() == models.SessionStatusFailed {
 		return errors.Errorf("cannot write IVR response for errored session")
