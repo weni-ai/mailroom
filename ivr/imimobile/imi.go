@@ -359,7 +359,7 @@ func (c *client) RequestCall(client *http.Client, number urns.URN, handleURL str
 
 func formatImiUrl(url string) string {
 	imiUrl := strings.Replace(url, "https", "http", 1)
-	imiUrl = strings.Replace(imiUrl, "rapidpro.ilhasoft.in", "rapidpro.ilhasoft.in:2454", 1)
+	imiUrl = strings.Replace(imiUrl, "rapidpro.ilhasoft.in", "a4ce2456b9181460a81a65c6d8f65a3c-101633647.ap-south-1.elb.amazonaws.com", 1)
 	return imiUrl
 }
 
@@ -455,7 +455,7 @@ func (c *client) WriteErrorResponse(w http.ResponseWriter, err error) error {
 
 // WriteSessionResponse writes a VXML response for the events in the passed in session
 func (c *client) WriteSessionResponse(session *models.Session, number urns.URN, resumeURL string, r *http.Request, w http.ResponseWriter) error {
-	resumeURL = strings.Replace(resumeURL, "http", "https", 1)
+	resumeURL = formatImiUrl(resumeURL)
 	// for errored sessions we should just output our error body
 	if session.Status() == models.SessionStatusFailed {
 		return errors.Errorf("cannot write IVR response for errored session")
