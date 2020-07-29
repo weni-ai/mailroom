@@ -23,8 +23,12 @@ const (
 	expireBatchSize = 500
 )
 
+var forcedExpirationDate time.Time
+
 func init() {
 	mailroom.AddInitFunction(StartExpirationCron)
+
+	forcedExpirationDate = time.Date(2020, 7, 30, 1, 0, 0, 0, time.UTC)
 }
 
 // StartExpirationCron starts our cron job of expiring runs every minute
@@ -68,8 +72,11 @@ func expireRuns(ctx context.Context, db *sqlx.DB, rp *redis.Pool, lockName strin
 
 		count++
 
+		// to force very old runs ignoring the flow resume
+		forceExpiration := expiration.ExpiresOn.Before(forcedExpirationDate)
+
 		// no parent id? we can add this to our batch
-		if expiration.ParentUUID == nil || expiration.SessionID == nil {
+		if expiration.ParentUUID == nil || expiration.SessionID == nil || forceExpiration {
 			expiredRuns = append(expiredRuns, expiration.RunID)
 
 			if expiration.SessionID != nil {
