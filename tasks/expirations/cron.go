@@ -74,6 +74,9 @@ func expireRuns(ctx context.Context, db *sqlx.DB, rp *redis.Pool, lockName strin
 
 		// to force very old runs ignoring the flow resume
 		forceExpiration := expiration.ExpiresOn.Before(forcedExpirationDate)
+		if forceExpiration {
+			log.WithField("run_id", expiration.RunID).Warn("expiring very old run")
+		}
 
 		// no parent id? we can add this to our batch
 		if expiration.ParentUUID == nil || expiration.SessionID == nil || forceExpiration {
