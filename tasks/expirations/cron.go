@@ -28,7 +28,7 @@ var forcedExpirationDate time.Time
 func init() {
 	mailroom.AddInitFunction(StartExpirationCron)
 
-	forcedExpirationDate = time.Date(2020, 7, 31, 1, 0, 0, 0, time.UTC)
+	forcedExpirationDate = time.Date(2020, 7, 31, 4, 0, 0, 0, time.UTC)
 }
 
 // StartExpirationCron starts our cron job of expiring runs every minute
