@@ -1,3 +1,67 @@
+v5.7.14
+----------
+ * Stop writing is_blocked and is_stopped
+
+v5.7.13
+----------
+ * Read from contact.status intead of is_stopped/is_blocked
+ * Implement saving of zendesk ticket files as attachments
+ * Abstract S3 code so tests and dev envs can use file storage
+
+v5.7.12
+----------
+ * Fix inserting channel logs and add test
+
+v5.7.11
+----------
+ * Always write contact.status when writing is_blocked or is_stopped
+ * Convert IVR code to use goflow's httpx package
+
+v5.7.10
+----------
+ * Tweak goreleaser config to include subdirectories inside docs folder
+
+v5.7.9
+----------
+ * Update to goflow v0.101.2
+ * Bundle localized goflow docs in release
+
+v5.7.8
+----------
+ * Recalculate event fires for campaign events based on last_seen_on
+
+v5.7.7
+----------
+ * Update to latest goflow v0.100.0
+
+v5.7.6
+----------
+ * Remove protection for overwriting last_seen_on with older values
+
+v5.7.5
+----------
+ * Update last_seen_on when handling certain channel events
+ * Update last_seen_on when we receive a message from a contact
+
+v5.7.4
+----------
+ * Fail outgoing messages for suspended orgs
+ * Refresh groups as well as fields for contact query parsing
+
+v5.7.3
+----------
+ * Update to goflow v0.99.0
+
+v5.7.2
+----------
+ * Update to latest goflow v0.98.0
+ * Render rich errors with code and extra field
+
+v5.7.1
+----------
+ * Update to latest goflow v0.96.0
+ * Add loop protection by passing session history to new flow action triggers
+
 v5.7.0
 ----------
  * Set user and origin on manual triggers
