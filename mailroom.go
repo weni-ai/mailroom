@@ -9,9 +9,9 @@ import (
 	"sync"
 	"time"
 
+	"github.com/nyaruka/gocommon/storage"
 	"github.com/nyaruka/mailroom/config"
 	"github.com/nyaruka/mailroom/queue"
-	"github.com/nyaruka/mailroom/utils/storage"
 	"github.com/nyaruka/mailroom/web"
 
 	"github.com/gomodule/redigo/redis"
@@ -159,9 +159,21 @@ func (mr *Mailroom) Start() error {
 	}
 
 	// create our storage (S3 or file system)
-	mr.Storage, err = storage.New(mr.Config)
-	if err != nil {
-		return err
+	if mr.Config.AWSAccessKeyID != "" {
+		s3Client, err := storage.NewS3Client(&storage.S3Options{
+			AWSAccessKeyID:     mr.Config.AWSAccessKeyID,
+			AWSSecretAccessKey: mr.Config.AWSSecretAccessKey,
+			Endpoint:           mr.Config.S3Endpoint,
+			Region:             mr.Config.S3Region,
+			DisableSSL:         mr.Config.S3DisableSSL,
+			ForcePathStyle:     mr.Config.S3ForcePathStyle,
+		})
+		if err != nil {
+			return err
+		}
+		mr.Storage = storage.NewS3(s3Client, mr.Config.S3MediaBucket)
+	} else {
+		mr.Storage = storage.NewFS("_storage")
 	}
 
 	// test our storage

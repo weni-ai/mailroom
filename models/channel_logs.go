@@ -2,6 +2,8 @@ package models
 
 import (
 	"context"
+	"fmt"
+	"net/http"
 	"time"
 
 	"github.com/jmoiron/sqlx"
@@ -52,9 +54,12 @@ func NewChannelLog(trace *httpx.Trace, isError bool, desc string, channel *Chann
 		statusCode = trace.Response.StatusCode
 	}
 
+	// if URL was rewritten (by nginx for example), we want to log the original request
+	url := originalURL(trace.Request)
+
 	l.Description = desc
 	l.IsError = isError
-	l.URL = trace.Request.URL.String()
+	l.URL = url
 	l.Method = trace.Request.Method
 	l.Request = string(trace.RequestTrace)
 	l.Response = trace.ResponseTraceUTF8("...")
@@ -68,6 +73,14 @@ func NewChannelLog(trace *httpx.Trace, isError bool, desc string, channel *Chann
 	return log
 }
 
+func originalURL(r *http.Request) string {
+	proxyPath := r.Header.Get("X-Forwarded-Path")
+	if proxyPath != "" {
+		return fmt.Sprintf("https://%s%s", r.Host, proxyPath)
+	}
+	return r.URL.String()
+}
+
 // InsertChannelLogs writes the given channel logs to the db
 func InsertChannelLogs(ctx context.Context, db *sqlx.DB, logs []*ChannelLog) error {
 	ls := make([]interface{}, len(logs))
@@ -75,7 +88,7 @@ func InsertChannelLogs(ctx context.Context, db *sqlx.DB, logs []*ChannelLog) err
 		ls[i] = &logs[i].l
 	}
 
-	err := BulkSQL(ctx, "insert channel log", db, insertChannelLogSQL, ls)
+	err := BulkQuery(ctx, "insert channel log", db, insertChannelLogSQL, ls)
 	if err != nil {
 		return errors.Wrapf(err, "error inserting channel log")
 	}
@@ -105,7 +118,7 @@ func InsertChannelLog(ctx context.Context, db *sqlx.DB,
 		l.ConnectionID = conn.ID()
 	}
 
-	err := BulkSQL(ctx, "insert channel log", db, insertChannelLogSQL, []interface{}{l})
+	err := BulkQuery(ctx, "insert channel log", db, insertChannelLogSQL, []interface{}{l})
 	if err != nil {
 		return nil, errors.Wrapf(err, "error inserting channel log")
 	}
