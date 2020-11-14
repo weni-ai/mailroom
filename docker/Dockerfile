@@ -17,4 +17,5 @@ RUN cp ./docs/en-us/*.* docs/
 RUN go install -v ./cmd/...
 
 EXPOSE 8000
+EXPOSE 9000
 ENTRYPOINT ["mailroom"]

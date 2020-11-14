@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	_ "net/http/pprof"
 	"sync"
 	"time"
 
@@ -175,6 +176,18 @@ func (s *Server) Start() {
 		if err != nil && err != http.ErrServerClosed {
 			logrus.WithFields(logrus.Fields{
 				"comp":  "server",
+				"state": "stopping",
+				"err":   err,
+			}).Error()
+		}
+	}()
+
+	// serve profiler
+	go func() {
+		err := http.ListenAndServe(fmt.Sprintf("%s:9000", s.Config.Address), nil)
+		if err != nil && err != http.ErrServerClosed {
+			logrus.WithFields(logrus.Fields{
+				"comp":  "profiler server",
 				"state": "stopping",
 				"err":   err,
 			}).Error()
