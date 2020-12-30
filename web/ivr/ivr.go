@@ -13,9 +13,9 @@ import (
 	"github.com/nyaruka/gocommon/urns"
 	"github.com/nyaruka/goflow/assets"
 	"github.com/nyaruka/mailroom/config"
-	"github.com/nyaruka/mailroom/ivr"
-	"github.com/nyaruka/mailroom/models"
-	"github.com/nyaruka/mailroom/tasks/handler"
+	"github.com/nyaruka/mailroom/core/ivr"
+	"github.com/nyaruka/mailroom/core/models"
+	"github.com/nyaruka/mailroom/core/tasks/handler"
 	"github.com/nyaruka/mailroom/web"
 
 	"github.com/go-chi/chi"
@@ -102,7 +102,7 @@ func handleIncomingCall(ctx context.Context, s *web.Server, r *http.Request, w h
 	}
 
 	// get the contact for this URN
-	contact, _, err := models.GetOrCreateContact(ctx, s.DB, oa, urn)
+	contact, _, _, err := models.GetOrCreateContact(ctx, s.DB, oa, []urns.URN{urn}, channel.ID())
 	if err != nil {
 		return channel, nil, client.WriteErrorResponse(w, errors.Wrapf(err, "unable to get contact by urn"))
 	}
