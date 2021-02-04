@@ -1,3 +1,121 @@
+v6.1.5
+----------
+ * Update to goflow v0.107.1
+
+v6.1.4
+----------
+ * Variable timeout for fire campaign task
+
+v6.1.3
+----------
+ * Fix misreporting created contacts as updated during imports
+
+v6.1.2
+----------
+ * Ensure field and group assets used for imports are fresh
+ * Add support for internal type ticketers
+
+v6.1.1
+----------
+ * Update to latest goflow v0.106.3
+
+v6.1.0
+----------
+ * Configure engine to disallow HTTP requests to private networks
+
+v6.0.3
+----------
+ * correct name for completion.json in release
+
+v6.0.2
+----------
+ * pin goreleaser, explicit inclusion of /docs/*, completions and functions
+
+v6.0.1
+----------
+ * add log when queuing to courier
+
+v6.0.0
+----------
+ * Update test database
+
+v5.7.44
+----------
+ * Add ticket service for Rocket.Chat
+
+v5.7.43
+----------
+ * Update to latest goflow v0.106.1
+
+v5.7.42
+----------
+ * Prevent importing invalid URNs during import
+
+v5.7.41
+----------
+ * Update to latest goflow v0.106.0
+ * Don't write to flows_flowrun.timeout_on so it can be dropped
+
+v5.7.40
+----------
+ * Update to goflow v0.105.5
+
+v5.7.39
+----------
+ * Fix input_labels_added event handling when session input ID isn't set
+
+v5.7.38
+----------
+ * Always request Mp3 files from Twilio IVR recordings
+
+v5.7.37
+----------
+ * Add support for outgoing mailgun ticket attachments
+
+v5.7.36
+----------
+ * Incoming attachments for mailgun ticketers
+
+v5.7.33
+----------
+ * Update to goflow v0.105.4
+ * Fix cloning of flows during simulation so that ignore keyword triggers is cloned too
+
+v5.7.32
+----------
+ * Update to goflow v0.105.3 to get support for arabic numerals in has_number tests
+
+v5.7.31
+----------
+ * Update to latest goflow to get for normalizing numbers from The Gambia
+ * Enable retrying on the elastic client
+
+v5.7.30
+----------
+ * Reorganization of core packages
+
+v5.7.29
+----------
+ * Fix race condition when bulk getting/creating contacts
+
+v5.7.28
+----------
+ * Add contact/resolve endpoint to assist with channel events still handled in RP
+
+v5.7.27
+----------
+ * If a flow start task creates new contacts, save those back to the start
+
+v5.7.26
+----------
+ * Add mockable DB to enable testing database errors
+ * CreateContact also should do lookup before trying to create new contact with URNs
+ * Imports 2.0
+
+v5.7.25
+----------
+ * Pass org from the base task to task structs to remove need for duplicating it in the task body
+
 v5.7.24
 ----------
  * Add SessionStatus to messages queued to courier
