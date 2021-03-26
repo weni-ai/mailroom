@@ -80,7 +80,7 @@ type Client interface {
 
 	InputForRequest(r *http.Request) (string, utils.Attachment, error)
 
-	StatusForRequest(r *http.Request) (models.ConnectionStatus, int)
+	StatusForRequest(r *http.Request, current models.ConnectionStatus) (models.ConnectionStatus, int)
 
 	PreprocessResume(ctx context.Context, db *sqlx.DB, rp *redis.Pool, conn *models.ChannelConnection, r *http.Request) ([]byte, error)
 
@@ -405,17 +405,17 @@ func ResumeIVRFlow(
 		return errors.Wrapf(err, "error loading session for contact")
 	}
 
-	if session == nil {
-		return WriteErrorResponse(ctx, db, client, conn, w, errors.Errorf("no active IVR session for contact"))
-	}
+	// if session == nil {
+	// 	return WriteErrorResponse(ctx, db, client, conn, w, errors.Errorf("no active IVR session for contact"))
+	// }
 
-	if session.ConnectionID() == nil {
-		return WriteErrorResponse(ctx, db, client, conn, w, errors.Errorf("active session: %d has no connection", session.ID()))
-	}
+	// if session.ConnectionID() == nil {
+	// 	return WriteErrorResponse(ctx, db, client, conn, w, errors.Errorf("active session: %d has no connection", session.ID()))
+	// }
 
-	if *session.ConnectionID() != conn.ID() {
-		return WriteErrorResponse(ctx, db, client, conn, w, errors.Errorf("active session: %d does not match connection: %d", session.ID(), *session.ConnectionID()))
-	}
+	// if *session.ConnectionID() != conn.ID() {
+	// 	return WriteErrorResponse(ctx, db, client, conn, w, errors.Errorf("active session: %d does not match connection: %d", session.ID(), *session.ConnectionID()))
+	// }
 
 	// preprocess this request
 	body, err := client.PreprocessResume(ctx, db, rp, conn, r)
@@ -515,7 +515,7 @@ func ResumeIVRFlow(
 	}
 
 	// make sure our call is still happening
-	status, _ := client.StatusForRequest(r)
+	status, _ := client.StatusForRequest(r, conn.Status())
 	if status != models.ConnectionStatusInProgress {
 		err := conn.UpdateStatus(ctx, db, status, 0, time.Now())
 		if err != nil {
@@ -550,7 +550,7 @@ func ResumeIVRFlow(
 // ended for some reason and update the state of the call and session if so
 func HandleIVRStatus(ctx context.Context, db *sqlx.DB, rp *redis.Pool, oa *models.OrgAssets, client Client, conn *models.ChannelConnection, r *http.Request, w http.ResponseWriter) error {
 	// read our status and duration from our client
-	status, duration := client.StatusForRequest(r)
+	status, duration := client.StatusForRequest(r, conn.Status())
 
 	// if we errored schedule a retry if appropriate
 	if status == models.ConnectionStatusErrored {

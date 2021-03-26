@@ -399,7 +399,7 @@ type StatusRequest struct {
 }
 
 // StatusForRequest returns the current call status for the passed in status (and optional duration if known)
-func (c *client) StatusForRequest(r *http.Request) (models.ConnectionStatus, int) {
+func (c *client) StatusForRequest(r *http.Request, current models.ConnectionStatus) (models.ConnectionStatus, int) {
 	// this is a resume, call is in progress, no need to look at the body
 	if r.Form.Get("action") == "resume" {
 		return models.ConnectionStatusInProgress, 0

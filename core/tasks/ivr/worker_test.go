@@ -104,7 +104,7 @@ func (c *MockClient) InputForRequest(r *http.Request) (string, utils.Attachment,
 	return "", ivr.NilAttachment, nil
 }
 
-func (c *MockClient) StatusForRequest(r *http.Request) (models.ConnectionStatus, int) {
+func (c *MockClient) StatusForRequest(r *http.Request, current models.ConnectionStatus) (models.ConnectionStatus, int) {
 	return models.ConnectionStatusFailed, 10
 }
 

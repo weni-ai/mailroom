@@ -258,7 +258,7 @@ func (c *client) InputForRequest(r *http.Request) (string, utils.Attachment, err
 }
 
 // StatusForRequest returns the current call status for the passed in status (and optional duration if known)
-func (c *client) StatusForRequest(r *http.Request) (models.ConnectionStatus, int) {
+func (c *client) StatusForRequest(r *http.Request, current models.ConnectionStatus) (models.ConnectionStatus, int) {
 	status := r.Form.Get("CallStatus")
 	switch status {
 

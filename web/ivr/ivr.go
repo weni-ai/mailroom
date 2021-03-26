@@ -27,6 +27,8 @@ func init() {
 	web.RegisterRoute(http.MethodPost, "/mr/ivr/c/{uuid:[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}}/handle", newIVRHandler(handleFlow))
 	web.RegisterRoute(http.MethodPost, "/mr/ivr/c/{uuid:[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}}/status", newIVRHandler(handleStatus))
 	web.RegisterRoute(http.MethodPost, "/mr/ivr/c/{uuid:[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}}/incoming", newIVRHandler(handleIncomingCall))
+	web.RegisterRoute(http.MethodGet, "/mr/ivr/c/{uuid:[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}}/handle", newIVRHandler(handleFlow))
+
 }
 
 type ivrHandlerFn func(ctx context.Context, s *web.Server, r *http.Request, w http.ResponseWriter) (*models.Channel, *models.ChannelConnection, error)
@@ -212,7 +214,7 @@ func buildResumeURL(channel *models.Channel, conn *models.ChannelConnection, urn
 		"urn":        []string{urn.String()},
 	}
 
-	return fmt.Sprintf("https://%s/mr/ivr/c/%s/handle?%s", domain, channel.UUID(), form.Encode())
+	return fmt.Sprintf("http://%s/mr/ivr/c/%s/handle?%s", domain, channel.UUID(), form.Encode())
 }
 
 // handleFlow handles all incoming IVR requests related to a flow (status is handled elsewhere)

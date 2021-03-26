@@ -43,6 +43,8 @@ import (
 	_ "github.com/nyaruka/mailroom/web/ticket"
 
 	_ "github.com/lib/pq"
+	_ "github.com/nyaruka/mailroom/services/tickets/mailgun"
+	_ "github.com/nyaruka/mailroom/services/tickets/zendesk"
 	"github.com/sirupsen/logrus"
 )
 
