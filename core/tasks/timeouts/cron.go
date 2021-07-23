@@ -20,7 +20,7 @@ import (
 const (
 	timeoutLock  = "sessions_timeouts"
 	markerGroup  = "session_timeouts"
-	tickInterval = 5
+	tickInterval = 15
 )
 
 func init() {
