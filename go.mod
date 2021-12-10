@@ -34,6 +34,8 @@ require (
 	gopkg.in/go-playground/validator.v9 v9.31.0
 )
 
+replace github.com/nyaruka/gocommon v1.14.1 => github.com/Ilhasoft/gocommon v1.14.2
+
 require (
 	github.com/antlr/antlr4 v0.0.0-20200701161529-3d9351f61e0f // indirect
 	github.com/blevesearch/segment v0.9.0 // indirect

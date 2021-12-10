@@ -1,5 +1,7 @@
 cloud.google.com/go v0.26.0/go.mod h1:aQUYkXzVsufM+DwF1aE+0xfcU+56JwCaLick0ClmMTw=
 github.com/BurntSushi/toml v0.3.1/go.mod h1:xHWCNGjB5oqiDr8zfno3MHue2Ht5sIBksp03qcyfWMU=
+github.com/Ilhasoft/gocommon v1.14.2 h1:ceTw45wJ3ypvXsycHU6PUVdLA7bzgtn3WVYda5mNOVw=
+github.com/Ilhasoft/gocommon v1.14.2/go.mod h1:R1Vr7PwrYCSu+vcU0t8t/5C4TsCwcWoqiuIQCxcMqxs=
 github.com/Masterminds/semver v1.5.0 h1:H65muMkzWKEuNDnfl9d70GUjFniHKHRbFPGBuZ3QEww=
 github.com/Masterminds/semver v1.5.0/go.mod h1:MB6lktGJrhw8PrUyiEoblNEGEQ+RzHPF078ddwwvV3Y=
 github.com/alecthomas/template v0.0.0-20160405071501-a0175ee3bccc/go.mod h1:LOuyumcjzFXgccqObfd/Ljyb9UuFJ6TxHnclSeseNhc=
@@ -132,8 +134,6 @@ github.com/naoina/toml v0.1.1 h1:PT/lllxVVN0gzzSqSlHEmP8MJB4MY2U7STGxiouV4X8=
 github.com/naoina/toml v0.1.1/go.mod h1:NBIhNtsFMo3G2szEBne+bO4gS192HuIYRqfvOWb4i1E=
 github.com/nyaruka/ezconf v0.2.1 h1:TDXWoqjqYya1uhou1mAJZg7rgFYL98EB0Tb3+BWtUh0=
 github.com/nyaruka/ezconf v0.2.1/go.mod h1:ey182kYkw2MIi4XiWe1FR/mzI33WCmTWuceDYYxgnQw=
-github.com/nyaruka/gocommon v1.14.1 h1:/ScvLmg4zzVAuZ78TaENrvSEvW3WnUdqRd/t9hX7z7E=
-github.com/nyaruka/gocommon v1.14.1/go.mod h1:R1Vr7PwrYCSu+vcU0t8t/5C4TsCwcWoqiuIQCxcMqxs=
 github.com/nyaruka/goflow v0.140.1 h1:B/ikb/eOgqzEIoKWYjTSQtb5h3AHpnf/xrTS0H2lJLA=
 github.com/nyaruka/goflow v0.140.1/go.mod h1:s3f7q2k6IKZicOcu2mu2EcuKgK3hava43Zb3cagtpVM=
 github.com/nyaruka/librato v1.0.0 h1:Vznj9WCeC1yZXbBYyYp40KnbmXLbEkjKmHesV/v2SR0=
