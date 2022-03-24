@@ -2,6 +2,7 @@ package runner
 
 import (
 	"context"
+	"encoding/json"
 	"time"
 
 	"github.com/gomodule/redigo/redis"
@@ -9,6 +10,7 @@ import (
 	"github.com/nyaruka/goflow/assets"
 	"github.com/nyaruka/goflow/excellent/types"
 	"github.com/nyaruka/goflow/flows"
+	"github.com/nyaruka/goflow/flows/actions"
 	"github.com/nyaruka/goflow/flows/triggers"
 	"github.com/nyaruka/librato"
 	"github.com/nyaruka/mailroom/core/goflow"
@@ -29,6 +31,12 @@ var startTypeToOrigin = map[models.StartType]string{
 	models.StartTypeManual:    "ui",
 	models.StartTypeAPI:       "api",
 	models.StartTypeAPIZapier: "zapier",
+}
+
+type FlowDefinition struct {
+	Nodes []struct {
+		Actions []actions.CallWebhookAction `json:"actions"`
+	} `json:"nodes"`
 }
 
 // NewStartOptions creates and returns the default start options to be used for flow starts
@@ -407,6 +415,10 @@ func FireCampaignEvents(
 	return startedContacts, nil
 }
 
+var bannedHeaders = []string{
+	"X-aws-ec2-metadata-token",
+}
+
 // StartFlow runs the passed in flow for the passed in contact
 func StartFlow(
 	ctx context.Context, rt *runtime.Runtime, oa *models.OrgAssets,
@@ -414,6 +426,25 @@ func StartFlow(
 
 	if len(contactIDs) == 0 {
 		return nil, nil
+	}
+
+	//Checking for any banned headers
+	definition := FlowDefinition{}
+	err := json.Unmarshal(flow.Definition(), &definition)
+	if err != nil {
+		return nil, errors.Wrapf(err, "unmarshalling error")
+	}
+
+	for _, node := range definition.Nodes {
+		for _, action := range node.Actions {
+			for header, _ := range action.Headers {
+				for _, hb := range bannedHeaders {
+					if header == hb {
+						return nil, errors.Errorf("error: banned header found")
+					}
+				}
+			}
+		}
 	}
 
 	// figures out which contacts need to be excluded if any
