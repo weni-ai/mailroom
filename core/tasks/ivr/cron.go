@@ -19,6 +19,7 @@ import (
 const (
 	retryIVRLock  = "retry_ivr_calls"
 	expireIVRLock = "expire_ivr_calls"
+	clearIVRLock  = "clear_ivr_connections"
 )
 
 func init() {
@@ -40,6 +41,14 @@ func StartIVRCron(rt *runtime.Runtime, wg *sync.WaitGroup, quit chan bool) error
 			ctx, cancel := context.WithTimeout(context.Background(), time.Minute*10)
 			defer cancel()
 			return expireCalls(ctx, rt, expireIVRLock, lockValue)
+		},
+	)
+
+	cron.StartCron(quit, rt.RP, clearIVRLock, time.Hour,
+		func(lockName string, lockValue string) error {
+			ctx, cancel := context.WithTimeout(context.Background(), time.Minute*10)
+			defer cancel()
+			return clearStuckedChannelConnections(ctx, rt, clearIVRLock, lockValue)
 		},
 	)
 
@@ -167,6 +176,41 @@ func expireCalls(ctx context.Context, rt *runtime.Runtime, lockName string, lock
 
 	return nil
 }
+
+func clearStuckedChannelConnections(ctx context.Context, rt *runtime.Runtime, lockName string, lockValue string) error {
+	log := logrus.WithField("comp", "ivr_cron_cleaner").WithField("lock", lockValue)
+	start := time.Now()
+
+	ctx, cancel := context.WithTimeout(ctx, time.Minute*5)
+	defer cancel()
+
+	result, err := rt.DB.ExecContext(ctx, clearStuckedChanelConnectionsSQL)
+	if err != nil {
+		return errors.Wrapf(err, "error cleaning stucked connections")
+	}
+
+	rowsAffected, err := result.RowsAffected()
+	if err != nil {
+		return errors.Wrapf(err, "error getting rows affected on cleaning stucked connections")
+	}
+	if rowsAffected > 0 {
+		log.WithField("count", rowsAffected).WithField("elapsed", time.Since(start)).Info("stucked channel connections")
+	}
+	return nil
+}
+
+const clearStuckedChanelConnectionsSQL = `
+	UPDATE channels_channelconnection
+	SET status = 'F' 
+	WHERE id in (
+		SELECT id
+		FROM channels_channelconnection
+		WHERE  
+			(status = 'W' OR status = 'R' OR status = 'I') AND
+			modified_on < NOW() - INTERVAL '1 DAY'
+		LIMIT  100
+	)
+`
 
 const selectExpiredRunsSQL = `
 	SELECT
