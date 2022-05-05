@@ -22,8 +22,8 @@ const (
 	retryIVRLock           = "retry_ivr_calls"
 	expireIVRLock          = "expire_ivr_calls"
 	clearIVRLock           = "clear_ivr_connections"
-	changeMaxConnNightLock = "change_ivr_max_conn"
-	changeMaxConnDayLock   = "change_ivr_max_conn"
+	changeMaxConnNightLock = "change_ivr_max_conn_night"
+	changeMaxConnDayLock   = "change_ivr_max_conn_day"
 )
 
 func init() {
