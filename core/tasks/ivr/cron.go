@@ -19,10 +19,11 @@ import (
 )
 
 const (
-	retryIVRLock  = "retry_ivr_calls"
-	expireIVRLock = "expire_ivr_calls"
-	clearIVRLock  = "clear_ivr_connections"
-	changeMaxConn = "change_ivr_max_conn"
+	retryIVRLock           = "retry_ivr_calls"
+	expireIVRLock          = "expire_ivr_calls"
+	clearIVRLock           = "clear_ivr_connections"
+	changeMaxConnNightLock = "change_ivr_max_conn"
+	changeMaxConnDayLock   = "change_ivr_max_conn"
 )
 
 func init() {
@@ -55,25 +56,25 @@ func StartIVRCron(rt *runtime.Runtime, wg *sync.WaitGroup, quit chan bool) error
 		},
 	)
 
-	cron.StartCron(quit, rt.RP, changeMaxConn, time.Minute*10,
+	cron.StartCron(quit, rt.RP, changeMaxConnNightLock, time.Minute*10,
 		func(lockName string, lockValue string) error {
 			currentHour := time.Now().Hour()
 			if currentHour >= 21 {
 				ctx, cancel := context.WithTimeout(context.Background(), time.Minute*10)
 				defer cancel()
-				return changeMaxConnectionsConfig(ctx, rt, changeMaxConn, lockValue, "TW", 0)
+				return changeMaxConnectionsConfig(ctx, rt, changeMaxConnNightLock, lockValue, "TW", 0)
 			}
 			return nil
 		},
 	)
 
-	cron.StartCron(quit, rt.RP, changeMaxConn, time.Minute*10,
+	cron.StartCron(quit, rt.RP, changeMaxConnDayLock, time.Minute*10,
 		func(lockName string, lockValue string) error {
 			currentHour := time.Now().Hour()
 			if currentHour >= 8 && currentHour < 21 {
 				ctx, cancel := context.WithTimeout(context.Background(), time.Minute*10)
 				defer cancel()
-				return changeMaxConnectionsConfig(ctx, rt, changeMaxConn, lockValue, "TW", 500)
+				return changeMaxConnectionsConfig(ctx, rt, changeMaxConnDayLock, lockValue, "TW", 500)
 			}
 			return nil
 		},
