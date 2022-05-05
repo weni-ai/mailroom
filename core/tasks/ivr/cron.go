@@ -58,8 +58,12 @@ func StartIVRCron(rt *runtime.Runtime, wg *sync.WaitGroup, quit chan bool) error
 
 	cron.StartCron(quit, rt.RP, changeMaxConnNightLock, time.Minute*10,
 		func(lockName string, lockValue string) error {
-			currentHour := time.Now().Hour()
-			if currentHour >= 21 {
+			location, err := time.LoadLocation("Asia/Kolkata")
+			if err != nil {
+				return err
+			}
+			currentHour := time.Now().In(location).Hour()
+			if currentHour >= 21 || currentHour < 8 {
 				ctx, cancel := context.WithTimeout(context.Background(), time.Minute*10)
 				defer cancel()
 				return changeMaxConnectionsConfig(ctx, rt, changeMaxConnNightLock, lockValue, "TW", 0)
@@ -70,7 +74,11 @@ func StartIVRCron(rt *runtime.Runtime, wg *sync.WaitGroup, quit chan bool) error
 
 	cron.StartCron(quit, rt.RP, changeMaxConnDayLock, time.Minute*10,
 		func(lockName string, lockValue string) error {
-			currentHour := time.Now().Hour()
+			location, err := time.LoadLocation("Asia/Kolkata")
+			if err != nil {
+				return err
+			}
+			currentHour := time.Now().In(location).Hour()
 			if currentHour >= 8 && currentHour < 21 {
 				ctx, cancel := context.WithTimeout(context.Background(), time.Minute*10)
 				defer cancel()
