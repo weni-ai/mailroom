@@ -20,7 +20,7 @@ func TestQueueCourierMessages(t *testing.T) {
 	rc := rp.Get()
 	defer rc.Close()
 
-	defer testsuite.Reset(testsuite.ResetAll)
+	defer testsuite.Reset(testsuite.ResetData | testsuite.ResetRedis)
 
 	// create an Andoid channel
 	androidChannel := testdata.InsertChannel(db, testdata.Org1, "A", "Android 1", []string{"tel"}, "SR", map[string]interface{}{"FCM_ID": "FCMID"})
@@ -28,76 +28,35 @@ func TestQueueCourierMessages(t *testing.T) {
 	oa, err := models.GetOrgAssetsWithRefresh(ctx, rt, testdata.Org1.ID, models.RefreshOrg|models.RefreshChannels)
 	require.NoError(t, err)
 
-	tests := []struct {
-		Description string
-		Msgs        []msgSpec
-		QueueSizes  map[string][]int
-	}{
-		{
-			Description: "2 queueable messages",
-			Msgs: []msgSpec{
-				{
-					ChannelID: testdata.TwilioChannel.ID,
-					ContactID: testdata.Cathy.ID,
-					URNID:     testdata.Cathy.URNID,
-				},
-				{
-					ChannelID: testdata.TwilioChannel.ID,
-					ContactID: testdata.Cathy.ID,
-					URNID:     testdata.Cathy.URNID,
-				},
-			},
-			QueueSizes: map[string][]int{
-				"msgs:74729f45-7f29-4868-9dc4-90e491e3c7d8|10/0": {2},
-			},
-		},
-		{
-			Description: "1 queueable message and 1 failed",
-			Msgs: []msgSpec{
-				{
-					ChannelID: testdata.TwilioChannel.ID,
-					ContactID: testdata.Cathy.ID,
-					URNID:     testdata.Cathy.URNID,
-					Failed:    true,
-				},
-				{
-					ChannelID: testdata.TwilioChannel.ID,
-					ContactID: testdata.Cathy.ID,
-					URNID:     testdata.Cathy.URNID,
-				},
-			},
-			QueueSizes: map[string][]int{
-				"msgs:74729f45-7f29-4868-9dc4-90e491e3c7d8|10/0": {1},
-			},
-		},
-		{
-			Description: "0 messages",
-			Msgs:        []msgSpec{},
-			QueueSizes:  map[string][]int{},
-		},
+	// noop if no messages provided
+	msgio.QueueCourierMessages(rc, testdata.Cathy.ID, []*models.Msg{})
+	testsuite.AssertCourierQueues(t, map[string][]int{})
+
+	// queue 3 messages for Cathy..
+	msgs := []*models.Msg{
+		(&msgSpec{Channel: testdata.TwilioChannel, Contact: testdata.Cathy}).createMsg(t, rt, oa),
+		(&msgSpec{Channel: testdata.TwilioChannel, Contact: testdata.Cathy}).createMsg(t, rt, oa),
+		(&msgSpec{Channel: testdata.TwilioChannel, Contact: testdata.Cathy, HighPriority: true}).createMsg(t, rt, oa),
+		(&msgSpec{Channel: testdata.VonageChannel, Contact: testdata.Cathy}).createMsg(t, rt, oa),
 	}
 
-	for _, tc := range tests {
-		var contactID models.ContactID
-		msgs := make([]*models.Msg, len(tc.Msgs))
-		for i, ms := range tc.Msgs {
-			msgs[i] = ms.createMsg(t, rt, oa)
-			contactID = ms.ContactID
-		}
+	msgio.QueueCourierMessages(rc, testdata.Cathy.ID, msgs)
 
-		rc.Do("FLUSHDB")
-		msgio.QueueCourierMessages(rc, contactID, msgs)
+	testsuite.AssertCourierQueues(t, map[string][]int{
+		"msgs:74729f45-7f29-4868-9dc4-90e491e3c7d8|10/0": {2}, // twilio, bulk priority
+		"msgs:74729f45-7f29-4868-9dc4-90e491e3c7d8|10/1": {1}, // twilio, high priority
+		"msgs:19012bfd-3ce3-4cae-9bb9-76cf92c73d49|10/0": {1}, // vonage, bulk priority
+	})
 
-		testsuite.AssertCourierQueues(t, tc.QueueSizes, "courier queue sizes mismatch in '%s'", tc.Description)
-	}
-
-	// check that trying to queue a courier message will panic
+	// check that trying to queue a message without a channel will panic
 	assert.Panics(t, func() {
-		ms := msgSpec{
-			ChannelID: androidChannel.ID,
-			ContactID: testdata.Cathy.ID,
-			URNID:     testdata.Cathy.URNID,
-		}
+		ms := msgSpec{Channel: nil, Contact: testdata.Cathy}
+		msgio.QueueCourierMessages(rc, testdata.Cathy.ID, []*models.Msg{ms.createMsg(t, rt, oa)})
+	})
+
+	// check that trying to queue an Android message will panic
+	assert.Panics(t, func() {
+		ms := msgSpec{Channel: androidChannel, Contact: testdata.Cathy}
 		msgio.QueueCourierMessages(rc, testdata.Cathy.ID, []*models.Msg{ms.createMsg(t, rt, oa)})
 	})
 }
@@ -114,8 +73,8 @@ func TestPushCourierBatch(t *testing.T) {
 
 	channel := oa.ChannelByID(testdata.TwilioChannel.ID)
 
-	msg1 := (&msgSpec{ChannelID: testdata.TwilioChannel.ID, ContactID: testdata.Cathy.ID, URNID: testdata.Cathy.URNID}).createMsg(t, rt, oa)
-	msg2 := (&msgSpec{ChannelID: testdata.TwilioChannel.ID, ContactID: testdata.Cathy.ID, URNID: testdata.Cathy.URNID}).createMsg(t, rt, oa)
+	msg1 := (&msgSpec{Channel: testdata.TwilioChannel, Contact: testdata.Cathy}).createMsg(t, rt, oa)
+	msg2 := (&msgSpec{Channel: testdata.TwilioChannel, Contact: testdata.Cathy}).createMsg(t, rt, oa)
 
 	err = msgio.PushCourierBatch(rc, channel, []*models.Msg{msg1, msg2}, "1636557205.123456")
 	require.NoError(t, err)
@@ -142,7 +101,7 @@ func TestPushCourierBatch(t *testing.T) {
 	// push another batch in the same epoch second with transaction counter still below limit
 	rc.Do("SET", "msgs:74729f45-7f29-4868-9dc4-90e491e3c7d8|10:tps:1636557205", "5")
 
-	msg3 := (&msgSpec{ChannelID: testdata.TwilioChannel.ID, ContactID: testdata.Cathy.ID, URNID: testdata.Cathy.URNID}).createMsg(t, rt, oa)
+	msg3 := (&msgSpec{Channel: testdata.TwilioChannel, Contact: testdata.Cathy}).createMsg(t, rt, oa)
 
 	err = msgio.PushCourierBatch(rc, channel, []*models.Msg{msg3}, "1636557205.234567")
 	require.NoError(t, err)
@@ -155,7 +114,7 @@ func TestPushCourierBatch(t *testing.T) {
 	rc.Do("ZREM", "msgs:active", "msgs:74729f45-7f29-4868-9dc4-90e491e3c7d8|10")
 	rc.Do("SET", "msgs:74729f45-7f29-4868-9dc4-90e491e3c7d8|10:tps:1636557205", "11")
 
-	msg4 := (&msgSpec{ChannelID: testdata.TwilioChannel.ID, ContactID: testdata.Cathy.ID, URNID: testdata.Cathy.URNID}).createMsg(t, rt, oa)
+	msg4 := (&msgSpec{Channel: testdata.TwilioChannel, Contact: testdata.Cathy}).createMsg(t, rt, oa)
 
 	err = msgio.PushCourierBatch(rc, channel, []*models.Msg{msg4}, "1636557205.345678")
 	require.NoError(t, err)

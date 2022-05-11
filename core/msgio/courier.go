@@ -10,7 +10,6 @@ import (
 	"github.com/nyaruka/mailroom/core/models"
 
 	"github.com/gomodule/redigo/redis"
-	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 )
 
@@ -74,6 +73,7 @@ func QueueCourierMessages(rc redis.Conn, contactID models.ContactID, msgs []*mod
 	// we batch msgs by channel uuid
 	batch := make([]*models.Msg, 0, len(msgs))
 	currentChannel := msgs[0].Channel()
+	currentPriority := msgs[0].HighPriority()
 
 	// commits our batch to redis
 	commitBatch := func() error {
@@ -94,39 +94,21 @@ func QueueCourierMessages(rc redis.Conn, contactID models.ContactID, msgs []*mod
 	}
 
 	for _, msg := range msgs {
-		// android messages should never get in here
-		if msg.Channel() != nil && msg.Channel().Type() == models.ChannelTypeAndroid {
-			panic("trying to queue android messages to courier")
-		}
+		// sanity check the state of the msg we're about to queue...
+		assert(msg.Channel() != nil && msg.ChannelUUID() != "", "can't queue a message to courier without a channel")
+		assert(msg.Channel().Type() != models.ChannelTypeAndroid, "can't queue an android message to courier")
+		assert(msg.URN() != urns.NilURN && msg.ContactURNID() != nil, "can't queue a message to courier without a URN")
 
-		// ignore any message without a channel or already marked as failed (maybe org is suspended)
-		if msg.ChannelUUID() == "" || msg.Status() == models.MsgStatusFailed {
-			continue
-		}
-
-		// nil channel object but have channel UUID? that's an error
-		if msg.Channel() == nil {
-			return errors.Errorf("msg passed in without channel set")
-		}
-
-		// no contact urn id or urn, also an error
-		if msg.URN() == urns.NilURN || msg.ContactURNID() == nil {
-			return errors.Errorf("msg passed with nil urn: %s", msg.URN())
-		}
-
-		// same channel? add to batch
-		if msg.Channel() == currentChannel {
+		// if this msg is the same channel and priority, add to current batch, otherwise start new batch
+		if msg.Channel() == currentChannel && msg.HighPriority() == currentPriority {
 			batch = append(batch, msg)
-		}
-
-		// different channel? queue it up
-		if msg.Channel() != currentChannel {
-			err := commitBatch()
-			if err != nil {
+		} else {
+			if err := commitBatch(); err != nil {
 				return err
 			}
 
 			currentChannel = msg.Channel()
+			currentPriority = msg.HighPriority()
 			batch = []*models.Msg{msg}
 		}
 	}
