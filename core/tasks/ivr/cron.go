@@ -97,22 +97,6 @@ func StartIVRCron(rt *runtime.Runtime, wg *sync.WaitGroup, quit chan bool) error
 		},
 	)
 
-	cron.StartCron(quit, rt.RP, clearQueuedPendingLock, time.Minute*10,
-		func(lockName string, lockValue string) error {
-			location, err := time.LoadLocation("Asia/Kolkata")
-			if err != nil {
-				return err
-			}
-			currentHour := time.Now().In(location).Hour()
-			if currentHour >= 21 || currentHour < 8 {
-				ctx, cancel := context.WithTimeout(context.Background(), time.Minute*10)
-				defer cancel()
-				return clearQueuedAndPendingConnections(ctx, rt, clearQueuedPendingLock, lockValue)
-			}
-			return nil
-		},
-	)
-
 	return nil
 }
 
@@ -311,26 +295,6 @@ func changeMaxConnectionsConfig(ctx context.Context, rt *runtime.Runtime, lockNa
 	return nil
 }
 
-func clearQueuedAndPendingConnections(ctx context.Context, rt *runtime.Runtime, lockName string, lockValue string) error {
-	log := logrus.WithField("comp", "ivr_cron_clear_queued_connections").WithField("lock", lockValue)
-	start := time.Now()
-
-	ctx, cancel := context.WithTimeout(ctx, time.Minute*5)
-	defer cancel()
-
-	result, err := rt.DB.ExecContext(ctx, clearQueuedAndPendingConnectionsSQL)
-	if err != nil {
-		return errors.Wrapf(err, "error cleaning queued and pending connections")
-	}
-
-	rowsAffected, err := result.RowsAffected()
-	if err != nil {
-		return errors.Wrapf(err, "error getting rows affected on cleaning queued or pending connections")
-	}
-	log.WithField("count", rowsAffected).WithField("elapsed", time.Since(start)).Info("cleaned queued or pendding connections")
-	return nil
-}
-
 const selectIVRTWTypeChannelsSQL = `
 	SELECT ROW_TO_JSON(r) FROM (
 		SELECT 
@@ -350,11 +314,6 @@ const updateIVRChannelConfigSQL = `
 	UPDATE channels_channel
 	SET config = $1
 	WHERE id = $2
-`
-
-const clearQueuedAndPendingConnectionsSQL = `
-	DELETE FROM public.channels_channelconnection
-	WHERE status = 'Q' OR status = 'P'
 `
 
 const clearStuckedChanelConnectionsSQL = `
