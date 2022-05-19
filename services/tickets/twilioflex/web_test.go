@@ -2,6 +2,7 @@ package twilioflex_test
 
 import (
 	"testing"
+	"time"
 
 	"github.com/nyaruka/mailroom/testsuite"
 	"github.com/nyaruka/mailroom/testsuite/testdata"
@@ -21,6 +22,7 @@ func TestEventCallback(t *testing.T) {
 		testdata.DefaultTopic,
 		"Have you seen my cookies?",
 		"CH6442c09c93ba4d13966fa42e9b78f620",
+		time.Time{},
 		nil,
 	)
 

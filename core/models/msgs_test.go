@@ -694,7 +694,7 @@ func TestSelectContactMessages(t *testing.T) {
 
 	now := time.Now()
 	msgIn := testdata.InsertIncomingMsg(db, testdata.Org1, testdata.TwilioChannel, testdata.Cathy, "in 1", models.MsgStatusHandled)
-	msgOut := testdata.InsertOutgoingMsg(db, testdata.Org1, testdata.TwilioChannel, testdata.Cathy, "out 1", []utils.Attachment{"image/jpeg:hi.jpg"}, models.MsgStatusSent)
+	msgOut := testdata.InsertOutgoingMsg(db, testdata.Org1, testdata.TwilioChannel, testdata.Cathy, "out 1", []utils.Attachment{"image/jpeg:hi.jpg"}, models.MsgStatusSent, false)
 
 	msgs, err := models.SelectContactMessages(ctx, db, int(testdata.Cathy.ID), now)
 
