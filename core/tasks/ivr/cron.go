@@ -40,7 +40,7 @@ func StartIVRCron(rt *runtime.Runtime, wg *sync.WaitGroup, quit chan bool) error
 				return err
 			}
 			currentHour := time.Now().In(location).Hour()
-			if currentHour >= 8 && currentHour < 21 {
+			if currentHour >= 7 && currentHour < 21 {
 				ctx, cancel := context.WithTimeout(context.Background(), time.Minute*10)
 				defer cancel()
 				return retryCalls(ctx, rt, retryIVRLock, lockValue)
@@ -72,7 +72,7 @@ func StartIVRCron(rt *runtime.Runtime, wg *sync.WaitGroup, quit chan bool) error
 				return err
 			}
 			currentHour := time.Now().In(location).Hour()
-			if currentHour >= 21 || currentHour < 8 {
+			if currentHour >= 21 || currentHour < 7 {
 				ctx, cancel := context.WithTimeout(context.Background(), time.Minute*10)
 				defer cancel()
 				return changeMaxConnectionsConfig(ctx, rt, changeMaxConnNightLock, lockValue, "TW", 0)
@@ -88,7 +88,7 @@ func StartIVRCron(rt *runtime.Runtime, wg *sync.WaitGroup, quit chan bool) error
 				return err
 			}
 			currentHour := time.Now().In(location).Hour()
-			if currentHour >= 8 && currentHour < 21 {
+			if currentHour >= 7 && currentHour < 21 {
 				ctx, cancel := context.WithTimeout(context.Background(), time.Minute*10)
 				defer cancel()
 				return changeMaxConnectionsConfig(ctx, rt, changeMaxConnDayLock, lockValue, "TW", 500)
@@ -324,7 +324,7 @@ const clearStuckedChanelConnectionsSQL = `
 		FROM channels_channelconnection
 		WHERE  
 			(status = 'W' OR status = 'R' OR status = 'I') AND
-			modified_on < NOW() - INTERVAL '1 DAY'
+			modified_on < NOW() - INTERVAL '2 DAYS'
 		LIMIT  100
 	)
 `
