@@ -14,15 +14,17 @@ import (
 
 	_ "github.com/nyaruka/mailroom/core/handlers"
 	_ "github.com/nyaruka/mailroom/core/hooks"
-	_ "github.com/nyaruka/mailroom/core/tasks/broadcasts"
+	_ "github.com/nyaruka/mailroom/core/tasks/analytics"
 	_ "github.com/nyaruka/mailroom/core/tasks/campaigns"
 	_ "github.com/nyaruka/mailroom/core/tasks/contacts"
 	_ "github.com/nyaruka/mailroom/core/tasks/expirations"
+	_ "github.com/nyaruka/mailroom/core/tasks/handler"
+	_ "github.com/nyaruka/mailroom/core/tasks/incidents"
 	_ "github.com/nyaruka/mailroom/core/tasks/interrupts"
 	_ "github.com/nyaruka/mailroom/core/tasks/ivr"
+	_ "github.com/nyaruka/mailroom/core/tasks/msgs"
 	_ "github.com/nyaruka/mailroom/core/tasks/schedules"
 	_ "github.com/nyaruka/mailroom/core/tasks/starts"
-	_ "github.com/nyaruka/mailroom/core/tasks/stats"
 	_ "github.com/nyaruka/mailroom/core/tasks/timeouts"
 	_ "github.com/nyaruka/mailroom/services/ivr/twiml"
 	_ "github.com/nyaruka/mailroom/services/ivr/vonage"
@@ -107,7 +109,7 @@ func main() {
 
 // handleSignals takes care of trapping quit, interrupt or terminate signals and doing the right thing
 func handleSignals(mr *mailroom.Mailroom) {
-	sigs := make(chan os.Signal)
+	sigs := make(chan os.Signal, 1)
 	signal.Notify(sigs, syscall.SIGINT, syscall.SIGTERM, syscall.SIGQUIT)
 
 	for {

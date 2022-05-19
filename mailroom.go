@@ -3,7 +3,6 @@ package mailroom
 import (
 	"context"
 	"net/url"
-	"os"
 	"strings"
 	"sync"
 	"time"
@@ -11,6 +10,7 @@ import (
 	"github.com/nyaruka/gocommon/storage"
 	"github.com/nyaruka/mailroom/core/queue"
 	"github.com/nyaruka/mailroom/runtime"
+	"github.com/nyaruka/mailroom/utils/cron"
 	"github.com/nyaruka/mailroom/web"
 	"github.com/pkg/errors"
 
@@ -22,13 +22,20 @@ import (
 )
 
 // InitFunction is a function that will be called when mailroom starts
-type InitFunction func(runtime *runtime.Runtime, wg *sync.WaitGroup, quit chan bool) error
+type InitFunction func(*runtime.Runtime, *sync.WaitGroup, chan bool) error
 
 var initFunctions = make([]InitFunction, 0)
 
-// AddInitFunction adds an init function that will be called on startup
-func AddInitFunction(initFunc InitFunction) {
+func addInitFunction(initFunc InitFunction) {
 	initFunctions = append(initFunctions, initFunc)
+}
+
+// RegisterCron registers a new cron function to run every interval
+func RegisterCron(name string, interval time.Duration, allInstances bool, fn cron.Function) {
+	addInitFunction(func(rt *runtime.Runtime, wg *sync.WaitGroup, quit chan bool) error {
+		cron.Start(rt, wg, name, interval, allInstances, fn, time.Minute*5, quit)
+		return nil
+	})
 }
 
 // TaskFunction is the function that will be called for a type of task
@@ -165,8 +172,7 @@ func (mr *Mailroom) Start() error {
 
 	// if we have a librato token, configure it
 	if c.LibratoToken != "" {
-		host, _ := os.Hostname()
-		librato.Configure(c.LibratoUsername, c.LibratoToken, host, time.Second, mr.wg)
+		librato.Configure(c.LibratoUsername, c.LibratoToken, c.InstanceName, time.Second, mr.wg)
 		librato.Start()
 	}
 
@@ -196,7 +202,12 @@ func (mr *Mailroom) Stop() error {
 	mr.webserver.Stop()
 
 	mr.wg.Wait()
-	mr.rt.ES.Stop()
+
+	// stop ES client if we have one
+	if mr.rt.ES != nil {
+		mr.rt.ES.Stop()
+	}
+
 	logrus.Info("mailroom stopped")
 	return nil
 }

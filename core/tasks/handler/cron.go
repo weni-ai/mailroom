@@ -4,48 +4,30 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"sync"
 	"time"
 
 	"github.com/nyaruka/mailroom"
 	"github.com/nyaruka/mailroom/core/models"
 	"github.com/nyaruka/mailroom/core/queue"
 	"github.com/nyaruka/mailroom/runtime"
-	"github.com/nyaruka/mailroom/utils/cron"
-	"github.com/nyaruka/mailroom/utils/marker"
-
+	"github.com/nyaruka/redisx"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 )
 
-const (
-	retryLock = "retry_msgs"
-	markerKey = "retried_msgs"
-)
+var retriedMsgs = redisx.NewIntervalSet("retried_msgs", time.Hour*24, 2)
 
 func init() {
-	mailroom.AddInitFunction(StartRetryCron)
-}
-
-// StartRetryCron starts our cron job of retrying pending incoming messages
-func StartRetryCron(rt *runtime.Runtime, wg *sync.WaitGroup, quit chan bool) error {
-	cron.StartCron(quit, rt.RP, retryLock, time.Minute*5,
-		func(lockName string, lockValue string) error {
-			ctx, cancel := context.WithTimeout(context.Background(), time.Minute*5)
-			defer cancel()
-			return RetryPendingMsgs(ctx, rt, lockName, lockValue)
-		},
-	)
-	return nil
+	mailroom.RegisterCron("retry_msgs", time.Minute*5, false, RetryPendingMsgs)
 }
 
 // RetryPendingMsgs looks for any pending msgs older than five minutes and queues them to be handled again
-func RetryPendingMsgs(ctx context.Context, rt *runtime.Runtime, lockName string, lockValue string) error {
+func RetryPendingMsgs(ctx context.Context, rt *runtime.Runtime) error {
 	if !rt.Config.RetryPendingMessages {
 		return nil
 	}
 
-	log := logrus.WithField("comp", "handler_retrier").WithField("lock", lockValue)
+	log := logrus.WithField("comp", "handler_retrier")
 	start := time.Now()
 
 	rc := rt.RP.Get()
@@ -85,7 +67,7 @@ func RetryPendingMsgs(ctx context.Context, rt *runtime.Runtime, lockName string,
 		// our key is built such that we will only retry once an hour
 		key := fmt.Sprintf("%d_%d", msgID, time.Now().Hour())
 
-		dupe, err := marker.HasTask(rc, markerKey, key)
+		dupe, err := retriedMsgs.Contains(rc, key)
 		if err != nil {
 			return errors.Wrapf(err, "error checking for dupe retry")
 		}
@@ -109,7 +91,7 @@ func RetryPendingMsgs(ctx context.Context, rt *runtime.Runtime, lockName string,
 		}
 
 		// mark it as queued
-		err = marker.AddTask(rc, markerKey, key)
+		err = retriedMsgs.Add(rc, key)
 		if err != nil {
 			return errors.Wrapf(err, "error marking task for retry")
 		}

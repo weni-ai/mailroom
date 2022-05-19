@@ -127,6 +127,24 @@ func TestImportNotifications(t *testing.T) {
 	})
 }
 
+func TestIncidentNotifications(t *testing.T) {
+	ctx, rt, db, rp := testsuite.Get()
+
+	defer testsuite.Reset(testsuite.ResetData)
+
+	oa, err := models.GetOrgAssets(ctx, rt, testdata.Org1.ID)
+	require.NoError(t, err)
+
+	t0 := time.Now()
+
+	_, err = models.IncidentWebhooksUnhealthy(ctx, db, rp, oa, nil)
+	require.NoError(t, err)
+
+	assertNotifications(t, ctx, db, t0, map[*testdata.User][]models.NotificationType{
+		testdata.Admin: {models.NotificationTypeIncidentStarted},
+	})
+}
+
 func assertNotifications(t *testing.T, ctx context.Context, db *sqlx.DB, after time.Time, expected map[*testdata.User][]models.NotificationType) {
 	// check last log
 	var notifications []*models.Notification
@@ -147,7 +165,7 @@ func assertNotifications(t *testing.T, ctx context.Context, db *sqlx.DB, after t
 }
 
 func openTicket(t *testing.T, ctx context.Context, db *sqlx.DB, openedBy *testdata.User, assignee *testdata.User) (*models.Ticket, *models.TicketEvent) {
-	ticket := testdata.InsertOpenTicket(db, testdata.Org1, testdata.Cathy, testdata.Internal, testdata.SupportTopic, "Where my pants", "", assignee)
+	ticket := testdata.InsertOpenTicket(db, testdata.Org1, testdata.Cathy, testdata.Internal, testdata.SupportTopic, "Where my pants", "", time.Now(), assignee)
 	modelTicket := ticket.Load(db)
 
 	openedEvent := models.NewTicketOpenedEvent(modelTicket, openedBy.SafeID(), assignee.SafeID())
