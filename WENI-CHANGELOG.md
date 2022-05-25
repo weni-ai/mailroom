@@ -1,3 +1,7 @@
+1.3.0-mailroom-7.1.22
+----------
+ * Merge tag v7.1.22 from nyaruka into 1.2.1-mailroom-7.0.1
+
 1.2.1-mailroom-7.0.1
 ----------
  * Tweak ticketer Twilio Flex to allow API key authentication
