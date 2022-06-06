@@ -40,7 +40,7 @@ func StartIVRCron(rt *runtime.Runtime, wg *sync.WaitGroup, quit chan bool) error
 				return err
 			}
 			currentHour := time.Now().In(location).Hour()
-			if currentHour >= 7 && currentHour < 21 {
+			if currentHour >= 6 && currentHour < 22 {
 				ctx, cancel := context.WithTimeout(context.Background(), time.Minute*10)
 				defer cancel()
 				return retryCalls(ctx, rt, retryIVRLock, lockValue)
@@ -72,7 +72,7 @@ func StartIVRCron(rt *runtime.Runtime, wg *sync.WaitGroup, quit chan bool) error
 				return err
 			}
 			currentHour := time.Now().In(location).Hour()
-			if currentHour >= 21 || currentHour < 7 {
+			if currentHour >= 22 || currentHour < 6 {
 				ctx, cancel := context.WithTimeout(context.Background(), time.Minute*10)
 				defer cancel()
 				return changeMaxConnectionsConfig(ctx, rt, changeMaxConnNightLock, lockValue, "TW", 0)
@@ -88,7 +88,7 @@ func StartIVRCron(rt *runtime.Runtime, wg *sync.WaitGroup, quit chan bool) error
 				return err
 			}
 			currentHour := time.Now().In(location).Hour()
-			if currentHour >= 7 && currentHour < 21 {
+			if currentHour >= 6 && currentHour < 22 {
 				ctx, cancel := context.WithTimeout(context.Background(), time.Minute*10)
 				defer cancel()
 				return changeMaxConnectionsConfig(ctx, rt, changeMaxConnDayLock, lockValue, "TW", 500)
