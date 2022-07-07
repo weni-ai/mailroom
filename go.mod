@@ -34,7 +34,7 @@ require (
 	gopkg.in/go-playground/validator.v9 v9.31.0
 )
 
-replace github.com/nyaruka/gocommon v1.16.2 => github.com/Ilhasoft/gocommon v1.16.2-teams-handler
+replace github.com/nyaruka/gocommon v1.15.1 => github.com/Ilhasoft/gocommon v1.16.2-teams-handler
 
 require (
 	github.com/DATA-DOG/go-sqlmock v1.5.0
