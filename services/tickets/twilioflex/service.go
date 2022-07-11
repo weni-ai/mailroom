@@ -89,7 +89,7 @@ func NewService(rtCfg *runtime.Config, httpClient *http.Client, httpRetries *htt
 func (s *service) Open(session flows.Session, topic *flows.Topic, body string, assignee *flows.User, logHTTP flows.HTTPLogCallback) (*flows.Ticket, error) {
 	ticket := flows.OpenTicket(s.ticketer, topic, body, assignee)
 	contact := session.Contact()
-	chatUser := &CreateChatUserParams{
+	chatUser := &CreateUserParams{
 		Identity:     fmt.Sprint(contact.ID()),
 		FriendlyName: contact.Name(),
 	}
@@ -149,14 +149,13 @@ func (s *service) Open(session flows.Session, topic *flows.Topic, body string, a
 		ticket.UUID(),
 	)
 
-	channelWebhook := &CreateChatChannelWebhookParams{
-		ConfigurationUrl:        callbackURL,
-		ConfigurationFilters:    []string{"onMessageSent", "onChannelUpdated", "onMediaMessageSent"},
-		ConfigurationMethod:     "POST",
-		ConfigurationRetryCount: 0,
-		Type:                    "webhook",
+	channelWebhook := &CreateConversationWebhookParams{
+		ConfigurationUrl:     callbackURL,
+		ConfigurationFilters: []string{"onMessageSent", "onChannelUpdated", "onMediaMessageSent"},
+		ConfigurationMethod:  "POST",
+		Target:               "webhook",
 	}
-	_, trace, err = s.restClient.CreateFlexChannelWebhook(channelWebhook, newFlexChannel.Sid)
+	_, trace, err = s.restClient.CreateFlexConversationWebhook(channelWebhook, newFlexChannel.Sid)
 	if trace != nil {
 		logHTTP(flows.NewHTTPLog(trace, flows.HTTPStatusFromCode, s.redactor))
 	}
@@ -175,15 +174,15 @@ func (s *service) Open(session flows.Session, topic *flows.Topic, body string, a
 
 	// send history
 	for _, msg := range msgs {
-		m := &CreateChatMessageParams{
-			Body:        msg.Text(),
-			ChannelSid:  newFlexChannel.Sid,
-			DateCreated: msg.CreatedOn().Format(time.RFC3339),
+		m := &CreateMessageParams{
+			Body:            msg.Text(),
+			ConversationSid: newFlexChannel.Sid,
+			DateCreated:     msg.CreatedOn().Format(time.RFC3339),
 		}
 		if msg.Direction() == "I" {
-			m.From = fmt.Sprint(contact.ID())
+			m.Author = fmt.Sprint(contact.ID())
 		} else {
-			m.From = "Bot"
+			m.Author = "Bot"
 		}
 		_, trace, err = s.restClient.CreateMessage(m)
 		if trace != nil {
@@ -206,6 +205,9 @@ func (s *service) Forward(ticket *models.Ticket, msgUUID flows.MsgUUID, text str
 		for _, attachment := range attachments {
 			attUrl := attachment.URL()
 			req, err := http.NewRequest("GET", attUrl, nil)
+			if err != nil {
+				return err
+			}
 			resp, err := httpx.DoTrace(s.restClient.httpClient, req, s.restClient.httpRetries, nil, -1)
 			if err != nil {
 				return err
@@ -233,21 +235,21 @@ func (s *service) Forward(ticket *models.Ticket, msgUUID flows.MsgUUID, text str
 			}
 			logHTTP(flows.NewHTTPLog(trace, flows.HTTPStatusFromCode, s.redactor))
 
-			msg := &CreateChatMessageParams{
-				From:       identity,
-				ChannelSid: string(ticket.ExternalID()),
-				MediaSid:   media.Sid,
+			msg := &CreateMessageParams{
+				Author:          identity,
+				ConversationSid: string(ticket.ExternalID()),
+				MediaSid:        media.Sid,
 			}
-			_, trace, err = s.restClient.CreateMessage(msg)
+			s.restClient.CreateMessage(msg)
 		}
 
 	}
 
 	if strings.TrimSpace(text) != "" {
-		msg := &CreateChatMessageParams{
-			From:       identity,
-			Body:       text,
-			ChannelSid: string(ticket.ExternalID()),
+		msg := &CreateMessageParams{
+			Author:          identity,
+			Body:            text,
+			ConversationSid: string(ticket.ExternalID()),
 		}
 		_, trace, err := s.restClient.CreateMessage(msg)
 		if trace != nil {

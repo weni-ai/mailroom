@@ -93,9 +93,9 @@ func NewClient(httpClient *http.Client, httpRetries *httpx.RetryConfig, authToke
 }
 
 // CreateUser creates a new twilio chat User.
-func (c *Client) CreateUser(user *CreateChatUserParams) (*ChatUser, *httpx.Trace, error) {
-	requestUrl := fmt.Sprintf("https://chat.twilio.com/v2/Services/%s/Users", c.serviceSid)
-	response := &ChatUser{}
+func (c *Client) CreateUser(user *CreateUserParams) (*User, *httpx.Trace, error) {
+	requestUrl := fmt.Sprintf("https://conversations.twilio.com/v1/Services/%s/Users", c.serviceSid)
+	response := &User{}
 	data, err := query.Values(user)
 	if err != nil {
 		return nil, nil, err
@@ -108,9 +108,9 @@ func (c *Client) CreateUser(user *CreateChatUserParams) (*ChatUser, *httpx.Trace
 }
 
 // FetchUser fetch a twilio chat User by sid.
-func (c *Client) FetchUser(userSid string) (*ChatUser, *httpx.Trace, error) {
-	requestUrl := fmt.Sprintf("https://chat.twilio.com/v2/Services/%s/Users/%s", c.serviceSid, userSid)
-	response := &ChatUser{}
+func (c *Client) FetchUser(userSid string) (*User, *httpx.Trace, error) {
+	requestUrl := fmt.Sprintf("https://conversations.twilio.com/v1/Services/%s/Users/%s", c.serviceSid, userSid)
+	response := &User{}
 	trace, err := c.post(requestUrl, url.Values{}, response)
 	if err != nil {
 		return nil, trace, err
@@ -146,16 +146,15 @@ func (c *Client) FetchFlexChannel(channelSid string) (*FlexChannel, *httpx.Trace
 	return response, trace, err
 }
 
-// CreateFlexChannelWebhook create a webhook target that is specific to a Channel.
-func (c *Client) CreateFlexChannelWebhook(channelWebhook *CreateChatChannelWebhookParams, channelSid string) (*ChatChannelWebhook, *httpx.Trace, error) {
-	requestUrl := fmt.Sprintf("https://chat.twilio.com/v2/Services/%s/Channels/%s/Webhooks", c.serviceSid, channelSid)
-	response := &ChatChannelWebhook{}
+// CreateFlexConversationWebhook create a webhook target that is specific to a Channel.
+func (c *Client) CreateFlexConversationWebhook(conversationWebhook *CreateConversationWebhookParams, channelSid string) (*ConversationWebhook, *httpx.Trace, error) {
+	requestUrl := fmt.Sprintf("https://conversations.twilio.com/v1/Services/%s/Conversations/%s/Webhooks", c.serviceSid, channelSid)
+	response := &ConversationWebhook{}
 	data := url.Values{
-		"Configuration.Url":        []string{channelWebhook.ConfigurationUrl},
-		"Configuration.Filters":    channelWebhook.ConfigurationFilters,
-		"Configuration.Method":     []string{channelWebhook.ConfigurationMethod},
-		"Configuration.RetryCount": []string{fmt.Sprint(channelWebhook.ConfigurationRetryCount)},
-		"Type":                     []string{channelWebhook.Type},
+		"Configuration.Url":     []string{conversationWebhook.ConfigurationUrl},
+		"Configuration.Filters": conversationWebhook.ConfigurationFilters,
+		"Configuration.Method":  []string{conversationWebhook.ConfigurationMethod},
+		"Target":                []string{conversationWebhook.Target},
 	}
 	trace, err := c.post(requestUrl, data, response)
 	if err != nil {
@@ -164,10 +163,10 @@ func (c *Client) CreateFlexChannelWebhook(channelWebhook *CreateChatChannelWebho
 	return response, trace, err
 }
 
-// CreateMessage create a message in chat channel.
-func (c *Client) CreateMessage(message *CreateChatMessageParams) (*ChatMessage, *httpx.Trace, error) {
-	url := fmt.Sprintf("https://chat.twilio.com/v2/Services/%s/Channels/%s/Messages", c.serviceSid, message.ChannelSid)
-	response := &ChatMessage{}
+// CreateMessage create a message in conversation.
+func (c *Client) CreateMessage(message *CreateMessageParams) (*Message, *httpx.Trace, error) {
+	url := fmt.Sprintf("https://conversations.twilio.com/v1/Services/%s/Conversations/%s/Messages", c.serviceSid, message.ConversationSid)
+	response := &Message{}
 	data, err := query.Values(message)
 	if err != nil {
 		return nil, nil, err
@@ -260,8 +259,8 @@ func (c *Client) FetchMedia(mediaSid string) (*Media, *httpx.Trace, error) {
 	return response, trace, err
 }
 
-// https://www.twilio.com/docs/chat/rest/user-resource#user-properties
-type ChatUser struct {
+// https://www.twilio.com/docs/conversations/api/user-resource#user-properties
+type User struct {
 	AccountSid   string                 `json:"account_sid,omitempty"`
 	Attributes   string                 `json:"attributes,omitempty"`
 	DateCreated  *time.Time             `json:"date_created,omitempty"`
@@ -275,8 +274,8 @@ type ChatUser struct {
 	Url          string                 `json:"url,omitempty"`
 }
 
-// https://www.twilio.com/docs/chat/rest/user-resource#create-a-user-resource
-type CreateChatUserParams struct {
+// https://www.twilio.com/docs/conversations/api/user-resource#create-a-conversations-user
+type CreateUserParams struct {
 	XTwilioWebhookEnabled string `json:"X-Twilio-Webhook-Enabled,omitempty"`
 	Attributes            string `json:"Attributes,omitempty"`
 	FriendlyName          string `json:"FriendlyName,omitempty"`
@@ -284,21 +283,17 @@ type CreateChatUserParams struct {
 	RoleSid               string `json:"RoleSid,omitempty"`
 }
 
-// https://www.twilio.com/docs/chat/rest/channel-resource#channel-properties
-type ChatChannel struct {
-	AccountSid    string                 `json:"account_sid,omitempty"`
-	Attributes    string                 `json:"attributes,omitempty"`
-	CreatedBy     string                 `json:"created_by,omitempty"`
-	DateCreated   *time.Time             `json:"date_created,omitempty"`
-	DateUpdated   *time.Time             `json:"date_updated,omitempty"`
-	FriendlyName  string                 `json:"friendly_name,omitempty"`
-	Links         map[string]interface{} `json:"links,omitempty"`
-	MemberCount   int                    `json:"member_count,omitempty"`
-	MessagesCount int                    `json:"messages_count,omitempty"`
-	ServiceSid    string                 `json:"service_sid,omitempty"`
-	Sid           string                 `json:"sid,omitempty"`
-	Type          string                 `json:"type,omitempty"`
-	UniqueName    string                 `json:"unique_name,omitempty"`
+// https://www.twilio.com/docs/conversations/api/conversation-resource#conversation-properties
+type Conversation struct {
+	AccountSid          string     `json:"account_sid,omitempty"`
+	Attributes          string     `json:"attributes,omitempty"`
+	ChatServiceSid      string     `json:"chat_service_sid,omitempty"`
+	DateCreated         *time.Time `json:"date_created,omitempty"`
+	DateUpdated         *time.Time `json:"date_updated,omitempty"`
+	FriendlyName        string     `json:"friendly_name,omitempty"`
+	MessagingServiceSid string     `json:"messaging_service_sid"`
+	Sid                 string     `json:"sid,omitempty"`
+	UniqueName          string     `json:"unique_name,omitempty"`
 }
 
 // https://www.twilio.com/docs/flex/developer/messaging/api/chat-channel#channel-properties
@@ -327,56 +322,54 @@ type CreateFlexChannelParams struct {
 	TaskSid              string `json:"TaskSid,omitempty"`
 }
 
-// https://www.twilio.com/docs/chat/rest/message-resource#message-properties
-type ChatMessage struct {
-	AccountSid    string                 `json:"account_sid,omitempty"`
-	Attributes    string                 `json:"attributes,omitempty"`
-	Body          string                 `json:"body,omitempty"`
-	ChannelSid    string                 `json:"channel_sid,omitempty"`
-	DateCreated   *time.Time             `json:"date_created,omitempty"`
-	DateUpdated   *time.Time             `json:"date_updated,omitempty"`
-	From          string                 `json:"from,omitempty"`
-	Index         int                    `json:"index,omitempty"`
-	LastUpdatedBy string                 `json:"last_updated_by,omitempty"`
-	Media         map[string]interface{} `json:"media,omitempty"`
-	ServiceSid    string                 `json:"service_sid,omitempty"`
-	Sid           string                 `json:"sid,omitempty"`
-	To            string                 `json:"to,omitempty"`
-	Type          string                 `json:"type,omitempty"`
-	Url           string                 `json:"url,omitempty"`
-	WasEdited     bool                   `json:"was_edited,omitempty"`
+// https://www.twilio.com/docs/conversations/api/conversation-message-resource#create-a-conversationmessage-resource
+type Message struct {
+	AccountSid      string                 `json:"account_sid,omitempty"`
+	Attributes      string                 `json:"attributes,omitempty"`
+	Body            string                 `json:"body,omitempty"`
+	ConversationSid string                 `json:"conversation_sid,omitempty"`
+	DateCreated     *time.Time             `json:"date_created,omitempty"`
+	DateUpdated     *time.Time             `json:"date_updated,omitempty"`
+	Author          string                 `json:"author,omitempty"`
+	Index           int                    `json:"index,omitempty"`
+	Media           map[string]interface{} `json:"media,omitempty"`
+	ChatServiceSid  string                 `json:"chat_service_sid,omitempty"`
+	Sid             string                 `json:"sid,omitempty"`
+	To              string                 `json:"to,omitempty"`
+	Type            string                 `json:"type,omitempty"`
+	Url             string                 `json:"url,omitempty"`
+	WasEdited       bool                   `json:"was_edited,omitempty"`
 }
 
-type CreateChatMessageParams struct {
-	Body        string `json:"Body,omitempty"`
-	From        string `json:"From,omitempty"`
-	MediaSid    string `json:"MediaSid,omitempty"`
-	ChannelSid  string `json:"ChanelSid,omitempty"`
-	DateCreated string `json:"DateCreated,omitempty"`
+type CreateMessageParams struct {
+	Body            string `json:"Body,omitempty"`
+	Author          string `json:"Author,omitempty"`
+	Attributes      string `json:"Attributes,omitempty"`
+	MediaSid        string `json:"MediaSid,omitempty"`
+	ConversationSid string `json:"ConversationSid,omitempty"`
+	DateCreated     string `json:"DateCreated,omitempty"`
 }
 
-// https://www.twilio.com/docs/chat/rest/channel-webhook-resource#channelwebhook-properties
-type ChatChannelWebhook struct {
-	AccountSid    string                 `json:"account_sid,omitempty"`
-	ChannelSid    string                 `json:"channel_sid,omitempty"`
-	Configuration map[string]interface{} `json:"configuration,omitempty"`
-	DateCreated   *time.Time             `json:"date_created,omitempty"`
-	DateUpdated   *time.Time             `json:"date_updated,omitempty"`
-	ServiceSid    string                 `json:"service_sid,omitempty"`
-	Sid           string                 `json:"sid,omitempty"`
-	Type          string                 `json:"type,omitempty"`
-	Url           string                 `json:"url,omitempty"`
+// https://www.twilio.com/docs/conversations/api/conversation-scoped-webhook-resource#conversationscopedwebhook-properties
+type ConversationWebhook struct {
+	AccountSid      string                 `json:"account_sid,omitempty"`
+	ConversationSid string                 `json:"conversation_sid,omitempty"`
+	Configuration   map[string]interface{} `json:"configuration,omitempty"`
+	DateCreated     *time.Time             `json:"date_created,omitempty"`
+	DateUpdated     *time.Time             `json:"date_updated,omitempty"`
+	Sid             string                 `json:"sid,omitempty"`
+	Target          string                 `json:"target,omitempty"`
+	Url             string                 `json:"url,omitempty"`
 }
 
-// https://www.twilio.com/docs/chat/rest/channel-webhook-resource#create-a-channelwebhook-resource
-type CreateChatChannelWebhookParams struct {
-	ConfigurationFilters    []string `json:"Configuration.Filters,omitempty"`
-	ConfigurationFlowSid    string   `json:"Configuration.FlowSid,omitempty"`
-	ConfigurationMethod     string   `json:"Configuration.Method,omitempty"`
-	ConfigurationRetryCount int      `json:"Configuration.RetryCount,omitempty"`
-	ConfigurationTriggers   []string `json:"Configuration.Triggers,omitempty"`
-	ConfigurationUrl        string   `json:"Configuration.Url,omitempty"`
-	Type                    string   `json:"Type,omitempty"`
+// https://www.twilio.com/docs/conversations/api/conversation-scoped-webhook-resource#create-a-conversationscopedwebhook-resource
+type CreateConversationWebhookParams struct {
+	ConfigurationFilters  []string `json:"Configuration.Filters,omitempty"`
+	ConfigurationFlowSid  string   `json:"Configuration.FlowSid,omitempty"`
+	ConfigurationMethod   string   `json:"Configuration.Method,omitempty"`
+	ConfigurationTriggers []string `json:"Configuration.Triggers,omitempty"`
+	ConfigurationUrl      string   `json:"Configuration.Url,omitempty"`
+	Target                string   `json:"Target,omitempty"`
 }
 
 // https://www.twilio.com/docs/taskrouter/api/task#task-properties
@@ -404,14 +397,14 @@ type TaskrouterTask struct {
 	WorkspaceSid          string                 `json:"workspace_sid,omitempty"`
 }
 
-// https://www.twilio.com/docs/chat/rest/media
+// https://www.twilio.com/docs/conversations/api/media-resource#properties
 type CreateMediaParams struct {
 	FileName string `json:"FileName,omitempty"`
 	Media    []byte `json:"Media,omitempty"`
 	Author   string `json:"Author,omitempty"`
 }
 
-// https://www.twilio.com/docs/chat/rest/media
+// https://www.twilio.com/docs/conversations/api/media-resource#properties
 type Media struct {
 	Sid               string `json:"sid"`
 	ServiceSid        string `json:"service_sid"`

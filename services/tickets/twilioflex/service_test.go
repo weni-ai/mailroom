@@ -2,6 +2,7 @@ package twilioflex_test
 
 import (
 	"fmt"
+	"log"
 	"net/http"
 	"testing"
 	"time"
@@ -41,7 +42,7 @@ func TestOpenAndForward(t *testing.T) {
 	uuids.SetGenerator(uuids.NewSeededGenerator(12345))
 
 	httpx.SetRequestor(httpx.NewMockRequestor(map[string][]httpx.MockResponse{
-		"https://chat.twilio.com/v2/Services/IS38067ec392f1486bb6e4de4610f26fb3/Users/1234567": {
+		"https://conversations.twilio.com/v1/Services/IS38067ec392f1486bb6e4de4610f26fb3/Users/1234567": {
 			httpx.NewMockResponse(404, nil, `{
 				"code": 20404,
 				"message": "The requested resource /Services/IS38067ec392f1486bb6e4de4610f26fb3/Users/1234567 was not found",
@@ -49,25 +50,21 @@ func TestOpenAndForward(t *testing.T) {
 				"status": 404
 			}`),
 		},
-		"https://chat.twilio.com/v2/Services/IS38067ec392f1486bb6e4de4610f26fb3/Users": {
+		"https://conversations.twilio.com/v1/Services/IS38067ec392f1486bb6e4de4610f26fb3/Users": {
 			httpx.NewMockResponse(201, nil, `{
 				"is_notifiable": null,
 				"date_updated": "2022-03-08T22:18:23Z",
 				"is_online": null,
 				"friendly_name": "dummy user",
 				"account_sid": "AC81d44315e19372138bdaffcc13cf3b94",
-				"url": "https://chat.twilio.com/v2/Services/IS38067ec392f1486bb6e4de4610f26fb3/Users/USf4015a97250d482889459f8e8819e09f",
+				"url": "https://conversations.twilio.com/v1/Services/IS38067ec392f1486bb6e4de4610f26fb3/Users/USf4015a97250d482889459f8e8819e09f",
 				"date_created": "2022-03-08T22:18:23Z",
 				"role_sid": "RL6f3f490b35534130845f98202673ffb9",
 				"sid": "USf4015a97250d482889459f8e8819e09f",
 				"attributes": "{}",
 				"service_sid": "IS38067ec392f1486bb6e4de4610f26fb3",
 				"joined_channels_count": 0,
-				"identity": "10000",
-				"links": {
-						"user_channels": "https://chat.twilio.com/v2/Services/IS38067ec392f1486bb6e4de4610f26fb3/Users/USf4015a97250d482889459f8e8819e09f/Channels",
-						"user_bindings": "https://chat.twilio.com/v2/Services/IS38067ec392f1486bb6e4de4610f26fb3/Users/USf4015a97250d482889459f8e8819e09f/Bindings"
-				}
+				"identity": "10000"
 			}`),
 		},
 		"https://flex-api.twilio.com/v1/Channels": {
@@ -82,10 +79,10 @@ func TestOpenAndForward(t *testing.T) {
 				"date_created": "2022-03-08T22:38:30Z"
 			}`),
 		},
-		"https://chat.twilio.com/v2/Services/IS38067ec392f1486bb6e4de4610f26fb3/Channels/CH6442c09c93ba4d13966fa42e9b78f620/Webhooks": {
+		"https://conversations.twilio.com/v1/Services/IS38067ec392f1486bb6e4de4610f26fb3/Conversations/CH6442c09c93ba4d13966fa42e9b78f620/Webhooks": {
 			httpx.NewMockResponse(201, nil, `{
-				"channel_sid": "CH6442c09c93ba4d13966fa42e9b78f620",
-				"url": "https://chat.twilio.com/v2/Services/IS38067ec392f1486bb6e4de4610f26fb3/Channels/CH6442c09c93ba4d13966fa42e9b78f620/Webhooks/WHa8a9ae86063e494d9f3b754a8da85f8e",
+				"conversation_sid": "CH6442c09c93ba4d13966fa42e9b78f620",
+				"url": "https://conversations.twilio.com/v1/Services/IS38067ec392f1486bb6e4de4610f26fb3/Conversations/CH6442c09c93ba4d13966fa42e9b78f620/Webhooks/WHa8a9ae86063e494d9f3b754a8da85f8e",
 				"account_sid": "AC81d44315e19372138bdaffcc13cf3b94",
 				"date_updated": "2022-03-09T19:54:49Z",
 				"configuration": {
@@ -93,16 +90,16 @@ func TestOpenAndForward(t *testing.T) {
 						"retry_count": 1,
 						"method": "POST",
 						"filters": [
-								"onMessageSent"
+								"onMessageAdded"
 						]
 				},
 				"sid": "WHa8a9ae86063e494d9f3b754a8da85f8e",
 				"date_created": "2022-03-09T19:54:49Z",
 				"service_sid": "IS38067ec392f1486bb6e4de4610f26fb3",
-				"type": "webhook"
+				"target": "webhook"
 			}`),
 		},
-		"https://chat.twilio.com/v2/Services/IS38067ec392f1486bb6e4de4610f26fb3/Channels/CH6442c09c93ba4d13966fa42e9b78f620/Messages": {
+		"https://conversations.twilio.com/v1/Services/IS38067ec392f1486bb6e4de4610f26fb3/Conversations/CH6442c09c93ba4d13966fa42e9b78f620/Messages": {
 			httpx.NewMockResponse(201, nil, `{
 				"body": "Hi! I'll try to help you!",
 				"index": 0,
@@ -116,7 +113,7 @@ func TestOpenAndForward(t *testing.T) {
 				"date_created": "2022-03-09T20:27:47Z",
 				"media": null,
 				"sid": "IM8842e723153b459b9e03a0bae87298d8",
-				"url": "https://chat.twilio.com/v2/Services/IS38067ec392f1486bb6e4de4610f26fb3/Channels/CH6442c09c93ba4d13966fa42e9b78f620/Messages/IM8842e723153b459b9e03a0bae87298d8",
+				"url": "https://conversations.twilio.com/v1/Services/IS38067ec392f1486bb6e4de4610f26fb3/Conversations/CH6442c09c93ba4d13966fa42e9b78f620/Messages/IM8842e723153b459b9e03a0bae87298d8",
 				"attributes": "{}",
 				"service_sid": "IS38067ec392f1486bb6e4de4610f26fb3",
 				"was_edited": false
@@ -134,7 +131,7 @@ func TestOpenAndForward(t *testing.T) {
 				"date_created": "2022-03-09T20:27:47Z",
 				"media": null,
 				"sid": "IM8842e723153b459b9e03a0bae87298d8",
-				"url": "https://chat.twilio.com/v2/Services/IS38067ec392f1486bb6e4de4610f26fb3/Channels/CH6442c09c93ba4d13966fa42e9b78f620/Messages/IM8842e723153b459b9e03a0bae87298d8",
+				"url": "https://conversations.twilio.com/v1/Services/IS38067ec392f1486bb6e4de4610f26fb3/Conversations/CH6442c09c93ba4d13966fa42e9b78f620/Messages/IM8842e723153b459b9e03a0bae87298d8",
 				"attributes": "{}",
 				"service_sid": "IS38067ec392f1486bb6e4de4610f26fb3",
 				"was_edited": false
@@ -152,7 +149,7 @@ func TestOpenAndForward(t *testing.T) {
 				"date_created": "2022-03-09T20:27:47Z",
 				"media": null,
 				"sid": "IM8842e723153b459b9e03a0bae87298d8",
-				"url": "https://chat.twilio.com/v2/Services/IS38067ec392f1486bb6e4de4610f26fb3/Channels/CH6442c09c93ba4d13966fa42e9b78f620/Messages/IM8842e723153b459b9e03a0bae87298d8",
+				"url": "https://conversations.twilio.com/v1/Services/IS38067ec392f1486bb6e4de4610f26fb3/Conversations/CH6442c09c93ba4d13966fa42e9b78f620/Messages/IM8842e723153b459b9e03a0bae87298d8",
 				"attributes": "{}",
 				"service_sid": "IS38067ec392f1486bb6e4de4610f26fb3",
 				"was_edited": false
@@ -171,7 +168,7 @@ func TestOpenAndForward(t *testing.T) {
 				"date_created": "2022-03-09T20:27:47Z",
 				"media": null,
 				"sid": "IM8842e723153b459b9e03a0bae87298d8",
-				"url": "https://chat.twilio.com/v2/Services/IS38067ec392f1486bb6e4de4610f26fb3/Channels/CH6442c09c93ba4d13966fa42e9b78f620/Messages/IM8842e723153b459b9e03a0bae87298d8",
+				"url": "https://conversations.twilio.com/v1/Services/IS38067ec392f1486bb6e4de4610f26fb3/Conversations/CH6442c09c93ba4d13966fa42e9b78f620/Messages/IM8842e723153b459b9e03a0bae87298d8",
 				"attributes": "{}",
 				"service_sid": "IS38067ec392f1486bb6e4de4610f26fb3",
 				"was_edited": false
@@ -245,7 +242,7 @@ func TestOpenAndForward(t *testing.T) {
 				"is_multipart_upstream": false
 			}`),
 		},
-		"https://chat.twilio.com/v2/Services/IS38067ec392f1486bb6e4de4610f26fb3/Channels/CH180fa48ef2ba40a08fa5c9fb5c8ddd99/Messages": {
+		"https://conversations.twilio.com/v1/Services/IS38067ec392f1486bb6e4de4610f26fb3/Conversations/CH180fa48ef2ba40a08fa5c9fb5c8ddd99/Messages": {
 			httpx.NewMockResponse(201, nil, `{
 				"body": null,
 				"index": 0,
@@ -264,7 +261,7 @@ func TestOpenAndForward(t *testing.T) {
 						"sid": "ME59b872f1e52fbd6fe6ad956bbb4fa9bd"
 				},
 				"sid": "IMadceb005ef924c728b6abde17d02775c",
-				"url": "https://chat.twilio.com/v2/Services/IS38067ec392f1486bb6e4de4610f26fb3/Channels/CH180fa48ef2ba40a08fa5c9fb5c8ddd99/Messages/IMadceb005ef924c728b6abde17d02775c",
+				"url": "https://conversations.twilio.com/v1/Services/IS38067ec392f1486bb6e4de4610f26fb3/Conversations/CH180fa48ef2ba40a08fa5c9fb5c8ddd99/Messages/IMadceb005ef924c728b6abde17d02775c",
 				"attributes": "{}",
 				"service_sid": "IS38067ec392f1486bb6e4de4610f26fb3",
 				"was_edited": false
@@ -287,7 +284,7 @@ func TestOpenAndForward(t *testing.T) {
 						"sid": "ME60b872f1e52fbd6fe6ad956bbb4fa9ce"
 				},
 				"sid": "IMbcdeb005ef924c728b6abde17d02786d",
-				"url": "https://chat.twilio.com/v2/Services/IS38067ec392f1486bb6e4de4610f26fb3/Channels/CH180fa48ef2ba40a08fa5c9fb5c8ddd99/Messages/IMbcdeb005ef924c728b6abde17d02786d",
+				"url": "https://conversations.twilio.com/v1/Services/IS38067ec392f1486bb6e4de4610f26fb3/Conversations/CH180fa48ef2ba40a08fa5c9fb5c8ddd99/Messages/IMbcdeb005ef924c728b6abde17d02786d",
 				"attributes": "{}",
 				"service_sid": "IS38067ec392f1486bb6e4de4610f26fb3",
 				"was_edited": false
@@ -310,7 +307,7 @@ func TestOpenAndForward(t *testing.T) {
 						"sid": "ME71b872f1e52fbd6fe6ad956bbb4fa9df"
 				},
 				"sid": "IMcedfb005ef924c728b6abde17d02798e",
-				"url": "https://chat.twilio.com/v2/Services/IS38067ec392f1486bb6e4de4610f26fb3/Channels/CH180fa48ef2ba40a08fa5c9fb5c8ddd99/Messages/IMcedfb005ef924c728b6abde17d02798e",
+				"url": "https://conversations.twilio.com/v1/Services/IS38067ec392f1486bb6e4de4610f26fb3/Conversations/CH180fa48ef2ba40a08fa5c9fb5c8ddd99/Messages/IMcedfb005ef924c728b6abde17d02798e",
 				"attributes": "{}",
 				"service_sid": "IS38067ec392f1486bb6e4de4610f26fb3",
 				"was_edited": false
@@ -328,7 +325,7 @@ func TestOpenAndForward(t *testing.T) {
 				"date_created": "2022-03-09T20:27:47Z",
 				"media": null,
 				"sid": "IM8842e723153b459b9e03a0bae87298d8",
-				"url": "https://chat.twilio.com/v2/Services/IS38067ec392f1486bb6e4de4610f26fb3/Channels/CH180fa48ef2ba40a08fa5c9fb5c8ddd99/Messages/IM8842e723153b459b9e03a0bae87298d8",
+				"url": "https://conversations.twilio.com/v1/Services/IS38067ec392f1486bb6e4de4610f26fb3/Conversations/CH180fa48ef2ba40a08fa5c9fb5c8ddd99/Messages/IM8842e723153b459b9e03a0bae87298d8",
 				"attributes": "{}",
 				"service_sid": "IS38067ec392f1486bb6e4de4610f26fb3",
 				"was_edited": false
@@ -348,6 +345,9 @@ func TestOpenAndForward(t *testing.T) {
 	assert.EqualError(t, err, "missing auth_token or account_sid or chat_service_sid or workspace_sid in twilio flex config")
 
 	mockDB, mock, err := sqlmock.New()
+	if err != nil {
+		log.Fatal(err)
+	}
 	defer mockDB.Close()
 	sqlxDB := sqlx.NewDb(mockDB, "sqlmock")
 

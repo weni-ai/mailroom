@@ -74,12 +74,12 @@ func handleEventCallback(ctx context.Context, rt *runtime.Runtime, r *http.Reque
 	}
 
 	switch request.EventType {
-	case "onMessageSent":
+	case "onMessageAdded":
 		_, err = tickets.SendReply(ctx, rt, ticket, request.Body, []*tickets.File{})
 		if err != nil {
 			return err, http.StatusBadRequest, nil
 		}
-	case "onMediaMessageSent":
+	case "onMediaMessageAdded":
 		config := ticketer.Config
 		authToken := config(configurationAuthToken)
 		accountSid := config(configurationAccountSid)
@@ -102,7 +102,7 @@ func handleEventCallback(ctx context.Context, rt *runtime.Runtime, r *http.Reque
 		if err != nil {
 			return err, http.StatusBadRequest, nil
 		}
-	case "onChannelUpdated":
+	case "onConversationUpdated":
 		jsonMap := make(map[string]interface{})
 		err = json.Unmarshal([]byte(request.Attributes), &jsonMap)
 		if err != nil {

@@ -21,7 +21,7 @@ const (
 func TestCreateUser(t *testing.T) {
 	defer httpx.SetRequestor(httpx.DefaultRequestor)
 	httpx.SetRequestor(httpx.NewMockRequestor(map[string][]httpx.MockResponse{
-		fmt.Sprintf("https://chat.twilio.com/v2/Services/%s/Users", serviceSid): {
+		fmt.Sprintf("https://conversations.twilio.com/v1/Services/%s/Users", serviceSid): {
 			httpx.MockConnectionError,
 			httpx.NewMockResponse(400, nil, `{"message": "Something went wrong", "detail": "Unknown", "code": 1234, "more_info": "https://www.twilio.com/docs/errors/1234"}`),
 			httpx.NewMockResponse(201, nil, `{
@@ -30,24 +30,22 @@ func TestCreateUser(t *testing.T) {
 				"is_online": null,
 				"friendly_name": "dummy user",
 				"account_sid": "AC81d44315e19372138bdaffcc13cf3b94",
-				"url": "https://chat.twilio.com/v2/Services/IS38067ec392f1486bb6e4de4610f26fb3/Users/USf4015a97250d482889459f8e8819e09f",
+				"url": "https://conversations.twilio.com/v1/Services/IS38067ec392f1486bb6e4de4610f26fb3/Users/USf4015a97250d482889459f8e8819e09f",
 				"date_created": "2022-03-08T22:18:23Z",
 				"role_sid": "RL6f3f490b35534130845f98202673ffb9",
 				"sid": "USf4015a97250d482889459f8e8819e09f",
 				"attributes": "{}",
-				"service_sid": "IS38067ec392f1486bb6e4de4610f26fb3",
-				"joined_channels_count": 0,
+				"chat_service_sid": "IS38067ec392f1486bb6e4de4610f26fb3",
 				"identity": "123",
 				"links": {
-						"user_channels": "https://chat.twilio.com/v2/Services/IS38067ec392f1486bb6e4de4610f26fb3/Users/USf4015a97250d482889459f8e8819e09f/Channels",
-						"user_bindings": "https://chat.twilio.com/v2/Services/IS38067ec392f1486bb6e4de4610f26fb3/Users/USf4015a97250d482889459f8e8819e09f/Bindings"
+						"user_conversations": "https://conversations.twilio.com/v1/Services/IS38067ec392f1486bb6e4de4610f26fb3/Users/USf4015a97250d482889459f8e8819e09f/Channels"
 				}
 			}`),
 		},
 	}))
 
 	client := twilioflex.NewClient(http.DefaultClient, nil, authToken, accountSid, serviceSid, workspaceSid, flexFlowSid)
-	params := &twilioflex.CreateChatUserParams{
+	params := &twilioflex.CreateUserParams{
 		Identity:     "123",
 		FriendlyName: "dummy user",
 	}
@@ -61,14 +59,14 @@ func TestCreateUser(t *testing.T) {
 	user, trace, err := client.CreateUser(params)
 	assert.NoError(t, err)
 	assert.Equal(t, "123", user.Identity)
-	assert.Equal(t, "HTTP/1.0 201 Created\r\nContent-Length: 915\r\n\r\n", string(trace.ResponseTrace))
+	assert.Equal(t, "HTTP/1.0 201 Created\r\nContent-Length: 764\r\n\r\n", string(trace.ResponseTrace))
 }
 
 func TestFetchUser(t *testing.T) {
 	userSid := "USf4015a97250d482889459f8e8819e09f"
 	defer httpx.SetRequestor(httpx.DefaultRequestor)
 	httpx.SetRequestor(httpx.NewMockRequestor(map[string][]httpx.MockResponse{
-		fmt.Sprintf("https://chat.twilio.com/v2/Services/%s/Users/%s", serviceSid, userSid): {
+		fmt.Sprintf("https://conversations.twilio.com/v1/Services/%s/Users/%s", serviceSid, userSid): {
 			httpx.MockConnectionError,
 			httpx.NewMockResponse(400, nil, `{"message": "Something went wrong", "detail": "Unknown", "code": 1234, "more_info": "https://www.twilio.com/docs/errors/1234"}`),
 			httpx.NewMockResponse(200, nil, `{
@@ -77,17 +75,15 @@ func TestFetchUser(t *testing.T) {
 				"is_online": null,
 				"friendly_name": "dummy user",
 				"account_sid": "AC81d44315e19372138bdaffcc13cf3b94",
-				"url": "https://chat.twilio.com/v2/Services/IS38067ec392f1486bb6e4de4610f26fb3/Users/USf4015a97250d482889459f8e8819e09f",
+				"url": "https://conversations.twilio.com/v1/Services/IS38067ec392f1486bb6e4de4610f26fb3/Users/USf4015a97250d482889459f8e8819e09f",
 				"date_created": "2022-03-08T22:18:23Z",
 				"role_sid": "RL6f3f490b35534130845f98202673ffb9",
 				"sid": "USf4015a97250d482889459f8e8819e09f",
 				"attributes": "{}",
-				"service_sid": "IS38067ec392f1486bb6e4de4610f26fb3",
-				"joined_channels_count": 0,
+				"chat_service_sid": "IS38067ec392f1486bb6e4de4610f26fb3",
 				"identity": "123",
 				"links": {
-						"user_channels": "https://chat.twilio.com/v2/Services/IS38067ec392f1486bb6e4de4610f26fb3/Users/USf4015a97250d482889459f8e8819e09f/Channels",
-						"user_bindings": "https://chat.twilio.com/v2/Services/IS38067ec392f1486bb6e4de4610f26fb3/Users/USf4015a97250d482889459f8e8819e09f/Bindings"
+						"user_channels": "https://conversations.twilio.com/v1/Services/IS38067ec392f1486bb6e4de4610f26fb3/Users/USf4015a97250d482889459f8e8819e09f/Channels"
 				}
 			}`),
 		},
@@ -103,7 +99,7 @@ func TestFetchUser(t *testing.T) {
 	user, trace, err := client.FetchUser(userSid)
 	assert.NoError(t, err)
 	assert.Equal(t, "123", user.Identity)
-	assert.Equal(t, "HTTP/1.0 200 OK\r\nContent-Length: 915\r\n\r\n", string(trace.ResponseTrace))
+	assert.Equal(t, "HTTP/1.0 200 OK\r\nContent-Length: 759\r\n\r\n", string(trace.ResponseTrace))
 }
 
 func TestCreateFlexChannel(t *testing.T) {
@@ -180,24 +176,23 @@ func TestFetchFlexChannel(t *testing.T) {
 	assert.Equal(t, "HTTP/1.0 200 OK\r\nContent-Length: 455\r\n\r\n", string(trace.ResponseTrace))
 }
 
-func TestCreateFlexChannelWebhook(t *testing.T) {
-	channelSid := "CH6442c09c93ba4d13966fa42e9b78f620"
+func TestCreateFlexConversationWebhook(t *testing.T) {
+	conversationSid := "CH6442c09c93ba4d13966fa42e9b78f620"
 	defer httpx.SetRequestor(httpx.DefaultRequestor)
 	httpx.SetRequestor(httpx.NewMockRequestor(map[string][]httpx.MockResponse{
-		fmt.Sprintf("https://chat.twilio.com/v2/Services/%s/Channels/%s/Webhooks", serviceSid, channelSid): {
+		fmt.Sprintf("https://conversations.twilio.com/v1/Services/%s/Conversations/%s/Webhooks", serviceSid, conversationSid): {
 			httpx.MockConnectionError,
 			httpx.NewMockResponse(400, nil, `{"message": "Something went wrong", "detail": "Unknown", "code": 1234, "more_info": "https://www.twilio.com/docs/errors/1234"}`),
 			httpx.NewMockResponse(201, nil, `{
-				"channel_sid": "CH6442c09c93ba4d13966fa42e9b78f620",
-				"url": "https://chat.twilio.com/v2/Services/IS38067ec392f1486bb6e4de4610f26fb3/Channels/CH6442c09c93ba4d13966fa42e9b78f620/Webhooks/WHa8a9ae86063e494d9f3b754a8da85f8e",
+				"conversation_sid": "CH6442c09c93ba4d13966fa42e9b78f620",
+				"url": "https://conversations.twilio.com/v1/Services/IS38067ec392f1486bb6e4de4610f26fb3/Conversations/CH6442c09c93ba4d13966fa42e9b78f620/Webhooks/WHa8a9ae86063e494d9f3b754a8da85f8e",
 				"account_sid": "AC81d44315e19372138bdaffcc13cf3b94",
 				"date_updated": "2022-03-09T19:54:49Z",
 				"configuration": {
 						"url": "https://mailroom.com/mr/tickets/types/twilioflex/event_callback/1234/4567",
-						"retry_count": 1,
 						"method": "POST",
 						"filters": [
-								"onMessageSent"
+								"onMessageAdded"
 						]
 				},
 				"sid": "WHa8a9ae86063e494d9f3b754a8da85f8e",
@@ -215,62 +210,59 @@ func TestCreateFlexChannelWebhook(t *testing.T) {
 		"ticket-uuid-1234-4567-7890",
 	)
 
-	channelWebhook := &twilioflex.CreateChatChannelWebhookParams{
-		ConfigurationUrl:        callbackURL,
-		ConfigurationFilters:    []string{"onMessageSent", "onChannelUpdated"},
-		ConfigurationMethod:     "POST",
-		ConfigurationRetryCount: 1,
-		Type:                    "webhook",
+	conversationWebhook := &twilioflex.CreateConversationWebhookParams{
+		ConfigurationUrl:     callbackURL,
+		ConfigurationFilters: []string{"onMessageAdded", "onConversationUpdated"},
+		ConfigurationMethod:  "POST",
+		Target:               "webhook",
 	}
 
 	client := twilioflex.NewClient(http.DefaultClient, nil, authToken, accountSid, serviceSid, workspaceSid, flexFlowSid)
 
-	_, _, err := client.CreateFlexChannelWebhook(channelWebhook, channelSid)
+	_, _, err := client.CreateFlexConversationWebhook(conversationWebhook, conversationSid)
 	assert.EqualError(t, err, "unable to connect to server")
 
-	_, _, err = client.CreateFlexChannelWebhook(channelWebhook, channelSid)
+	_, _, err = client.CreateFlexConversationWebhook(conversationWebhook, conversationSid)
 	assert.EqualError(t, err, "Something went wrong")
 
-	webhook, trace, err := client.CreateFlexChannelWebhook(channelWebhook, channelSid)
+	webhook, trace, err := client.CreateFlexConversationWebhook(conversationWebhook, conversationSid)
 	assert.NoError(t, err)
-	assert.Equal(t, "CH6442c09c93ba4d13966fa42e9b78f620", webhook.ChannelSid)
-	assert.Equal(t, "HTTP/1.0 201 Created\r\nContent-Length: 728\r\n\r\n", string(trace.ResponseTrace))
+	assert.Equal(t, "CH6442c09c93ba4d13966fa42e9b78f620", webhook.ConversationSid)
+	assert.Equal(t, "HTTP/1.0 201 Created\r\nContent-Length: 724\r\n\r\n", string(trace.ResponseTrace))
 }
 
 func TestCreateMessage(t *testing.T) {
-	channelSid := "CH6442c09c93ba4d13966fa42e9b78f620"
+	conversationSid := "CH6442c09c93ba4d13966fa42e9b78f620"
 	defer httpx.SetRequestor(httpx.DefaultRequestor)
 	httpx.SetRequestor(httpx.NewMockRequestor(map[string][]httpx.MockResponse{
-		fmt.Sprintf("https://chat.twilio.com/v2/Services/%s/Channels/%s/Messages", serviceSid, channelSid): {
+		fmt.Sprintf("https://conversations.twilio.com/v1/Services/%s/Conversations/%s/Messages", serviceSid, conversationSid): {
 			httpx.MockConnectionError,
 			httpx.NewMockResponse(400, nil, `{"message": "Something went wrong", "detail": "Unknown", "code": 1234, "more_info": "https://www.twilio.com/docs/errors/1234"}`),
 			httpx.NewMockResponse(201, nil, `{
 				"body": "hello",
 				"index": 0,
-				"channel_sid": "CH6442c09c93ba4d13966fa42e9b78f620",
-				"from": "123",
+				"author": "123",
 				"date_updated": "2022-03-09T20:27:47Z",
-				"type": "text",
-				"account_sid": "AC81d44315e19372138bdaffcc13cf3b94",
-				"to": "CH6442c09c93ba4d13966fa42e9b78f620",
-				"last_updated_by": null,
-				"date_created": "2022-03-09T20:27:47Z",
 				"media": null,
+				"conversation_sid": "CH6442c09c93ba4d13966fa42e9b78f620",
+				"account_sid": "AC81d44315e19372138bdaffcc13cf3b94",
+				"delivery": null,
+				"url": "https://conversations.twilio.com/v1/Services/IS38067ec392f1486bb6e4de4610f26fb3/Conversations/CH6442c09c93ba4d13966fa42e9b78f620/Messages/IM8842e723153b459b9e03a0bae87298d8",
+				"to": "CH6442c09c93ba4d13966fa42e9b78f620",
+				"date_created": "2022-03-09T20:27:47Z",
 				"sid": "IM8842e723153b459b9e03a0bae87298d8",
-				"url": "https://chat.twilio.com/v2/Services/IS38067ec392f1486bb6e4de4610f26fb3/Channels/CH6442c09c93ba4d13966fa42e9b78f620/Messages/IM8842e723153b459b9e03a0bae87298d8",
 				"attributes": "{}",
-				"service_sid": "IS38067ec392f1486bb6e4de4610f26fb3",
-				"was_edited": false
+				"chat_service_sid": "IS38067ec392f1486bb6e4de4610f26fb3"
 				}`),
 		},
 	}))
 
 	client := twilioflex.NewClient(http.DefaultClient, nil, authToken, accountSid, serviceSid, workspaceSid, flexFlowSid)
 
-	msg := &twilioflex.CreateChatMessageParams{
-		From:       "123",
-		Body:       "hello",
-		ChannelSid: channelSid,
+	msg := &twilioflex.CreateMessageParams{
+		Author:          "123",
+		Body:            "hello",
+		ConversationSid: conversationSid,
 	}
 
 	_, _, err := client.CreateMessage(msg)
@@ -282,7 +274,7 @@ func TestCreateMessage(t *testing.T) {
 	response, trace, err := client.CreateMessage(msg)
 	assert.NoError(t, err)
 	assert.Equal(t, "hello", response.Body)
-	assert.Equal(t, "HTTP/1.0 201 Created\r\nContent-Length: 708\r\n\r\n", string(trace.ResponseTrace))
+	assert.Equal(t, "HTTP/1.0 201 Created\r\nContent-Length: 682\r\n\r\n", string(trace.ResponseTrace))
 }
 
 func TestCompleteTask(t *testing.T) {
