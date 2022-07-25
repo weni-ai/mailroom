@@ -2,6 +2,7 @@ package ivr
 
 import (
 	"context"
+	"encoding/json"
 	"sync"
 	"time"
 
@@ -11,14 +12,24 @@ import (
 	"github.com/nyaruka/mailroom/core/models"
 	"github.com/nyaruka/mailroom/runtime"
 	"github.com/nyaruka/mailroom/utils/cron"
+	"github.com/nyaruka/mailroom/utils/dbutil"
 
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 )
 
 const (
-	retryIVRLock  = "retry_ivr_calls"
-	expireIVRLock = "expire_ivr_calls"
+	retryIVRLock           = "retry_ivr_calls"
+	expireIVRLock          = "expire_ivr_calls"
+	clearIVRLock           = "clear_ivr_connections"
+	changeMaxConnNightLock = "change_ivr_max_conn_night"
+	changeMaxConnDayLock   = "change_ivr_max_conn_day"
+	clearQueuedPendingLock = "clear_ivr_queued_pending"
+)
+
+const (
+	startHour  = 6
+	finishHour = 22
 )
 
 func init() {
@@ -27,19 +38,61 @@ func init() {
 
 // StartIVRCron starts our cron job of retrying errored calls
 func StartIVRCron(rt *runtime.Runtime, wg *sync.WaitGroup, quit chan bool) error {
+
+	location, err := time.LoadLocation("Asia/Kolkata")
+	if err != nil {
+		return err
+	}
+
 	cron.Start(quit, rt, retryIVRLock, time.Minute, false,
 		func() error {
-			ctx, cancel := context.WithTimeout(context.Background(), time.Minute*5)
-			defer cancel()
-			return retryCalls(ctx, rt)
+			currentHour := time.Now().In(location).Hour()
+			if currentHour >= startHour && currentHour < finishHour {
+				ctx, cancel := context.WithTimeout(context.Background(), time.Minute*10)
+				defer cancel()
+				return retryCalls(ctx, rt)
+			}
+			return nil
 		},
 	)
 
 	cron.Start(quit, rt, expireIVRLock, time.Minute, false,
 		func() error {
-			ctx, cancel := context.WithTimeout(context.Background(), time.Minute*5)
+			ctx, cancel := context.WithTimeout(context.Background(), time.Minute*10)
 			defer cancel()
 			return expireCalls(ctx, rt)
+		},
+	)
+
+	cron.Start(quit, rt, clearIVRLock, time.Hour, false,
+		func() error {
+			ctx, cancel := context.WithTimeout(context.Background(), time.Minute*10)
+			defer cancel()
+			return clearStuckedChannelConnections(ctx, rt, clearIVRLock)
+		},
+	)
+
+	cron.Start(quit, rt, changeMaxConnNightLock, time.Minute*10, false,
+		func() error {
+			currentHour := time.Now().In(location).Hour()
+			if currentHour >= 22 || currentHour < 6 {
+				ctx, cancel := context.WithTimeout(context.Background(), time.Minute*10)
+				defer cancel()
+				return changeMaxConnectionsConfig(ctx, rt, changeMaxConnNightLock, "TW", 0)
+			}
+			return nil
+		},
+	)
+
+	cron.Start(quit, rt, changeMaxConnDayLock, time.Minute*10, false,
+		func() error {
+			currentHour := time.Now().In(location).Hour()
+			if currentHour >= 6 && currentHour < 22 {
+				ctx, cancel := context.WithTimeout(context.Background(), time.Minute*10)
+				defer cancel()
+				return changeMaxConnectionsConfig(ctx, rt, changeMaxConnDayLock, "TW", 500)
+			}
+			return nil
 		},
 	)
 
@@ -168,6 +221,111 @@ func expireCalls(ctx context.Context, rt *runtime.Runtime) error {
 	return nil
 }
 
+func clearStuckedChannelConnections(ctx context.Context, rt *runtime.Runtime, lockName string) error {
+	log := logrus.WithField("comp", "ivr_cron_cleaner")
+	start := time.Now()
+
+	ctx, cancel := context.WithTimeout(ctx, time.Minute*5)
+	defer cancel()
+
+	result, err := rt.DB.ExecContext(ctx, clearStuckedChanelConnectionsSQL)
+	if err != nil {
+		return errors.Wrapf(err, "error cleaning stucked connections")
+	}
+
+	rowsAffected, err := result.RowsAffected()
+	if err != nil {
+		return errors.Wrapf(err, "error getting rows affected on cleaning stucked connections")
+	}
+	if rowsAffected > 0 {
+		log.WithField("count", rowsAffected).WithField("elapsed", time.Since(start)).Info("stucked channel connections")
+	}
+	return nil
+}
+
+func changeMaxConnectionsConfig(ctx context.Context, rt *runtime.Runtime, lockName string, channelType string, maxConcurrentEventsToSet int) error {
+	log := logrus.WithField("comp", "ivr_cron_change_max_connections")
+	start := time.Now()
+
+	ctx, cancel := context.WithTimeout(ctx, time.Minute*5)
+	defer cancel()
+
+	rows, err := rt.DB.QueryxContext(ctx, selectIVRTWTypeChannelsSQL, channelType)
+	if err != nil {
+		return errors.Wrapf(err, "error querying for channels")
+	}
+	defer rows.Close()
+
+	ivrChannels := make([]Channel, 0)
+
+	for rows.Next() {
+		ch := Channel{}
+		err := dbutil.ReadJSONRow(rows, &ch)
+		if err != nil {
+			return errors.Wrapf(err, "error scanning channel")
+		}
+
+		ivrChannels = append(ivrChannels, ch)
+	}
+
+	for _, ch := range ivrChannels {
+
+		if ch.Config["max_concurrent_events"] == maxConcurrentEventsToSet {
+			return nil
+		}
+
+		ch.Config["max_concurrent_events"] = maxConcurrentEventsToSet
+
+		configJSON, err := json.Marshal(ch.Config)
+		if err != nil {
+			return errors.Wrapf(err, "error marshalling channels config")
+		}
+
+		_, err = rt.DB.ExecContext(ctx, updateIVRChannelConfigSQL, string(configJSON), ch.ID)
+		if err != nil {
+			return errors.Wrapf(err, "error updating channels config")
+		}
+	}
+
+	log.WithField("count", len(ivrChannels)).WithField("elapsed", time.Since(start)).Info("channels that have max_concurrent_events updated")
+
+	return nil
+}
+
+const selectIVRTWTypeChannelsSQL = `
+	SELECT ROW_TO_JSON(r) FROM (
+		SELECT 
+			c.id, 
+			c.uuid, 
+			c.channel_type, 
+			COALESCE(c.config, '{}')::json as config, 
+			c.is_active 
+		FROM 
+			channels_channel as c 
+		WHERE 
+			c.channel_type = $1 AND 
+			c.is_active = TRUE ) r;
+`
+
+const updateIVRChannelConfigSQL = `
+	UPDATE channels_channel
+	SET config = $1
+	WHERE id = $2
+`
+
+const clearStuckedChanelConnectionsSQL = `
+	UPDATE channels_channelconnection
+	SET status = 'F' 
+	WHERE id in (
+		SELECT id
+		FROM channels_channelconnection
+		WHERE  
+			(status = 'W' OR status = 'R' OR status = 'I') AND
+			modified_on < NOW() - INTERVAL '2 DAYS'
+		LIMIT  100
+	)
+`
+
 const selectExpiredRunsSQL = `
 	SELECT
 		fr.id as run_id,	
@@ -200,4 +358,12 @@ type RunExpiration struct {
 	SessionID    models.SessionID    `db:"session_id"`
 	ExpiresOn    time.Time           `db:"expires_on"`
 	ConnectionID models.ConnectionID `db:"connection_id"`
+}
+
+type Channel struct {
+	ID          int                    `db:"id" json:"id,omitempty"`
+	UUID        string                 `db:"uuid" json:"uuid,omitempty"`
+	ChannelType string                 `db:"channel_type" json:"channel_type,omitempty"`
+	Config      map[string]interface{} `db:"config" json:"config,omitempty"`
+	IsActive    bool                   `db:"is_active" json:"is_active,omitempty"`
 }
