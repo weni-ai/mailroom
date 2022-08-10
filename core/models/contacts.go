@@ -129,7 +129,7 @@ func (c *Contact) UpdateLastSeenOn(ctx context.Context, db Queryer, lastSeenOn t
 
 // UpdateInfoMsg updates last seen on (and modified on)
 func (c *Contact) UpdateInfoMsg(ctx context.Context, db Queryer, infoMsg Msg) error {
-	c.infoMsg = string(infoMsg.ID())
+	c.infoMsg = fmt.Sprint(infoMsg.ID())
 	return UpdateContactInfoMsg(ctx, db, c.id, c.infoMsg)
 }
 
