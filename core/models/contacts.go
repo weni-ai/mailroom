@@ -84,6 +84,7 @@ type Contact struct {
 	createdOn  time.Time
 	modifiedOn time.Time
 	lastSeenOn *time.Time
+	infoMsg    string
 }
 
 func (c *Contact) ID() ContactID                   { return c.id }
@@ -97,6 +98,7 @@ func (c *Contact) URNs() []urns.URN                { return c.urns }
 func (c *Contact) CreatedOn() time.Time            { return c.createdOn }
 func (c *Contact) ModifiedOn() time.Time           { return c.modifiedOn }
 func (c *Contact) LastSeenOn() *time.Time          { return c.lastSeenOn }
+func (c *Contact) InfoMsg() string                 { return c.infoMsg }
 
 // URNForID returns the flow URN for the passed in URN, return NilURN if not found
 func (c *Contact) URNForID(urnID URNID) urns.URN {
@@ -123,6 +125,12 @@ func (c *Contact) Unstop(ctx context.Context, db Queryer) error {
 func (c *Contact) UpdateLastSeenOn(ctx context.Context, db Queryer, lastSeenOn time.Time) error {
 	c.lastSeenOn = &lastSeenOn
 	return UpdateContactLastSeenOn(ctx, db, c.id, lastSeenOn)
+}
+
+// UpdateInfoMsg updates last seen on (and modified on)
+func (c *Contact) UpdateInfoMsg(ctx context.Context, db Queryer, infoMsg Msg) error {
+	c.infoMsg = string(infoMsg.ID())
+	return UpdateContactInfoMsg(ctx, db, c.id, c.infoMsg)
 }
 
 // UpdatePreferredURN updates the URNs for the contact (if needbe) to have the passed in URN as top priority
@@ -1149,6 +1157,11 @@ func UpdateContactModifiedOn(ctx context.Context, db Queryer, contactIDs []Conta
 // UpdateContactLastSeenOn updates last seen on (and modified on) on the passed in contact
 func UpdateContactLastSeenOn(ctx context.Context, db Queryer, contactID ContactID, lastSeenOn time.Time) error {
 	_, err := db.ExecContext(ctx, `UPDATE contacts_contact SET last_seen_on = $2, modified_on = NOW() WHERE id = $1`, contactID, lastSeenOn)
+	return err
+}
+
+func UpdateContactInfoMsg(ctx context.Context, db Queryer, contactID ContactID, infoMsg string) error {
+	_, err := db.ExecContext(ctx, `UPDATE contacts_contact SET msg_sent_id = $2, modified_on = NOW() WHERE id = $1`, contactID, infoMsg)
 	return err
 }
 
