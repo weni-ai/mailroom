@@ -72,3 +72,52 @@ func TestRetries(t *testing.T) {
 	testsuite.AssertQuery(t, db, `SELECT COUNT(*) FROM channels_channelconnection WHERE contact_id = $1 AND status = $2 AND external_id = $3`,
 		testdata.Cathy.ID, models.ConnectionStatusFailed, "call1").Returns(1)
 }
+
+func TestClearConnections(t *testing.T) {
+	ctx, rt, db, rp := testsuite.Get()
+	rc := rp.Get()
+	defer rc.Close()
+
+	defer testsuite.Reset(testsuite.ResetAll)
+
+	ivr.RegisterServiceType(models.ChannelType("ZZ"), newMockProvider)
+
+	db.MustExec(`UPDATE channels_channel SET channel_type = 'ZZ', config = '{"max_concurrent_events": 1}' WHERE id = $1`, testdata.TwilioChannel.ID)
+
+	start := models.NewFlowStart(testdata.Org1.ID, models.StartTypeTrigger, models.FlowTypeVoice, testdata.IVRFlow.ID, models.DoRestartParticipants, models.DoIncludeActive).
+		WithContactIDs([]models.ContactID{testdata.Cathy.ID})
+
+	// call our master starter
+	err := starts.CreateFlowBatches(ctx, rt, start)
+	assert.NoError(t, err)
+
+	task, err := queue.PopNextTask(rc, queue.HandlerQueue)
+	assert.NoError(t, err)
+	batch := &models.FlowStartBatch{}
+	err = json.Unmarshal(task.Task, batch)
+	assert.NoError(t, err)
+
+	client.callError = nil
+	client.callID = ivr.CallID("call1")
+	err = HandleFlowStartBatch(ctx, rt, batch)
+	assert.NoError(t, err)
+	testsuite.AssertQuery(t, db,
+		`SELECT COUNT(*) FROM channels_channelconnection WHERE contact_id = $1 AND status = $2 AND external_id = $3`,
+		testdata.Cathy.ID, models.ConnectionStatusWired, "call1",
+	).Returns(1)
+
+	// update channel connection to be modified_on 2 days ago
+	db.MustExec(`UPDATE channels_channelconnection SET modified_on = NOW() - INTERVAL '2 DAY' WHERE contact_id = $1 AND status = $2 AND external_id = $3`,
+		testdata.Cathy.ID, models.ConnectionStatusWired, "call1",
+	)
+
+	// cleaning
+	err = clearStuckedChannelConnections(ctx, rt, "cleaner_test")
+	assert.NoError(t, err)
+
+	// status should be Failed
+	testsuite.AssertQuery(t, db,
+		`SELECT COUNT(*) FROM channels_channelconnection WHERE contact_id = $1 AND status = $2 AND external_id = $3`,
+		testdata.Cathy.ID, models.ConnectionStatusFailed, "call1",
+	).Returns(1)
+}
