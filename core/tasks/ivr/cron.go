@@ -90,7 +90,7 @@ func StartIVRCron(rt *runtime.Runtime, wg *sync.WaitGroup, quit chan bool) error
 			if currentHour >= 6 && currentHour < 22 {
 				ctx, cancel := context.WithTimeout(context.Background(), time.Minute*10)
 				defer cancel()
-				return changeMaxConnectionsConfig(ctx, rt, changeMaxConnDayLock, "TW", 500)
+				return changeMaxConnectionsConfig(ctx, rt, changeMaxConnDayLock, "TW", rt.Config.MaxConcurrentEvents)
 			}
 			return nil
 		},

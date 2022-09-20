@@ -67,10 +67,11 @@ type Config struct {
 	FCMKey            string `help:"the FCM API key used to notify Android relayers to sync"`
 	MailgunSigningKey string `help:"the signing key used to validate requests from mailgun"`
 
-	InstanceName string `help:"the unique name of this instance used for analytics"`
-	LogLevel     string `help:"the logging level courier should use"`
-	UUIDSeed     int    `help:"seed to use for UUID generation in a testing environment"`
-	Version      string `help:"the version of this mailroom install"`
+	InstanceName        string `help:"the unique name of this instance used for analytics"`
+	LogLevel            string `help:"the logging level courier should use"`
+	UUIDSeed            int    `help:"seed to use for UUID generation in a testing environment"`
+	Version             string `help:"the version of this mailroom install"`
+	MaxConcurrentEvents int    `help:"ivr max concurrent events limit to set when on day time period of activity of ivr channels"`
 }
 
 // NewDefaultConfig returns a new default configuration object
@@ -121,6 +122,8 @@ func NewDefaultConfig() *Config {
 		LogLevel:     "error",
 		UUIDSeed:     0,
 		Version:      "Dev",
+
+		MaxConcurrentEvents: 1500,
 	}
 }
 
