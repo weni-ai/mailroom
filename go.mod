@@ -11,18 +11,18 @@ require (
 	github.com/go-chi/chi v4.1.2+incompatible
 	github.com/golang-jwt/jwt v3.2.2+incompatible
 	github.com/golang/protobuf v1.4.0
-	github.com/gomodule/redigo v2.0.0+incompatible
+	github.com/gomodule/redigo v1.8.8
 	github.com/gorilla/schema v1.1.0
 	github.com/jmoiron/sqlx v1.3.4
 	github.com/kylelemons/godebug v1.1.0 // indirect
 	github.com/lib/pq v1.10.4
 	github.com/nyaruka/ezconf v0.2.1
-	github.com/nyaruka/gocommon v1.15.1
-	github.com/nyaruka/goflow v0.144.3
+	github.com/nyaruka/gocommon v1.17.1
+	github.com/nyaruka/goflow v0.152.0
 	github.com/nyaruka/librato v1.0.0
 	github.com/nyaruka/logrus_sentry v0.8.2-0.20190129182604-c2962b80ba7d
 	github.com/nyaruka/null v1.2.0
-	github.com/nyaruka/redisx v0.1.0
+	github.com/nyaruka/redisx v0.2.1
 	github.com/olivere/elastic/v7 v7.0.22
 	github.com/patrickmn/go-cache v2.1.0+incompatible
 	github.com/pkg/errors v0.9.1

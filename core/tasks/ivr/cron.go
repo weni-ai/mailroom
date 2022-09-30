@@ -5,20 +5,17 @@ import (
 	"sync"
 	"time"
 
-	"github.com/nyaruka/goflow/flows"
 	"github.com/nyaruka/mailroom"
 	"github.com/nyaruka/mailroom/core/ivr"
 	"github.com/nyaruka/mailroom/core/models"
 	"github.com/nyaruka/mailroom/runtime"
 	"github.com/nyaruka/mailroom/utils/cron"
-
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 )
 
 const (
-	retryIVRLock  = "retry_ivr_calls"
-	expireIVRLock = "expire_ivr_calls"
+	retryIVRLock = "retry_ivr_calls"
 )
 
 func init() {
@@ -31,23 +28,15 @@ func StartIVRCron(rt *runtime.Runtime, wg *sync.WaitGroup, quit chan bool) error
 		func() error {
 			ctx, cancel := context.WithTimeout(context.Background(), time.Minute*5)
 			defer cancel()
-			return retryCalls(ctx, rt)
-		},
-	)
-
-	cron.Start(quit, rt, expireIVRLock, time.Minute, false,
-		func() error {
-			ctx, cancel := context.WithTimeout(context.Background(), time.Minute*5)
-			defer cancel()
-			return expireCalls(ctx, rt)
+			return RetryCalls(ctx, rt)
 		},
 	)
 
 	return nil
 }
 
-// retryCalls looks for calls that need to be retried and retries them
-func retryCalls(ctx context.Context, rt *runtime.Runtime) error {
+// RetryCalls looks for calls that need to be retried and retries them
+func RetryCalls(ctx context.Context, rt *runtime.Runtime) error {
 	log := logrus.WithField("comp", "ivr_cron_retryer")
 	start := time.Now()
 
