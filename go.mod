@@ -13,7 +13,7 @@ require (
 	github.com/go-chi/chi v4.1.2+incompatible
 	github.com/golang-jwt/jwt v3.2.2+incompatible
 	github.com/golang/protobuf v1.4.0
-	github.com/gomodule/redigo v1.8.8
+	github.com/gomodule/redigo v2.0.0+incompatible
 	github.com/gorilla/schema v1.1.0
 	github.com/jmoiron/sqlx v1.3.4
 	github.com/kylelemons/godebug v1.1.0 // indirect
@@ -69,3 +69,5 @@ require (
 require github.com/gabriel-vasile/mimetype v1.4.1
 
 replace github.com/nyaruka/gocommon => github.com/Ilhasoft/gocommon v1.16.2-weni
+
+replace github.com/gomodule/redigo => github.com/gomodule/redigo v1.8.8
