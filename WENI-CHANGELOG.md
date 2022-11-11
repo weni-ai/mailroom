@@ -1,3 +1,7 @@
+1.5.0-mailroom-7.1.43
+----------
+ * Merge nyaruka tag v7.1.43 into weni 1.4.5-mailroom-7.1.22 and resolve conflicts.
+
 1.4.5-mailroom-7.1.22
 ----------
  * Add Ticket Fields for Zendesk #86
