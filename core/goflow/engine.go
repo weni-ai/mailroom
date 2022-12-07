@@ -19,6 +19,7 @@ var emailFactory func(*runtime.Config) engine.EmailServiceFactory
 var classificationFactory func(*runtime.Config) engine.ClassificationServiceFactory
 var ticketFactory func(*runtime.Config) engine.TicketServiceFactory
 var airtimeFactory func(*runtime.Config) engine.AirtimeServiceFactory
+var externalServiceFactory func(*runtime.Config) engine.ExternalServiceServiceFactory
 
 // RegisterEmailServiceFactory can be used by outside callers to register a email factory
 // for use by the engine
@@ -42,6 +43,10 @@ func RegisterTicketServiceFactory(f func(*runtime.Config) engine.TicketServiceFa
 // for use by the engine
 func RegisterAirtimeServiceFactory(f func(*runtime.Config) engine.AirtimeServiceFactory) {
 	airtimeFactory = f
+}
+
+func RegisterExternalServiceServiceFactory(f func(*runtime.Config) engine.ExternalServiceServiceFactory) {
+	externalServiceFactory = f
 }
 
 // Engine returns the global engine instance for use with real sessions
