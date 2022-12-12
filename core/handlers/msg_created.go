@@ -94,10 +94,13 @@ func handleMsgCreated(ctx context.Context, rt *runtime.Runtime, tx *sqlx.Tx, oa 
 			return errors.Errorf("unable to load channel with uuid: %s", event.Msg.Channel().UUID)
 		} else {
 			if fmt.Sprint(channel.Type()) == "WAC" || fmt.Sprint(channel.Type()) == "WA" {
+				fmt.Println(event.Msg.URN().Path())
 				country := envs.DeriveCountryFromTel(event.Msg.URN().Path())
+				fmt.Println(fmt.Sprint(country))
 				locale := envs.NewLocale(event.Msg.TextLanguage, country)
+				fmt.Println(fmt.Sprint(locale))
 				languageCode := locale.ToBCP47()
-
+				fmt.Println(languageCode)
 				if _, valid := validLanguageCodes[languageCode]; !valid {
 					languageCode = ""
 				}
