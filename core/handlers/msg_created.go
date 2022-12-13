@@ -100,8 +100,9 @@ func handleMsgCreated(ctx context.Context, rt *runtime.Runtime, tx *sqlx.Tx, oa 
 				locale := envs.NewLocale(event.Msg.TextLanguage, country)
 				fmt.Println(fmt.Sprint(locale))
 				languageCode := locale.ToBCP47()
-				fmt.Println(languageCode)
+				fmt.Println(fmt.Sprint(languageCode))
 				if _, valid := validLanguageCodes[languageCode]; !valid {
+					fmt.Println("Error")
 					languageCode = ""
 				}
 
