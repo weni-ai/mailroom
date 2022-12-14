@@ -230,7 +230,9 @@ func LoadOrg(ctx context.Context, cfg *runtime.Config, db sqlx.Queryer, orgID Or
 	start := time.Now()
 
 	org := &Org{}
+	fmt.Println(orgID)
 	rows, err := db.Queryx(selectOrgByID, orgID, cfg.MaxValueLength)
+	fmt.Println(fmt.Sprint(rows))
 	if err != nil {
 		return nil, errors.Wrapf(err, "error loading org: %d", orgID)
 	}
