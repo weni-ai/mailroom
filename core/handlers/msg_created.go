@@ -95,7 +95,7 @@ func handleMsgCreated(ctx context.Context, rt *runtime.Runtime, tx *sqlx.Tx, oa 
 		} else {
 			if fmt.Sprint(channel.Type()) == "WAC" || fmt.Sprint(channel.Type()) == "WA" {
 				fmt.Println(event.Msg.URN().Path())
-				country := envs.DeriveCountryFromTel(event.Msg.URN().Path())
+				country := envs.DeriveCountryFromTel("+" + event.Msg.URN().Path())
 				fmt.Println(fmt.Sprint(country))
 				locale := envs.NewLocale(scene.Contact().Language(), country)
 				fmt.Println(fmt.Sprint(locale))
