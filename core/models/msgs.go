@@ -139,6 +139,8 @@ type Msg struct {
 		SessionID     SessionID     `json:"session_id,omitempty"`
 		SessionStatus SessionStatus `json:"session_status,omitempty"`
 
+		TextLanguage envs.Language `json:"text_language"`
+
 		// These fields are set on the last outgoing message in a session's sprint. In the case
 		// of the session being at a wait with a timeout then the timeout will be set. It is up to
 		// Courier to update the session's timeout appropriately after sending the message.
@@ -178,6 +180,7 @@ func (m *Msg) TopupID() TopupID                 { return m.m.TopupID }
 func (m *Msg) ContactID() ContactID             { return m.m.ContactID }
 func (m *Msg) ContactURNID() *URNID             { return m.m.ContactURNID }
 func (m *Msg) IsResend() bool                   { return m.m.IsResend }
+func (m *Msg) TextLanguage() envs.Language      { return m.m.TextLanguage }
 
 func (m *Msg) SetTopup(topupID TopupID) { m.m.TopupID = topupID }
 
