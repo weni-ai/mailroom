@@ -116,6 +116,7 @@ func handleMsgCreated(ctx context.Context, rt *runtime.Runtime, tx *sqlx.Tx, oa 
 	if err != nil {
 		return errors.Wrapf(err, "error creating outgoing message to %s", event.Msg.URN())
 	}
+	fmt.Println("TextLanguage: ", fmt.Sprint(msg.TextLanguage()))
 
 	// register to have this message committed
 	scene.AppendToEventPreCommitHook(hooks.CommitMessagesHook, msg)
