@@ -27,11 +27,6 @@ const (
 	clearQueuedPendingLock = "clear_ivr_queued_pending"
 )
 
-const (
-	startHour  = 6
-	finishHour = 22
-)
-
 func init() {
 	mailroom.AddInitFunction(StartIVRCron)
 }
@@ -39,7 +34,7 @@ func init() {
 // StartIVRCron starts our cron job of retrying errored calls
 func StartIVRCron(rt *runtime.Runtime, wg *sync.WaitGroup, quit chan bool) error {
 
-	location, err := time.LoadLocation("Asia/Kolkata")
+	location, err := time.LoadLocation(rt.Config.IVRTimeZone)
 	if err != nil {
 		return err
 	}
@@ -47,7 +42,7 @@ func StartIVRCron(rt *runtime.Runtime, wg *sync.WaitGroup, quit chan bool) error
 	cron.Start(quit, rt, retryIVRLock, time.Minute, false,
 		func() error {
 			currentHour := time.Now().In(location).Hour()
-			if currentHour >= startHour && currentHour < finishHour {
+			if currentHour >= rt.Config.IVRStartHour && currentHour < rt.Config.IVRStopHour {
 				ctx, cancel := context.WithTimeout(context.Background(), time.Minute*10)
 				defer cancel()
 				return retryCalls(ctx, rt)
@@ -75,7 +70,7 @@ func StartIVRCron(rt *runtime.Runtime, wg *sync.WaitGroup, quit chan bool) error
 	cron.Start(quit, rt, changeMaxConnNightLock, time.Minute*10, false,
 		func() error {
 			currentHour := time.Now().In(location).Hour()
-			if currentHour >= 22 || currentHour < 6 {
+			if currentHour >= rt.Config.IVRStopHour || currentHour < rt.Config.IVRStartHour {
 				ctx, cancel := context.WithTimeout(context.Background(), time.Minute*10)
 				defer cancel()
 				return changeMaxConnectionsConfig(ctx, rt, changeMaxConnNightLock, "TW", 0)
@@ -87,7 +82,7 @@ func StartIVRCron(rt *runtime.Runtime, wg *sync.WaitGroup, quit chan bool) error
 	cron.Start(quit, rt, changeMaxConnDayLock, time.Minute*10, false,
 		func() error {
 			currentHour := time.Now().In(location).Hour()
-			if currentHour >= 6 && currentHour < 22 {
+			if currentHour >= rt.Config.IVRStartHour && currentHour < rt.Config.IVRStopHour {
 				ctx, cancel := context.WithTimeout(context.Background(), time.Minute*10)
 				defer cancel()
 				return changeMaxConnectionsConfig(ctx, rt, changeMaxConnDayLock, "TW", rt.Config.MaxConcurrentEvents)
