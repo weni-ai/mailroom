@@ -262,6 +262,7 @@ SELECT ROW_TO_JSON(o) FROM (SELECT
 	timezone,
 	(SELECT CASE is_anon WHEN TRUE THEN 'urns' WHEN FALSE THEN 'none' END) AS redaction_policy,
 	$2::int AS max_value_length,
+	flow_languages AS allowed_languages,
 	COALESCE(
 		(
 			SELECT
