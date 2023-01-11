@@ -72,10 +72,11 @@ type Config struct {
 	UUIDSeed     int    `help:"seed to use for UUID generation in a testing environment"`
 	Version      string `help:"the version of this mailroom install"`
 
-	MaxConcurrentEvents int    `help:"ivr max concurrent events limit to set when on day time period of activity of ivr channels"`
-	IVRStartHour        int    `help:"ivr start hour"`
-	IVRStopHour         int    `help:"ivr stop hour"`
-	IVRTimeZone         string `help:"ivr time zone"`
+	MaxConcurrentEvents    int    `help:"ivr max concurrent events limit to set when on day time period of activity of ivr channels"`
+	IVRStartHour           int    `help:"ivr start hour"`
+	IVRStopHour            int    `help:"ivr stop hour"`
+	IVRTimeZone            string `help:"ivr time zone"`
+	IVRCancelCronStartHour int    `help:"the cron hour to start cancel ivr calls queued"`
 }
 
 // NewDefaultConfig returns a new default configuration object
@@ -127,10 +128,11 @@ func NewDefaultConfig() *Config {
 		UUIDSeed:     0,
 		Version:      "Dev",
 
-		MaxConcurrentEvents: 1500,
-		IVRStartHour:        8,
-		IVRStopHour:         21,
-		IVRTimeZone:         "Asia/Kolkata",
+		MaxConcurrentEvents:    1500,
+		IVRStartHour:           8,
+		IVRStopHour:            21,
+		IVRTimeZone:            "Asia/Kolkata",
+		IVRCancelCronStartHour: 22,
 	}
 }
 

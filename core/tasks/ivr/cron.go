@@ -25,6 +25,7 @@ const (
 	changeMaxConnNightLock = "change_ivr_max_conn_night"
 	changeMaxConnDayLock   = "change_ivr_max_conn_day"
 	clearQueuedPendingLock = "clear_ivr_queued_pending"
+	cancelIVRCallsLock     = "cancel_ivr_calls"
 )
 
 func init() {
@@ -86,6 +87,18 @@ func StartIVRCron(rt *runtime.Runtime, wg *sync.WaitGroup, quit chan bool) error
 				ctx, cancel := context.WithTimeout(context.Background(), time.Minute*10)
 				defer cancel()
 				return changeMaxConnectionsConfig(ctx, rt, changeMaxConnDayLock, "TW", rt.Config.MaxConcurrentEvents)
+			}
+			return nil
+		},
+	)
+
+	cron.Start(quit, rt, cancelIVRCallsLock, time.Hour*1, false,
+		func() error {
+			currentHour := time.Now().In(location).Hour()
+			if currentHour == rt.Config.IVRCancelCronStartHour {
+				ctx, cancel := context.WithTimeout(context.Background(), time.Minute*20)
+				defer cancel()
+				return cancelCalls(ctx, rt, cancelIVRCallsLock)
 			}
 			return nil
 		},
@@ -238,6 +251,27 @@ func clearStuckedChannelConnections(ctx context.Context, rt *runtime.Runtime, lo
 	return nil
 }
 
+func cancelCalls(ctx context.Context, rt *runtime.Runtime, lockName string) error {
+	log := logrus.WithField("comp", "ivr_cron_canceler")
+	start := time.Now()
+	ctx, cancel := context.WithTimeout(ctx, time.Minute*15)
+	defer cancel()
+
+	result, err := rt.DB.ExecContext(ctx, cancelQueuedChannelConnectionsSQL)
+	if err != nil {
+		return errors.Wrapf(err, "error canceling remaining connection calls")
+	}
+
+	rowsAffected, err := result.RowsAffected()
+	if err != nil {
+		return errors.Wrapf(err, "error getting rows affected on cleaning stucked connections")
+	}
+	if rowsAffected > 0 {
+		log.WithField("count", rowsAffected).WithField("elapsed", time.Since(start)).Info("stucked channel connections")
+	}
+	return nil
+}
+
 func changeMaxConnectionsConfig(ctx context.Context, rt *runtime.Runtime, lockName string, channelType string, maxConcurrentEventsToSet int) error {
 	log := logrus.WithField("comp", "ivr_cron_change_max_connections")
 	start := time.Now()
@@ -306,6 +340,17 @@ const updateIVRChannelConfigSQL = `
 	UPDATE channels_channel
 	SET config = $1
 	WHERE id = $2
+`
+
+const cancelQueuedChannelConnectionsSQL = `
+		UPDATE channels_channelconnection
+		SET status = 'F'
+		WHERE id in (
+			SELECT id
+			FROM channels_channelconnection
+			WHERE
+				(status = 'Q' OR status = 'E' OR status = 'P')
+		)
 `
 
 const clearStuckedChanelConnectionsSQL = `
