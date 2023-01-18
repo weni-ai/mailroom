@@ -77,6 +77,7 @@ type Config struct {
 	IVRStopHour            int    `help:"ivr stop hour"`
 	IVRTimeZone            string `help:"ivr time zone"`
 	IVRCancelCronStartHour int    `help:"the cron hour to start cancel ivr calls queued"`
+	IVRConnRetryLimit      int    `help:"limit connection that be retryed"`
 }
 
 // NewDefaultConfig returns a new default configuration object
@@ -133,6 +134,7 @@ func NewDefaultConfig() *Config {
 		IVRStopHour:            21,
 		IVRTimeZone:            "Asia/Kolkata",
 		IVRCancelCronStartHour: 22,
+		IVRConnRetryLimit:      500,
 	}
 }
 
