@@ -77,9 +77,13 @@ type Config struct {
 	IVRStopHour                          int    `help:"ivr stop hour"`
 	IVRTimeZone                          string `help:"ivr time zone"`
 	IVRCancelCronStartHour               int    `help:"the cron hour to start cancel ivr calls queued"`
-	IVRConnRetryLimit                    int    `help:"limit connection that be retryed"`
-	IVRFLowStartBatchTimeout             int    `help:"timeout of flow start batch"`
+	IVRFlowStartBatchTimeout             int    `help:"timeout of flow start batch"`
 	IVRFlowStartBatchExecutionsPerSecond int    `help:"executions per second of flow start batch calls"`
+
+	IVRConnRetryLimit                  int `help:"limit connection that be retryed"`
+	IVRRetryWorkers                    int `help:"the number of goroutines that will be used to handle each connection retry"`
+	IVRRetryTimeout                    int `help:"timeout to run a retry ivr connections"`
+	IVRRetryMaximumExecutionsPerSecond int `help:"maximum executions per second of retry calls"`
 }
 
 // NewDefaultConfig returns a new default configuration object
@@ -136,9 +140,13 @@ func NewDefaultConfig() *Config {
 		IVRStopHour:                          21,
 		IVRTimeZone:                          "Asia/Kolkata",
 		IVRCancelCronStartHour:               22,
-		IVRConnRetryLimit:                    500,
-		IVRFLowStartBatchTimeout:             10,
+		IVRFlowStartBatchTimeout:             10,
 		IVRFlowStartBatchExecutionsPerSecond: 50,
+
+		IVRConnRetryLimit:                  500,
+		IVRRetryWorkers:                    5,
+		IVRRetryTimeout:                    10,
+		IVRRetryMaximumExecutionsPerSecond: 10,
 	}
 }
 

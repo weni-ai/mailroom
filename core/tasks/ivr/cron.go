@@ -46,7 +46,7 @@ func StartIVRCron(rt *runtime.Runtime, wg *sync.WaitGroup, quit chan bool) error
 			if currentHour >= rt.Config.IVRStartHour && currentHour < rt.Config.IVRStopHour {
 				ctx, cancel := context.WithTimeout(context.Background(), time.Minute*10)
 				defer cancel()
-				return retryCalls(ctx, rt)
+				return retryCallsInWorkerPool(ctx, rt)
 			}
 			return nil
 		},
@@ -103,6 +103,47 @@ func StartIVRCron(rt *runtime.Runtime, wg *sync.WaitGroup, quit chan bool) error
 			return nil
 		},
 	)
+
+	return nil
+}
+
+// retryCallsInWorkerPoll looks for calls that need to be retried and retries then
+func retryCallsInWorkerPool(ctx context.Context, rt *runtime.Runtime) error {
+	log := logrus.WithField("comp", "ivr_cron_retryer")
+	start := time.Now()
+
+	ctx, cancel := context.WithTimeout(ctx, time.Minute*10)
+	defer cancel()
+
+	conns, err := models.LoadChannelConnectionsToRetry(ctx, rt.DB, rt.Config.IVRConnRetryLimit)
+	if err != nil {
+		return errors.Wrapf(err, "error loading connections to retry")
+	}
+
+	var jobs []Job
+	for i := 0; i < len(conns); i++ {
+		jobs = append(jobs, Job{Id: i, conn: conns[i]})
+	}
+
+	var (
+		wg         sync.WaitGroup
+		jobChannel = make(chan Job)
+	)
+
+	wg.Add(rt.Config.IVRRetryWorkers)
+
+	for i := 0; i < rt.Config.IVRRetryWorkers; i++ {
+		go handleWork(i, rt, &wg, jobChannel)
+	}
+
+	for _, job := range jobs {
+		jobChannel <- job
+	}
+
+	close(jobChannel)
+	wg.Wait()
+
+	log.WithField("count", len(conns)).WithField("elapsed", time.Since(start)).Info("retried errored calls")
 
 	return nil
 }

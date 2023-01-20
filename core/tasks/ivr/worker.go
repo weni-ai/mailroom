@@ -35,7 +35,7 @@ func handleFlowStartTask(ctx context.Context, rt *runtime.Runtime, task *queue.T
 
 // HandleFlowStartBatch starts a batch of contacts in an IVR flow
 func HandleFlowStartBatch(bg context.Context, rt *runtime.Runtime, batch *models.FlowStartBatch) error {
-	ctx, cancel := context.WithTimeout(bg, time.Minute*time.Duration(rt.Config.IVRFLowStartBatchTimeout))
+	ctx, cancel := context.WithTimeout(bg, time.Minute*time.Duration(rt.Config.IVRFlowStartBatchTimeout))
 	defer cancel()
 
 	// contacts we will exclude either because they are in a flow or have already been in this one
