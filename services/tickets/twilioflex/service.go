@@ -301,8 +301,8 @@ func SendHistory(session flows.Session, contactID flows.ContactID, newFlexChanne
 		DateCreated: time.Now().Format(time.RFC3339),
 	}
 
-	headerWebhookEnabled := http.Header{"X-Twilio-Webhook-Enabled": []string{"True"}}
-	_, trace, err = restClient.CreateMessage(m, headerWebhookEnabled)
+	//headerWebhookEnabled := http.Header{"X-Twilio-Webhook-Enabled": []string{"True"}}
+	_, trace, err = restClient.CreateMessage(m, nil)
 	if trace != nil {
 		logHTTP(flows.NewHTTPLog(trace, flows.HTTPStatusFromCode, redactor))
 	}
