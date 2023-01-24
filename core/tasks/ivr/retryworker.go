@@ -2,7 +2,6 @@ package ivr
 
 import (
 	"context"
-	"fmt"
 	"math"
 	"sync"
 	"time"
@@ -10,6 +9,7 @@ import (
 	"github.com/nyaruka/mailroom/core/ivr"
 	"github.com/nyaruka/mailroom/core/models"
 	"github.com/nyaruka/mailroom/runtime"
+	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 )
 
@@ -30,46 +30,45 @@ func handleWork(id int, rt *runtime.Runtime, wg *sync.WaitGroup, jobChannel <-ch
 	for job := range jobChannel {
 		timeUntilNextExecution := -(time.Since(lastExecutionTime) - minimumTimeBetweenEachExecution)
 		if timeUntilNextExecution > 0 {
-			fmt.Printf("Worker #%d backing off for %s\n", id, timeUntilNextExecution)
+			logrus.Infof("Worker #%d backing off for %s\n", id, timeUntilNextExecution)
 			time.Sleep(timeUntilNextExecution)
 		} else {
-			fmt.Printf("Worker #%d not backing off \n", id)
+			logrus.Infof("Worker #%d not backing off \n", id)
 		}
 		lastExecutionTime = time.Now()
-		retryCall(id, rt, job.conn)
+		err := retryCall(id, rt, job.conn)
+		if err != nil {
+			logrus.Error(err)
+		}
 	}
 }
 
-func retryCall(workerId int, rt *runtime.Runtime, conn *models.ChannelConnection) JobResult {
-	log := logrus.WithField("connection_id", conn.ID())
+func retryCall(workerId int, rt *runtime.Runtime, conn *models.ChannelConnection) error {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*1)
 	defer cancel()
 	oa, err := models.GetOrgAssets(ctx, rt, conn.OrgID())
 	if err != nil {
-		log.WithError(err).WithField("org_id", conn.OrgID()).Error("erroro loading org")
-		return JobResult{Output: "Fail"}
+		return errors.Wrapf(err, "error loading org with id %v", conn.OrgID())
 	}
 
 	channel := oa.ChannelByID(conn.ChannelID())
 	if channel == nil {
 		err = models.UpdateChannelConnectionStatuses(ctx, rt.DB, []models.ConnectionID{conn.ID()}, models.ConnectionStatusFailed)
 		if err != nil {
-			log.WithError(err).WithField("channel_id", conn.ChannelID()).Error("error marking call as failed due to missing channel")
+			return errors.Wrapf(err, "error marking call as failed due to missing channel with id %v", conn.ChannelID())
 		}
-		return JobResult{Output: "Fail"}
+		return err
 	}
 
 	urn, err := models.URNForID(ctx, rt.DB, oa, conn.ContactURNID())
 	if err != nil {
-		log.WithError(err).WithField("urn_id", conn.ContactURNID()).Error("unable to load contact urn")
-		return JobResult{Output: "Fail"}
+		return errors.Wrapf(err, "unable to load contact urn for urn_id %v", conn.ContactURNID())
 	}
 
 	err = ivr.RequestCallStartForConnection(ctx, rt, channel, urn, conn)
 	if err != nil {
-		log.WithError(err).Error(err)
-		return JobResult{Output: "Fail"}
+		return err
 	}
 
-	return JobResult{Output: "Success"}
+	return nil
 }

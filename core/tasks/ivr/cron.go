@@ -44,7 +44,7 @@ func StartIVRCron(rt *runtime.Runtime, wg *sync.WaitGroup, quit chan bool) error
 		func() error {
 			currentHour := time.Now().In(location).Hour()
 			if currentHour >= rt.Config.IVRStartHour && currentHour < rt.Config.IVRStopHour {
-				ctx, cancel := context.WithTimeout(context.Background(), time.Minute*10)
+				ctx, cancel := context.WithTimeout(context.Background(), time.Minute*time.Duration(rt.Config.IVRRetryTimeout))
 				defer cancel()
 				return retryCallsInWorkerPool(ctx, rt)
 			}
@@ -111,9 +111,6 @@ func StartIVRCron(rt *runtime.Runtime, wg *sync.WaitGroup, quit chan bool) error
 func retryCallsInWorkerPool(ctx context.Context, rt *runtime.Runtime) error {
 	log := logrus.WithField("comp", "ivr_cron_retryer")
 	start := time.Now()
-
-	ctx, cancel := context.WithTimeout(ctx, time.Minute*10)
-	defer cancel()
 
 	conns, err := models.LoadChannelConnectionsToRetry(ctx, rt.DB, rt.Config.IVRConnRetryLimit)
 	if err != nil {

@@ -94,7 +94,7 @@ func HandleFlowStartBatch(bg context.Context, rt *runtime.Runtime, batch *models
 		if nextExecutionTime > 0 {
 			logrus.WithFields(logrus.Fields{
 				"elapsed": time.Since(time.Now()),
-			}).Info("backing off call start for %s", nextExecutionTime)
+			}).Infof("backing off call start for %v", nextExecutionTime)
 			time.Sleep(nextExecutionTime)
 		}
 

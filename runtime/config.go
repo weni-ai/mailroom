@@ -140,7 +140,7 @@ func NewDefaultConfig() *Config {
 		IVRStopHour:                          21,
 		IVRTimeZone:                          "Asia/Kolkata",
 		IVRCancelCronStartHour:               22,
-		IVRFlowStartBatchTimeout:             10,
+		IVRFlowStartBatchTimeout:             15,
 		IVRFlowStartBatchExecutionsPerSecond: 50,
 
 		IVRConnRetryLimit:                  500,
