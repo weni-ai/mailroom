@@ -290,7 +290,7 @@ func SendHistory(session flows.Session, contactID flows.ContactID, newFlexChanne
 		if msg.Direction() == "I" {
 			historyMsg += "**" + fmt.Sprint(contactID) + "** [" + msg.CreatedOn().Format(time.RFC3339) + "]: " + msg.Text() + "\n"
 		} else {
-			historyMsg += "**Bot** [" + msg.CreatedOn().Format(time.RFC3339) + "]: " + msg.Text() + "\n"
+			historyMsg += "**Bot** [" + msg.CreatedOn().Format(time.RFC3339) + "]: " + msg.Text() + " | "
 		}
 	}
 
