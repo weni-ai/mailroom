@@ -288,9 +288,9 @@ func SendHistory(session flows.Session, contactID flows.ContactID, newFlexChanne
 	historyMsg := ""
 	for _, msg := range msgs {
 		if msg.Direction() == "I" {
-			historyMsg += "**" + fmt.Sprint(contactID) + "** [" + msg.CreatedOn().Format(time.RFC3339) + "]: " + msg.Text() + "\n"
+			historyMsg += "👤 (" + msg.CreatedOn().Format(time.RFC3339) + "): " + msg.Text() + "\n"
 		} else {
-			historyMsg += "**Bot** [" + msg.CreatedOn().Format(time.RFC3339) + "]: " + msg.Text() + " | "
+			historyMsg += "🤖 (" + msg.CreatedOn().Format(time.RFC3339) + "): " + msg.Text() + "\n"
 		}
 	}
 
