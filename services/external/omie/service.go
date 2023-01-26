@@ -17,10 +17,11 @@ type service struct {
 }
 
 func NewService(rtCfg *runtime.Config, httpClient *http.Client, httpRetries *httpx.RetryConfig, externalService *flows.ExternalService, config map[string]string) (models.ExternalServiceService, error) {
-	authToken := config["auth_token"]
+	appKey := config["app_key"]
+	appSecret := config["app_secret"]
 	return &service{
 		rtConfig:   rtCfg,
-		restClient: NewClient(httpClient, httpRetries, "todo-base-url", authToken),
+		restClient: NewClient(httpClient, httpRetries, "todo-base-url", appKey, appSecret),
 		redactor:   utils.NewRedactor(flows.RedactionMask),
 	}, nil
 }
