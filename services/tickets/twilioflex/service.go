@@ -288,6 +288,7 @@ func SendHistory(session flows.Session, contactID flows.ContactID, newFlexChanne
 	// send history
 	for _, msg := range msgs {
 		if msg.Direction() == "I" {
+			fmt.Println("Time msg: ", fmt.Sprint(msg.CreatedOn()))
 			historyMsg += "👤 (" + msg.CreatedOn().Format("02/01/2006 15:04:05") + "): " + msg.Text() + "\n"
 		} else {
 			historyMsg += "🤖 (" + msg.CreatedOn().Format("02/01/2006 15:04:05") + "): " + msg.Text() + "\n"
