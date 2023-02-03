@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"net/url"
 	"path"
+	"sort"
 	"strings"
 	"sync"
 	"time"
@@ -283,6 +284,12 @@ func SendHistory(session flows.Session, contactID flows.ContactID, newFlexChanne
 		logrus.Error(errors.Wrap(err, "failed to get history messages"))
 		return
 	}
+
+	// sort messages by CreatedOn()
+	sort.SliceStable(msgs, func(i, j int) bool {
+		return msgs[i].CreatedOn().Before(msgs[j].CreatedOn())
+	})
+
 	var trace *httpx.Trace
 	// send history
 	for _, msg := range msgs {
