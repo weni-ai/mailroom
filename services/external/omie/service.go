@@ -10,6 +10,8 @@ import (
 	"github.com/nyaruka/mailroom/runtime"
 )
 
+var baseURL = "https://app.omie.com.br/api"
+
 type service struct {
 	rtConfig   *runtime.Config
 	restClient *Client
