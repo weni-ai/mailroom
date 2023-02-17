@@ -167,6 +167,7 @@ type IncluirContatoRequest struct {
 	OmieCall
 	Param []struct {
 		Identificacao struct {
+			NCod       int    `json:"nCod"`
 			CCodInt    string `json:"cCodInt"`
 			CNome      string `json:"cNome"`
 			CSobrenome string `json:"cSobrenome"`
@@ -187,9 +188,16 @@ type IncluirContatoRequest struct {
 		TelefoneEmail struct {
 			CDDDCel1 string `json:"cDDDCel1"`
 			CNumCel1 string `json:"cNumCel1"`
+			CDDDCel2 string `json:"cDDDCel2"`
+			CNumCel2 string `json:"cNumCel2"`
+			CDDDTel  string `json:"cDDDTel"`
+			CNumTel  string `json:"cNumTel"`
+			CDDDFax  string `json:"cDDDFax"`
+			CNumFax  string `json:"cNumFax"`
 			CEmail   string `json:"cEmail"`
 			CWebsite string `json:"cWebsite"`
 		} `json:"telefone_email"`
+		CObs string `json:"cObs"`
 	} `json:"param"`
 }
 
