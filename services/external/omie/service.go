@@ -4,8 +4,8 @@ import (
 	"encoding/json"
 	"net/http"
 
-	"github.com/buger/jsonparser"
 	"github.com/nyaruka/gocommon/httpx"
+	"github.com/nyaruka/goflow/assets"
 	"github.com/nyaruka/goflow/flows"
 	"github.com/nyaruka/goflow/utils"
 	"github.com/nyaruka/mailroom/core/models"
@@ -39,18 +39,14 @@ func NewService(rtCfg *runtime.Config, httpClient *http.Client, httpRetries *htt
 	}, nil
 }
 
-func (s *service) Call(sesion flows.Session, body string, logHTTP flows.HTTPLogCallback) (*flows.ExternalServiceCall, error) {
-	call, err := jsonparser.GetString([]byte(body), "call")
-	if err != nil {
-		return nil, errors.Errorf("invalid jsonbody")
-	}
+func (s *service) Call(sesion flows.Session, callAction assets.ExternalServiceCallAction, params []assets.ExternalServiceParam, logHTTP flows.HTTPLogCallback) (*flows.ExternalServiceCall, error) {
+	call := callAction.Name
 
 	callResult := &flows.ExternalServiceCall{}
 
 	switch call {
 	case "IncluirContato":
-		request := &IncluirContatoRequest{}
-		err := json.Unmarshal([]byte(body), request)
+		request, err := ParamsToIncluirContatoRequest(params)
 		if err != nil {
 			return nil, errors.Wrap(err, "unable to unmarshal IncluirContatoRequest")
 		}
@@ -63,8 +59,7 @@ func (s *service) Call(sesion flows.Session, body string, logHTTP flows.HTTPLogC
 			return nil, errors.Wrap(err, "error to marshal result for ExternalServiceCall.ResponseJSON")
 		}
 	case "IncluirOportunidade":
-		request := &IncluirOportunidadeRequest{}
-		err := json.Unmarshal([]byte(body), request)
+		request, err := ParamsToIncluirOportunidadeRequest(params)
 		if err != nil {
 			return nil, errors.Wrap(err, "unable to unmarshal IncluirOportunidadeRequest")
 		}
@@ -77,8 +72,7 @@ func (s *service) Call(sesion flows.Session, body string, logHTTP flows.HTTPLogC
 			return nil, errors.Wrap(err, "error to marshal result for ExternalServiceCall.ResponseJSON")
 		}
 	case "ListarClientes":
-		request := &ListarClientesRequest{}
-		err := json.Unmarshal([]byte(body), request)
+		request, err := ParamsToListarClientesRequest(params)
 		if err != nil {
 			return nil, errors.Wrap(err, "unable to unmarshal ListarCLientesRequest")
 		}
@@ -91,8 +85,7 @@ func (s *service) Call(sesion flows.Session, body string, logHTTP flows.HTTPLogC
 			return nil, errors.Wrap(err, "error to marshal result for ExternalServiceCall.ResponseJSON")
 		}
 	case "PesquisarLancamentosRequest":
-		request := &PesquisarLancamentosRequest{}
-		err := json.Unmarshal([]byte(body), request)
+		request, err := ParamsToPesquisarLancamentosRequest(params)
 		if err != nil {
 			return nil, errors.Wrap(err, "unable to unmarshal PesquisarLancamentosRequest")
 		}

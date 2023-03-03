@@ -34,9 +34,9 @@ func TestIncluirOportunidade(t *testing.T) {
 	}))
 
 	client := omie.NewClient(http.DefaultClient, nil, baseURL, appKey, appSecret)
-	data := &omie.IncluirOportunidadeRequest{Param: []omie.OpIncluirRequest{}}
+	data := &omie.IncluirOportunidadeRequest{Param: []omie.IncluirOportunidadeRequestParam{}}
 
-	param := omie.OpIncluirRequest{
+	param := omie.IncluirOportunidadeRequestParam{
 		Identificacao: omie.OpIdentificacao{
 			CCodIntOp: "e8f8b762-24c1-4adf-7",
 		},
@@ -153,7 +153,7 @@ func TestListarClientes(t *testing.T) {
 	cls, trace, err := client.ListarClientes(data)
 	assert.NoError(t, err)
 	assert.Equal(t, 1, cls.TotalDeRegistros)
-	assert.Equal(t, "HTTP/1.0 200 OK\r\nContent-Length: 1965\r\n\r\n", string(trace.ResponseTrace))
+	assert.Equal(t, "HTTP/1.0 200 OK\r\nContent-Length: 1964\r\n\r\n", string(trace.ResponseTrace))
 }
 
 func TestPesquisarLancamentos(t *testing.T) {

@@ -24,6 +24,7 @@ func handleServiceCalled(ctx context.Context, rt *runtime.Runtime, tx *sqlx.Tx, 
 	event := e.(*events.ServiceCalledEvent)
 	var classifier *models.Classifier
 	var ticketer *models.Ticketer
+	var externalService *models.ExternalService
 
 	if event.Service == "classifier" {
 		classifier = oa.ClassifierByUUID(event.Classifier.UUID)
@@ -34,6 +35,11 @@ func handleServiceCalled(ctx context.Context, rt *runtime.Runtime, tx *sqlx.Tx, 
 		ticketer = oa.TicketerByUUID(event.Ticketer.UUID)
 		if ticketer == nil {
 			return errors.Errorf("unable to find ticketer with UUID: %s", event.Ticketer.UUID)
+		}
+	} else if event.Service == "external_service" {
+		externalService = oa.ExternalServiceByUUID(event.ExternalService.UUID)
+		if externalService == nil {
+			return errors.Errorf("unable to find external service with UUID: %s", event.ExternalService.UUID)
 		}
 	}
 
@@ -66,6 +72,19 @@ func handleServiceCalled(ctx context.Context, rt *runtime.Runtime, tx *sqlx.Tx, 
 			log = models.NewTicketerCalledLog(
 				oa.OrgID(),
 				ticketer.ID(),
+				httpLog.URL,
+				httpLog.StatusCode,
+				httpLog.Request,
+				httpLog.Response,
+				httpLog.Status != flows.CallStatusSuccess,
+				time.Duration(httpLog.ElapsedMS)*time.Millisecond,
+				httpLog.Retries,
+				httpLog.CreatedOn,
+			)
+		} else if event.Service == "external_service" {
+			log = models.NewExternalServiceCalledLog(
+				oa.OrgID(),
+				externalService.ID(),
 				httpLog.URL,
 				httpLog.StatusCode,
 				httpLog.Request,

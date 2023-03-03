@@ -165,40 +165,42 @@ type IncluirContatoResponse struct {
 
 type IncluirContatoRequest struct {
 	OmieCall
-	Param []struct {
-		Identificacao struct {
-			NCod       int    `json:"nCod"`
-			CCodInt    string `json:"cCodInt"`
-			CNome      string `json:"cNome"`
-			CSobrenome string `json:"cSobrenome"`
-			CCargo     string `json:"cCargo"`
-			DDtNasc    string `json:"dDtNasc"`
-			NCodVend   int    `json:"nCodVend"`
-			NCodConta  int    `json:"nCodConta"`
-		} `json:"identificacao"`
-		Endereco struct {
-			CEndereco string `json:"cEndereco"`
-			CCompl    string `json:"cCompl"`
-			CCEP      string `json:"cCEP"`
-			CBairro   string `json:"cBairro"`
-			CCidade   string `json:"cCidade"`
-			CUF       string `json:"cUF"`
-			CPais     string `json:"cPais"`
-		} `json:"endereco"`
-		TelefoneEmail struct {
-			CDDDCel1 string `json:"cDDDCel1"`
-			CNumCel1 string `json:"cNumCel1"`
-			CDDDCel2 string `json:"cDDDCel2"`
-			CNumCel2 string `json:"cNumCel2"`
-			CDDDTel  string `json:"cDDDTel"`
-			CNumTel  string `json:"cNumTel"`
-			CDDDFax  string `json:"cDDDFax"`
-			CNumFax  string `json:"cNumFax"`
-			CEmail   string `json:"cEmail"`
-			CWebsite string `json:"cWebsite"`
-		} `json:"telefone_email"`
-		CObs string `json:"cObs"`
-	} `json:"param"`
+	Param []IncluirContatoRequestParam `json:"param"`
+}
+
+type IncluirContatoRequestParam struct {
+	Identificacao struct {
+		NCod       int    `json:"nCod,omitempty"`
+		CCodInt    string `json:"cCodInt,omitempty"`
+		CNome      string `json:"cNome,omitempty"`
+		CSobrenome string `json:"cSobrenome,omitempty"`
+		CCargo     string `json:"cCargo,omitempty"`
+		DDtNasc    string `json:"dDtNasc,omitempty"`
+		NCodVend   int    `json:"nCodVend,omitempty"`
+		NCodConta  int    `json:"nCodConta,omitempty"`
+	} `json:"identificacao,omitempty"`
+	Endereco struct {
+		CEndereco string `json:"cEndereco,omitempty"`
+		CCompl    string `json:"cCompl,omitempty"`
+		CCEP      string `json:"cCEP,omitempty"`
+		CBairro   string `json:"cBairro,omitempty"`
+		CCidade   string `json:"cCidade,omitempty"`
+		CUF       string `json:"cUF,omitempty"`
+		CPais     string `json:"cPais,omitempty"`
+	} `json:"endereco,omitempty"`
+	TelefoneEmail struct {
+		CDDDCel1 string `json:"cDDDCel1,omitempty"`
+		CNumCel1 string `json:"cNumCel1,omitempty"`
+		CDDDCel2 string `json:"cDDDCel2,omitempty"`
+		CNumCel2 string `json:"cNumCel2,omitempty"`
+		CDDDTel  string `json:"cDDDTel,omitempty"`
+		CNumTel  string `json:"cNumTel,omitempty"`
+		CDDDFax  string `json:"cDDDFax,omitempty"`
+		CNumFax  string `json:"cNumFax,omitempty"`
+		CEmail   string `json:"cEmail,omitempty"`
+		CWebsite string `json:"cWebsite,omitempty"`
+	} `json:"telefone_email,omitempty"`
+	CObs string `json:"cObs,omitempty"`
 }
 
 type OpIncluirResponse struct {
@@ -210,10 +212,10 @@ type OpIncluirResponse struct {
 
 type IncluirOportunidadeRequest struct {
 	OmieCall
-	Param []OpIncluirRequest
+	Param []IncluirOportunidadeRequestParam
 }
 
-type OpIncluirRequest struct {
+type IncluirOportunidadeRequestParam struct {
 	Identificacao OpIdentificacao `json:"identificacao"`
 	FasesStatus   OpFasesStatus   `json:"fasesStatus"`
 	Ticket        OpTicket        `json:"ticket"`
@@ -277,6 +279,12 @@ type OpEnvolvidos struct {
 	NCodFinder   int `json:"nCodFinder"`
 	NCodParceiro int `json:"nCodParceiro"`
 	NCodPrevenda int `json:"nCodPrevenda"`
+}
+
+type OpConcorrentes struct {
+	NCodConc    int    `json:"nCodConc"`
+	CCodIntConc string `json:"cCodIntConc"`
+	CObservacao string `json:"cObservacao"`
 }
 
 type ListarClientesResponse struct {
