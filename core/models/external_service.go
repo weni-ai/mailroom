@@ -50,12 +50,12 @@ func externalServiceServiceFactory(c *runtime.Config) engine.ExternalServiceServ
 
 type ExternalService struct {
 	e struct {
-		ID     ExternalServiceID
-		UUID   assets.ExternalServiceUUID
-		OrgID  OrgID
-		Type   string
-		Name   string
-		Config map[string]string
+		ID     ExternalServiceID          `json:"id,omitempty"`
+		UUID   assets.ExternalServiceUUID `json:"uuid,omitempty"`
+		OrgID  OrgID                      `json:"org_id,omitempty"`
+		Type   string                     `json:"external_service_type,omitempty"`
+		Name   string                     `json:"name,omitempty"`
+		Config map[string]string          `json:"config,omitempty"`
 	}
 }
 
@@ -79,7 +79,7 @@ func (e *ExternalService) AsService(cfg *runtime.Config, externalService *flows.
 	httpClient, httpRetries, _ := goflow.HTTP(cfg)
 
 	initFunc := externalServiceServices[e.Type()]
-	if initFunc == nil {
+	if initFunc != nil {
 		return initFunc(cfg, httpClient, httpRetries, externalService, e.e.Config)
 	}
 
@@ -120,10 +120,10 @@ SELECT ROW_TO_JSON(r) FROM (SELECT
 	e.uuid as uuid
 	e.org_id as org_id,
 	e.name as name,
-	e.service_type as service_type,
+	e.external_service_type as external_service_type,
 	e.config as config
 FROM
-	external_services_service e
+	externals_externalservice; e
 WHERE
 	e.uuid = $1 AND
 	e.is_active = TRUE
@@ -156,10 +156,10 @@ SELECT ROW_TO_JSON(r) FROM (SELECT
 	e.uuid as uuid,
 	e.org_id as org_id,
 	e.name as name,
-	e.service_type as service_type,
+	e.external_service_type as external_service_type,
 	e.config as config
 FROM
-	external_services_service e
+	externals_externalservice e
 WHERE
 	e.org_id = $1 AND
 	e.is_active = TRUE
