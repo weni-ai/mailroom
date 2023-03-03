@@ -64,6 +64,7 @@ func Engine(c *runtime.Config) flows.Engine {
 			WithClassificationServiceFactory(classificationFactory(c)).
 			WithEmailServiceFactory(emailFactory(c)).
 			WithTicketServiceFactory(ticketFactory(c)).
+			WithExternalServiceServiceFactory(externalServiceFactory((c))).
 			WithAirtimeServiceFactory(airtimeFactory(c)).
 			WithMaxStepsPerSprint(c.MaxStepsPerSprint).
 			WithMaxResumesPerSession(c.MaxResumesPerSession).
