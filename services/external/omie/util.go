@@ -388,7 +388,7 @@ func ParamsToListarClientesRequest(params []assets.ExternalServiceParam) (*Lista
 		}
 	}
 	r.Param = append(r.Param, p)
-	return nil, nil
+	return r, nil
 }
 
 func ParamsToPesquisarLancamentosRequest(param []assets.ExternalServiceParam) (*PesquisarLancamentosRequest, error) {

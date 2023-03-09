@@ -132,7 +132,7 @@ func (c *Client) PesquisarLancamentos(data *PesquisarLancamentosRequest) (*Pesqu
 	requestUrl := c.baseURL + "/v1/financas/pesquisartitulos/"
 	response := &PesquisarLancamentosResponse{}
 
-	data.Call = "PesquisarLancamentosRequest"
+	data.Call = "PesquisarLancamentos"
 	data.AppKey = c.appKey
 	data.AppSecret = c.appSecret
 
@@ -212,311 +212,311 @@ type OpIncluirResponse struct {
 
 type IncluirOportunidadeRequest struct {
 	OmieCall
-	Param []IncluirOportunidadeRequestParam
+	Param []IncluirOportunidadeRequestParam `json:"param"`
 }
 
 type IncluirOportunidadeRequestParam struct {
-	Identificacao OpIdentificacao `json:"identificacao"`
-	FasesStatus   OpFasesStatus   `json:"fasesStatus"`
-	Ticket        OpTicket        `json:"ticket"`
-	PrevisaoTemp  OpPrevisaoTemp  `json:"previsaoTemp"`
-	Observacoes   OpObservacoes   `json:"observacoes"`
-	OutraInf      OpOutrasInf     `json:"outrasInf"`
-	Envolvidos    OpEnvolvidos    `json:"envolvidos"`
-	Concorrentes  []interface{}   `json:"concorrentes"`
+	Identificacao OpIdentificacao `json:"identificacao,omitempty"`
+	FasesStatus   OpFasesStatus   `json:"fasesStatus,omitempty"`
+	Ticket        OpTicket        `json:"ticket,omitempty"`
+	PrevisaoTemp  OpPrevisaoTemp  `json:"previsaoTemp,omitempty"`
+	Observacoes   OpObservacoes   `json:"observacoes,omitempty"`
+	OutraInf      OpOutrasInf     `json:"outrasInf,omitempty"`
+	Envolvidos    OpEnvolvidos    `json:"envolvidos,omitempty"`
+	Concorrentes  []interface{}   `json:"concorrentes,omitempty"`
 }
 
 type OpIdentificacao struct {
-	CCodIntOp    string `json:"cCodIntOp"`
-	CDesOp       string `json:"cDesOp"`
-	NCodConta    int    `json:"nCodConta"`
-	NCodContato  int    `json:"nCodContato"`
-	NCodOp       int64  `json:"nCodOp"`
-	NCodOrigem   int    `json:"nCodOrigem"`
-	NCodSolucao  int    `json:"nCodSolucao"`
-	NCodVendedor int    `json:"nCodVendedor"`
+	CCodIntOp    string `json:"cCodIntOp,omitempty"`
+	CDesOp       string `json:"cDesOp,omitempty"`
+	NCodConta    int    `json:"nCodConta,omitempty"`
+	NCodContato  int    `json:"nCodContato,omitempty"`
+	NCodOp       int64  `json:"nCodOp,omitempty"`
+	NCodOrigem   int    `json:"nCodOrigem,omitempty"`
+	NCodSolucao  int    `json:"nCodSolucao,omitempty"`
+	NCodVendedor int    `json:"nCodVendedor,omitempty"`
 }
 
 type OpFasesStatus struct {
-	DConclusao    string `json:"dConclusao"`
-	DNovoLead     string `json:"dNovoLead"`
-	DProjeto      string `json:"dProjeto"`
-	DQualificacao string `json:"dQualificacao"`
-	DShowRoom     string `json:"dShowRoom"`
-	DTreinamento  string `json:"dTreinamento"`
-	NCodFase      int    `json:"nCodFase"`
-	NCodMotivo    int    `json:"nCodMotivo"`
-	NCodStatus    int    `json:"nCodStatus"`
+	DConclusao    string `json:"dConclusao,omitempty"`
+	DNovoLead     string `json:"dNovoLead,omitempty"`
+	DProjeto      string `json:"dProjeto,omitempty"`
+	DQualificacao string `json:"dQualificacao,omitempty"`
+	DShowRoom     string `json:"dShowRoom,omitempty"`
+	DTreinamento  string `json:"dTreinamento,omitempty"`
+	NCodFase      int    `json:"nCodFase,omitempty"`
+	NCodMotivo    int    `json:"nCodMotivo,omitempty"`
+	NCodStatus    int    `json:"nCodStatus,omitempty"`
 }
 type OpTicket struct {
-	NMeses       int `json:"nMeses"`
-	NProdutos    int `json:"nProdutos"`
-	NRecorrencia int `json:"nRecorrencia"`
-	NServicos    int `json:"nServicos"`
-	NTicket      int `json:"nTicket"`
+	NMeses       int `json:"nMeses,omitempty"`
+	NProdutos    int `json:"nProdutos,omitempty"`
+	NRecorrencia int `json:"nRecorrencia,omitempty"`
+	NServicos    int `json:"nServicos,omitempty"`
+	NTicket      int `json:"nTicket,omitempty"`
 }
 
 type OpPrevisaoTemp struct {
-	NAnoPrev     int `json:"nAnoPrev"`
-	NMesPrev     int `json:"nMesPrev"`
-	NTemperatura int `json:"nTemperatura"`
+	NAnoPrev     int `json:"nAnoPrev,omitempty"`
+	NMesPrev     int `json:"nMesPrev,omitempty"`
+	NTemperatura int `json:"nTemperatura,omitempty"`
 }
 
 type OpObservacoes struct {
-	CObs string `json:"cObs"`
+	CObs string `json:"cObs,omitempty"`
 }
 
 type OpOutrasInf struct {
-	CEmailOp   string `json:"cEmailOp"`
-	DAlteracao string `json:"dAlteracao"`
-	DInclusao  string `json:"dInclusao"`
-	HAlteracao string `json:"hAlteracao"`
-	HInclusao  string `json:"hInclusao"`
-	NCodTipo   int    `json:"nCodTipo"`
+	CEmailOp   string `json:"cEmailOp,omitempty"`
+	DAlteracao string `json:"dAlteracao,omitempty"`
+	DInclusao  string `json:"dInclusao,omitempty"`
+	HAlteracao string `json:"hAlteracao,omitempty"`
+	HInclusao  string `json:"hInclusao,omitempty"`
+	NCodTipo   int    `json:"nCodTipo,omitempty"`
 }
 
 type OpEnvolvidos struct {
-	NCodFinder   int `json:"nCodFinder"`
-	NCodParceiro int `json:"nCodParceiro"`
-	NCodPrevenda int `json:"nCodPrevenda"`
+	NCodFinder   int `json:"nCodFinder,omitempty"`
+	NCodParceiro int `json:"nCodParceiro,omitempty"`
+	NCodPrevenda int `json:"nCodPrevenda,omitempty"`
 }
 
 type OpConcorrentes struct {
-	NCodConc    int    `json:"nCodConc"`
-	CCodIntConc string `json:"cCodIntConc"`
-	CObservacao string `json:"cObservacao"`
+	NCodConc    int    `json:"nCodConc,omitempty"`
+	CCodIntConc string `json:"cCodIntConc,omitempty"`
+	CObservacao string `json:"cObservacao,omitempty"`
 }
 
 type ListarClientesResponse struct {
-	Pagina           int               `json:"pagina"`
-	TotalDePaginas   int               `json:"total_de_paginas"`
-	Registros        int               `json:"registros"`
-	TotalDeRegistros int               `json:"total_de_registros"`
-	ClientesCadastro []ClienteCadastro `json:"clientes_cadastro"`
+	Pagina           int               `json:"pagina,omitempty"`
+	TotalDePaginas   int               `json:"total_de_paginas,omitempty"`
+	Registros        int               `json:"registros,omitempty"`
+	TotalDeRegistros int               `json:"total_de_registros,omitempty"`
+	ClientesCadastro []ClienteCadastro `json:"clientes_cadastro,omitempty"`
 }
 
 type ClienteCadastro struct {
-	Bairro                  string `json:"bairro"`
-	BloquearExclusao        string `json:"bloquear_exclusao"`
-	BloquearFaturamento     string `json:"bloquear_faturamento"`
-	Cep                     string `json:"cep"`
-	Cidade                  string `json:"cidade"`
-	CidadeIbge              string `json:"cidade_ibge"`
-	CnpjCpf                 string `json:"cnpj_cpf"`
-	CodigoClienteIntegracao string `json:"codigo_cliente_integracao"`
-	CodigoClienteOmie       int64  `json:"codigo_cliente_omie"`
-	CodigoPais              string `json:"codigo_pais"`
-	Complemento             string `json:"complemento"`
+	Bairro                  string `json:"bairro,omitempty"`
+	BloquearExclusao        string `json:"bloquear_exclusao,omitempty"`
+	BloquearFaturamento     string `json:"bloquear_faturamento,omitempty"`
+	Cep                     string `json:"cep,omitempty"`
+	Cidade                  string `json:"cidade,omitempty"`
+	CidadeIbge              string `json:"cidade_ibge,omitempty"`
+	CnpjCpf                 string `json:"cnpj_cpf,omitempty"`
+	CodigoClienteIntegracao string `json:"codigo_cliente_integracao,omitempty"`
+	CodigoClienteOmie       int64  `json:"codigo_cliente_omie,omitempty"`
+	CodigoPais              string `json:"codigo_pais,omitempty"`
+	Complemento             string `json:"complemento,omitempty"`
 	DadosBancarios          struct {
-		Agencia       string `json:"agencia"`
-		CodigoBanco   string `json:"codigo_banco"`
-		ContaCorrente string `json:"conta_corrente"`
-		DocTitular    string `json:"doc_titular"`
-		NomeTitular   string `json:"nome_titular"`
-		TransfPadrao  string `json:"transf_padrao"`
-	} `json:"dadosBancarios"`
-	Email           string `json:"email"`
-	Endereco        string `json:"endereco"`
+		Agencia       string `json:"agencia,omitempty"`
+		CodigoBanco   string `json:"codigo_banco,omitempty"`
+		ContaCorrente string `json:"conta_corrente,omitempty"`
+		DocTitular    string `json:"doc_titular,omitempty"`
+		NomeTitular   string `json:"nome_titular,omitempty"`
+		TransfPadrao  string `json:"transf_padrao,omitempty"`
+	} `json:"dadosBancarios,omitempty"`
+	Email           string `json:"email,omitempty"`
+	Endereco        string `json:"endereco,omitempty"`
 	EnderecoEntrega struct {
-	} `json:"enderecoEntrega"`
-	EnderecoNumero string `json:"endereco_numero"`
-	Estado         string `json:"estado"`
-	Exterior       string `json:"exterior"`
-	Inativo        string `json:"inativo"`
+	} `json:"enderecoEntrega,omitempty"`
+	EnderecoNumero string `json:"endereco_numero,omitempty"`
+	Estado         string `json:"estado,omitempty"`
+	Exterior       string `json:"exterior,omitempty"`
+	Inativo        string `json:"inativo,omitempty"`
 	Info           struct {
-		CImpAPI string `json:"cImpAPI"`
-		DAlt    string `json:"dAlt"`
-		DInc    string `json:"dInc"`
-		HAlt    string `json:"hAlt"`
-		HInc    string `json:"hInc"`
-		UAlt    string `json:"uAlt"`
-		UInc    string `json:"uInc"`
-	} `json:"info"`
-	InscricaoEstadual  string `json:"inscricao_estadual"`
-	InscricaoMunicipal string `json:"inscricao_municipal"`
-	NomeFantasia       string `json:"nome_fantasia"`
-	PessoaFisica       string `json:"pessoa_fisica"`
-	RazaoSocial        string `json:"razao_social"`
+		CImpAPI string `json:"cImpAPI,omitempty"`
+		DAlt    string `json:"dAlt,omitempty"`
+		DInc    string `json:"dInc,omitempty"`
+		HAlt    string `json:"hAlt,omitempty"`
+		HInc    string `json:"hInc,omitempty"`
+		UAlt    string `json:"uAlt,omitempty"`
+		UInc    string `json:"uInc,omitempty"`
+	} `json:"info,omitempty"`
+	InscricaoEstadual  string `json:"inscricao_estadual,omitempty"`
+	InscricaoMunicipal string `json:"inscricao_municipal,omitempty"`
+	NomeFantasia       string `json:"nome_fantasia,omitempty"`
+	PessoaFisica       string `json:"pessoa_fisica,omitempty"`
+	RazaoSocial        string `json:"razao_social,omitempty"`
 	Recomendacoes      struct {
-		GerarBoletos string `json:"gerar_boletos"`
-	} `json:"recomendacoes"`
-	Tags            []interface{} `json:"tags"`
-	Telefone1Ddd    string        `json:"telefone1_ddd"`
-	Telefone1Numero string        `json:"telefone1_numero"`
+		GerarBoletos string `json:"gerar_boletos,omitempty"`
+	} `json:"recomendacoes,omitempty"`
+	Tags            []interface{} `json:"tags,omitempty"`
+	Telefone1Ddd    string        `json:"telefone1_ddd,omitempty"`
+	Telefone1Numero string        `json:"telefone1_numero,omitempty"`
 }
 
 type ListarClientesRequest struct {
 	OmieCall
-	Param []ListarClientesRequestParam `json:"param"`
+	Param []ListarClientesRequestParam `json:"param,omitempty"`
 }
 
 type ListarClientesRequestParam struct {
-	Pagina                 int    `json:"pagina"`
-	RegistrosPorPagina     int    `json:"registros_por_pagina"`
-	ApenasImportadoAPI     string `json:"apenas_importado_api"`
-	OrdenarPor             string `json:"ordenar_por"`
-	OrdemDecrescente       string `json:"ordem_decrescente"`
-	FiltrarPorDataDe       string `json:"filtrar_por_data_de"`
-	FiltrarPorDataAte      string `json:"filtrar_por_data_ate"`
-	FiltrarPorHoraDe       string `json:"filtrar_por_hora_de"`
-	FiltrarPorHoraAte      string `json:"filtrar_por_hora_ate"`
-	FiltrarApenasInclusao  string `json:"filtrar_apenas_inclusao"`
-	FiltrarApenasAlteracao string `json:"filtrar_apenas_alteracao"`
+	Pagina                 int    `json:"pagina,omitempty"`
+	RegistrosPorPagina     int    `json:"registros_por_pagina,omitempty"`
+	ApenasImportadoAPI     string `json:"apenas_importado_api,omitempty"`
+	OrdenarPor             string `json:"ordenar_por,omitempty"`
+	OrdemDecrescente       string `json:"ordem_decrescente,omitempty"`
+	FiltrarPorDataDe       string `json:"filtrar_por_data_de,omitempty"`
+	FiltrarPorDataAte      string `json:"filtrar_por_data_ate,omitempty"`
+	FiltrarPorHoraDe       string `json:"filtrar_por_hora_de,omitempty"`
+	FiltrarPorHoraAte      string `json:"filtrar_por_hora_ate,omitempty"`
+	FiltrarApenasInclusao  string `json:"filtrar_apenas_inclusao,omitempty"`
+	FiltrarApenasAlteracao string `json:"filtrar_apenas_alteracao,omitempty"`
 	ClientesFiltro         struct {
-		CodigoClienteOmie       int    `json:"codigo_cliente_omie"`
-		CodigoClienteIntegracao string `json:"codigo_cliente_integracao"`
-		CnpjCpf                 string `json:"cnpj_cpf"`
-		RazaoSocial             string `json:"razao_social"`
-		NomeFantasia            string `json:"nome_fantasia"`
-		Endereco                string `json:"endereco"`
-		Bairro                  string `json:"bairro"`
-		Cidade                  string `json:"cidade"`
-		Estado                  string `json:"estado"`
-		Cep                     string `json:"cep"`
-		Contato                 string `json:"contato"`
-		Email                   string `json:"email"`
-		Homepage                string `json:"homepage"`
-		InscricaoMunicipal      string `json:"inscricao_municipal"`
-		InscricaoEstadual       string `json:"inscricao_estadual"`
-		InscricaoSuframa        string `json:"inscricao_suframa"`
-		PessoaFisica            string `json:"pessoa_fisica"`
-		OptanteSimplesNacional  string `json:"optante_simples_nacional"`
-		Inativo                 string `json:"inativo"`
-		Tags                    string `json:"tags"`
-	} `json:"clientesFiltro"`
+		CodigoClienteOmie       int    `json:"codigo_cliente_omie,omitempty"`
+		CodigoClienteIntegracao string `json:"codigo_cliente_integracao,omitempty"`
+		CnpjCpf                 string `json:"cnpj_cpf,omitempty"`
+		RazaoSocial             string `json:"razao_social,omitempty"`
+		NomeFantasia            string `json:"nome_fantasia,omitempty"`
+		Endereco                string `json:"endereco,omitempty"`
+		Bairro                  string `json:"bairro,omitempty"`
+		Cidade                  string `json:"cidade,omitempty"`
+		Estado                  string `json:"estado,omitempty"`
+		Cep                     string `json:"cep,omitempty"`
+		Contato                 string `json:"contato,omitempty"`
+		Email                   string `json:"email,omitempty"`
+		Homepage                string `json:"homepage,omitempty"`
+		InscricaoMunicipal      string `json:"inscricao_municipal,omitempty"`
+		InscricaoEstadual       string `json:"inscricao_estadual,omitempty"`
+		InscricaoSuframa        string `json:"inscricao_suframa,omitempty"`
+		PessoaFisica            string `json:"pessoa_fisica,omitempty"`
+		OptanteSimplesNacional  string `json:"optante_simples_nacional,omitempty"`
+		Inativo                 string `json:"inativo,omitempty"`
+		Tags                    string `json:"tags,omitempty"`
+	} `json:"clientesFiltro,omitempty"`
 	ClientesPorCodigo struct {
-		CodigoClienteOmie       int    `json:"codigo_cliente_omie"`
-		CodigoClienteIntegracao string `json:"codigo_cliente_integracao"`
-	} `json:"clientesPorCodigo"`
-	ExibirCaracteristicas string `json:"exibir_caracteristicas"`
+		CodigoClienteOmie       int    `json:"codigo_cliente_omie,omitempty"`
+		CodigoClienteIntegracao string `json:"codigo_cliente_integracao,omitempty"`
+	} `json:"clientesPorCodigo,omitempty"`
+	ExibirCaracteristicas string `json:"exibir_caracteristicas,omitempty"`
 }
 
 type PesquisarLancamentosRequest struct {
 	OmieCall
-	Param []PesquisarLancamentosParam `json:"param"`
+	Param []PesquisarLancamentosParam `json:"param,omitempty"`
 }
 
 type PesquisarLancamentosParam struct {
-	NPagina           int    `json:"nPagina"`
-	NRegPorPagina     int    `json:"nRegPorPagina"`
-	COrdenarPor       string `json:"cOrdenarPor"`
-	COrdemDecrescente string `json:"cOrdemDecrescente"`
-	NCodTitulo        int    `json:"nCodTitulo"`
-	CCodIntTitulo     string `json:"cCodIntTitulo"`
-	CNumTitulo        string `json:"cNumTitulo"`
-	DDtEmisDe         string `json:"dDtEmisDe"`
-	DDtEmisAte        string `json:"dDtEmisAte"`
-	DDtVencDe         string `json:"dDtVencDe"`
-	DDtVencAte        string `json:"dDtVencAte"`
-	DDtPagtoDe        string `json:"dDtPagtoDe"`
-	DDtPagtoAte       string `json:"dDtPagtoAte"`
-	DDtPrevDe         string `json:"dDtPrevDe"`
-	DDtPrevAte        string `json:"dDtPrevAte"`
-	DDtRegDe          string `json:"dDtRegDe"`
-	DDtRegAte         string `json:"dDtRegAte"`
-	NCodCliente       int    `json:"nCodCliente"`
-	CCPFCNPJCliente   string `json:"cCPFCNPJCliente"`
-	NCodCtr           int    `json:"nCodCtr"`
-	CNumCtr           string `json:"cNumCtr"`
-	NCodOS            int    `json:"nCodOS"`
-	CNumOS            string `json:"cNumOS"`
-	NCodCC            int    `json:"nCodCC"`
-	CStatus           string `json:"cStatus"`
-	CNatureza         string `json:"cNatureza"`
-	CTipo             string `json:"cTipo"`
-	COperacao         string `json:"cOperacao"`
-	CNumDocFiscal     string `json:"cNumDocFiscal"`
-	CCodigoBarras     string `json:"cCodigoBarras"`
-	NCodProjeto       int    `json:"nCodProjeto"`
-	NCodVendedor      int    `json:"nCodVendedor"`
-	NCodComprador     int    `json:"nCodComprador"`
-	CCodCateg         string `json:"cCodCateg"`
-	DDtIncDe          string `json:"dDtIncDe"`
-	DDtIncAte         string `json:"dDtIncAte"`
-	DDtAltDe          string `json:"dDtAltDe"`
-	DDtAltAte         string `json:"dDtAltAte"`
-	DDtCancDe         string `json:"dDtCancDe"`
-	DDtCancAte        string `json:"dDtCancAte"`
-	CChaveNFe         string `json:"cChaveNFe"`
+	NPagina           int    `json:"nPagina,omitempty"`
+	NRegPorPagina     int    `json:"nRegPorPagina,omitempty"`
+	COrdenarPor       string `json:"cOrdenarPor,omitempty"`
+	COrdemDecrescente string `json:"cOrdemDecrescente,omitempty"`
+	NCodTitulo        int    `json:"nCodTitulo,omitempty"`
+	CCodIntTitulo     string `json:"cCodIntTitulo,omitempty"`
+	CNumTitulo        string `json:"cNumTitulo,omitempty"`
+	DDtEmisDe         string `json:"dDtEmisDe,omitempty"`
+	DDtEmisAte        string `json:"dDtEmisAte,omitempty"`
+	DDtVencDe         string `json:"dDtVencDe,omitempty"`
+	DDtVencAte        string `json:"dDtVencAte,omitempty"`
+	DDtPagtoDe        string `json:"dDtPagtoDe,omitempty"`
+	DDtPagtoAte       string `json:"dDtPagtoAte,omitempty"`
+	DDtPrevDe         string `json:"dDtPrevDe,omitempty"`
+	DDtPrevAte        string `json:"dDtPrevAte,omitempty"`
+	DDtRegDe          string `json:"dDtRegDe,omitempty"`
+	DDtRegAte         string `json:"dDtRegAte,omitempty"`
+	NCodCliente       int    `json:"nCodCliente,omitempty"`
+	CCPFCNPJCliente   string `json:"cCPFCNPJCliente,omitempty"`
+	NCodCtr           int    `json:"nCodCtr,omitempty"`
+	CNumCtr           string `json:"cNumCtr,omitempty"`
+	NCodOS            int    `json:"nCodOS,omitempty"`
+	CNumOS            string `json:"cNumOS,omitempty"`
+	NCodCC            int    `json:"nCodCC,omitempty"`
+	CStatus           string `json:"cStatus,omitempty"`
+	CNatureza         string `json:"cNatureza,omitempty"`
+	CTipo             string `json:"cTipo,omitempty"`
+	COperacao         string `json:"cOperacao,omitempty"`
+	CNumDocFiscal     string `json:"cNumDocFiscal,omitempty"`
+	CCodigoBarras     string `json:"cCodigoBarras,omitempty"`
+	NCodProjeto       int    `json:"nCodProjeto,omitempty"`
+	NCodVendedor      int    `json:"nCodVendedor,omitempty"`
+	NCodComprador     int    `json:"nCodComprador,omitempty"`
+	CCodCateg         string `json:"cCodCateg,omitempty"`
+	DDtIncDe          string `json:"dDtIncDe,omitempty"`
+	DDtIncAte         string `json:"dDtIncAte,omitempty"`
+	DDtAltDe          string `json:"dDtAltDe,omitempty"`
+	DDtAltAte         string `json:"dDtAltAte,omitempty"`
+	DDtCancDe         string `json:"dDtCancDe,omitempty"`
+	DDtCancAte        string `json:"dDtCancAte,omitempty"`
+	CChaveNFe         string `json:"cChaveNFe,omitempty"`
 }
 
 type PesquisarLancamentosResponse struct {
-	NPagina            int `json:"nPagina"`
-	NTotPaginas        int `json:"nTotPaginas"`
-	NRegistros         int `json:"nRegistros"`
-	NTotRegistros      int `json:"nTotRegistros"`
+	NPagina            int `json:"nPagina,omitempty"`
+	NTotPaginas        int `json:"nTotPaginas,omitempty"`
+	NRegistros         int `json:"nRegistros,omitempty"`
+	NTotRegistros      int `json:"nTotRegistros,omitempty"`
 	TitulosEncontrados []struct {
 		CabecTitulo struct {
 			ACodCateg []struct {
-				CCodCateg string `json:"cCodCateg"`
-				NPerc     int    `json:"nPerc"`
-				NValor    int    `json:"nValor"`
-			} `json:"aCodCateg"`
-			CCPFCNPJCliente string `json:"cCPFCNPJCliente"`
-			CCodCateg       string `json:"cCodCateg"`
-			CCodIntTitulo   string `json:"cCodIntTitulo"`
-			CCodVendedor    int    `json:"cCodVendedor"`
-			CNSU            string `json:"cNSU"`
-			CNatureza       string `json:"cNatureza"`
-			CNumBoleto      string `json:"cNumBoleto"`
-			CNumDocFiscal   string `json:"cNumDocFiscal"`
-			CNumParcela     string `json:"cNumParcela"`
-			CNumTitulo      string `json:"cNumTitulo"`
-			COperacao       string `json:"cOperacao"`
-			COrigem         string `json:"cOrigem"`
-			CRetCOFINS      string `json:"cRetCOFINS"`
-			CRetCSLL        string `json:"cRetCSLL"`
-			CRetINSS        string `json:"cRetINSS"`
-			CRetIR          string `json:"cRetIR"`
-			CRetISS         string `json:"cRetISS"`
-			CRetPIS         string `json:"cRetPIS"`
-			CStatus         string `json:"cStatus"`
-			CTipo           string `json:"cTipo"`
-			DDtEmissao      string `json:"dDtEmissao"`
-			DDtPagamento    string `json:"dDtPagamento"`
-			DDtPrevisao     string `json:"dDtPrevisao"`
-			DDtRegistro     string `json:"dDtRegistro"`
-			DDtVenc         string `json:"dDtVenc"`
-			NCodCC          int    `json:"nCodCC"`
-			NCodCliente     int    `json:"nCodCliente"`
-			NCodTitRepet    int    `json:"nCodTitRepet"`
-			NCodTitulo      int    `json:"nCodTitulo"`
-			NValorCOFINS    int    `json:"nValorCOFINS"`
-			NValorCSLL      int    `json:"nValorCSLL"`
-			NValorINSS      int    `json:"nValorINSS"`
-			NValorIR        int    `json:"nValorIR"`
-			NValorISS       int    `json:"nValorISS"`
-			NValorPIS       int    `json:"nValorPIS"`
-			NValorTitulo    int    `json:"nValorTitulo"`
-			Observacao      string `json:"observacao"`
-		} `json:"cabecTitulo"`
-		Departamentos []struct {
-			CCodDepartamento string `json:"cCodDepartamento"`
-			NDistrPercentual int    `json:"nDistrPercentual"`
-			NDistrValor      int    `json:"nDistrValor"`
-			NValorFixo       string `json:"nValorFixo"`
-		} `json:"departamentos,omitempty"`
+				CCodCateg string  `json:"cCodCateg,omitempty"`
+				NPerc     float64 `json:"nPerc,omitempty"`
+				NValor    float64 `json:"nValor,omitempty"`
+			} `json:"aCodCateg,omitempty"`
+			CCPFCNPJCliente string  `json:"cCPFCNPJCliente,omitempty"`
+			CCodCateg       string  `json:"cCodCateg,omitempty"`
+			CCodIntTitulo   string  `json:"cCodIntTitulo,omitempty"`
+			CCodVendedor    int     `json:"cCodVendedor,omitempty"`
+			CNSU            string  `json:"cNSU,omitempty"`
+			CNatureza       string  `json:"cNatureza,omitempty"`
+			CNumBoleto      string  `json:"cNumBoleto,omitempty"`
+			CNumDocFiscal   string  `json:"cNumDocFiscal,omitempty"`
+			CNumParcela     string  `json:"cNumParcela,omitempty"`
+			CNumTitulo      string  `json:"cNumTitulo,omitempty"`
+			COperacao       string  `json:"cOperacao,omitempty"`
+			COrigem         string  `json:"cOrigem,omitempty"`
+			CRetCOFINS      string  `json:"cRetCOFINS,omitempty"`
+			CRetCSLL        string  `json:"cRetCSLL,omitempty"`
+			CRetINSS        string  `json:"cRetINSS,omitempty"`
+			CRetIR          string  `json:"cRetIR,omitempty"`
+			CRetISS         string  `json:"cRetISS,omitempty"`
+			CRetPIS         string  `json:"cRetPIS,omitempty"`
+			CStatus         string  `json:"cStatus,omitempty"`
+			CTipo           string  `json:"cTipo,omitempty"`
+			DDtEmissao      string  `json:"dDtEmissao,omitempty"`
+			DDtPagamento    string  `json:"dDtPagamento,omitempty"`
+			DDtPrevisao     string  `json:"dDtPrevisao,omitempty"`
+			DDtRegistro     string  `json:"dDtRegistro,omitempty"`
+			DDtVenc         string  `json:"dDtVenc,omitempty"`
+			NCodCC          int     `json:"nCodCC,omitempty"`
+			NCodCliente     int     `json:"nCodCliente,omitempty"`
+			NCodTitRepet    int     `json:"nCodTitRepet,omitempty"`
+			NCodTitulo      int     `json:"nCodTitulo,omitempty"`
+			NValorCOFINS    float64 `json:"nValorCOFINS,omitempty"`
+			NValorCSLL      float64 `json:"nValorCSLL,omitempty"`
+			NValorINSS      float64 `json:"nValorINSS,omitempty"`
+			NValorIR        float64 `json:"nValorIR,omitempty"`
+			NValorISS       float64 `json:"nValorISS,omitempty"`
+			NValorPIS       float64 `json:"nValorPIS,omitempty"`
+			NValorTitulo    float64 `json:"nValorTitulo,omitempty"`
+			Observacao      string  `json:"observacao,omitempty"`
+			Departamentos   []struct {
+				CCodDepartamento string  `json:"cCodDepartamento,omitempty"`
+				NDistrPercentual float64 `json:"nDistrPercentual,omitempty"`
+				NDistrValor      float64 `json:"nDistrValor,omitempty"`
+				NValorFixo       string  `json:"nValorFixo,omitempty"`
+			} `json:"departamentos,omitempty"`
+		} `json:"cabecTitulo,omitempty"`
 		Lancamentos []struct {
-			CCodIntLanc string `json:"cCodIntLanc"`
-			CNatureza   string `json:"cNatureza"`
-			CObsLanc    string `json:"cObsLanc"`
-			DDtLanc     string `json:"dDtLanc"`
-			NCodCC      int    `json:"nCodCC"`
-			NCodLanc    int64  `json:"nCodLanc"`
-			NDesconto   int    `json:"nDesconto"`
-			NIDLancCC   int64  `json:"nIdLancCC"`
-			NJuros      int    `json:"nJuros"`
-			NMulta      int    `json:"nMulta"`
-			NValLanc    int    `json:"nValLanc"`
-		} `json:"lancamentos"`
+			CCodIntLanc string  `json:"cCodIntLanc,omitempty"`
+			CNatureza   string  `json:"cNatureza,omitempty"`
+			CObsLanc    string  `json:"cObsLanc,omitempty"`
+			DDtLanc     string  `json:"dDtLanc,omitempty"`
+			NCodCC      int     `json:"nCodCC,omitempty"`
+			NCodLanc    int64   `json:"nCodLanc,omitempty"`
+			NDesconto   float64 `json:"nDesconto,omitempty"`
+			NIDLancCC   int64   `json:"nIdLancCC,omitempty"`
+			NJuros      float64 `json:"nJuros,omitempty"`
+			NMulta      float64 `json:"nMulta,omitempty"`
+			NValLanc    float64 `json:"nValLanc,omitempty"`
+		} `json:"lancamentos,omitempty"`
 		Resumo struct {
-			CLiquidado  string `json:"cLiquidado"`
-			NDesconto   int    `json:"nDesconto"`
-			NJuros      int    `json:"nJuros"`
-			NMulta      int    `json:"nMulta"`
-			NValAberto  int    `json:"nValAberto"`
-			NValLiquido int    `json:"nValLiquido"`
-			NValPago    int    `json:"nValPago"`
-		} `json:"resumo"`
-	} `json:"titulosEncontrados"`
+			CLiquidado  string  `json:"cLiquidado,omitempty"`
+			NDesconto   float64 `json:"nDesconto,omitempty"`
+			NJuros      float64 `json:"nJuros,omitempty"`
+			NMulta      float64 `json:"nMulta,omitempty"`
+			NValAberto  float64 `json:"nValAberto,omitempty"`
+			NValLiquido float64 `json:"nValLiquido,omitempty"`
+			NValPago    float64 `json:"nValPago,omitempty"`
+		} `json:"resumo,omitempty"`
+	} `json:"titulosEncontrados,omitempty"`
 }

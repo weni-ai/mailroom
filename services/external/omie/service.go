@@ -82,7 +82,7 @@ func (s *service) Call(sesion flows.Session, callAction assets.ExternalServiceCa
 		}
 		r, t, err := s.restClient.ListarClientes(request)
 		if err != nil {
-			return nil, errors.Wrap(err, "error on call omie IncluirOportunidade")
+			return nil, errors.Wrap(err, "error on call omie ListarClientes")
 		}
 		callResult.ResponseJSON, err = json.Marshal(r)
 		if err != nil {
@@ -90,14 +90,14 @@ func (s *service) Call(sesion flows.Session, callAction assets.ExternalServiceCa
 		}
 		callResult.RequestMethod = t.Request.Method
 		callResult.RequestURL = t.Request.URL.String()
-	case "PesquisarLancamentosRequest":
+	case "PesquisarLancamentos":
 		request, err := ParamsToPesquisarLancamentosRequest(params)
 		if err != nil {
 			return nil, errors.Wrap(err, "unable to unmarshal PesquisarLancamentosRequest")
 		}
 		r, t, err := s.restClient.PesquisarLancamentos(request)
 		if err != nil {
-			return nil, errors.Wrap(err, "error on call omie IncluirOportunidade")
+			return nil, errors.Wrap(err, "error on call omie PesquisarLancamentos")
 		}
 		callResult.ResponseJSON, err = json.Marshal(r)
 		if err != nil {
