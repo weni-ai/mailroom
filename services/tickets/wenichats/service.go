@@ -96,7 +96,11 @@ func (s *service) Open(session flows.Session, topic *flows.Topic, body string, a
 	}
 
 	roomData.Contact.ExternalID = string(contact.UUID())
-	roomData.Contact.Name = contact.Name()
+	if contact.Name() != "" {
+		roomData.Contact.Name = contact.Name()
+	} else {
+		roomData.Contact.Name = session.Contact().PreferredURN().URN().Format()
+	}
 	roomData.SectorUUID = s.sectorUUID
 	roomData.QueueUUID = string(topic.UUID())
 	roomData.Contact.URN = session.Contact().PreferredURN().URN().String()
