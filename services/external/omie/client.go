@@ -2,6 +2,7 @@ package omie
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/url"
 	"strings"
@@ -91,6 +92,8 @@ func (c *Client) IncluirContato(data *IncluirContatoRequest) (*IncluirContatoRes
 	data.AppKey = c.appKey
 	data.AppSecret = c.appSecret
 
+	fmt.Println("Data IncluirContato: ", data)
+
 	trace, err := c.post(requestUrl, nil, data, response)
 	if err != nil {
 		return nil, trace, err
@@ -105,6 +108,8 @@ func (c *Client) IncluirOportunidade(data *IncluirOportunidadeRequest) (*OpInclu
 	data.Call = "IncluirOportunidade"
 	data.AppKey = c.appKey
 	data.AppSecret = c.appSecret
+
+	fmt.Println("Data IncluirOportunidade: ", data)
 
 	trace, err := c.post(requestUrl, nil, data, response)
 	if err != nil {
@@ -121,6 +126,8 @@ func (c *Client) ListarClientes(data *ListarClientesRequest) (*ListarClientesRes
 	data.AppKey = c.appKey
 	data.AppSecret = c.appSecret
 
+	fmt.Println("Data ListarClientes: ", data)
+
 	trace, err := c.post(requestUrl, nil, data, response)
 	if err != nil {
 		return nil, trace, err
@@ -135,6 +142,8 @@ func (c *Client) PesquisarLancamentos(data *PesquisarLancamentosRequest) (*Pesqu
 	data.Call = "PesquisarLancamentos"
 	data.AppKey = c.appKey
 	data.AppSecret = c.appSecret
+
+	fmt.Println("Data PesquisarLancamentos: ", data)
 
 	trace, err := c.post(requestUrl, nil, data, response)
 	if err != nil {
