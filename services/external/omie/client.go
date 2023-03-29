@@ -410,7 +410,7 @@ type PesquisarLancamentosRequest struct {
 }
 
 type PesquisarLancamentosParam struct {
-	NPagina           int    `json:"nPagina,omitempty"`
+	NPagina           int    `json:"nPagina"`
 	NRegPorPagina     int    `json:"nRegPorPagina,omitempty"`
 	COrdenarPor       string `json:"cOrdenarPor,omitempty"`
 	COrdemDecrescente string `json:"cOrdemDecrescente,omitempty"`
