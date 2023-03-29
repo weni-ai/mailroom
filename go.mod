@@ -69,3 +69,5 @@ require github.com/gabriel-vasile/mimetype v1.4.1
 go 1.17
 
 replace github.com/nyaruka/gocommon => github.com/Ilhasoft/gocommon v1.16.2-weni
+
+replace github.com/nyaruka/goflow => github.com/Ilhasoft/goflow v0.0.1-goflow-0.144.3-dev-7

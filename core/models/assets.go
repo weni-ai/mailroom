@@ -75,6 +75,10 @@ type OrgAssets struct {
 	users        []assets.User
 	usersByID    map[UserID]*User
 	usersByEmail map[string]*User
+
+	externalServices       []assets.ExternalService
+	externalServicesByID   map[ExternalServiceID]*ExternalService
+	externalServicesByUUID map[assets.ExternalServiceUUID]*ExternalService
 }
 
 var ErrNotFound = errors.New("not found")
@@ -360,6 +364,19 @@ func NewOrgAssets(ctx context.Context, rt *runtime.Runtime, orgID OrgID, prev *O
 		oa.usersByEmail = prev.usersByEmail
 	}
 
+	if prev != nil || refresh&RefreshExternalServices > 0 {
+		oa.externalServices, err = loadExternalServices(ctx, db, orgID)
+		if err != nil {
+			return nil, errors.Wrapf(err, "error loading external services for org %d", orgID)
+		}
+		oa.externalServicesByID = make(map[ExternalServiceID]*ExternalService)
+		oa.externalServicesByUUID = make(map[assets.ExternalServiceUUID]*ExternalService)
+	} else {
+		oa.externalServices = prev.externalServices
+		oa.externalServicesByID = prev.externalServicesByID
+		oa.externalServicesByUUID = prev.externalServicesByUUID
+	}
+
 	// intialize our session assets
 	oa.sessionAssets, err = engine.NewSessionAssets(oa.Env(), oa, goflow.MigrationConfig(rt.Config))
 	if err != nil {
@@ -374,24 +391,25 @@ type Refresh int
 
 // refresh bit masks
 const (
-	RefreshNone        = Refresh(0)
-	RefreshAll         = Refresh(^0)
-	RefreshOrg         = Refresh(1 << 1)
-	RefreshChannels    = Refresh(1 << 2)
-	RefreshFields      = Refresh(1 << 3)
-	RefreshGroups      = Refresh(1 << 4)
-	RefreshLocations   = Refresh(1 << 5)
-	RefreshGlobals     = Refresh(1 << 6)
-	RefreshTemplates   = Refresh(1 << 7)
-	RefreshTriggers    = Refresh(1 << 8)
-	RefreshCampaigns   = Refresh(1 << 9)
-	RefreshResthooks   = Refresh(1 << 10)
-	RefreshClassifiers = Refresh(1 << 11)
-	RefreshLabels      = Refresh(1 << 12)
-	RefreshFlows       = Refresh(1 << 13)
-	RefreshTicketers   = Refresh(1 << 14)
-	RefreshTopics      = Refresh(1 << 15)
-	RefreshUsers       = Refresh(1 << 16)
+	RefreshNone             = Refresh(0)
+	RefreshAll              = Refresh(^0)
+	RefreshOrg              = Refresh(1 << 1)
+	RefreshChannels         = Refresh(1 << 2)
+	RefreshFields           = Refresh(1 << 3)
+	RefreshGroups           = Refresh(1 << 4)
+	RefreshLocations        = Refresh(1 << 5)
+	RefreshGlobals          = Refresh(1 << 6)
+	RefreshTemplates        = Refresh(1 << 7)
+	RefreshTriggers         = Refresh(1 << 8)
+	RefreshCampaigns        = Refresh(1 << 9)
+	RefreshResthooks        = Refresh(1 << 10)
+	RefreshClassifiers      = Refresh(1 << 11)
+	RefreshLabels           = Refresh(1 << 12)
+	RefreshFlows            = Refresh(1 << 13)
+	RefreshTicketers        = Refresh(1 << 14)
+	RefreshTopics           = Refresh(1 << 15)
+	RefreshUsers            = Refresh(1 << 16)
+	RefreshExternalServices = Refresh(1 << 17)
 )
 
 // GetOrgAssets creates or gets org assets for the passed in org
@@ -671,4 +689,16 @@ func (a *OrgAssets) UserByID(id UserID) *User {
 
 func (a *OrgAssets) UserByEmail(email string) *User {
 	return a.usersByEmail[email]
+}
+
+func (a *OrgAssets) ExternalServices() ([]assets.ExternalService, error) {
+	return a.externalServices, nil
+}
+
+func (a *OrgAssets) ExternalServiceByID(id ExternalServiceID) *ExternalService {
+	return a.externalServicesByID[id]
+}
+
+func (a *OrgAssets) ExternalServiceByUUID(uuid assets.ExternalServiceUUID) *ExternalService {
+	return a.externalServicesByUUID[uuid]
 }
