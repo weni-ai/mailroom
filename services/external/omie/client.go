@@ -61,6 +61,10 @@ func (c *baseClient) request(method, url string, params *url.Values, body, respo
 		req.URL.RawQuery = params.Encode()
 	}
 
+	fmt.Printf("Body: %+v", body)
+	fmt.Println("b: ", string(b))
+	fmt.Printf("Data: %+v", data)
+
 	trace, err := httpx.DoTrace(c.httpClient, req, c.httpRetries, nil, -1)
 	if err != nil {
 		return trace, err

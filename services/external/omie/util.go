@@ -391,10 +391,10 @@ func ParamsToListarClientesRequest(params []assets.ExternalServiceParam) (*Lista
 	return r, nil
 }
 
-func ParamsToPesquisarLancamentosRequest(param []assets.ExternalServiceParam) (*PesquisarLancamentosRequest, error) {
+func ParamsToPesquisarLancamentosRequest(params []assets.ExternalServiceParam) (*PesquisarLancamentosRequest, error) {
 	r := &PesquisarLancamentosRequest{}
 	p := PesquisarLancamentosParam{}
-	for _, param := range param {
+	for _, param := range params {
 		dv := param.Data.Value
 		switch param.Type {
 		case "nPagina":
