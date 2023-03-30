@@ -81,20 +81,20 @@ func handleServiceCalled(ctx context.Context, rt *runtime.Runtime, tx *sqlx.Tx, 
 				httpLog.Retries,
 				httpLog.CreatedOn,
 			)
-		} else if event.Service == "external_service" {
-			log = models.NewExternalServiceCalledLog(
-				oa.OrgID(),
-				externalService.ID(),
-				httpLog.URL,
-				httpLog.StatusCode,
-				httpLog.Request,
-				httpLog.Response,
-				httpLog.Status != flows.CallStatusSuccess,
-				time.Duration(httpLog.ElapsedMS)*time.Millisecond,
-				httpLog.Retries,
-				httpLog.CreatedOn,
-			)
-		}
+		} // else if event.Service == "external_service" {
+		// 	log = models.NewExternalServiceCalledLog(
+		// 		oa.OrgID(),
+		// 		externalService.ID(),
+		// 		httpLog.URL,
+		// 		httpLog.StatusCode,
+		// 		httpLog.Request,
+		// 		httpLog.Response,
+		// 		httpLog.Status != flows.CallStatusSuccess,
+		// 		time.Duration(httpLog.ElapsedMS)*time.Millisecond,
+		// 		httpLog.Retries,
+		// 		httpLog.CreatedOn,
+		// 	)
+		// }
 
 		scene.AppendToEventPreCommitHook(hooks.InsertHTTPLogsHook, log)
 	}
