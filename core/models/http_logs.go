@@ -109,7 +109,7 @@ func (h *HTTPLog) SetAirtimeTransferID(tid AirtimeTransferID) {
 
 const insertHTTPLogsSQL = `
 INSERT INTO request_logs_httplog( log_type,  org_id,  url,  status_code,  flow_id,  classifier_id,  ticketer_id,  airtime_transfer_id,  request,  response,  is_error,  request_time,  num_retries,  created_on)
-					      VALUES(:log_type, :org_id, :url, :status_code, :flow_id, :classifier_id, :ticketer_id, :external_service_id :airtime_transfer_id, :request, :response, :is_error, :request_time, :num_retries, :created_on)
+					      VALUES(:log_type, :org_id, :url, :status_code, :flow_id, :classifier_id, :ticketer_id, :external_service_id, :airtime_transfer_id, :request, :response, :is_error, :request_time, :num_retries, :created_on)
 RETURNING id
 `
 
