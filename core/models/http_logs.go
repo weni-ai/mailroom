@@ -37,21 +37,21 @@ const (
 
 // HTTPLog is our type for a HTTPLog
 type HTTPLog struct {
-	ID                HTTPLogID         `db:"id"`
-	OrgID             OrgID             `db:"org_id"`
-	LogType           HTTPLogType       `db:"log_type"`
-	URL               string            `db:"url"`
-	StatusCode        int               `db:"status_code"`
-	Request           string            `db:"request"`
-	Response          null.String       `db:"response"`
-	IsError           bool              `db:"is_error"`
-	RequestTime       int               `db:"request_time"`
-	NumRetries        int               `db:"num_retries"`
-	CreatedOn         time.Time         `db:"created_on"`
-	FlowID            FlowID            `db:"flow_id"`
-	ClassifierID      ClassifierID      `db:"classifier_id"`
-	TicketerID        TicketerID        `db:"ticketer_id"`
-	ExternalServiceID ExternalServiceID `db:"external_service_id"`
+	ID           HTTPLogID    `db:"id"`
+	OrgID        OrgID        `db:"org_id"`
+	LogType      HTTPLogType  `db:"log_type"`
+	URL          string       `db:"url"`
+	StatusCode   int          `db:"status_code"`
+	Request      string       `db:"request"`
+	Response     null.String  `db:"response"`
+	IsError      bool         `db:"is_error"`
+	RequestTime  int          `db:"request_time"`
+	NumRetries   int          `db:"num_retries"`
+	CreatedOn    time.Time    `db:"created_on"`
+	FlowID       FlowID       `db:"flow_id"`
+	ClassifierID ClassifierID `db:"classifier_id"`
+	TicketerID   TicketerID   `db:"ticketer_id"`
+	//ExternalServiceID ExternalServiceID `db:"external_service_id"`
 	AirtimeTransferID AirtimeTransferID `db:"airtime_transfer_id"`
 }
 
@@ -91,11 +91,11 @@ func NewTicketerCalledLog(orgID OrgID, tid TicketerID, url string, statusCode in
 	return h
 }
 
-func NewExternalServiceCalledLog(orgID OrgID, eid ExternalServiceID, url string, statusCode int, request, response string, isError bool, elapsed time.Duration, retries int, createdOn time.Time) *HTTPLog {
-	h := newHTTPLog(orgID, LogTypeExternalServiceCalled, url, statusCode, request, response, isError, elapsed, retries, createdOn)
-	h.ExternalServiceID = eid
-	return h
-}
+// func NewExternalServiceCalledLog(orgID OrgID, eid ExternalServiceID, url string, statusCode int, request, response string, isError bool, elapsed time.Duration, retries int, createdOn time.Time) *HTTPLog {
+// 	h := newHTTPLog(orgID, LogTypeExternalServiceCalled, url, statusCode, request, response, isError, elapsed, retries, createdOn)
+// 	h.ExternalServiceID = eid
+// 	return h
+// }
 
 // NewAirtimeTransferredLog creates a new HTTP log for an airtime transfer
 func NewAirtimeTransferredLog(orgID OrgID, url string, statusCode int, request, response string, isError bool, elapsed time.Duration, retries int, createdOn time.Time) *HTTPLog {
@@ -108,8 +108,8 @@ func (h *HTTPLog) SetAirtimeTransferID(tid AirtimeTransferID) {
 }
 
 const insertHTTPLogsSQL = `
-INSERT INTO request_logs_httplog( log_type,  org_id,  url,  status_code,  flow_id,  classifier_id,  ticketer_id, external_service_id, airtime_transfer_id,  request,  response,  is_error,  request_time,  num_retries,  created_on)
-					      VALUES(:log_type, :org_id, :url, :status_code, :flow_id, :classifier_id, :ticketer_id, :external_service_id, :airtime_transfer_id, :request, :response, :is_error, :request_time, :num_retries, :created_on)
+INSERT INTO request_logs_httplog( log_type,  org_id,  url,  status_code,  flow_id,  classifier_id,  ticketer_id, airtime_transfer_id,  request,  response,  is_error,  request_time,  num_retries,  created_on)
+					      VALUES(:log_type, :org_id, :url, :status_code, :flow_id, :classifier_id, :ticketer_id, :airtime_transfer_id, :request, :response, :is_error, :request_time, :num_retries, :created_on)
 RETURNING id
 `
 
