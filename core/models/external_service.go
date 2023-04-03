@@ -123,7 +123,7 @@ SELECT ROW_TO_JSON(r) FROM (SELECT
 	e.external_service_type as external_service_type,
 	e.config as config
 FROM
-	externals_externalservice; e
+	externals_externalservice e
 WHERE
 	e.uuid = $1 AND
 	e.is_active = TRUE
