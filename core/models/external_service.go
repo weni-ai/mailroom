@@ -117,7 +117,7 @@ func RegisterExternalServiceService(name string, initFunc ExternalServiceService
 const selectExternalServiceByUUIDSQL = `
 SELECT ROW_TO_JSON(r) FROM (SELECT
 	e.id as id,
-	e.uuid as uuid
+	e.uuid as uuid,
 	e.org_id as org_id,
 	e.name as name,
 	e.external_service_type as external_service_type,
