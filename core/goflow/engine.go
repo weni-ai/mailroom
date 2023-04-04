@@ -86,10 +86,11 @@ func Simulator(c *runtime.Config) flows.Engine {
 
 		simulator = engine.NewBuilder().
 			WithWebhookServiceFactory(webhooks.NewServiceFactory(httpClient, nil, httpAccess, webhookHeaders, c.WebhooksMaxBodyBytes)).
-			WithClassificationServiceFactory(classificationFactory(c)). // simulated sessions do real classification
-			WithEmailServiceFactory(simulatorEmailServiceFactory).      // but faked emails
-			WithTicketServiceFactory(simulatorTicketServiceFactory).    // and faked tickets
-			WithAirtimeServiceFactory(simulatorAirtimeServiceFactory).  // and faked airtime transfers
+			WithClassificationServiceFactory(classificationFactory(c)).     // simulated sessions do real classification
+			WithExternalServiceServiceFactory(externalServiceFactory((c))). // and real external services
+			WithEmailServiceFactory(simulatorEmailServiceFactory).          // but faked emails
+			WithTicketServiceFactory(simulatorTicketServiceFactory).        // and faked tickets
+			WithAirtimeServiceFactory(simulatorAirtimeServiceFactory).      // and faked airtime transfers
 			WithMaxStepsPerSprint(c.MaxStepsPerSprint).
 			WithMaxResumesPerSession(c.MaxResumesPerSession).
 			Build()
