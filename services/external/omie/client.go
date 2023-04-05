@@ -2,7 +2,6 @@ package omie
 
 import (
 	"encoding/json"
-	"fmt"
 	"net/http"
 	"net/url"
 	"strings"
@@ -61,10 +60,6 @@ func (c *baseClient) request(method, url string, params *url.Values, body, respo
 		req.URL.RawQuery = params.Encode()
 	}
 
-	fmt.Printf("Body: %+v", body)
-	fmt.Println("b: ", string(b))
-	fmt.Printf("Data: %+v", data)
-
 	trace, err := httpx.DoTrace(c.httpClient, req, c.httpRetries, nil, -1)
 	if err != nil {
 		return trace, err
@@ -96,8 +91,6 @@ func (c *Client) IncluirContato(data *IncluirContatoRequest) (*IncluirContatoRes
 	data.AppKey = c.appKey
 	data.AppSecret = c.appSecret
 
-	fmt.Printf("Data %+v", data)
-
 	trace, err := c.post(requestUrl, nil, data, response)
 	if err != nil {
 		return nil, trace, err
@@ -112,8 +105,6 @@ func (c *Client) IncluirOportunidade(data *IncluirOportunidadeRequest) (*OpInclu
 	data.Call = "IncluirOportunidade"
 	data.AppKey = c.appKey
 	data.AppSecret = c.appSecret
-
-	fmt.Printf("Data %+v", data)
 
 	trace, err := c.post(requestUrl, nil, data, response)
 	if err != nil {
@@ -130,8 +121,6 @@ func (c *Client) ListarClientes(data *ListarClientesRequest) (*ListarClientesRes
 	data.AppKey = c.appKey
 	data.AppSecret = c.appSecret
 
-	fmt.Printf("Data %+v", data)
-
 	trace, err := c.post(requestUrl, nil, data, response)
 	if err != nil {
 		return nil, trace, err
@@ -147,7 +136,35 @@ func (c *Client) PesquisarLancamentos(data *PesquisarLancamentosRequest) (*Pesqu
 	data.AppKey = c.appKey
 	data.AppSecret = c.appSecret
 
-	fmt.Printf("Data %+v", data)
+	trace, err := c.post(requestUrl, nil, data, response)
+	if err != nil {
+		return nil, trace, err
+	}
+	return response, trace, nil
+}
+
+func (c *Client) VerificarContato(data *VerificarContatoRequest) (*VerificarContatoResponse, *httpx.Trace, error) {
+	requestUrl := c.baseURL + "/v1/crm/contatos/"
+	response := &VerificarContatoResponse{}
+
+	data.Call = "VerificarContato"
+	data.AppKey = c.appKey
+	data.AppSecret = c.appSecret
+
+	trace, err := c.post(requestUrl, nil, data, response)
+	if err != nil {
+		return nil, trace, err
+	}
+	return response, trace, nil
+}
+
+func (c *Client) ObterBoleto(data *ObterBoletoRequest) (*ObterBoletoResponse, *httpx.Trace, error) {
+	requestUrl := c.baseURL + "/v1/financas/contareceberboleto/"
+	response := &ObterBoletoResponse{}
+
+	data.Call = "ObterBoleto"
+	data.AppKey = c.appKey
+	data.AppSecret = c.appSecret
 
 	trace, err := c.post(requestUrl, nil, data, response)
 	if err != nil {
@@ -532,4 +549,49 @@ type PesquisarLancamentosResponse struct {
 			NValPago    float64 `json:"nValPago,omitempty"`
 		} `json:"resumo,omitempty"`
 	} `json:"titulosEncontrados,omitempty"`
+}
+
+type VerificarContatoRequest struct {
+	OmieCall
+	Param []VerificarContatoParam `json:"param,omitempty"`
+}
+
+type VerificarContatoParam struct {
+	CNome  string `json:"cNome"`
+	CEmail string `json:"cEmail"`
+}
+
+type VerificarContatoResponse struct {
+	NCod       int    `json:"nCod"`
+	CCodInt    string `json:"cCodInt"`
+	CCodStatus string `json:"cCodStatus"`
+	CDesStatus string `json:"cDesStatus"`
+}
+
+type ObterBoletoRequest struct {
+	OmieCall
+	Param []ObterBoletoParam `json:"param,omitempty"`
+}
+
+type ObterBoletoParam struct {
+	NCodTitulo    int    `json:"nCodTitulo"`
+	CCodIntTitulo string `json:"cCodIntTitulo"`
+}
+
+type ObterBoletoResponse struct {
+	CLinkBoleto    string  `json:"cLinkBoleto"`
+	CCodStatus     string  `json:"cCodStatus"`
+	CDesStatus     string  `json:"cDesStatus"`
+	DDtEmBol       string  `json:"dDtEmBol"`
+	CNumBoleto     string  `json:"cNumBoleto"`
+	CCodBarras     string  `json:"cCodBarras"`
+	NPerJuros      float64 `json:"nPerJuros"`
+	NPerMulta      float64 `json:"nPerMulta"`
+	CNumBancario   string  `json:"cNumBancario"`
+	DDescontoCond1 string  `json:"dDescontoCond1"`
+	VDescontoCond1 float64 `json:"vDescontoCond1"`
+	DDescontoCond2 string  `json:"dDescontoCond2"`
+	VDescontoCond2 float64 `json:"vDescontoCond2"`
+	DDescontoCond3 string  `json:"dDescontoCond3"`
+	VDescontoCond3 float64 `json:"vDescontoCond3"`
 }

@@ -105,6 +105,38 @@ func (s *service) Call(sesion flows.Session, callAction assets.ExternalServiceCa
 		}
 		callResult.RequestMethod = t.Request.Method
 		callResult.RequestURL = t.Request.URL.String()
+
+	case "VerificarContato":
+		request, err := ParamsToVerificarContatoRequest(params)
+		if err != nil {
+			return nil, errors.Wrap(err, "unable to unmarshal VerificarContatoRequest")
+		}
+		r, t, err := s.restClient.VerificarContato(request)
+		if err != nil {
+			return nil, errors.Wrap(err, "error on call omie VerificarContato")
+		}
+		callResult.ResponseJSON, err = json.Marshal(r)
+		if err != nil {
+			return nil, errors.Wrap(err, "error to marshal result for ExternalServiceCall.ResponseJSON")
+		}
+		callResult.RequestMethod = t.Request.Method
+		callResult.RequestURL = t.Request.URL.String()
+
+	case "ObterBoleto":
+		request, err := ParamsToObterBoletoRequest(params)
+		if err != nil {
+			return nil, errors.Wrap(err, "unable to unmarshal ObterBoletoRequest")
+		}
+		r, t, err := s.restClient.ObterBoleto(request)
+		if err != nil {
+			return nil, errors.Wrap(err, "error on call omie ObterBoleto")
+		}
+		callResult.ResponseJSON, err = json.Marshal(r)
+		if err != nil {
+			return nil, errors.Wrap(err, "error to marshal result for ExternalServiceCall.ResponseJSON")
+		}
+		callResult.RequestMethod = t.Request.Method
+		callResult.RequestURL = t.Request.URL.String()
 	}
 
 	return callResult, nil
