@@ -99,7 +99,7 @@ func (e *ExternalService) UpdateConfig(ctx context.Context, db Queryer, add map[
 		dbMap[key] = value
 	}
 
-	return Exec(ctx, "update external service config", db, `UPDATE external_services_service SET config = $2 WHERE id = $1`, e.e.ID, null.NewMap(dbMap))
+	return Exec(ctx, "update external service config", db, `UPDATE externals_externalservice SET config = $2 WHERE id = $1`, e.e.ID, null.NewMap(dbMap))
 }
 
 type ExternalServiceService interface {
