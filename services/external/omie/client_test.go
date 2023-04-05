@@ -266,3 +266,73 @@ func TestPesquisarLancamentos(t *testing.T) {
 	assert.Equal(t, 1, l.NTotRegistros)
 	assert.Equal(t, "HTTP/1.0 200 OK\r\nContent-Length: 2098\r\n\r\n", string(trace.ResponseTrace))
 }
+
+func TestVerificarContato(t *testing.T) {
+	defer httpx.SetRequestor(httpx.DefaultRequestor)
+	httpx.SetRequestor(httpx.NewMockRequestor(map[string][]httpx.MockResponse{
+		fmt.Sprintf("%s/v1/crm/contatos/", baseURL): {
+			httpx.NewMockResponse(400, nil, `{
+				"faultstring": "error",
+				"faultcode": "ERROR-CODE 123"
+			}`),
+			httpx.NewMockResponse(200, nil, `{
+				"nCod": 1,
+				"cCodInt": "whatsapp:100000",
+				"cCodStatus": "0",
+				"nTotRegistros": 1,
+				"cDesStatus": "Contato encontrado com sucesso!"
+			}`),
+		},
+	}))
+
+	client := omie.NewClient(http.DefaultClient, nil, baseURL, appKey, appSecret)
+	data := &omie.VerificarContatoRequest{}
+
+	_, _, err := client.VerificarContato(data)
+	assert.EqualError(t, err, "error")
+
+	c, trace, err := client.VerificarContato(data)
+	assert.NoError(t, err)
+	assert.Equal(t, "Contato encontrado com sucesso!", c.CDesStatus)
+	assert.Equal(t, "HTTP/1.0 200 OK\r\nContent-Length: 154\r\n\r\n", string(trace.ResponseTrace))
+}
+
+func TestObterBoleto(t *testing.T) {
+	defer httpx.SetRequestor(httpx.DefaultRequestor)
+	httpx.SetRequestor(httpx.NewMockRequestor(map[string][]httpx.MockResponse{
+		fmt.Sprintf("%s/v1/financas/contareceberboleto/", baseURL): {
+			httpx.NewMockResponse(400, nil, `{
+				"faultstring": "error",
+				"faultcode": "ERROR-CODE 123"
+			}`),
+			httpx.NewMockResponse(200, nil, `{
+				"cLinkBoleto": "https://foo.boleto",
+				"cCodStatus": "0",
+				"cDesStatus": "status",
+				"dDtEmBol": "07/02/2023",
+				"cNumBoleto": "12345",
+				"cCodBarras": "123456789",
+				"nPerJuros": 0.5,
+				"nPerMulta": 0.2,
+				"cNumBancario": "0000",
+				"dDescontoCond1": "02/03/2023",
+				"vDescontoCond1": 0.3,
+				"dDescontoCond2": "01/04/2023",
+				"vDescontoCond2": 0.6,
+				"dDescontoCond3": "03/05/2023",
+				"vDescontoCond3": 0.8
+			}`),
+		},
+	}))
+
+	client := omie.NewClient(http.DefaultClient, nil, baseURL, appKey, appSecret)
+	data := &omie.ObterBoletoRequest{}
+
+	_, _, err := client.ObterBoleto(data)
+	assert.EqualError(t, err, "error")
+
+	b, trace, err := client.ObterBoleto(data)
+	assert.NoError(t, err)
+	assert.Equal(t, "https://foo.boleto", b.CLinkBoleto)
+	assert.Equal(t, "HTTP/1.0 200 OK\r\nContent-Length: 446\r\n\r\n", string(trace.ResponseTrace))
+}

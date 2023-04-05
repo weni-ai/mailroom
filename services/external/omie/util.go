@@ -524,3 +524,39 @@ func ParamsToPesquisarLancamentosRequest(param []assets.ExternalServiceParam) (*
 	r.Param = append(r.Param, p)
 	return r, nil
 }
+
+func ParamsToVerificarContatoRequest(params []assets.ExternalServiceParam) (*VerificarContatoRequest, error) {
+	r := &VerificarContatoRequest{}
+	p := VerificarContatoParam{}
+	for _, param := range params {
+		dv := param.Data.Value
+		switch param.Type {
+		case "cNome":
+			p.CNome = dv
+		case "cEmail":
+			p.CEmail = dv
+		}
+	}
+	r.Param = append(r.Param, p)
+	return r, nil
+}
+
+func ParamsToObterBoletoRequest(params []assets.ExternalServiceParam) (*ObterBoletoRequest, error) {
+	r := &ObterBoletoRequest{}
+	p := ObterBoletoParam{}
+	for _, param := range params {
+		dv := param.Data.Value
+		switch param.Type {
+		case "nCodTitulo":
+			v, err := strconv.Atoi(dv)
+			if err != nil {
+				return nil, errors.Wrap(err, "error to parse filter data value")
+			}
+			p.NCodTitulo = v
+		case "cCodIntTitulo":
+			p.CCodIntTitulo = dv
+		}
+	}
+	r.Param = append(r.Param, p)
+	return r, nil
+}
