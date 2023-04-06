@@ -364,13 +364,17 @@ func NewOrgAssets(ctx context.Context, rt *runtime.Runtime, orgID OrgID, prev *O
 		oa.usersByEmail = prev.usersByEmail
 	}
 
-	if prev != nil || refresh&RefreshExternalServices > 0 {
+	if prev == nil || refresh&RefreshExternalServices > 0 {
 		oa.externalServices, err = loadExternalServices(ctx, db, orgID)
 		if err != nil {
 			return nil, errors.Wrapf(err, "error loading external services for org %d", orgID)
 		}
 		oa.externalServicesByID = make(map[ExternalServiceID]*ExternalService)
 		oa.externalServicesByUUID = make(map[assets.ExternalServiceUUID]*ExternalService)
+		for _, a := range oa.externalServices {
+			oa.externalServicesByID[a.(*ExternalService).ID()] = a.(*ExternalService)
+			oa.externalServicesByUUID[a.UUID()] = a.(*ExternalService)
+		}
 	} else {
 		oa.externalServices = prev.externalServices
 		oa.externalServicesByID = prev.externalServicesByID

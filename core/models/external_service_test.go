@@ -51,5 +51,4 @@ func TestExternalServices(t *testing.T) {
 
 	assert.Equal(t, "foo", es.Config("new_key"))
 	assert.Equal(t, "", es.Config("service_id"))
-	assert.Equal(t, "543210", es.Config("service_id"))
 }
