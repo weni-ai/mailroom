@@ -4,6 +4,8 @@ github.com/DATA-DOG/go-sqlmock v1.5.0 h1:Shsta01QNfFxHCfpW6YH2STWB0MudeXXEWMr20O
 github.com/DATA-DOG/go-sqlmock v1.5.0/go.mod h1:f/Ixk793poVmq4qj/V1dPUg2JEAKC73Q5eFN3EC/SaM=
 github.com/Ilhasoft/gocommon v1.16.2-weni h1:IDDxPVNIVDMwSErQmTrAiziLMvEi6rbeRb3GG8D+XmA=
 github.com/Ilhasoft/gocommon v1.16.2-weni/go.mod h1:pk8L9T79VoKO8OWTiZbtUutFPI3sGGKB5u8nNWDKuGE=
+github.com/Ilhasoft/goflow v0.0.1-goflow-0.144.3-stg-2 h1:2p26eo5Ybc8xjfKg/BJucoVuerk5x8zaaiCmSq75ANg=
+github.com/Ilhasoft/goflow v0.0.1-goflow-0.144.3-stg-2/go.mod h1:o0xaVWP9qNcauBSlcNLa79Fm2oCPV+BDpheFRa/D40c=
 github.com/Masterminds/semver v1.5.0 h1:H65muMkzWKEuNDnfl9d70GUjFniHKHRbFPGBuZ3QEww=
 github.com/Masterminds/semver v1.5.0/go.mod h1:MB6lktGJrhw8PrUyiEoblNEGEQ+RzHPF078ddwwvV3Y=
 github.com/alecthomas/template v0.0.0-20160405071501-a0175ee3bccc/go.mod h1:LOuyumcjzFXgccqObfd/Ljyb9UuFJ6TxHnclSeseNhc=
@@ -142,8 +144,6 @@ github.com/naoina/toml v0.1.1 h1:PT/lllxVVN0gzzSqSlHEmP8MJB4MY2U7STGxiouV4X8=
 github.com/naoina/toml v0.1.1/go.mod h1:NBIhNtsFMo3G2szEBne+bO4gS192HuIYRqfvOWb4i1E=
 github.com/nyaruka/ezconf v0.2.1 h1:TDXWoqjqYya1uhou1mAJZg7rgFYL98EB0Tb3+BWtUh0=
 github.com/nyaruka/ezconf v0.2.1/go.mod h1:ey182kYkw2MIi4XiWe1FR/mzI33WCmTWuceDYYxgnQw=
-github.com/nyaruka/goflow v0.144.3 h1:5mPEOeyYd4pF6lcGshkcA1MDgP/QZcGm0pzThBphiqE=
-github.com/nyaruka/goflow v0.144.3/go.mod h1:o0xaVWP9qNcauBSlcNLa79Fm2oCPV+BDpheFRa/D40c=
 github.com/nyaruka/librato v1.0.0 h1:Vznj9WCeC1yZXbBYyYp40KnbmXLbEkjKmHesV/v2SR0=
 github.com/nyaruka/librato v1.0.0/go.mod h1:pkRNLFhFurOz0QqBz6/DuTFhHHxAubWxs4Jx+J7yUgg=
 github.com/nyaruka/logrus_sentry v0.8.2-0.20190129182604-c2962b80ba7d h1:hyp9u36KIwbTCo2JAJ+TuJcJBc+UZzEig7RI/S5Dvkc=

@@ -26,6 +26,7 @@ import (
 	_ "github.com/nyaruka/mailroom/core/tasks/schedules"
 	_ "github.com/nyaruka/mailroom/core/tasks/starts"
 	_ "github.com/nyaruka/mailroom/core/tasks/timeouts"
+	_ "github.com/nyaruka/mailroom/services/external/omie"
 	_ "github.com/nyaruka/mailroom/services/ivr/twiml"
 	_ "github.com/nyaruka/mailroom/services/ivr/vonage"
 	_ "github.com/nyaruka/mailroom/services/tickets/intern"
