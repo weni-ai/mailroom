@@ -1,3 +1,7 @@
+1.5.0-mailroom-7.1.22
+----------
+ * Support for the new Omie external service
+
 1.4.18-mailroom-7.1.22
 ----------
  * Fix wenichats send media #118
