@@ -14,6 +14,7 @@ import (
 
 	"github.com/nyaruka/gocommon/httpx"
 	"github.com/nyaruka/gocommon/jsonx"
+	"github.com/nyaruka/goflow/envs"
 	"github.com/nyaruka/goflow/flows"
 	"github.com/nyaruka/goflow/utils"
 	"github.com/nyaruka/mailroom/core/models"
@@ -96,12 +97,19 @@ func (s *service) Open(session flows.Session, topic *flows.Topic, body string, a
 		groups = append(groups, g)
 	}
 
-	roomData.Contact.ExternalID = string(contact.UUID())
-	if contact.Name() != "" {
-		roomData.Contact.Name = contact.Name()
+	rp := session.Environment().RedactionPolicy()
+
+	fmt.Println("RP: ", rp)
+	fmt.Println("RP2: ", session.Assets().Source().(*models.OrgAssets).Org().RedactionPolicy())
+	fmt.Println("ID Org: ", session.Assets().Source().(*models.OrgAssets).Org().ID())
+
+	if rp == envs.RedactionPolicyNone {
+		roomData.Contact.Name = strconv.Itoa(int(contact.ID()))
 	} else {
-		roomData.Contact.Name = strconv.FormatInt(int64(contact.ID()), 10)
+		roomData.Contact.Name = contact.Name()
 	}
+
+	roomData.Contact.ExternalID = string(contact.UUID())
 	roomData.SectorUUID = s.sectorUUID
 	roomData.QueueUUID = string(topic.UUID())
 	roomData.Contact.URN = session.Contact().PreferredURN().URN().String()
