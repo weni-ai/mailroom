@@ -103,7 +103,8 @@ func (s *service) Open(session flows.Session, topic *flows.Topic, body string, a
 	fmt.Println("RP2: ", session.Assets().Source().(*models.OrgAssets).Org().RedactionPolicy())
 	fmt.Println("ID Org: ", session.Assets().Source().(*models.OrgAssets).Org().ID())
 
-	if rp == envs.RedactionPolicyNone {
+	// check if the organization has restrictions in RedactionPolicy
+	if rp == envs.RedactionPolicyURNs {
 		roomData.Contact.Name = strconv.Itoa(int(contact.ID()))
 	} else {
 		roomData.Contact.Name = contact.Name()
