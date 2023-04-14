@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"net/http"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -13,6 +14,7 @@ import (
 
 	"github.com/nyaruka/gocommon/httpx"
 	"github.com/nyaruka/gocommon/jsonx"
+	"github.com/nyaruka/goflow/envs"
 	"github.com/nyaruka/goflow/flows"
 	"github.com/nyaruka/goflow/utils"
 	"github.com/nyaruka/mailroom/core/models"
@@ -96,7 +98,15 @@ func (s *service) Open(session flows.Session, topic *flows.Topic, body string, a
 	}
 
 	roomData.Contact.ExternalID = string(contact.UUID())
-	roomData.Contact.Name = contact.Name()
+
+	// check if the organization has restrictions in RedactionPolicy
+	rp := session.Environment().RedactionPolicy()
+	if rp == envs.RedactionPolicyURNs {
+		roomData.Contact.Name = strconv.Itoa(int(contact.ID()))
+	} else {
+		roomData.Contact.Name = contact.Name()
+	}
+
 	roomData.SectorUUID = s.sectorUUID
 	roomData.QueueUUID = string(topic.UUID())
 	roomData.Contact.URN = session.Contact().PreferredURN().URN().String()
