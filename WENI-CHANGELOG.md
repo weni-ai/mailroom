@@ -1,3 +1,7 @@
+1.5.1-mailroom-7.1.22
+----------
+ * use contact id for name on open wenichats ticket if name is empty
+
 1.5.0-mailroom-7.1.22
 ----------
  * Support for the new Omie external service
