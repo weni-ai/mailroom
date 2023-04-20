@@ -396,10 +396,8 @@ func TestResendMessages(t *testing.T) {
 	// both messages should now have a channel, a topup and be marked for resending
 	assert.True(t, msgs[0].IsResend())
 	assert.Equal(t, testdata.TwilioChannel.ID, msgs[0].ChannelID())
-	//assert.Equal(t, models.TopupID(1), msgs[0].TopupID())
 	assert.True(t, msgs[1].IsResend())
 	assert.Equal(t, testdata.VonageChannel.ID, msgs[1].ChannelID())
-	//assert.Equal(t, models.TopupID(1), msgs[1].TopupID())
 
 	testsuite.AssertQuery(t, db, `SELECT count(*) FROM msgs_msg WHERE status = 'P' AND queued_on > $1 AND sent_on IS NULL`, now).Returns(2)
 }
