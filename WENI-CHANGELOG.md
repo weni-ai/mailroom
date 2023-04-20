@@ -1,3 +1,7 @@
+1.5.2-mailroom-7.1.22
+----------
+ * Remove topups to fix tests
+
 1.5.1-mailroom-7.1.22
 ----------
  * use contact id for name on open wenichats ticket if name is empty
