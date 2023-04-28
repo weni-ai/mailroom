@@ -1,3 +1,7 @@
+1.5.3-mailroom-7.1.22
+----------
+ * Send is_anon field when opening room in wenichats
+
 1.5.2-mailroom-7.1.22
 ----------
  * Remove topups to fix tests
