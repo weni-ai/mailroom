@@ -155,6 +155,7 @@ type RoomRequest struct {
 	CustomFields map[string]interface{} `json:"custom_fields,omitempty"`
 	CallbackURL  string                 `json:"callback_url,omitempty"`
 	FlowUUID     assets.FlowUUID        `json:"flow_uuid,omitempty"`
+	IsAnon       bool                   `json:"is_anon,omitempty"`
 }
 
 type Contact struct {

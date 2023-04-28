@@ -103,8 +103,10 @@ func (s *service) Open(session flows.Session, topic *flows.Topic, body string, a
 	rp := session.Environment().RedactionPolicy()
 	if rp == envs.RedactionPolicyURNs {
 		roomData.Contact.Name = strconv.Itoa(int(contact.ID()))
+		roomData.IsAnon = true
 	} else {
 		roomData.Contact.Name = contact.Name()
+		roomData.IsAnon = false
 	}
 
 	roomData.SectorUUID = s.sectorUUID
