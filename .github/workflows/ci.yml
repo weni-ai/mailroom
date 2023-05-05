@@ -66,7 +66,7 @@ jobs:
     - name: Fetch GoFlow docs
       # for backward compatibility, English docs are copied to root of docs directory
       run: |
-        GOFLOW_VERSION=$(grep Ilhasoft/goflow go.mod | cut -d" " -f5)
+        GOFLOW_VERSION=$(grep Ilhasoft/goflow go.mod | cut -d" " -f5 | cut -c2-)
         curl -L https://github.com/nyaruka/goflow/releases/download/v${GOFLOW_VERSION}/docs.tar.gz | tar zxv
         cp ./docs/en-us/*.* docs/
 
