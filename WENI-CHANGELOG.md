@@ -1,3 +1,7 @@
+1.5.4-mailroom-7.1.22
+----------
+ * Fix goflow version command 
+
 1.5.3-mailroom-7.1.22
 ----------
  * Send is_anon field when opening room in wenichats
