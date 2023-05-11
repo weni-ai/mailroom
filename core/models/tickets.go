@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"database/sql/driver"
+	"fmt"
 	"net/http"
 	"time"
 
@@ -519,6 +520,7 @@ WHERE
 
 // CloseTickets closes the passed in tickets
 func CloseTickets(ctx context.Context, rt *runtime.Runtime, oa *OrgAssets, userID UserID, tickets []*Ticket, externally, force bool, logger *HTTPLogger) (map[*Ticket]*TicketEvent, error) {
+	fmt.Println("CloseTickets")
 	byTicketer := make(map[TicketerID][]*Ticket)
 	ids := make([]TicketID, 0, len(tickets))
 	events := make([]*TicketEvent, 0, len(tickets))

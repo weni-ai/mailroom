@@ -51,6 +51,7 @@ func HandleEvent(ctx context.Context, rt *runtime.Runtime, task *queue.Task) err
 // Called when an event comes in for a contact. To make sure we don't get into a situation of being off by one,
 // this task ingests and handles all the events for a contact, one by one.
 func handleContactEvent(ctx context.Context, rt *runtime.Runtime, task *queue.Task) error {
+	fmt.Println("HandleContactEvent")
 	ctx, cancel := context.WithTimeout(ctx, time.Minute*5)
 	defer cancel()
 
