@@ -535,8 +535,8 @@ func CloseTickets(ctx context.Context, rt *runtime.Runtime, oa *OrgAssets, userI
 			t.ModifiedOn = now
 			t.ClosedOn = &now
 			t.LastActivityOn = now
-
-			e := NewTicketClosedEvent(ticket, userID)
+			note := "nota"
+			e := newTicketEvent(ticket, userID, TicketEventTypeClosed, note, NilTopicID, NilUserID) //NewTicketClosedEvent(ticket, userID)
 			events = append(events, e)
 			eventsByTicket[ticket] = e
 			contactIDs[ticket.ContactID()] = true
