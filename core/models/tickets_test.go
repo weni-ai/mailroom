@@ -301,7 +301,7 @@ func TestCloseTickets(t *testing.T) {
 	assert.Equal(t, "Tickets", cathy.Groups().All()[1].Name())
 
 	logger := &models.HTTPLogger{}
-	evts, err := models.CloseTickets(ctx, rt, oa, testdata.Admin.ID, []*models.Ticket{modelTicket1, modelTicket2}, true, false, logger)
+	evts, err := models.CloseTickets(ctx, rt, oa, testdata.Admin.ID, []*models.Ticket{modelTicket1, modelTicket2}, true, false, logger, "")
 	require.NoError(t, err)
 	assert.Equal(t, 1, len(evts))
 	assert.Equal(t, models.TicketEventTypeClosed, evts[modelTicket1].EventType())
@@ -330,7 +330,7 @@ func TestCloseTickets(t *testing.T) {
 	ticket3 := testdata.InsertOpenTicket(db, testdata.Org1, testdata.Cathy, testdata.Mailgun, testdata.DefaultTopic, "Where my shoes", "123", nil)
 	modelTicket3 := ticket3.Load(db)
 
-	evts, err = models.CloseTickets(ctx, rt, oa, models.NilUserID, []*models.Ticket{modelTicket3}, false, false, logger)
+	evts, err = models.CloseTickets(ctx, rt, oa, models.NilUserID, []*models.Ticket{modelTicket3}, false, false, logger, "")
 	require.NoError(t, err)
 	assert.Equal(t, 1, len(evts))
 	assert.Equal(t, models.TicketEventTypeClosed, evts[modelTicket3].EventType())

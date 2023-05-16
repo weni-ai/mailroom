@@ -184,7 +184,7 @@ func TestCloseTicket(t *testing.T) {
 
 	logger := &models.HTTPLogger{}
 
-	err = tickets.Close(ctx, rt, oa, ticket1, true, logger)
+	err = tickets.Close(ctx, rt, oa, ticket1, true, logger, "")
 	require.NoError(t, err)
 
 	testsuite.AssertContactTasks(t, 1, testdata.Cathy.ID,

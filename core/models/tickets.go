@@ -4,7 +4,6 @@ import (
 	"context"
 	"database/sql"
 	"database/sql/driver"
-	"fmt"
 	"net/http"
 	"time"
 
@@ -519,8 +518,7 @@ WHERE
 `
 
 // CloseTickets closes the passed in tickets
-func CloseTickets(ctx context.Context, rt *runtime.Runtime, oa *OrgAssets, userID UserID, tickets []*Ticket, externally, force bool, logger *HTTPLogger) (map[*Ticket]*TicketEvent, error) {
-	fmt.Println("CloseTickets")
+func CloseTickets(ctx context.Context, rt *runtime.Runtime, oa *OrgAssets, userID UserID, tickets []*Ticket, externally, force bool, logger *HTTPLogger, request string) (map[*Ticket]*TicketEvent, error) {
 	byTicketer := make(map[TicketerID][]*Ticket)
 	ids := make([]TicketID, 0, len(tickets))
 	events := make([]*TicketEvent, 0, len(tickets))
@@ -537,8 +535,7 @@ func CloseTickets(ctx context.Context, rt *runtime.Runtime, oa *OrgAssets, userI
 			t.ModifiedOn = now
 			t.ClosedOn = &now
 			t.LastActivityOn = now
-			note := "nota"
-			e := newTicketEvent(ticket, userID, TicketEventTypeClosed, note, NilTopicID, NilUserID) //NewTicketClosedEvent(ticket, userID)
+			e := NewTicketClosedEvent(ticket, userID, request)
 			events = append(events, e)
 			eventsByTicket[ticket] = e
 			contactIDs[ticket.ContactID()] = true

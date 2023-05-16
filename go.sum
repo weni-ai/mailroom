@@ -4,8 +4,8 @@ github.com/DATA-DOG/go-sqlmock v1.5.0 h1:Shsta01QNfFxHCfpW6YH2STWB0MudeXXEWMr20O
 github.com/DATA-DOG/go-sqlmock v1.5.0/go.mod h1:f/Ixk793poVmq4qj/V1dPUg2JEAKC73Q5eFN3EC/SaM=
 github.com/Ilhasoft/gocommon v1.16.2-weni h1:IDDxPVNIVDMwSErQmTrAiziLMvEi6rbeRb3GG8D+XmA=
 github.com/Ilhasoft/gocommon v1.16.2-weni/go.mod h1:pk8L9T79VoKO8OWTiZbtUutFPI3sGGKB5u8nNWDKuGE=
-github.com/Ilhasoft/goflow v0.0.1-goflow-0.144.3-stg-2 h1:2p26eo5Ybc8xjfKg/BJucoVuerk5x8zaaiCmSq75ANg=
-github.com/Ilhasoft/goflow v0.0.1-goflow-0.144.3-stg-2/go.mod h1:o0xaVWP9qNcauBSlcNLa79Fm2oCPV+BDpheFRa/D40c=
+github.com/Ilhasoft/goflow v0.0.2-goflow-0.144.3-dev h1:88zbUf5nhAXELgR7M6YXq8LHYUhePjkkY4Pd/zAwUxU=
+github.com/Ilhasoft/goflow v0.0.2-goflow-0.144.3-dev/go.mod h1:o0xaVWP9qNcauBSlcNLa79Fm2oCPV+BDpheFRa/D40c=
 github.com/Masterminds/semver v1.5.0 h1:H65muMkzWKEuNDnfl9d70GUjFniHKHRbFPGBuZ3QEww=
 github.com/Masterminds/semver v1.5.0/go.mod h1:MB6lktGJrhw8PrUyiEoblNEGEQ+RzHPF078ddwwvV3Y=
 github.com/alecthomas/template v0.0.0-20160405071501-a0175ee3bccc/go.mod h1:LOuyumcjzFXgccqObfd/Ljyb9UuFJ6TxHnclSeseNhc=

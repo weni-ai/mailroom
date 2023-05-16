@@ -52,8 +52,8 @@ func NewTicketTopicChangedEvent(t *Ticket, userID UserID, topicID TopicID) *Tick
 	return newTicketEvent(t, userID, TicketEventTypeTopicChanged, "", topicID, NilUserID)
 }
 
-func NewTicketClosedEvent(t *Ticket, userID UserID) *TicketEvent {
-	return newTicketEvent(t, userID, TicketEventTypeClosed, "", NilTopicID, NilUserID)
+func NewTicketClosedEvent(t *Ticket, userID UserID, note string) *TicketEvent {
+	return newTicketEvent(t, userID, TicketEventTypeClosed, note, NilTopicID, NilUserID)
 }
 
 func NewTicketReopenedEvent(t *Ticket, userID UserID) *TicketEvent {

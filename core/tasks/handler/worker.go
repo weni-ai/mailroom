@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/apex/log"
 	"github.com/gomodule/redigo/redis"
 	"github.com/jmoiron/sqlx"
 	"github.com/nyaruka/gocommon/urns"
@@ -51,7 +52,6 @@ func HandleEvent(ctx context.Context, rt *runtime.Runtime, task *queue.Task) err
 // Called when an event comes in for a contact. To make sure we don't get into a situation of being off by one,
 // this task ingests and handles all the events for a contact, one by one.
 func handleContactEvent(ctx context.Context, rt *runtime.Runtime, task *queue.Task) error {
-	fmt.Println("HandleContactEvent")
 	ctx, cancel := context.WithTimeout(ctx, time.Minute*5)
 	defer cancel()
 
@@ -730,13 +730,25 @@ func handleTicketEvent(ctx context.Context, rt *runtime.Runtime, event *models.T
 		return errors.Wrapf(err, "error creating flow contact")
 	}
 
+	var params *types.XObject
+	if event.Note() != "" {
+		asJSON, err := json.Marshal(event.Note())
+		if err != nil {
+			log.WithError(err).Error("unable to marshal note from ticket event")
+		}
+		params, err = types.ReadXObject(asJSON)
+		if err != nil {
+			log.WithError(err).Error("unable to marshal note from ticket event")
+		}
+	}
+
 	// build our flow trigger
 	var flowTrigger flows.Trigger
 
 	switch event.EventType() {
 	case models.TicketEventTypeClosed:
 		flowTrigger = triggers.NewBuilder(oa.Env(), flow.FlowReference(), contact).
-			Ticket(ticket, triggers.TicketEventTypeClosed).
+			Ticket(ticket, triggers.TicketEventTypeClosed).WithParams(params).
 			Build()
 	default:
 		return errors.Errorf("unknown ticket event type: %s", event.EventType())
