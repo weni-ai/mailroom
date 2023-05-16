@@ -284,11 +284,12 @@ func handleTicketerWebhook(ctx context.Context, rt *runtime.Runtime, r *http.Req
 	if err != nil {
 		return err, http.StatusBadRequest, nil
 	}
-	requestStr := fmt.Sprint(request)
+
+	requestJSON, err := json.Marshal(request)
 	if request.Event == "status_changed" {
 		switch strings.ToLower(request.Status) {
 		case statusSolved, statusClosed, "resuelto", "cerrado", "resolvido":
-			err = tickets.Close(ctx, rt, oa, ticket, false, l, requestStr)
+			err = tickets.Close(ctx, rt, oa, ticket, false, l, string(requestJSON))
 		case statusOpen, "abierto", "aberto":
 			err = tickets.Reopen(ctx, rt, oa, ticket, false, l)
 		}

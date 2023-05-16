@@ -527,7 +527,7 @@ func CloseTickets(ctx context.Context, rt *runtime.Runtime, oa *OrgAssets, userI
 	now := dates.Now()
 
 	for _, ticket := range tickets {
-		if ticket.Status() != TicketStatusClosed {
+		if ticket.Status() != TicketStatusClosed || request != "" {
 			byTicketer[ticket.TicketerID()] = append(byTicketer[ticket.TicketerID()], ticket)
 			ids = append(ids, ticket.ID())
 			t := &ticket.t
