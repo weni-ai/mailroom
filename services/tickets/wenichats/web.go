@@ -72,11 +72,6 @@ func handleEventCallback(ctx context.Context, rt *runtime.Runtime, r *http.Reque
 		return err, http.StatusBadRequest, nil
 	}
 
-	eMsg := &eventCallbackRequest{}
-	if err := json.Unmarshal([]byte(body), eMsg); err != nil {
-		return err, http.StatusInternalServerError, nil
-	}
-
 	switch eventType {
 	case "msg.create":
 		eMsg := &eventCallbackRequest{}
@@ -120,8 +115,7 @@ func handleEventCallback(ctx context.Context, rt *runtime.Runtime, r *http.Reque
 			}
 		}
 	case "room.update":
-		request, _ := json.Marshal(eMsg)
-		err = tickets.Close(ctx, rt, oa, ticket, false, nil, string(request))
+		err = tickets.Close(ctx, rt, oa, ticket, false, nil, "")
 		if err != nil {
 			return errors.Wrapf(err, "error on close ticket"), http.StatusInternalServerError, nil
 		}
