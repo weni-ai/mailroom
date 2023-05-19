@@ -44,9 +44,9 @@ type ChatCompletionRequest struct {
 }
 
 type ChatCompletionChoice struct {
-	Index        int
-	Message      ChatCompletionMessage
-	FinishReason string
+	Index        int                   `json:"index,omitempty"`
+	Message      ChatCompletionMessage `json:"message,omitempty"`
+	FinishReason string                `json:"finish_reason,omitempty"`
 }
 
 type ChatCompletionResponse struct {
@@ -110,6 +110,7 @@ func (c *baseClient) request(method, url string, params *url.Values, body, respo
 		return nil, err
 	}
 	req.Header.Add("Content-Type", "application/json")
+	req.Header.Add("Authorization", fmt.Sprintf("Bearer %s", c.apiKey))
 
 	if params != nil {
 		req.URL.RawQuery = params.Encode()
@@ -132,4 +133,15 @@ func (c *baseClient) request(method, url string, params *url.Values, body, respo
 	}
 
 	return trace, nil
+}
+
+func (c *baseClient) CreateChatCompletion(data *ChatCompletionRequest) (*ChatCompletionResponse, *httpx.Trace, error) {
+	requestURL := c.baseURL + "/v1/chat/completions"
+	response := &ChatCompletionResponse{}
+
+	trace, err := c.request("POST", requestURL, nil, data, response)
+	if err != nil {
+		return nil, trace, err
+	}
+	return response, trace, nil
 }
