@@ -1,3 +1,7 @@
+1.5.5-mailroom-7.1.22
+----------
+ * Add support for sending webhook parameters in trigger.params to Zendesk
+
 1.5.4-mailroom-7.1.22
 ----------
  * Fix goflow version command 
