@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/apex/log"
 	"github.com/gomodule/redigo/redis"
 	"github.com/jmoiron/sqlx"
 	"github.com/nyaruka/gocommon/urns"
@@ -729,13 +730,34 @@ func handleTicketEvent(ctx context.Context, rt *runtime.Runtime, event *models.T
 		return errors.Wrapf(err, "error creating flow contact")
 	}
 
+	var params *types.XObject
+	if event.Note() != "" {
+		note := struct {
+			Event  string `json:"event"`
+			ID     int    `json:"id"`
+			Status string `json:"status"`
+		}{}
+		err := json.Unmarshal([]byte(event.Note()), &note)
+		if err != nil {
+			log.WithError(err).Error("unable to unmarshal note from ticket event")
+		}
+		asJSON, err := json.Marshal(note)
+		if err != nil {
+			log.WithError(err).Error("unable to marshal note from ticket event")
+		}
+		params, err = types.ReadXObject(asJSON)
+		if err != nil {
+			log.WithError(err).Error("unable to marshal note from ticket event")
+		}
+	}
+
 	// build our flow trigger
 	var flowTrigger flows.Trigger
 
 	switch event.EventType() {
 	case models.TicketEventTypeClosed:
 		flowTrigger = triggers.NewBuilder(oa.Env(), flow.FlowReference(), contact).
-			Ticket(ticket, triggers.TicketEventTypeClosed).
+			Ticket(ticket, triggers.TicketEventTypeClosed).WithParams(params).
 			Build()
 	default:
 		return errors.Errorf("unknown ticket event type: %s", event.EventType())
