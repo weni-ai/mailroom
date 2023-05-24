@@ -58,17 +58,22 @@ type service struct {
 }
 
 func NewService(rtCfg *runtime.Config, httpClient *http.Client, httpRetries *httpx.RetryConfig, externalService *flows.ExternalService, config map[string]string) (models.ExternalServiceService, error) {
-	apiKey := config["api"]
+	apiKey := config["api_key"]
 
-	if err := initDB(rtCfg.DB); err != nil {
-		return nil, err
+	if apiKey != "" {
+		if err := initDB(rtCfg.DB); err != nil {
+			return nil, err
+		}
+
+		return &service{
+			rtConfig:   rtCfg,
+			restClient: NewClient(httpClient, httpRetries, baseURL, apiKey),
+			redactor:   utils.NewRedactor(flows.RedactionMask, apiKey),
+			config:     config,
+		}, nil
 	}
 
-	return &service{
-		rtConfig:   rtCfg,
-		restClient: NewClient(httpClient, httpRetries, baseURL, apiKey),
-		redactor:   utils.NewRedactor(flows.RedactionMask, apiKey),
-	}, nil
+	return nil, errors.New("missing api_key in external service for chatgpt config")
 }
 
 func (s *service) Call(session flows.Session, callAction assets.ExternalServiceCallAction, params []assets.ExternalServiceParam, logHTTP flows.HTTPLogCallback) (*flows.ExternalServiceCall, error) {
@@ -77,14 +82,31 @@ func (s *service) Call(session flows.Session, callAction assets.ExternalServiceC
 	callResult := &flows.ExternalServiceCall{}
 	sendHistory := false
 
+	// default could be "gpt-3.5-turbo"
+	aiModel := s.config["ai_model"]
+
 	switch call {
 	case "CreateCompletion":
 
 		request := &ChatCompletionRequest{
-			Model: "gpt-3.5-turbo",
+			Model: aiModel,
 		}
 
 		input := ""
+
+		rulesText := s.config["rules"]
+		rulesMsg := ChatCompletionMessage{
+			Role:    ChatMessageRoleAssistant,
+			Content: rulesText,
+		}
+		request.Messages = append(request.Messages, rulesMsg)
+
+		knowledgeBaseText := s.config["knowledge_base"]
+		knowledgeBaseMsg := ChatCompletionMessage{
+			Role:    ChatMessageRoleAssistant,
+			Content: knowledgeBaseText,
+		}
+		request.Messages = append(request.Messages, knowledgeBaseMsg)
 
 		for _, param := range params {
 			dv := param.Data.Value

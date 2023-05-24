@@ -12,6 +12,8 @@ import (
 	"github.com/pkg/errors"
 )
 
+const model = "gpt-3.5-turbo"
+
 const (
 	ChatMessageRoleSystem    = "system"
 	ChatMessageRoleUser      = "user"
@@ -41,6 +43,13 @@ type ChatCompletionRequest struct {
 	FrequencyPenalty float32                 `json:"frequency_penalty,omitempty"`
 	LogitBias        map[string]int          `json:"logit_bias,omitempty"`
 	User             string                  `json:"user,omitempty"`
+}
+
+func NewChatCompletionRequest(messages []ChatCompletionMessage) *ChatCompletionRequest {
+	return &ChatCompletionRequest{
+		Model:    model,
+		Messages: messages,
+	}
 }
 
 type ChatCompletionChoice struct {
