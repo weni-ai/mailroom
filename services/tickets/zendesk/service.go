@@ -104,6 +104,7 @@ func (s *service) Open(session flows.Session, topic *flows.Topic, body string, a
 			Description  string       `json:"description"`
 			CustomFields []FieldValue `json:"custom_fields"`
 			Tags         []string     `json:"tags"`
+			ID           int64        `json:"id"`
 		}{}
 
 		err := jsonx.Unmarshal([]byte(body), extra)
@@ -111,33 +112,43 @@ func (s *service) Open(session flows.Session, topic *flows.Topic, body string, a
 			return nil, err
 		}
 
-		v := reflect.ValueOf(extra)
-		fields := reflect.Indirect(v)
-		if fields.NumField() > 0 {
-			for i := 0; i < fields.NumField(); i++ {
-				if fields.Field(i).Type().Name() == "string" && fields.Field(i).Interface() != "" {
-					fieldsValue = append(fieldsValue, FieldValue{ID: fields.Type().Field(i).Tag.Get("json"), Value: fields.Field(i).Interface()})
-				} else if fields.Type().Field(i).Tag.Get("json") == "custom_fields" && fields.Field(i).Interface() != nil {
-					for _, cf := range extra.CustomFields {
-						fieldsValue = append(fieldsValue, FieldValue{ID: cf.ID, Value: cf.Value})
-					}
-				} else if fields.Type().Field(i).Tag.Get("json") == "tags" && fields.Field(i).Interface() != nil {
-					fieldsValue = append(fieldsValue, FieldValue{ID: fields.Type().Field(i).Tag.Get("json"), Value: fields.Field(i).Interface()})
-				}
+		if extra.ID > 0 {
+			var ids []int64
+			ids = append(ids, extra.ID)
+			_, trace, _ := s.restClient.UpdateManyTickets(ids, statusOpen)
+			if trace != nil {
+				logHTTP(flows.NewHTTPLog(trace, flows.HTTPStatusFromCode, s.redactor))
 			}
-			fieldsValue = append(fieldsValue, FieldValue{ID: "external_id", Value: string(ticket.UUID())})
-			msg.Fields = fieldsValue
-		}
-
-		if extra.Message != "" {
-			msg.Message = extra.Message
 		} else {
-			msg.Message = extra.Subject
-		}
-	}
+			v := reflect.ValueOf(extra)
+			fields := reflect.Indirect(v)
+			if fields.NumField() > 0 {
+				for i := 0; i < fields.NumField(); i++ {
+					if fields.Field(i).Type().Name() == "string" && fields.Field(i).Interface() != "" {
+						fieldsValue = append(fieldsValue, FieldValue{ID: fields.Type().Field(i).Tag.Get("json"), Value: fields.Field(i).Interface()})
+					} else if fields.Type().Field(i).Tag.Get("json") == "custom_fields" && fields.Field(i).Interface() != nil {
+						for _, cf := range extra.CustomFields {
+							fieldsValue = append(fieldsValue, FieldValue{ID: cf.ID, Value: cf.Value})
+						}
+					} else if fields.Type().Field(i).Tag.Get("json") == "tags" && fields.Field(i).Interface() != nil {
+						fieldsValue = append(fieldsValue, FieldValue{ID: fields.Type().Field(i).Tag.Get("json"), Value: fields.Field(i).Interface()})
+					}
+				}
+				fieldsValue = append(fieldsValue, FieldValue{ID: "external_id", Value: string(ticket.UUID())})
+				msg.Fields = fieldsValue
+			}
 
-	if err := s.push(msg, logHTTP); err != nil {
-		return nil, err
+			if extra.Message != "" {
+				msg.Message = extra.Message
+			} else {
+				msg.Message = extra.Subject
+			}
+
+			if err := s.push(msg, logHTTP); err != nil {
+				return nil, err
+			}
+		}
+
 	}
 
 	return ticket, nil
