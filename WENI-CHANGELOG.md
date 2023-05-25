@@ -1,3 +1,7 @@
+1.5.6-mailroom-7.1.22
+----------
+ * Support for reopening zendesk ticket with body ID
+
 1.5.5-mailroom-7.1.22
 ----------
  * Add support for sending webhook parameters in trigger.params to Zendesk
