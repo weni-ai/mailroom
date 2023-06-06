@@ -74,6 +74,7 @@ var Wenichats = &Ticketer{7, "006d224e-107f-4e18-afb2-f41fe302abdc"}
 var Luis = &Classifier{1, "097e026c-ae79-4740-af67-656dbedf0263"}
 var Wit = &Classifier{2, "ff2a817c-040a-4eb2-8404-7d92e8b79dd0"}
 var Bothub = &Classifier{3, "859b436d-3005-4e43-9ad5-3de5f26ede4c"}
+var Zeroshot = &Classifier{4, "10a84f15-3009-43c6-9ce8-9c7fc4918197"}
 
 var RemindersCampaign = &Campaign{10000, "72aa12c5-cc11-4bc7-9406-044047845c70"}
 var RemindersEvent1 = &CampaignEvent{10000}

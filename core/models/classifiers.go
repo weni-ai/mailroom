@@ -11,6 +11,7 @@ import (
 	"github.com/nyaruka/goflow/services/classification/bothub"
 	"github.com/nyaruka/goflow/services/classification/luis"
 	"github.com/nyaruka/goflow/services/classification/wit"
+	"github.com/nyaruka/goflow/services/classification/zeroshot"
 	"github.com/nyaruka/mailroom/core/goflow"
 	"github.com/nyaruka/mailroom/runtime"
 	"github.com/nyaruka/mailroom/utils/dbutil"
@@ -29,9 +30,10 @@ const NilClassifierID = ClassifierID(0)
 
 // classifier type constants
 const (
-	ClassifierTypeWit    = "wit"
-	ClassifierTypeLuis   = "luis"
-	ClassifierTypeBothub = "bothub"
+	ClassifierTypeWit      = "wit"
+	ClassifierTypeLuis     = "luis"
+	ClassifierTypeBothub   = "bothub"
+	ClassifierTypeZeroshot = "zeroshot"
 )
 
 // classifier config key constants
@@ -47,6 +49,9 @@ const (
 	LuisConfigPredictionEndpoint = "prediction_endpoint"
 	LuisConfigPredictionKey      = "prediction_key"
 	LuisConfigSlot               = "slot"
+
+	ZeroshotConfigToken    = "access_token"
+	ZeroshotRepositoryUUID = "repository_uuid"
 )
 
 // Register a classification service factory with the engine
@@ -121,6 +126,14 @@ func (c *Classifier) AsService(cfg *runtime.Config, classifier *flows.Classifier
 			return nil, errors.Errorf("missing %s for Bothub classifier: %s", BothubConfigAccessToken, c.UUID())
 		}
 		return bothub.NewService(httpClient, httpRetries, classifier, accessToken), nil
+
+	case ClassifierTypeZeroshot:
+		accessToken := c.c.Config[ZeroshotConfigToken]
+		repository := c.c.Config[ZeroshotRepositoryUUID]
+		if accessToken == "" || repository == "" {
+			return nil, errors.Errorf("missing %s or %s on Zeroshot classifier: %s", ZeroshotConfigToken, ZeroshotRepositoryUUID, c.UUID())
+		}
+		return zeroshot.NewService(httpClient, httpRetries, classifier, accessToken, repository), nil
 
 	default:
 		return nil, errors.Errorf("unknown classifier type '%s' for classifier: %s", c.Type(), c.UUID())
