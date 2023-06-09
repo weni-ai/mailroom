@@ -81,49 +81,38 @@ func (s *service) Call(session flows.Session, callAction assets.ExternalServiceC
 
 	callResult := &flows.ExternalServiceCall{}
 	sendHistory := false
-
+	input := ""
+	promptMessages := []ChatCompletionMessage{}
 	// default could be "gpt-3.5-turbo"
 	aiModel := s.config["ai_model"]
 
 	switch call {
-	case "CreateCompletion":
+	case "ConsultarChatGPT":
 
 		request := &ChatCompletionRequest{
 			Model: aiModel,
 		}
 
-		input := ""
-
-		rulesText := s.config["rules"]
-		rulesMsg := ChatCompletionMessage{
-			Role:    ChatMessageRoleAssistant,
-			Content: rulesText,
-		}
-		request.Messages = append(request.Messages, rulesMsg)
-
-		knowledgeBaseText := s.config["knowledge_base"]
-		knowledgeBaseMsg := ChatCompletionMessage{
-			Role:    ChatMessageRoleAssistant,
-			Content: knowledgeBaseText,
-		}
-		request.Messages = append(request.Messages, knowledgeBaseMsg)
-
 		for _, param := range params {
 			dv := param.Data.Value
 			switch param.Type {
-			case "prompt":
-				newMsg := ChatCompletionMessage{
-					Role: ChatMessageRoleAssistant,
-				}
-				newMsg.Content = dv
-				request.Messages = append(request.Messages, newMsg)
-			case "send_history":
+			case "AditionalPrompts":
+
+				// TODO: prompt data value will be string or interface{}
+
+				// newMsg := ChatCompletionMessage{
+				// 	Role: ChatMessageRoleAssistant,
+				// }
+				// newMsg.Content = dv
+				// promptMessages = append(promptMessages, newMsg)
+
+			case "SendCompleteHistory":
 				var err error
 				sendHistory, err = strconv.ParseBool(dv)
 				if err != nil {
 					sendHistory = false
 				}
-			case "input":
+			case "UserInput":
 				if dv == "" {
 					return nil, errors.New("error on call chatgpt: input can't be empty")
 				}
@@ -153,7 +142,7 @@ func (s *service) Call(session flows.Session, callAction assets.ExternalServiceC
 				if msg.Direction() == "I" {
 					m.Role = ChatMessageRoleUser
 				} else {
-					m.Role = ChatMessageRoleSystem
+					m.Role = ChatMessageRoleAssistant
 				}
 				request.Messages = append(request.Messages, m)
 			}
@@ -165,6 +154,22 @@ func (s *service) Call(session flows.Session, callAction assets.ExternalServiceC
 				Role:    ChatMessageRoleUser,
 				Content: input,
 			})
+
+		rulesText := s.config["rules"]
+		rulesMsg := ChatCompletionMessage{
+			Role:    ChatMessageRoleAssistant,
+			Content: rulesText,
+		}
+		request.Messages = append(request.Messages, rulesMsg)
+
+		knowledgeBaseText := s.config["knowledge_base"]
+		knowledgeBaseMsg := ChatCompletionMessage{
+			Role:    ChatMessageRoleAssistant,
+			Content: knowledgeBaseText,
+		}
+		request.Messages = append(request.Messages, knowledgeBaseMsg)
+
+		request.Messages = append(request.Messages, promptMessages...)
 
 		r, t, err := s.restClient.CreateChatCompletion(request)
 		if err != nil {

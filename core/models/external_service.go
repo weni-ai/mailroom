@@ -9,6 +9,7 @@ import (
 
 	"github.com/jmoiron/sqlx"
 	"github.com/nyaruka/gocommon/httpx"
+	"github.com/nyaruka/gocommon/uuids"
 	"github.com/nyaruka/goflow/assets"
 	"github.com/nyaruka/goflow/flows"
 	"github.com/nyaruka/goflow/flows/engine"
@@ -190,4 +191,53 @@ func loadExternalServices(ctx context.Context, db sqlx.Queryer, orgID OrgID) ([]
 	logrus.WithField("elapsed", time.Since(start)).WithField("org_id", orgID).WithField("count", len(externalServices)).Debug("loaded external services")
 
 	return externalServices, nil
+}
+
+type PromptID null.Int
+type PromptUUID uuids.UUID
+
+type Prompt struct {
+	p struct {
+		ID                PromptID          `db:"id"`
+		UUID              PromptUUID        `db:"uuid"`
+		Text              string            `db:"org_id"`
+		ExternalServiceID ExternalServiceID `db:"external_service_id"`
+	}
+}
+
+func (p *Prompt) ID() PromptID                         { return p.p.ID }
+func (p *Prompt) UUID() PromptUUID                     { return p.p.UUID }
+func (p *Prompt) Text() string                         { return p.p.Text }
+func (p *Prompt) ExternalServiceID() ExternalServiceID { return p.p.ExternalServiceID }
+
+const selectPromptsByExternalServiceIDSQL = `
+SELECT 
+	p.id as id,
+	p.uuid as uuid,
+	p."text" as "text",
+	p.chat_gpt_service_id as chat_gpt_service_id, 
+FROM 
+	public.externals_prompt p
+WHERE
+  p.chat_gpt_service_id = $1
+`
+
+func SelectPromptsByExternalServiceID(ctx context.Context, db Queryer, externalServiceID ExternalServiceID) ([]*Prompt, error) {
+	rows, err := db.QueryxContext(ctx, selectPromptsByExternalServiceIDSQL, externalServiceID)
+	if err != nil && err != sql.ErrNoRows {
+		return nil, errors.Wrap(err, "error loading prompts")
+	}
+	defer rows.Close()
+
+	prompts := make([]*Prompt, 0, 2)
+	for rows.Next() {
+		prompt := &Prompt{}
+		err = rows.StructScan(&prompt.p)
+		if err != nil {
+			return nil, errors.Wrapf(err, "error unmarshalling prompt")
+		}
+		prompts = append(prompts, prompt)
+	}
+
+	return prompts, nil
 }
