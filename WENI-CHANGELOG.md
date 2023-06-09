@@ -1,3 +1,7 @@
+1.5.7-mailroom-7.1.22
+----------
+ * Remove returned ticket in case of reopening for zendesk
+
 1.5.6-mailroom-7.1.22
 ----------
  * Support for reopening zendesk ticket with body ID
