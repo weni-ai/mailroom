@@ -118,7 +118,7 @@ func (s *service) Open(session flows.Session, topic *flows.Topic, body string, a
 			_, trace, _ := s.restClient.UpdateManyTickets(ids, statusOpen)
 			if trace != nil {
 				logHTTP(flows.NewHTTPLog(trace, flows.HTTPStatusFromCode, s.redactor))
-				return ticket, nil
+				return nil, nil
 			}
 		}
 

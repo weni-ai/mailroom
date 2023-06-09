@@ -145,9 +145,8 @@ func TestOpenAndForward(t *testing.T) {
 	test.AssertSnapshot(t, "forward_message", logger.Logs[0].Request)
 
 	logger = &flows.HTTPLogger{}
-	ticket1, err := svc.Open(session, defaultTopic, fieldTicket1, nil, logger.Log)
+	_, err = svc.Open(session, defaultTopic, fieldTicket1, nil, logger.Log)
 	assert.NoError(t, err)
-	assert.Equal(t, fieldTicket1, ticket1.Body())
 	assert.Equal(t, 1, len(logger.Logs))
 	test.AssertSnapshot(t, "open", logger.Logs[0].Request)
 }
