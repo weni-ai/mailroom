@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"net/http"
 	"sort"
-	"strconv"
 	"sync"
 	"time"
 
@@ -20,7 +19,7 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-var baseURL = "https://api/openai.com"
+var baseURL = "https://api.openai.com"
 
 var db *sqlx.DB
 var mu = &sync.Mutex{}
@@ -98,25 +97,33 @@ func (s *service) Call(session flows.Session, callAction assets.ExternalServiceC
 			switch param.Type {
 			case "AditionalPrompts":
 
-				// TODO: prompt data value will be string or interface{}
-
-				// newMsg := ChatCompletionMessage{
-				// 	Role: ChatMessageRoleAssistant,
-				// }
-				// newMsg.Content = dv
-				// promptMessages = append(promptMessages, newMsg)
+				pmdv, ok := param.Data.Value.([]interface{})
+				if !ok {
+					return nil, errors.New("error on convert 'Data.Value' to []interface{}")
+				}
+				for _, element := range pmdv {
+					if elem, ok := element.(map[string]interface{}); ok {
+						if text, ok := elem["text"].(string); ok {
+							newMsgParam := ChatCompletionMessage{
+								Role:    ChatMessageRoleSystem,
+								Content: text,
+							}
+							promptMessages = append(promptMessages, newMsgParam)
+						}
+					}
+				}
 
 			case "SendCompleteHistory":
-				var err error
-				sendHistory, err = strconv.ParseBool(dv)
-				if err != nil {
+				var ok bool
+				sendHistory, ok = dv.(bool)
+				if !ok {
 					sendHistory = false
 				}
 			case "UserInput":
-				if dv == "" {
+				if dv == "" || dv == nil {
 					return nil, errors.New("error on call chatgpt: input can't be empty")
 				}
-				input = dv
+				input = dv.(string)
 			}
 		}
 
@@ -156,20 +163,26 @@ func (s *service) Call(session flows.Session, callAction assets.ExternalServiceC
 			})
 
 		rulesText := s.config["rules"]
-		rulesMsg := ChatCompletionMessage{
-			Role:    ChatMessageRoleAssistant,
-			Content: rulesText,
+		if rulesText != "" {
+			rulesMsg := ChatCompletionMessage{
+				Role:    ChatMessageRoleSystem,
+				Content: rulesText,
+			}
+			request.Messages = append(request.Messages, rulesMsg)
 		}
-		request.Messages = append(request.Messages, rulesMsg)
 
 		knowledgeBaseText := s.config["knowledge_base"]
-		knowledgeBaseMsg := ChatCompletionMessage{
-			Role:    ChatMessageRoleAssistant,
-			Content: knowledgeBaseText,
+		if knowledgeBaseText != "" {
+			knowledgeBaseMsg := ChatCompletionMessage{
+				Role:    ChatMessageRoleSystem,
+				Content: knowledgeBaseText,
+			}
+			request.Messages = append(request.Messages, knowledgeBaseMsg)
 		}
-		request.Messages = append(request.Messages, knowledgeBaseMsg)
 
-		request.Messages = append(request.Messages, promptMessages...)
+		if len(promptMessages) > 0 {
+			request.Messages = append(request.Messages, promptMessages...)
+		}
 
 		r, t, err := s.restClient.CreateChatCompletion(request)
 		if err != nil {

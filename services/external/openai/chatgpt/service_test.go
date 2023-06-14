@@ -70,7 +70,7 @@ func TestCall(t *testing.T) {
 
 	logger := &flows.HTTPLogger{}
 
-	callAction := assets.ExternalServiceCallAction{Name: "CreateCompletion", Value: "CreateCompletion"}
+	callAction := assets.ExternalServiceCallAction{Name: "ConsultarChatGPT", Value: "ConsultarChatGPT"}
 	params := []assets.ExternalServiceParam{}
 	call, err := svc.Call(session, callAction, params, logger.Log)
 	assert.EqualError(t, err, "error on call openai create completion: message:. type:invalid_request_error")
@@ -109,9 +109,23 @@ func TestCall(t *testing.T) {
 		chatgptService,
 		map[string]string{"api_key": apiKey},
 	)
+	assert.NoError(t, err)
 
-	callAction = assets.ExternalServiceCallAction{Name: "CreateCompletion", Value: "CreateCompletion"}
+	callAction = assets.ExternalServiceCallAction{Name: "ConsultarChatGPT", Value: "ConsultarChatGPT"}
 	params = []assets.ExternalServiceParam{}
+
+	pmPrompt := assets.NewExternalServiceParam(
+		[]struct{ Value string }{
+			{Value: "prompt test"},
+		},
+		"",
+		"",
+		"",
+		"AditionalPrompts",
+		"AditionalPrompts",
+	)
+	params = append(params, *pmPrompt)
+
 	call, err = svc.Call(session, callAction, params, logger.Log)
 	assert.NoError(t, err)
 	assert.NotNil(t, call)
