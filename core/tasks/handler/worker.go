@@ -626,8 +626,50 @@ func handleMsgEvent(ctx context.Context, rt *runtime.Runtime, event *MsgEvent) e
 			}
 
 			// otherwise build the trigger and start the flow directly
-			trigger := triggers.NewBuilder(oa.Env(), flow.FlowReference(), contact).Msg(msgIn).WithMatch(trigger.Match()).Build()
-			_, err = runner.StartFlowForContacts(ctx, rt, oa, flow, []flows.Trigger{trigger}, flowMsgHook, true)
+			trigger := triggers.NewBuilder(oa.Env(), flow.FlowReference(), contact).Msg(msgIn).WithMatch(trigger.Match())
+
+			if event.Metadata != nil {
+
+				var params *types.XObject
+				metadata := struct {
+					Headline   string `json:"headline"`
+					Body       string `json:"body"`
+					SourceType string `json:"source_type"`
+					SourceID   string `json:"source_id"`
+					SourceURL  string `json:"source_url"`
+					Image      struct {
+						Caption  string `json:"caption"`
+						Filename string `json:"filename"`
+						ID       string `json:"id"`
+						Mimetype string `json:"mime_type"`
+						SHA256   string `json:"sha256"`
+					} `json:"image,omitempty"`
+					Video struct {
+						Caption  string `json:"caption"`
+						Filename string `json:"filename"`
+						ID       string `json:"id"`
+						Mimetype string `json:"mime_type"`
+						SHA256   string `json:"sha256"`
+					} `json:"video,omitempty"`
+				}{}
+				err := json.Unmarshal([]byte(event.Metadata), &metadata)
+				if err != nil {
+					log.WithError(err).Error("unable to unmarshal metadata from msg event")
+				}
+				asJSON, err := json.Marshal(metadata)
+				if err != nil {
+					log.WithError(err).Error("unable to marshal metadata from msg event")
+				}
+				params, err = types.ReadXObject(asJSON)
+				if err != nil {
+					log.WithError(err).Error("unable to marshal metadata from msg event")
+				}
+
+				trigger.WithParams(params)
+			}
+			triggerBuild := trigger.Build()
+
+			_, err = runner.StartFlowForContacts(ctx, rt, oa, flow, []flows.Trigger{triggerBuild}, flowMsgHook, true)
 			if err != nil {
 				return errors.Wrapf(err, "error starting flow for contact")
 			}
@@ -828,6 +870,7 @@ type MsgEvent struct {
 	Attachments   []utils.Attachment `json:"attachments"`
 	NewContact    bool               `json:"new_contact"`
 	CreatedOn     time.Time          `json:"created_on"`
+	Metadata      json.RawMessage    `json:"metadata"`
 }
 
 type StopEvent struct {
