@@ -626,8 +626,42 @@ func handleMsgEvent(ctx context.Context, rt *runtime.Runtime, event *MsgEvent) e
 			}
 
 			// otherwise build the trigger and start the flow directly
-			trigger := triggers.NewBuilder(oa.Env(), flow.FlowReference(), contact).Msg(msgIn).WithMatch(trigger.Match()).Build()
-			_, err = runner.StartFlowForContacts(ctx, rt, oa, flow, []flows.Trigger{trigger}, flowMsgHook, true)
+			trigger := triggers.NewBuilder(oa.Env(), flow.FlowReference(), contact).Msg(msgIn).WithMatch(trigger.Match())
+
+			if event.Metadata != nil {
+
+				var params *types.XObject
+				metadata := struct {
+					Headline   string `json:"headline,omitempty"`
+					Body       string `json:"body,omitempty"`
+					SourceType string `json:"source_type,omitempty"`
+					SourceID   string `json:"source_id,omitempty"`
+					SourceURL  string `json:"source_url,omitempty"`
+					Image      *struct {
+						ID string `json:"id"`
+					} `json:"image,omitempty"`
+					Video *struct {
+						ID string `json:"id"`
+					} `json:"video,omitempty"`
+				}{}
+				err := json.Unmarshal(event.Metadata, &metadata)
+				if err != nil {
+					log.WithError(err).Error("unable to unmarshal metadata from msg event")
+				}
+				asJSON, err := json.Marshal(metadata)
+				if err != nil {
+					log.WithError(err).Error("unable to marshal metadata from msg event")
+				}
+				params, err = types.ReadXObject(asJSON)
+				if err != nil {
+					log.WithError(err).Error("unable to marshal metadata from msg event")
+				}
+
+				trigger.WithParams(params)
+			}
+			triggerBuild := trigger.Build()
+
+			_, err = runner.StartFlowForContacts(ctx, rt, oa, flow, []flows.Trigger{triggerBuild}, flowMsgHook, true)
 			if err != nil {
 				return errors.Wrapf(err, "error starting flow for contact")
 			}
@@ -828,6 +862,7 @@ type MsgEvent struct {
 	Attachments   []utils.Attachment `json:"attachments"`
 	NewContact    bool               `json:"new_contact"`
 	CreatedOn     time.Time          `json:"created_on"`
+	Metadata      json.RawMessage    `json:"metadata"`
 }
 
 type StopEvent struct {
