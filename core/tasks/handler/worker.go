@@ -632,11 +632,11 @@ func handleMsgEvent(ctx context.Context, rt *runtime.Runtime, event *MsgEvent) e
 
 				var params *types.XObject
 				metadata := struct {
-					Headline   string `json:"headline"`
-					Body       string `json:"body"`
-					SourceType string `json:"source_type"`
-					SourceID   string `json:"source_id"`
-					SourceURL  string `json:"source_url"`
+					Headline   string `json:"headline,omitempty"`
+					Body       string `json:"body,omitempty"`
+					SourceType string `json:"source_type,omitempty"`
+					SourceID   string `json:"source_id,omitempty"`
+					SourceURL  string `json:"source_url,omitempty"`
 					Image      *struct {
 						ID string `json:"id"`
 					} `json:"image,omitempty"`
