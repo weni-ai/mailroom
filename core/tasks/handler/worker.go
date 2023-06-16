@@ -638,18 +638,10 @@ func handleMsgEvent(ctx context.Context, rt *runtime.Runtime, event *MsgEvent) e
 					SourceID   string `json:"source_id"`
 					SourceURL  string `json:"source_url"`
 					Image      *struct {
-						Caption  string `json:"caption"`
-						Filename string `json:"filename"`
-						ID       string `json:"id"`
-						Mimetype string `json:"mime_type"`
-						SHA256   string `json:"sha256"`
+						ID string `json:"id"`
 					} `json:"image,omitempty"`
 					Video *struct {
-						Caption  string `json:"caption"`
-						Filename string `json:"filename"`
-						ID       string `json:"id"`
-						Mimetype string `json:"mime_type"`
-						SHA256   string `json:"sha256"`
+						ID string `json:"id"`
 					} `json:"video,omitempty"`
 				}{}
 				err := json.Unmarshal(event.Metadata, &metadata)
