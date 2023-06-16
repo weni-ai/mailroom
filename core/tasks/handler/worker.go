@@ -637,14 +637,14 @@ func handleMsgEvent(ctx context.Context, rt *runtime.Runtime, event *MsgEvent) e
 					SourceType string `json:"source_type"`
 					SourceID   string `json:"source_id"`
 					SourceURL  string `json:"source_url"`
-					Image      struct {
+					Image      *struct {
 						Caption  string `json:"caption"`
 						Filename string `json:"filename"`
 						ID       string `json:"id"`
 						Mimetype string `json:"mime_type"`
 						SHA256   string `json:"sha256"`
 					} `json:"image,omitempty"`
-					Video struct {
+					Video *struct {
 						Caption  string `json:"caption"`
 						Filename string `json:"filename"`
 						ID       string `json:"id"`
@@ -652,7 +652,7 @@ func handleMsgEvent(ctx context.Context, rt *runtime.Runtime, event *MsgEvent) e
 						SHA256   string `json:"sha256"`
 					} `json:"video,omitempty"`
 				}{}
-				err := json.Unmarshal([]byte(event.Metadata), &metadata)
+				err := json.Unmarshal(event.Metadata, &metadata)
 				if err != nil {
 					log.WithError(err).Error("unable to unmarshal metadata from msg event")
 				}
