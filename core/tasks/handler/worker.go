@@ -132,10 +132,12 @@ func handleContactEvent(ctx context.Context, rt *runtime.Runtime, task *queue.Ta
 
 		case MsgEventType:
 			msg := &MsgEvent{}
+			fmt.Printf("Task: %s", contactEvent.Task)
 			err = json.Unmarshal(contactEvent.Task, msg)
 			if err != nil {
 				return errors.Wrapf(err, "error unmarshalling msg event: %s", event)
 			}
+			fmt.Printf("%+v\n", msg)
 			err = handleMsgEvent(ctx, rt, msg)
 
 		case TicketClosedEventType:
