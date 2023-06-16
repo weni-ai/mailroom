@@ -1,3 +1,7 @@
+1.5.8-mailroom-7.1.22
+----------
+ * Support for trigger.params in Msg events
+
 1.5.7-mailroom-7.1.22
 ----------
  * Remove returned ticket in case of reopening for zendesk
