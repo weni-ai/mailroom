@@ -652,15 +652,20 @@ func handleMsgEvent(ctx context.Context, rt *runtime.Runtime, event *MsgEvent) e
 						SHA256   string `json:"sha256"`
 					} `json:"video,omitempty"`
 				}{}
-				err := json.Unmarshal([]byte(event.Metadata), &metadata)
+				fmt.Println("Metadata1: ", event.Metadata)
+				fmt.Printf("Metadata2: %s", event.Metadata)
+				err := json.Unmarshal(event.Metadata, &metadata)
 				if err != nil {
 					log.WithError(err).Error("unable to unmarshal metadata from msg event")
 				}
+				fmt.Printf("Metadata3: %s", metadata)
 				asJSON, err := json.Marshal(metadata)
 				if err != nil {
 					log.WithError(err).Error("unable to marshal metadata from msg event")
 				}
+				fmt.Printf("Metadata4: %s", asJSON)
 				params, err = types.ReadXObject(asJSON)
+				fmt.Printf("params: %s", params)
 				if err != nil {
 					log.WithError(err).Error("unable to marshal metadata from msg event")
 				}
