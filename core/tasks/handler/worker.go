@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/apex/log"
 	"github.com/gomodule/redigo/redis"
 	"github.com/jmoiron/sqlx"
 	"github.com/nyaruka/gocommon/urns"
@@ -625,8 +626,42 @@ func handleMsgEvent(ctx context.Context, rt *runtime.Runtime, event *MsgEvent) e
 			}
 
 			// otherwise build the trigger and start the flow directly
-			trigger := triggers.NewBuilder(oa.Env(), flow.FlowReference(), contact).Msg(msgIn).WithMatch(trigger.Match()).Build()
-			_, err = runner.StartFlowForContacts(ctx, rt, oa, flow, []flows.Trigger{trigger}, flowMsgHook, true)
+			trigger := triggers.NewBuilder(oa.Env(), flow.FlowReference(), contact).Msg(msgIn).WithMatch(trigger.Match())
+
+			if event.Metadata != nil {
+
+				var params *types.XObject
+				metadata := struct {
+					Headline   string `json:"headline,omitempty"`
+					Body       string `json:"body,omitempty"`
+					SourceType string `json:"source_type,omitempty"`
+					SourceID   string `json:"source_id,omitempty"`
+					SourceURL  string `json:"source_url,omitempty"`
+					Image      *struct {
+						ID string `json:"id"`
+					} `json:"image,omitempty"`
+					Video *struct {
+						ID string `json:"id"`
+					} `json:"video,omitempty"`
+				}{}
+				err := json.Unmarshal(event.Metadata, &metadata)
+				if err != nil {
+					log.WithError(err).Error("unable to unmarshal metadata from msg event")
+				}
+				asJSON, err := json.Marshal(metadata)
+				if err != nil {
+					log.WithError(err).Error("unable to marshal metadata from msg event")
+				}
+				params, err = types.ReadXObject(asJSON)
+				if err != nil {
+					log.WithError(err).Error("unable to marshal metadata from msg event")
+				}
+
+				trigger.WithParams(params)
+			}
+			triggerBuild := trigger.Build()
+
+			_, err = runner.StartFlowForContacts(ctx, rt, oa, flow, []flows.Trigger{triggerBuild}, flowMsgHook, true)
 			if err != nil {
 				return errors.Wrapf(err, "error starting flow for contact")
 			}
@@ -729,13 +764,34 @@ func handleTicketEvent(ctx context.Context, rt *runtime.Runtime, event *models.T
 		return errors.Wrapf(err, "error creating flow contact")
 	}
 
+	var params *types.XObject
+	if event.Note() != "" {
+		note := struct {
+			Event  string `json:"event"`
+			ID     int    `json:"id"`
+			Status string `json:"status"`
+		}{}
+		err := json.Unmarshal([]byte(event.Note()), &note)
+		if err != nil {
+			log.WithError(err).Error("unable to unmarshal note from ticket event")
+		}
+		asJSON, err := json.Marshal(note)
+		if err != nil {
+			log.WithError(err).Error("unable to marshal note from ticket event")
+		}
+		params, err = types.ReadXObject(asJSON)
+		if err != nil {
+			log.WithError(err).Error("unable to marshal note from ticket event")
+		}
+	}
+
 	// build our flow trigger
 	var flowTrigger flows.Trigger
 
 	switch event.EventType() {
 	case models.TicketEventTypeClosed:
 		flowTrigger = triggers.NewBuilder(oa.Env(), flow.FlowReference(), contact).
-			Ticket(ticket, triggers.TicketEventTypeClosed).
+			Ticket(ticket, triggers.TicketEventTypeClosed).WithParams(params).
 			Build()
 	default:
 		return errors.Errorf("unknown ticket event type: %s", event.EventType())
@@ -806,6 +862,7 @@ type MsgEvent struct {
 	Attachments   []utils.Attachment `json:"attachments"`
 	NewContact    bool               `json:"new_contact"`
 	CreatedOn     time.Time          `json:"created_on"`
+	Metadata      json.RawMessage    `json:"metadata"`
 }
 
 type StopEvent struct {

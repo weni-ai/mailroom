@@ -1,3 +1,19 @@
+1.5.8-mailroom-7.1.22
+----------
+ * Support for trigger.params in Msg events
+
+1.5.7-mailroom-7.1.22
+----------
+ * Remove returned ticket in case of reopening for zendesk
+
+1.5.6-mailroom-7.1.22
+----------
+ * Support for reopening zendesk ticket with body ID
+
+1.5.5-mailroom-7.1.22
+----------
+ * Add support for sending webhook parameters in trigger.params to Zendesk
+
 1.5.4-mailroom-7.1.22
 ----------
  * Fix goflow version command 

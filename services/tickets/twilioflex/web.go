@@ -114,7 +114,7 @@ func handleEventCallback(ctx context.Context, rt *runtime.Runtime, r *http.Reque
 			return err, http.StatusBadRequest, nil
 		}
 		if jsonMap["status"] == "INACTIVE" {
-			err = tickets.Close(ctx, rt, oa, ticket, false, nil)
+			err = tickets.Close(ctx, rt, oa, ticket, false, nil, "")
 			if err != nil {
 				return err, http.StatusBadRequest, nil
 			}

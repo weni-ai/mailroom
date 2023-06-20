@@ -318,7 +318,7 @@ func TestTicketEvents(t *testing.T) {
 	ticket := testdata.InsertClosedTicket(rt.DB, testdata.Org1, testdata.Cathy, testdata.Mailgun, testdata.DefaultTopic, "Where are my shoes?", "", nil)
 	modelTicket := ticket.Load(db)
 
-	event := models.NewTicketClosedEvent(modelTicket, testdata.Admin.ID)
+	event := models.NewTicketClosedEvent(modelTicket, testdata.Admin.ID, "")
 
 	err := handler.QueueTicketEvent(rc, testdata.Cathy.ID, event)
 	require.NoError(t, err)

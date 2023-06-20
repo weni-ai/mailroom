@@ -111,7 +111,7 @@ func handleReceive(ctx context.Context, rt *runtime.Runtime, r *http.Request, l 
 
 	// check if reply is actually a command
 	if strings.ToLower(strings.TrimSpace(request.StrippedText)) == "close" {
-		err = tickets.Close(ctx, rt, oa, ticket, true, l)
+		err = tickets.Close(ctx, rt, oa, ticket, true, l, "")
 		if err != nil {
 			return errors.Wrapf(err, "error closing ticket: %s", ticket.UUID()), http.StatusInternalServerError, nil
 		}

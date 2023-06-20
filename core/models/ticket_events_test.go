@@ -38,7 +38,7 @@ func TestTicketEvents(t *testing.T) {
 	assert.Equal(t, null.String("please handle"), e3.Note())
 	assert.Equal(t, testdata.Agent.ID, e3.CreatedByID())
 
-	e4 := models.NewTicketClosedEvent(modelTicket, testdata.Agent.ID)
+	e4 := models.NewTicketClosedEvent(modelTicket, testdata.Agent.ID, "")
 	assert.Equal(t, models.TicketEventTypeClosed, e4.EventType())
 	assert.Equal(t, testdata.Agent.ID, e4.CreatedByID())
 

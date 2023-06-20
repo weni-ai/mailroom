@@ -23,7 +23,10 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-const fieldTicket = `{"message":"Cookies","priority":"high","subject":"Where are my cookies?","description":"I want to know where is my cookie.","tags": ["TAG_01","TAG_02"],"custom_fields":[{"id":"21938362","value":"hd_3000"}]}`
+const (
+	fieldTicket  = `{"message":"Cookies","priority":"high","subject":"Where are my cookies?","description":"I want to know where is my cookie.","tags": ["TAG_01","TAG_02"],"custom_fields":[{"id":"21938362","value":"hd_3000"}]}`
+	fieldTicket1 = `{"id":10}`
+)
 
 func TestOpenAndForward(t *testing.T) {
 	ctx, rt, _, _ := testsuite.Get()
@@ -65,6 +68,14 @@ func TestOpenAndForward(t *testing.T) {
 					"subject": "Where are my cookie?"
 				}
 			]}`),
+		},
+		"https://nyaruka.zendesk.com/api/v2/tickets/update_many.json?ids=10": {
+			httpx.NewMockResponse(200, nil, `{
+				"job_status": {
+					"id": "1234-abcd",
+					"url": "http://zendesk.com",
+					"status": "queued"
+				}}`),
 		},
 	}))
 
@@ -132,6 +143,12 @@ func TestOpenAndForward(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, 1, len(logger.Logs))
 	test.AssertSnapshot(t, "forward_message", logger.Logs[0].Request)
+
+	logger = &flows.HTTPLogger{}
+	_, err = svc.Open(session, defaultTopic, fieldTicket1, nil, logger.Log)
+	assert.NoError(t, err)
+	assert.Equal(t, 1, len(logger.Logs))
+	test.AssertSnapshot(t, "open", logger.Logs[0].Request)
 }
 
 func TestCloseAndReopen(t *testing.T) {

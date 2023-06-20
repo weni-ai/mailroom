@@ -115,7 +115,7 @@ func handleEventCallback(ctx context.Context, rt *runtime.Runtime, r *http.Reque
 			}
 		}
 	case "room.update":
-		err = tickets.Close(ctx, rt, oa, ticket, false, nil)
+		err = tickets.Close(ctx, rt, oa, ticket, false, nil, "")
 		if err != nil {
 			return errors.Wrapf(err, "error on close ticket"), http.StatusInternalServerError, nil
 		}

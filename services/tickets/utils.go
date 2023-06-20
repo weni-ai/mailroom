@@ -155,8 +155,8 @@ func FetchFileWithMaxSize(url string, headers map[string]string, maxBodyBytes in
 }
 
 // Close closes the given ticket, and creates and queues a closed event
-func Close(ctx context.Context, rt *runtime.Runtime, oa *models.OrgAssets, ticket *models.Ticket, externally bool, l *models.HTTPLogger) error {
-	events, err := models.CloseTickets(ctx, rt, oa, models.NilUserID, []*models.Ticket{ticket}, externally, false, l)
+func Close(ctx context.Context, rt *runtime.Runtime, oa *models.OrgAssets, ticket *models.Ticket, externally bool, l *models.HTTPLogger, request string) error {
+	events, err := models.CloseTickets(ctx, rt, oa, models.NilUserID, []*models.Ticket{ticket}, externally, false, l, request)
 	if err != nil {
 		return errors.Wrap(err, "error closing ticket")
 	}

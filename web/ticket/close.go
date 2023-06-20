@@ -19,13 +19,12 @@ func init() {
 // Closes any open tickets with the given ids. If force=true then even if tickets can't be closed on external service,
 // they are still closed locally. This is used in case of deleting a ticketing service which may no longer be functioning.
 //
-//   {
-//     "org_id": 123,
-//     "user_id": 234,
-//     "ticket_ids": [1234, 2345],
-//     "force": false
-//   }
-//
+//	{
+//	  "org_id": 123,
+//	  "user_id": 234,
+//	  "ticket_ids": [1234, 2345],
+//	  "force": false
+//	}
 func handleClose(ctx context.Context, rt *runtime.Runtime, r *http.Request, l *models.HTTPLogger) (interface{}, int, error) {
 	request := &bulkTicketRequest{}
 	if err := utils.UnmarshalAndValidateWithLimit(r.Body, request, web.MaxRequestBytes); err != nil {
@@ -43,7 +42,7 @@ func handleClose(ctx context.Context, rt *runtime.Runtime, r *http.Request, l *m
 		return nil, http.StatusBadRequest, errors.Wrapf(err, "error loading tickets for org: %d", request.OrgID)
 	}
 
-	evts, err := models.CloseTickets(ctx, rt, oa, request.UserID, tickets, true, request.Force, l)
+	evts, err := models.CloseTickets(ctx, rt, oa, request.UserID, tickets, true, request.Force, l, "")
 	if err != nil {
 		return nil, http.StatusInternalServerError, errors.Wrap(err, "error closing tickets")
 	}

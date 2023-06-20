@@ -104,11 +104,22 @@ func (s *service) Open(session flows.Session, topic *flows.Topic, body string, a
 			Description  string       `json:"description"`
 			CustomFields []FieldValue `json:"custom_fields"`
 			Tags         []string     `json:"tags"`
+			ID           int64        `json:"id"`
 		}{}
 
 		err := jsonx.Unmarshal([]byte(body), extra)
 		if err != nil {
 			return nil, err
+		}
+
+		if extra.ID > 0 {
+			var ids []int64
+			ids = append(ids, extra.ID)
+			_, trace, _ := s.restClient.UpdateManyTickets(ids, statusOpen)
+			if trace != nil {
+				logHTTP(flows.NewHTTPLog(trace, flows.HTTPStatusFromCode, s.redactor))
+				return nil, nil
+			}
 		}
 
 		v := reflect.ValueOf(extra)
@@ -134,12 +145,11 @@ func (s *service) Open(session flows.Session, topic *flows.Topic, body string, a
 		} else {
 			msg.Message = extra.Subject
 		}
-	}
 
+	}
 	if err := s.push(msg, logHTTP); err != nil {
 		return nil, err
 	}
-
 	return ticket, nil
 }
 
