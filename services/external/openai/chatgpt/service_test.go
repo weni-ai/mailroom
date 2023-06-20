@@ -22,7 +22,6 @@ import (
 
 func TestCall(t *testing.T) {
 	_, rt, _, _ := testsuite.Get()
-	testsuite.Reset(testsuite.ResetData | testsuite.ResetStorage)
 
 	defer dates.SetNowSource(dates.DefaultNowSource)
 	dates.SetNowSource(dates.NewSequentialNowSource(time.Date(2019, 10, 7, 15, 21, 30, 0, time.UTC)))
@@ -36,7 +35,7 @@ func TestCall(t *testing.T) {
 	uuids.SetGenerator(uuids.NewSeededGenerator(12345))
 
 	httpx.SetRequestor(httpx.NewMockRequestor(map[string][]httpx.MockResponse{
-		"https://api/openai.com/v1/chat/completions": {
+		"https://api.openai.com/v1/chat/completions": {
 			httpx.NewMockResponse(400, nil, `{
 				"error": {
 						"message": "",
@@ -77,7 +76,7 @@ func TestCall(t *testing.T) {
 	assert.Nil(t, call)
 
 	httpx.SetRequestor(httpx.NewMockRequestor(map[string][]httpx.MockResponse{
-		"https://api/openai.com/v1/chat/completions": {
+		"https://api.openai.com/v1/chat/completions": {
 			httpx.NewMockResponse(200, nil, `{
 				"id": "chatcmpl-7J0hfe9HOXQw5AsfC5jxylO5QRjpW",
 				"object": "chat.completion",
@@ -114,10 +113,10 @@ func TestCall(t *testing.T) {
 	callAction = assets.ExternalServiceCallAction{Name: "ConsultarChatGPT", Value: "ConsultarChatGPT"}
 	params = []assets.ExternalServiceParam{}
 
+	pptDataValue := []interface{}{[]map[string]interface{}{{"text": "prompt test"}}}
+
 	pmPrompt := assets.NewExternalServiceParam(
-		[]struct{ Value string }{
-			{Value: "prompt test"},
-		},
+		pptDataValue,
 		"",
 		"",
 		"",
