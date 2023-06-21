@@ -1,3 +1,7 @@
+1.6.0-mailroom-7.1.22
+----------
+ * Add ChatGPT external service
+
 1.5.8-mailroom-7.1.22
 ----------
  * Support for trigger.params in Msg events
