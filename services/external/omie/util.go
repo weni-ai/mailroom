@@ -12,7 +12,7 @@ func ParamsToIncluirContatoRequest(params []assets.ExternalServiceParam) (*Inclu
 
 	p := IncluirContatoRequestParam{}
 	for _, param := range params {
-		dv := param.Data.Value
+		dv := param.Data.Value.(string)
 		switch param.Type {
 		case "identificacao":
 			if param.Filter.Value != nil {
@@ -106,7 +106,7 @@ func ParamsToIncluirOportunidadeRequest(params []assets.ExternalServiceParam) (*
 
 	p := IncluirOportunidadeRequestParam{}
 	for _, param := range params {
-		dv := param.Data.Value
+		dv := param.Data.Value.(string)
 		switch param.Type {
 		case "identificacao":
 			switch param.Filter.Value.Name {
@@ -293,7 +293,7 @@ func ParamsToListarClientesRequest(params []assets.ExternalServiceParam) (*Lista
 	p := ListarClientesRequestParam{}
 
 	for _, param := range params {
-		dv := param.Data.Value
+		dv := param.Data.Value.(string)
 		switch param.Type {
 		case "pagina":
 			v, err := strconv.Atoi(dv)
@@ -395,7 +395,7 @@ func ParamsToPesquisarLancamentosRequest(param []assets.ExternalServiceParam) (*
 	r := &PesquisarLancamentosRequest{}
 	p := PesquisarLancamentosParam{}
 	for _, param := range param {
-		dv := param.Data.Value
+		dv := param.Data.Value.(string)
 		switch param.Type {
 		case "nPagina":
 			v, err := strconv.Atoi(dv)
@@ -529,7 +529,7 @@ func ParamsToVerificarContatoRequest(params []assets.ExternalServiceParam) (*Ver
 	r := &VerificarContatoRequest{}
 	p := VerificarContatoParam{}
 	for _, param := range params {
-		dv := param.Data.Value
+		dv := param.Data.Value.(string)
 		switch param.Type {
 		case "cNome":
 			p.CNome = dv
@@ -545,7 +545,7 @@ func ParamsToObterBoletoRequest(params []assets.ExternalServiceParam) (*ObterBol
 	r := &ObterBoletoRequest{}
 	p := ObterBoletoParam{}
 	for _, param := range params {
-		dv := param.Data.Value
+		dv := param.Data.Value.(string)
 		switch param.Type {
 		case "nCodTitulo":
 			v, err := strconv.Atoi(dv)
