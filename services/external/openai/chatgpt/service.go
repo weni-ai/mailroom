@@ -155,13 +155,6 @@ func (s *service) Call(session flows.Session, callAction assets.ExternalServiceC
 			}
 		}
 
-		request.Messages = append(
-			request.Messages,
-			ChatCompletionMessage{
-				Role:    ChatMessageRoleUser,
-				Content: input,
-			})
-
 		rulesText := s.config["rules"]
 		if rulesText != "" {
 			rulesMsg := ChatCompletionMessage{
@@ -183,6 +176,13 @@ func (s *service) Call(session flows.Session, callAction assets.ExternalServiceC
 		if len(promptMessages) > 0 {
 			request.Messages = append(request.Messages, promptMessages...)
 		}
+
+		request.Messages = append(
+			request.Messages,
+			ChatCompletionMessage{
+				Role:    ChatMessageRoleUser,
+				Content: input,
+			})
 
 		r, t, err := s.restClient.CreateChatCompletion(request)
 		if err != nil {
