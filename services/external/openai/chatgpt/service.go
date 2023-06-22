@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"sort"
+	"strconv"
 	"sync"
 	"time"
 
@@ -23,6 +24,11 @@ var baseURL = "https://api.openai.com"
 
 var db *sqlx.DB
 var mu = &sync.Mutex{}
+
+const (
+	DEFAULT_TEMPERATURE = 0.1
+	DEFAULT_TOP_P       = 0.1
+)
 
 func initDB(dbURL string) error {
 	mu.Lock()
@@ -85,12 +91,27 @@ func (s *service) Call(session flows.Session, callAction assets.ExternalServiceC
 	// default could be "gpt-3.5-turbo"
 	aiModel := s.config["ai_model"]
 
+	temperature := s.config["temperature"]
+	topP := s.config["top_p"]
+
 	switch call {
 	case "ConsultarChatGPT":
 
 		request := &ChatCompletionRequest{
 			Model: aiModel,
 		}
+
+		rTemp, err := strconv.ParseFloat(temperature, 64)
+		if err != nil {
+			rTemp = DEFAULT_TEMPERATURE
+		}
+		request.Temperature = rTemp
+
+		rTopP, err := strconv.ParseFloat(topP, 64)
+		if err != nil {
+			rTopP = DEFAULT_TEMPERATURE
+		}
+		request.TopP = rTopP
 
 		for _, param := range params {
 			dv := param.Data.Value
