@@ -1,3 +1,7 @@
+1.6.1-mailroom-7.1.22
+----------
+ * Add ChatGPT configs for temperature and top_p
+
 1.6.0-mailroom-7.1.22
 ----------
  * Add ChatGPT external service
