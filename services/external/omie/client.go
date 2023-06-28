@@ -44,7 +44,7 @@ type errorResponse struct {
 	Faultcode   string `json:"faultcode"`
 }
 
-func (c *baseClient) request(method, url string, params *url.Values, body, response interface{}) (*httpx.Trace, error) {
+func (c *baseClient) Request(method, url string, params *url.Values, body, response interface{}) (*httpx.Trace, error) {
 	b, err := json.Marshal(body)
 	if err != nil {
 		return nil, err
@@ -79,8 +79,8 @@ func (c *baseClient) request(method, url string, params *url.Values, body, respo
 	return trace, nil
 }
 
-func (c *baseClient) post(url string, params *url.Values, payload, response interface{}) (*httpx.Trace, error) {
-	return c.request("POST", url, params, payload, response)
+func (c *baseClient) Post(url string, params *url.Values, payload, response interface{}) (*httpx.Trace, error) {
+	return c.Request("POST", url, params, payload, response)
 }
 
 func (c *Client) IncluirContato(data *IncluirContatoRequest) (*IncluirContatoResponse, *httpx.Trace, error) {
@@ -91,7 +91,7 @@ func (c *Client) IncluirContato(data *IncluirContatoRequest) (*IncluirContatoRes
 	data.AppKey = c.appKey
 	data.AppSecret = c.appSecret
 
-	trace, err := c.post(requestUrl, nil, data, response)
+	trace, err := c.Post(requestUrl, nil, data, response)
 	if err != nil {
 		return nil, trace, err
 	}
@@ -106,7 +106,7 @@ func (c *Client) IncluirOportunidade(data *IncluirOportunidadeRequest) (*OpInclu
 	data.AppKey = c.appKey
 	data.AppSecret = c.appSecret
 
-	trace, err := c.post(requestUrl, nil, data, response)
+	trace, err := c.Post(requestUrl, nil, data, response)
 	if err != nil {
 		return nil, trace, err
 	}
@@ -121,7 +121,7 @@ func (c *Client) ListarClientes(data *ListarClientesRequest) (*ListarClientesRes
 	data.AppKey = c.appKey
 	data.AppSecret = c.appSecret
 
-	trace, err := c.post(requestUrl, nil, data, response)
+	trace, err := c.Post(requestUrl, nil, data, response)
 	if err != nil {
 		return nil, trace, err
 	}
@@ -136,7 +136,7 @@ func (c *Client) PesquisarLancamentos(data *PesquisarLancamentosRequest) (*Pesqu
 	data.AppKey = c.appKey
 	data.AppSecret = c.appSecret
 
-	trace, err := c.post(requestUrl, nil, data, response)
+	trace, err := c.Post(requestUrl, nil, data, response)
 	if err != nil {
 		return nil, trace, err
 	}
@@ -151,7 +151,7 @@ func (c *Client) VerificarContato(data *VerificarContatoRequest) (*VerificarCont
 	data.AppKey = c.appKey
 	data.AppSecret = c.appSecret
 
-	trace, err := c.post(requestUrl, nil, data, response)
+	trace, err := c.Post(requestUrl, nil, data, response)
 	if err != nil {
 		return nil, trace, err
 	}
@@ -166,7 +166,7 @@ func (c *Client) ObterBoleto(data *ObterBoletoRequest) (*ObterBoletoResponse, *h
 	data.AppKey = c.appKey
 	data.AppSecret = c.appSecret
 
-	trace, err := c.post(requestUrl, nil, data, response)
+	trace, err := c.Post(requestUrl, nil, data, response)
 	if err != nil {
 		return nil, trace, err
 	}

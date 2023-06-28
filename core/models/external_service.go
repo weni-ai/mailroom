@@ -198,24 +198,24 @@ type PromptUUID uuids.UUID
 
 type Prompt struct {
 	p struct {
-		ID                PromptID          `db:"id"`
-		UUID              PromptUUID        `db:"uuid"`
-		Text              string            `db:"org_id"`
-		ExternalServiceID ExternalServiceID `db:"external_service_id"`
+		ID               PromptID          `db:"id"`
+		UUID             PromptUUID        `db:"uuid"`
+		Text             string            `db:"text"`
+		ChatGPTServiceID ExternalServiceID `db:"chat_gpt_service_id"`
 	}
 }
 
 func (p *Prompt) ID() PromptID                         { return p.p.ID }
 func (p *Prompt) UUID() PromptUUID                     { return p.p.UUID }
 func (p *Prompt) Text() string                         { return p.p.Text }
-func (p *Prompt) ExternalServiceID() ExternalServiceID { return p.p.ExternalServiceID }
+func (p *Prompt) ExternalServiceID() ExternalServiceID { return p.p.ChatGPTServiceID }
 
 const selectPromptsByExternalServiceIDSQL = `
 SELECT 
 	p.id as id,
 	p.uuid as uuid,
 	p."text" as "text",
-	p.chat_gpt_service_id as chat_gpt_service_id, 
+	p.chat_gpt_service_id as chat_gpt_service_id
 FROM 
 	public.externals_prompt p
 WHERE

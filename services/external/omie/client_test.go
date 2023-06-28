@@ -1,8 +1,10 @@
 package omie_test
 
 import (
+	"encoding/json"
 	"fmt"
 	"net/http"
+	"net/url"
 	"testing"
 
 	"github.com/nyaruka/gocommon/httpx"
@@ -15,6 +17,98 @@ const (
 	appKey    = "APP_KEY"
 	appSecret = "APP_SECRET"
 )
+
+func TestRequest(t *testing.T) {
+	client := omie.NewClient(http.DefaultClient, nil, baseURL, appKey, appSecret)
+
+	response := new(interface{})
+
+	// should return error because body is a anon function
+	_, err := client.Request("GET", "", nil, func() {}, response)
+	assert.Error(t, err)
+
+	// should return error because method is invalid
+	_, err = client.Request("{[:INVALID:]}", "", nil, nil, response)
+	assert.Error(t, err)
+
+	defer httpx.SetRequestor(httpx.DefaultRequestor)
+	httpx.SetRequestor(httpx.NewMockRequestor(map[string][]httpx.MockResponse{
+		fmt.Sprintf("%s/v1/crm/contatos/", baseURL): {
+			httpx.NewMockResponse(400, nil, `{
+				"faultstring": "error",
+				"faultcode": "ERROR-CODE 123"
+			}`),
+			httpx.NewMockResponse(200, nil, `{
+				"nCod": 5491077640,
+				"cCodInt": "12344321",
+				"cCodStatus": "0",
+				"cDesStatus": "Contato cadastrado com sucesso!"
+			}`),
+			httpx.NewMockResponse(200, nil, `{`),
+		},
+		fmt.Sprintf("%s/v1/crm/contatos/?param1=vparam1", baseURL): {
+			httpx.NewMockResponse(200, nil, `{
+				"nCod": 5491077640,
+				"cCodInt": "12344321",
+				"cCodStatus": "0",
+				"cDesStatus": "Contato cadastrado com sucesso!"
+			}`),
+		},
+	}))
+
+	// as mock response returns error should error
+	_, err = client.Request("GET", fmt.Sprintf("%s/v1/crm/contatos/", baseURL), nil, nil, nil)
+	assert.Error(t, err)
+
+	// should return error nil because expected response is nil and doesn't need to try unmarshal response body
+	_, err = client.Request("GET", fmt.Sprintf("%s/v1/crm/contatos/", baseURL), nil, nil, nil)
+	assert.Nil(t, err)
+
+	// as mock response returns invalid json then error
+	_, err = client.Request("GET", fmt.Sprintf("%s/v1/crm/contatos/", baseURL), nil, nil, response)
+	assert.Error(t, err)
+	assert.EqualError(t, err, "couldn't parse response body: unexpected end of JSON input")
+
+	params := &url.Values{"param1": {"vparam1"}}
+	_, err = client.Request("GET", fmt.Sprintf("%s/v1/crm/contatos/", baseURL), params, nil, nil)
+	assert.Nil(t, err)
+}
+
+func TestIncluirContato(t *testing.T) {
+	defer httpx.SetRequestor(httpx.DefaultRequestor)
+	httpx.SetRequestor(httpx.NewMockRequestor(map[string][]httpx.MockResponse{
+		fmt.Sprintf("%s/v1/crm/contatos/", baseURL): {
+			httpx.NewMockResponse(400, nil, `{
+				"faultstring": "error",
+				"faultcode": "ERROR-CODE 123"
+			}`),
+			httpx.NewMockResponse(200, nil, `{
+				"nCod": 5491077640,
+				"cCodInt": "12344321",
+				"cCodStatus": "0",
+				"cDesStatus": "Contato cadastrado com sucesso!"			
+			}`),
+		},
+	}))
+
+	client := omie.NewClient(http.DefaultClient, nil, baseURL, appKey, appSecret)
+	data := &omie.IncluirContatoRequest{}
+
+	paramJSON := `[{"identificacao":{"cCodInt":"12344321","cNome":"nome12134","cSobrenome":"","cCargo":"","dDtNasc":"","nCodVend":0,"nCodConta":0},"endereco":{"cEndereco":"","cCompl":"","cCEP":"","cBairro":"","cCidade":"","cUF":"","cPais":""},"telefone_email":{"cDDDCel1":"","cNumCel1":"","cEmail":"","cWebsite":""}}]`
+	var param []omie.IncluirContatoRequestParam
+
+	err := json.Unmarshal([]byte(paramJSON), &param)
+	assert.NoError(t, err)
+	data.Param = param
+
+	_, _, err = client.IncluirContato(data)
+	assert.EqualError(t, err, "error")
+
+	op, trace, err := client.IncluirContato(data)
+	assert.NoError(t, err)
+	assert.Equal(t, int64(5491077640), op.NCod)
+	assert.Equal(t, "HTTP/1.0 200 OK\r\nContent-Length: 135\r\n\r\n", string(trace.ResponseTrace))
+}
 
 func TestIncluirOportunidade(t *testing.T) {
 	defer httpx.SetRequestor(httpx.DefaultRequestor)

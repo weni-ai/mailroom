@@ -3,6 +3,7 @@ package chatgpt_test
 import (
 	"fmt"
 	"net/http"
+	"net/url"
 	"testing"
 
 	"github.com/nyaruka/gocommon/httpx"
@@ -14,6 +15,53 @@ const (
 	baseURL = "https://chatgpt.com.br"
 	apiKey  = "DUMMY_API_KEY"
 )
+
+func TestRequest(t *testing.T) {
+	client := chatgpt.NewClient(http.DefaultClient, nil, baseURL, apiKey)
+
+	_, err := client.Request("POST", "", nil, func() {}, nil)
+	assert.Error(t, err)
+
+	_, err = client.Request("{[:INVALID:]}", "", nil, nil, nil)
+	assert.Error(t, err)
+
+	defer httpx.SetRequestor(httpx.DefaultRequestor)
+	httpx.SetRequestor(httpx.NewMockRequestor(map[string][]httpx.MockResponse{
+		fmt.Sprintf("%s/v1/chat/completions", baseURL): {
+			httpx.NewMockResponse(400, nil, `{
+				"error": {
+					"message": "dummy error message",
+					"type": "dummy error type"
+				}
+			}`),
+			httpx.NewMockResponse(200, nil, `{}`),
+			httpx.NewMockResponse(200, nil, `{`),
+		},
+		fmt.Sprintf("%s/v1/chat/completions/?param1=vparam1", baseURL): {
+			httpx.NewMockResponse(400, nil, `{
+				"error": {
+					"message": "dummy error message",
+					"type": "dummy error type"
+				}
+			}`),
+			httpx.NewMockResponse(200, nil, `{}`),
+		},
+	}))
+
+	_, err = client.Request("POST", fmt.Sprintf("%s/v1/chat/completions", baseURL), nil, nil, nil)
+	assert.Error(t, err)
+
+	_, err = client.Request("POST", fmt.Sprintf("%s/v1/chat/completions", baseURL), nil, nil, nil)
+	assert.Nil(t, err)
+
+	response := new(interface{})
+	_, err = client.Request("POST", fmt.Sprintf("%s/v1/chat/completions", baseURL), nil, nil, response)
+	assert.Error(t, err)
+
+	params := &url.Values{"param1": {"vparam1"}}
+	_, err = client.Request("POST", fmt.Sprintf("%s/v1/chat/completions/", baseURL), params, nil, response)
+	assert.Error(t, err)
+}
 
 func TestCreateChatCompletion(t *testing.T) {
 	defer httpx.SetRequestor(httpx.DefaultRequestor)

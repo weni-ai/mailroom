@@ -92,9 +92,7 @@ func ParamsToIncluirContatoRequest(params []assets.ExternalServiceParam) (*Inclu
 				}
 			}
 		case "cObs":
-			if param.Filter.Value != nil {
-				p.CObs = dv
-			}
+			p.CObs = dv
 		}
 	}
 	r.Param = append(r.Param, p)
