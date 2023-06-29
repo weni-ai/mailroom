@@ -1,11 +1,14 @@
 package chatgpt_test
 
 import (
+	"encoding/json"
 	"net/http"
 	"testing"
 	"time"
 
+	"github.com/DATA-DOG/go-sqlmock"
 	"github.com/buger/jsonparser"
+	"github.com/jmoiron/sqlx"
 	"github.com/nyaruka/gocommon/dates"
 	"github.com/nyaruka/gocommon/httpx"
 	"github.com/nyaruka/gocommon/uuids"
@@ -58,6 +61,7 @@ func TestCall(t *testing.T) {
 	)
 	assert.EqualError(t, err, "missing api_key in external service for chatgpt config")
 
+	rt.Config.DB = "postgres://mailroom_test:temba@localhost/mailroom_test?sslmode=disable&Timezone=UTC"
 	svc, err := chatgpt.NewService(
 		rt.Config,
 		http.DefaultClient,
@@ -106,25 +110,46 @@ func TestCall(t *testing.T) {
 		http.DefaultClient,
 		nil,
 		chatgptService,
-		map[string]string{"api_key": apiKey},
+		map[string]string{
+			"api_key":        apiKey,
+			"rules":          "mock rules",
+			"knowledge_base": "mock knowledge base",
+		},
 	)
 	assert.NoError(t, err)
 
 	callAction = assets.ExternalServiceCallAction{Name: "ConsultarChatGPT", Value: "ConsultarChatGPT"}
 	params = []assets.ExternalServiceParam{}
 
-	pptDataValue := []interface{}{[]map[string]interface{}{{"text": "prompt test"}}}
+	jsonParams := `[
+		{"type": "AditionalPrompts", "data": {"value": [{"text": "prompt test"}]}},
+		{"type": "SendCompleteHistory", "data": {"value": true}},
+		{"type": "UserInput", "data": {"value": "Say This is a test!"}}
+	]`
+	err = json.Unmarshal([]byte(jsonParams), &params)
+	assert.NoError(t, err)
 
-	pmPrompt := assets.NewExternalServiceParam(
-		pptDataValue,
-		"",
-		"",
-		"",
-		"AditionalPrompts",
-		"AditionalPrompts",
-	)
-	params = append(params, *pmPrompt)
+	// set a mock db with message for test history
+	mockDB, mock, err := sqlmock.New()
+	assert.NoError(t, err)
+	defer mockDB.Close()
+	sqlxDB := sqlx.NewDb(mockDB, "sqlmock")
 
+	dummyTime, _ := time.Parse(time.RFC1123, "2019-10-07T15:21:30")
+
+	rows := sqlmock.NewRows([]string{"id", "uuid", "text", "high_priority", "created_on", "modified_on", "sent_on", "queued_on", "direction", "status", "visibility", "msg_type", "msg_count", "error_count", "next_attempt", "external_id", "attachments", "metadata", "broadcast_id", "channel_id", "contact_id", "contact_urn_id", "org_id", "topup_id"}).
+		AddRow(100, "1348d654-e3dc-4f2f-add0-a9163dc48895", "I have a request", true, dummyTime, dummyTime, dummyTime, dummyTime, "O", "W", "V", "F", 1, 0, nil, "398", nil, nil, nil, 3, 1234567, 2, 3, 3)
+
+	after, err := time.Parse("2006-01-02T15:04:05", "2019-10-07T15:21:30")
+	assert.NoError(t, err)
+
+	mock.ExpectQuery("SELECT").
+		WithArgs(1234567, after).
+		WillReturnRows(rows)
+
+	chatgpt.SetDB(sqlxDB)
+
+	// call external service action
 	call, err = svc.Call(session, callAction, params, logger.Log)
 	assert.NoError(t, err)
 	assert.NotNil(t, call)
