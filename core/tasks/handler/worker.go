@@ -637,6 +637,7 @@ func handleMsgEvent(ctx context.Context, rt *runtime.Runtime, event *MsgEvent) e
 					SourceType string `json:"source_type,omitempty"`
 					SourceID   string `json:"source_id,omitempty"`
 					SourceURL  string `json:"source_url,omitempty"`
+					Email      string `json:"email,omitempty"`
 					Image      *struct {
 						ID string `json:"id"`
 					} `json:"image,omitempty"`
