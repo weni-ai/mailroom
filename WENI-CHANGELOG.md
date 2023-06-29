@@ -1,3 +1,7 @@
+1.6.2-mailroom-7.1.22
+----------
+ * Add email field to params 
+
 1.6.1-mailroom-7.1.22
 ----------
  * Add ChatGPT configs for temperature and top_p
