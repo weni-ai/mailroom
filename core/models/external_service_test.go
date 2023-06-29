@@ -6,7 +6,10 @@ import (
 	"time"
 
 	"github.com/nyaruka/goflow/assets"
+	"github.com/nyaruka/goflow/assets/static"
+	"github.com/nyaruka/goflow/flows"
 	"github.com/nyaruka/mailroom/core/models"
+	_ "github.com/nyaruka/mailroom/services/external/omie"
 	"github.com/nyaruka/mailroom/testsuite"
 	"github.com/nyaruka/mailroom/testsuite/testdata"
 	"github.com/stretchr/testify/assert"
@@ -31,6 +34,8 @@ func TestExternalServices(t *testing.T) {
 	assert.Equal(t, "External Service Weni", es.Name())
 	assert.Equal(t, "1234-abcd", es.Config("service_id"))
 	assert.Equal(t, "543210", es.Config("service_token"))
+	assert.Equal(t, models.OrgID(1), es.OrgID())
+	assert.Equal(t, "omie", es.Type())
 
 	org1, err := models.GetOrgAssets(ctx, rt, testdata.Org1.ID)
 	assert.NoError(t, err)
@@ -52,6 +57,13 @@ func TestExternalServices(t *testing.T) {
 
 	assert.Equal(t, "foo", es.Config("new_key"))
 	assert.Equal(t, "", es.Config("service_id"))
+
+	reference := es.Reference()
+	assert.Equal(t, "External Service Weni", reference.Name)
+	assert.Equal(t, esTest.UUID, reference.UUID)
+
+	_, err = es.AsService(rt.Config, flows.NewExternalService(static.NewExternalService(es.UUID(), es.Name(), es.Type())))
+	assert.NoError(t, err)
 
 	_, err = db.Exec(promptDDL)
 	if err != nil {
@@ -79,6 +91,10 @@ func TestExternalServices(t *testing.T) {
 	prompts, err := models.SelectPromptsByExternalServiceID(ctxp, db, 2)
 	assert.NoError(t, err)
 	assert.Equal(t, 1, len(prompts))
+	assert.Equal(t, models.PromptID(1), prompts[0].ID())
+	assert.Equal(t, "prompt test", prompts[0].Text())
+	assert.Equal(t, models.PromptUUID("1ca7a60b-3408-47c7-a232-8f7a84140572"), prompts[0].UUID())
+	assert.Equal(t, models.ExternalServiceID(2), prompts[0].ExternalServiceID())
 }
 
 const (
