@@ -98,7 +98,8 @@ func handleEventCallback(ctx context.Context, rt *runtime.Runtime, r *http.Reque
 		_, err = tickets.SendReply(ctx, rt, ticket, data.Text, files)
 
 	case "close-room":
-		err = tickets.Close(ctx, rt, oa, ticket, false, l, "")
+		requestJSON, _ := json.Marshal(request)
+		err = tickets.Close(ctx, rt, oa, ticket, false, l, string(requestJSON))
 
 	default:
 		err = errors.New("invalid event type")

@@ -767,16 +767,7 @@ func handleTicketEvent(ctx context.Context, rt *runtime.Runtime, event *models.T
 
 	var params *types.XObject
 	if event.Note() != "" {
-		note := struct {
-			Event  string `json:"event"`
-			ID     int    `json:"id"`
-			Status string `json:"status"`
-		}{}
-		err := json.Unmarshal([]byte(event.Note()), &note)
-		if err != nil {
-			log.WithError(err).Error("unable to unmarshal note from ticket event")
-		}
-		asJSON, err := json.Marshal(note)
+		asJSON, err := json.Marshal(event.Note())
 		if err != nil {
 			log.WithError(err).Error("unable to marshal note from ticket event")
 		}
