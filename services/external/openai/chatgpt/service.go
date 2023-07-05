@@ -194,6 +194,15 @@ func (s *service) Call(session flows.Session, callAction assets.ExternalServiceC
 			request.Messages = append(request.Messages, knowledgeBaseMsg)
 		}
 
+		voiceTone := s.config["voice_tone"]
+		if voiceTone != "" {
+			voiceTonePrompt := ChatCompletionMessage{
+				Role:    ChatMessageRoleSystem,
+				Content: voiceTone,
+			}
+			request.Messages = append(request.Messages, voiceTonePrompt)
+		}
+
 		if len(promptMessages) > 0 {
 			request.Messages = append(request.Messages, promptMessages...)
 		}
