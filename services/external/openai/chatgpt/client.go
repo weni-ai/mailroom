@@ -108,7 +108,7 @@ func NewClient(httpClient *http.Client, httpRetries *httpx.RetryConfig, baseURL,
 	}
 }
 
-func (c *baseClient) request(method, url string, params *url.Values, body, response interface{}) (*httpx.Trace, error) {
+func (c *baseClient) Request(method, url string, params *url.Values, body, response interface{}) (*httpx.Trace, error) {
 	b, err := json.Marshal(body)
 	if err != nil {
 		return nil, err
@@ -148,7 +148,7 @@ func (c *baseClient) CreateChatCompletion(data *ChatCompletionRequest) (*ChatCom
 	requestURL := c.baseURL + "/v1/chat/completions"
 	response := &ChatCompletionResponse{}
 
-	trace, err := c.request("POST", requestURL, nil, data, response)
+	trace, err := c.Request("POST", requestURL, nil, data, response)
 	if err != nil {
 		return nil, trace, err
 	}
