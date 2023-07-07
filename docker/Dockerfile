@@ -11,7 +11,7 @@ RUN addgroup -S golang \
 
 COPY . .
 
-RUN curl -L https://github.com/Ilhasoft/goflow/releases/download/v0.0.1-goflow-0.144.3-dev-7/docs.tar.gz --output docs.tar.gz && tar -xf docs.tar.gz && rm docs.tar.gz
+RUN curl -L https://github.com/weni-ai/goflow/releases/download/$(grep weni-ai/goflow go.mod | cut -d" " -f5)/docs.tar.gz --output docs.tar.gz && tar -xf docs.tar.gz && rm docs.tar.gz
 
 RUN go install -v ./cmd/...
 
