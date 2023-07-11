@@ -98,6 +98,7 @@ func handleEventCallback(ctx context.Context, rt *runtime.Runtime, r *http.Reque
 		_, err = tickets.SendReply(ctx, rt, ticket, data.Text, files)
 
 	case "close-room":
+		fmt.Println(string(request.Data))
 		requestJSON, _ := json.Marshal(request)
 		err = tickets.Close(ctx, rt, oa, ticket, false, l, string(requestJSON))
 
