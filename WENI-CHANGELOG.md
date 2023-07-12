@@ -1,3 +1,7 @@
+1.6.3-mailroom-7.1.22
+----------
+ * Add close room webhook in parameters for RocketChat
+
 1.6.2-mailroom-7.1.22
 ----------
  * Add email field to params 
