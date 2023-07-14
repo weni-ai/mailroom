@@ -1,3 +1,7 @@
+1.6.4-mailroom-7.1.22
+----------
+ * Update goflow version for v0.1.1-goflow-0.144.3
+
 1.6.3-mailroom-7.1.22
 ----------
  * Add close room webhook in parameters for RocketChat
