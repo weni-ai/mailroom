@@ -3,6 +3,7 @@ package rocketchat
 import (
 	"net/http"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/nyaruka/gocommon/httpx"
@@ -58,6 +59,10 @@ func (s *service) Open(session flows.Session, topic *flows.Topic, body string, a
 	contact := session.Contact()
 	email := ""
 	phone := ""
+
+	if strings.HasPrefix(body, `{"id":`) {
+		return nil, nil
+	}
 
 	// look up email and phone
 	for _, urn := range contact.URNs() {
