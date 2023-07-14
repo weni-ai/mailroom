@@ -25,6 +25,16 @@ func TestCreateContacts(t *testing.T) {
 	web.RunWebTests(t, ctx, rt, "testdata/create.json", nil)
 }
 
+func TestCreateContactsWithErrors(t *testing.T) {
+	ctx, rt, db, _ := testsuite.Get()
+
+	defer testsuite.Reset(testsuite.ResetAll)
+
+	db.MustExec(`ALTER SEQUENCE contacts_contact_id_seq RESTART WITH 30000`)
+
+	web.RunWebTests(t, ctx, rt, "testdata/create_with_errors.json", nil)
+}
+
 func TestModifyContacts(t *testing.T) {
 	ctx, rt, db, _ := testsuite.Get()
 

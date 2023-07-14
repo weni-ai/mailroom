@@ -51,5 +51,32 @@
         },
         "status": 200,
         "response_file": "testdata/multiple_flows_noargs.es.po"
+    },
+    {
+        "label": "export POT with invalid body single flow",
+        "method": "POST",
+        "path": "/mr/po/export",
+        "body": {
+            "key1": 1
+        },
+        "status": 500,
+        "response": {
+            "error": "request failed validation: field 'org_id' is required, field 'flow_ids' is required"
+        }
+    },
+    {
+        "label": "export POT from single flow with invalid org_id",
+        "method": "POST",
+        "path": "/mr/po/export",
+        "body": {
+            "org_id": 11,
+            "flow_ids": [
+                10009
+            ]
+        },
+        "status": 500,
+        "response": {
+            "error": "unable to load org assets: error loading environment for org 11: no org with id: 11"
+        }
     }
 ]
