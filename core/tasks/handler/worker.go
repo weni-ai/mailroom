@@ -591,6 +591,28 @@ func handleMsgEvent(ctx context.Context, rt *runtime.Runtime, event *MsgEvent) e
 	msgIn.SetExternalID(string(event.MsgExternalID))
 	msgIn.SetID(event.MsgID)
 
+	if event.Metadata != nil {
+		var metadata map[string]interface{}
+		err := json.Unmarshal(event.Metadata, &metadata)
+		if err != nil {
+			log.WithError(err).Error("unable to unmarshal metadata from msg event")
+		}
+		// if metadata has order key set msg order
+		mdValue, ok := metadata["order"]
+		if ok {
+			var order *types.XObject
+			asJSON, err := json.Marshal(mdValue)
+			if err != nil {
+				log.WithError(err).Error("unable to marshal metadata from msg event")
+			}
+			order, err = types.ReadXObject(asJSON)
+			if err != nil {
+				log.WithError(err).Error("unable to marshal metadata from msg event")
+			}
+			msgIn.SetOrder(order)
+		}
+	}
+
 	// build our hook to mark a flow message as handled
 	flowMsgHook := func(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, oa *models.OrgAssets, sessions []*models.Session) error {
 		// set our incoming message event on our session
@@ -629,31 +651,8 @@ func handleMsgEvent(ctx context.Context, rt *runtime.Runtime, event *MsgEvent) e
 			trigger := triggers.NewBuilder(oa.Env(), flow.FlowReference(), contact).Msg(msgIn).WithMatch(trigger.Match())
 
 			if event.Metadata != nil {
-
 				var params *types.XObject
-				metadata := struct {
-					Headline   string `json:"headline,omitempty"`
-					Body       string `json:"body,omitempty"`
-					SourceType string `json:"source_type,omitempty"`
-					SourceID   string `json:"source_id,omitempty"`
-					SourceURL  string `json:"source_url,omitempty"`
-					Email      string `json:"email,omitempty"`
-					Image      *struct {
-						ID string `json:"id"`
-					} `json:"image,omitempty"`
-					Video *struct {
-						ID string `json:"id"`
-					} `json:"video,omitempty"`
-				}{}
-				err := json.Unmarshal(event.Metadata, &metadata)
-				if err != nil {
-					log.WithError(err).Error("unable to unmarshal metadata from msg event")
-				}
-				asJSON, err := json.Marshal(metadata)
-				if err != nil {
-					log.WithError(err).Error("unable to marshal metadata from msg event")
-				}
-				params, err = types.ReadXObject(asJSON)
+				params, err = types.ReadXObject(event.Metadata)
 				if err != nil {
 					log.WithError(err).Error("unable to marshal metadata from msg event")
 				}
