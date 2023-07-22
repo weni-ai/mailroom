@@ -1,3 +1,7 @@
+1.6.5-mailroom-7.1.22
+----------
+ * Add support to receive order on input and tigger and any metadata object in trigger
+
 1.6.4-mailroom-7.1.22
 ----------
  * Update goflow version for v0.1.1-goflow-0.144.3
