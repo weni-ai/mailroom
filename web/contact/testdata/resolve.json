@@ -92,5 +92,19 @@
                 "count": 1
             }
         ]
+    },
+    {
+        "label": "error with invalid org id",
+        "method": "POST",
+        "path": "/mr/contact/resolve",
+        "body": {
+            "org_id": 12345,
+            "channel_id": 10000,
+            "urn": "tel:+1-605-5747777"
+        },
+        "status": 500,
+        "response": {
+            "error": "unable to load org assets: error loading environment for org 12345: no org with id: 12345"
+        }
     }
 ]

@@ -1393,5 +1393,34 @@
                 ]
             }
         }
+    },
+    {
+        "label": "with no contacts for error on validate",
+        "method": "POST",
+        "path": "/mr/contact/modify",
+        "body": {
+            "org_id": 1,
+            "modifiers": []
+        },
+        "status": 400,
+        "response": {
+            "error": "request failed validation: field 'contact_ids' is required"
+        }
+    },
+    {
+        "label": "with invalid org id",
+        "method": "POST",
+        "path": "/mr/contact/modify",
+        "body": {
+            "org_id": 12345,
+            "contact_ids": [
+                10000
+            ],
+            "modifiers": []
+        },
+        "status": 500,
+        "response": {
+            "error": "unable to load org assets: error loading environment for org 12345: no org with id: 12345"
+        }
     }
 ]

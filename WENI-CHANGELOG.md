@@ -1,3 +1,7 @@
+1.6.6-mailroom-7.1.22
+----------
+ * Increase tests coverage in web module
+
 1.6.5-mailroom-7.1.22
 ----------
  * Add support to receive order on input and tigger and any metadata object in trigger
