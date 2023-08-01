@@ -308,3 +308,46 @@ func encodeIds(ids []int64) string {
 	}
 	return strings.Join(idStrs, ",")
 }
+
+// User see https://developer.zendesk.com/api-reference/ticketing/users/users/#json-format
+type User struct {
+	ID           int64  `json:"id,omitempty"`
+	Name         string `json:"name"`
+	Organization struct {
+		Name string `json:"name"`
+	} `json:"organization"`
+	ExternalID string `json:"external_id"`
+	Identities []struct {
+		Type  string `json:"type"`
+		Value string `json:"value"`
+	} `json:"identities,omitempty"`
+	Verified bool   `json:"verified"`
+	Role     string `json:"role"`
+}
+
+func (c *RESTClient) CreateUser(user *User) (*User, *httpx.Trace, error) {
+	payload := struct {
+		User *User `json:"user"`
+	}{User: user}
+
+	response := &struct {
+		User *User `json:"user"`
+	}{}
+
+	trace, err := c.post("users", payload, response)
+	if err != nil {
+		return nil, trace, err
+	}
+
+	return response.User, trace, nil
+}
+
+func (c *RESTClient) SearchUser(externalID string) (*User, *httpx.Trace, error) {
+	endpoint := fmt.Sprintf("users/search?external_id=%s", externalID)
+	var response map[string][]User
+	trace, err := c.get(endpoint, nil, &response)
+	if err != nil {
+		return nil, trace, err
+	}
+	return &response["users"][0], trace, nil
+}
