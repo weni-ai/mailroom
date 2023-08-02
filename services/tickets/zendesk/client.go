@@ -312,19 +312,20 @@ func encodeIds(ids []int64) string {
 // User see https://developer.zendesk.com/api-reference/ticketing/users/users/#json-format
 type User struct {
 	ID           int64  `json:"id,omitempty"`
-	Name         string `json:"name"`
+	Name         string `json:"name,omitempty"`
 	Organization struct {
 		Name string `json:"name"`
-	} `json:"organization"`
-	ExternalID string `json:"external_id"`
+	} `json:"organization,omitempty"`
+	ExternalID string `json:"external_id,omitempty"`
 	Identities []struct {
 		Type  string `json:"type"`
 		Value string `json:"value"`
 	} `json:"identities,omitempty"`
-	Verified bool   `json:"verified"`
-	Role     string `json:"role"`
+	Verified bool   `json:"verified,omitempty"`
+	Role     string `json:"role,omitempty"`
 }
 
+// CreateUser creates a new user in zendesk
 func (c *RESTClient) CreateUser(user *User) (*User, *httpx.Trace, error) {
 	payload := struct {
 		User *User `json:"user"`
@@ -342,12 +343,20 @@ func (c *RESTClient) CreateUser(user *User) (*User, *httpx.Trace, error) {
 	return response.User, trace, nil
 }
 
+type SearchUserResponse struct {
+	Users []User `json:"users"`
+}
+
+// SearchUser returns the user with the given external ID or nil if it doesn't exist
 func (c *RESTClient) SearchUser(externalID string) (*User, *httpx.Trace, error) {
 	endpoint := fmt.Sprintf("users/search?external_id=%s", externalID)
-	var response map[string][]User
+	var response SearchUserResponse
 	trace, err := c.get(endpoint, nil, &response)
 	if err != nil {
 		return nil, trace, err
 	}
-	return &response["users"][0], trace, nil
+	if len(response.Users) == 0 {
+		return nil, trace, nil
+	}
+	return &response.Users[0], trace, nil
 }

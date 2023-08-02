@@ -316,14 +316,8 @@ func TestSearchUser(t *testing.T) {
 		fmt.Sprintf("https://mocked_subdomain.zendesk.com/api/v2/users/search?external_id=%s", userUUID): {
 			httpx.MockConnectionError,
 			httpx.NewMockResponse(400, nil, `{"description": "Something went wrong", "error": "Unknown"}`),
-			httpx.NewMockResponse(201, nil, `{
-				"users": [
-					{
-						"id": 35436,
-						"name": "Dummy User"
-					}
-				]
-			}`),
+			httpx.NewMockResponse(200, nil, `{"users": []}`),
+			httpx.NewMockResponse(200, nil, `{"users": [{"id": 35436,"name": "Dummy User"}]}`),
 		},
 	}))
 
@@ -335,8 +329,12 @@ func TestSearchUser(t *testing.T) {
 	_, _, err = client.SearchUser(userUUID)
 	assert.EqualError(t, err, "Something went wrong")
 
+	user, _, err := client.SearchUser(userUUID)
+	assert.NoError(t, err)
+	assert.Nil(t, user)
+
 	user, trace, err := client.SearchUser(userUUID)
 	assert.NoError(t, err)
 	assert.Equal(t, "Dummy User", user.Name)
-	assert.Equal(t, "HTTP/1.0 201 Created\r\nContent-Length: 87\r\n\r\n", string(trace.ResponseTrace))
+	assert.Equal(t, "HTTP/1.0 200 OK\r\nContent-Length: 47\r\n\r\n", string(trace.ResponseTrace))
 }

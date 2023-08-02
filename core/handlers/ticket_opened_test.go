@@ -32,6 +32,19 @@ func TestTicketOpened(t *testing.T) {
 				"message": "Queued. Thank you."
 			}`),
 		},
+		"https://nyaruka.zendesk.com/api/v2/users/search?external_id=b699a406-7e44-49be-9f01-1a82893e8a10": {
+			httpx.NewMockResponse(200, nil, `{"users": []}`),
+		},
+		"https://nyaruka.zendesk.com/api/v2/users": {
+			httpx.NewMockResponse(201, nil, `{
+				"user": {
+					"id": 9873843,
+					"external_id": "b699a406-7e44-49be-9f01-1a82893e8a10",
+					"name": "Bob",
+					"role": "end-user"
+				}
+			}`),
+		},
 		"https://nyaruka.zendesk.com/api/v2/any_channel/push.json": {
 			httpx.NewMockResponse(201, nil, `{
 				"results": [
@@ -97,7 +110,7 @@ func TestTicketOpened(t *testing.T) {
 				{ // and there's an HTTP log for that
 					SQL:   "select count(*) from request_logs_httplog where ticketer_id = $1",
 					Args:  []interface{}{testdata.Zendesk.ID},
-					Count: 1,
+					Count: 3,
 				},
 				{ // which doesn't include our API token
 					SQL:   "select count(*) from request_logs_httplog where ticketer_id = $1 AND request like '%523562%'",
