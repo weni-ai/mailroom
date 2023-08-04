@@ -335,7 +335,7 @@ func (c *RESTClient) CreateUser(user *User) (*User, *httpx.Trace, error) {
 		User *User `json:"user"`
 	}{}
 
-	trace, err := c.post("users", payload, response)
+	trace, err := c.post("users.json", payload, response)
 	if err != nil {
 		return nil, trace, err
 	}
@@ -349,7 +349,7 @@ type SearchUserResponse struct {
 
 // SearchUser returns the user with the given external ID or nil if it doesn't exist
 func (c *RESTClient) SearchUser(externalID string) (*User, *httpx.Trace, error) {
-	endpoint := fmt.Sprintf("users/search?external_id=%s", externalID)
+	endpoint := fmt.Sprintf("users/search.json?external_id=%s", externalID)
 	var response SearchUserResponse
 	trace, err := c.get(endpoint, nil, &response)
 	if err != nil {
