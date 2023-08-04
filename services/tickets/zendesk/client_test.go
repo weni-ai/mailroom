@@ -1,6 +1,7 @@
 package zendesk_test
 
 import (
+	"fmt"
 	"net/http"
 	"testing"
 	"time"
@@ -265,4 +266,75 @@ func TestPush(t *testing.T) {
 	assert.Equal(t, "Boom", results[1].Status.Description)
 	assert.Equal(t, "POST /api/v2/any_channel/push.json HTTP/1.1\r\nHost: nyaruka.zendesk.com\r\nUser-Agent: Go-http-client/1.1\r\nContent-Length: 589\r\nAuthorization: Bearer 123456789\r\nContent-Type: application/json\r\nAccept-Encoding: gzip\r\n\r\n{\"instance_push_id\":\"1234-abcd\",\"request_id\":\"5678-edfg\",\"external_resources\":[{\"external_id\":\"234\",\"message\":\"A useful comment\",\"html_message\":\"A <b>very</b> useful comment\",\"parent_id\":\"123\",\"created_at\":\"2015-01-13T08:59:26Z\",\"author\":{\"external_id\":\"456\",\"name\":\"Fred\",\"locale\":\"de\"},\"display_info\":[{\"type\":\"9ef45ff7-4aaa-4a58-8e77-a7c74dfa51c4\",\"data\":{\"whatever\":\"I want\"}}],\"allow_channelback\":true},{\"external_id\":\"636\",\"message\":\"Hi there\",\"thread_id\":\"347\",\"created_at\":\"2020-01-13T08:59:26Z\",\"author\":{\"external_id\":\"123\",\"name\":\"Jim\",\"locale\":\"en\"},\"allow_channelback\":true}]}", string(trace.RequestTrace))
 	assert.Equal(t, "HTTP/1.0 201 Created\r\nContent-Length: 234\r\n\r\n", string(trace.ResponseTrace))
+}
+
+func TestCreateUser(t *testing.T) {
+	defer httpx.SetRequestor(httpx.DefaultRequestor)
+	httpx.SetRequestor(httpx.NewMockRequestor(map[string][]httpx.MockResponse{
+		"https://mocked_subdomain.zendesk.com/api/v2/users": {
+			httpx.MockConnectionError,
+			httpx.NewMockResponse(400, nil, `{"description": "Something went wrong", "error": "Unknown"}`),
+			httpx.NewMockResponse(201, nil, `{
+				"user": {
+					"id": 9873843,
+					"external_id": "9a327960-b2ce-4659-bef7-87cbb837a154",
+					"name": "Dummy User",
+					"organization_id": 57542,
+					"role": "end-user"
+				}
+			}`),
+		},
+	}))
+
+	client := zendesk.NewRESTClient(http.DefaultClient, nil, "mocked_subdomain", "123456789")
+
+	user := &zendesk.User{
+		Name:       "Dummy User",
+		ExternalID: "9a327960-b2ce-4659-bef7-87cbb837a154",
+		Role:       "end-user",
+	}
+
+	_, _, err := client.CreateUser(user)
+	assert.EqualError(t, err, "unable to connect to server")
+
+	_, _, err = client.CreateUser(user)
+	assert.EqualError(t, err, "Something went wrong")
+
+	responseUser, trace, err := client.CreateUser(user)
+	assert.NoError(t, err)
+	assert.Equal(t, int64(9873843), responseUser.ID)
+	assert.Equal(t, "9a327960-b2ce-4659-bef7-87cbb837a154", responseUser.ExternalID)
+	assert.Equal(t, "HTTP/1.0 201 Created\r\nContent-Length: 188\r\n\r\n", string(trace.ResponseTrace))
+}
+
+func TestSearchUser(t *testing.T) {
+	defer httpx.SetRequestor(httpx.DefaultRequestor)
+
+	userUUID := "9a327960-b2ce-4659-bef7-87cbb837a154"
+
+	httpx.SetRequestor(httpx.NewMockRequestor(map[string][]httpx.MockResponse{
+		fmt.Sprintf("https://mocked_subdomain.zendesk.com/api/v2/users/search?external_id=%s", userUUID): {
+			httpx.MockConnectionError,
+			httpx.NewMockResponse(400, nil, `{"description": "Something went wrong", "error": "Unknown"}`),
+			httpx.NewMockResponse(200, nil, `{"users": []}`),
+			httpx.NewMockResponse(200, nil, `{"users": [{"id": 35436,"name": "Dummy User"}]}`),
+		},
+	}))
+
+	client := zendesk.NewRESTClient(http.DefaultClient, nil, "mocked_subdomain", "123456789")
+
+	_, _, err := client.SearchUser(userUUID)
+	assert.EqualError(t, err, "unable to connect to server")
+
+	_, _, err = client.SearchUser(userUUID)
+	assert.EqualError(t, err, "Something went wrong")
+
+	user, _, err := client.SearchUser(userUUID)
+	assert.NoError(t, err)
+	assert.Nil(t, user)
+
+	user, trace, err := client.SearchUser(userUUID)
+	assert.NoError(t, err)
+	assert.Equal(t, "Dummy User", user.Name)
+	assert.Equal(t, "HTTP/1.0 200 OK\r\nContent-Length: 47\r\n\r\n", string(trace.ResponseTrace))
 }

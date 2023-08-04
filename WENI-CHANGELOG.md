@@ -1,3 +1,7 @@
+1.6.7-mailroom-7.1.22
+----------
+ * Relates a zendesk user with external id equal to contact uuid when opening zendesk ticket
+
 1.6.6-mailroom-7.1.22
 ----------
  * Increase tests coverage in web module
