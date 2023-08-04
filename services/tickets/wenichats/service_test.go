@@ -77,10 +77,79 @@ func TestOpenAndForward(t *testing.T) {
 				},
 				"callback_url": "http://example.com"
 			}`),
+			httpx.NewMockResponse(201, nil, `{
+				"uuid": "e5cbc781-4e0e-4954-b078-0373308e11c3",
+				"user": {
+					"first_name": "John",
+					"last_name": "Doe",
+					"email": "john.doe@chats.weni.ai"
+				},
+				"contact": {
+					"external_id": "095be615-a8ad-4c33-8e9c-c7612fbf6c9f",
+					"name": "Foo Bar",
+					"email": "FooBar@weni.ai",
+					"status": "string",
+					"phone": "+250788123123",
+					"custom_fields": {},
+					"created_on": "2019-08-24T14:15:22Z"
+				},
+				"queue": {
+					"uuid": "449f48d9-4905-4d6f-8abf-f1ff6afb803e",
+					"created_on": "2019-08-24T14:15:22Z",
+					"modified_on": "2019-08-24T14:15:22Z",
+					"name": "CHATS",
+					"sector": "f3d496ff-c154-4a96-a678-6a8879583ddb"
+				},
+				"created_on": "2019-08-24T14:15:22Z",
+				"modified_on": "2019-08-24T14:15:22Z",
+				"is_active": true,
+				"custom_fields": {
+					"country": "brazil",
+					"mood": "angry",
+					"age": 23,
+					"join_date": "2017-12-02",
+					"gender": "male"
+				},
+				"callback_url": "http://example.com"
+			}`),
 		},
 		fmt.Sprintf("%s/rooms/8ecb1e4a-b457-4645-a161-e2b02ddffa88/", baseURL): {
 			httpx.NewMockResponse(200, nil, `{
 				"uuid": "8ecb1e4a-b457-4645-a161-e2b02ddffa88",
+				"user": {
+					"first_name": "John",
+					"last_name": "Doe",
+					"email": "john.doe@chats.weni.ai"
+				},
+				"contact": {
+					"external_id": "095be615-a8ad-4c33-8e9c-c7612fbf6c9f",
+					"name": "Foo Bar",
+					"email": "FooBar@weni.ai",
+					"status": "string",
+					"phone": "+250788123123",
+					"custom_fields": {},
+					"created_on": "2019-08-24T14:15:22Z"
+				},
+				"queue": {
+					"uuid": "449f48d9-4905-4d6f-8abf-f1ff6afb803e",
+					"created_on": "2019-08-24T14:15:22Z",
+					"modified_on": "2019-08-24T14:15:22Z",
+					"name": "CHATS",
+					"sector": "f3d496ff-c154-4a96-a678-6a8879583ddb"
+				},
+				"created_on": "2019-08-24T14:15:22Z",
+				"modified_on": "2019-08-24T14:15:22Z",
+				"is_active": true,
+				"custom_fields": {
+					"country": "brazil",
+					"mood": "angry"
+				},
+				"callback_url": "http://example.com"
+			}`),
+		},
+		fmt.Sprintf("%s/rooms/e5cbc781-4e0e-4954-b078-0373308e11c3/", baseURL): {
+			httpx.NewMockResponse(200, nil, `{
+				"uuid": "e5cbc781-4e0e-4954-b078-0373308e11c3",
 				"user": {
 					"first_name": "John",
 					"last_name": "Doe",
@@ -261,6 +330,37 @@ func TestOpenAndForward(t *testing.T) {
 	err = svc.Forward(dbTicket2, flows.MsgUUID("5ga340ae-1fb0-4666-98db-2177fe9bf31c"), "It's urgent", attachments, logger.Log)
 	assert.NoError(t, err)
 	assert.Equal(t, 1, len(logger.Logs))
+
+	// test open with body empty
+
+	logger2 := &flows.HTTPLogger{}
+
+	wenichats.SetDB(rt.DB)
+	svc, err = wenichats.NewService(
+		rt.Config,
+		http.DefaultClient,
+		nil,
+		ticketer,
+		map[string]string{
+			"project_auth": authToken,
+			"sector_uuid":  "1a4bae05-993c-4f3b-91b5-80f4e09951f2",
+		},
+	)
+	assert.NoError(t, err)
+
+	oa, err = models.GetOrgAssets(ctx, rt, testdata.Org1.ID)
+	require.NoError(t, err)
+	defaultTopic = oa.SessionAssets().Topics().FindByName("General")
+
+	ticket, err = svc.Open(session, defaultTopic, "", nil, logger2.Log)
+
+	assert.NoError(t, err)
+	assert.Equal(t, flows.TicketUUID("59d74b86-3e2f-4a93-aece-b05d2fdcde0c"), ticket.UUID())
+	assert.Equal(t, "General", ticket.Topic().Name())
+	assert.Equal(t, "", ticket.Body())
+	assert.Equal(t, "e5cbc781-4e0e-4954-b078-0373308e11c3", ticket.ExternalID())
+	assert.Equal(t, 2, len(logger2.Logs))
+	test.AssertSnapshot(t, "open_ticket_empty_body", logger2.Logs[0].Request)
 }
 
 func TestCloseAndReopen(t *testing.T) {
