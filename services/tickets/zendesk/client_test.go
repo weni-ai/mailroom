@@ -271,7 +271,7 @@ func TestPush(t *testing.T) {
 func TestCreateUser(t *testing.T) {
 	defer httpx.SetRequestor(httpx.DefaultRequestor)
 	httpx.SetRequestor(httpx.NewMockRequestor(map[string][]httpx.MockResponse{
-		"https://mocked_subdomain.zendesk.com/api/v2/users": {
+		"https://mocked_subdomain.zendesk.com/api/v2/users.json": {
 			httpx.MockConnectionError,
 			httpx.NewMockResponse(400, nil, `{"description": "Something went wrong", "error": "Unknown"}`),
 			httpx.NewMockResponse(201, nil, `{
@@ -313,7 +313,7 @@ func TestSearchUser(t *testing.T) {
 	userUUID := "9a327960-b2ce-4659-bef7-87cbb837a154"
 
 	httpx.SetRequestor(httpx.NewMockRequestor(map[string][]httpx.MockResponse{
-		fmt.Sprintf("https://mocked_subdomain.zendesk.com/api/v2/users/search?external_id=%s", userUUID): {
+		fmt.Sprintf("https://mocked_subdomain.zendesk.com/api/v2/users/search.json?external_id=%s", userUUID): {
 			httpx.MockConnectionError,
 			httpx.NewMockResponse(400, nil, `{"description": "Something went wrong", "error": "Unknown"}`),
 			httpx.NewMockResponse(200, nil, `{"users": []}`),

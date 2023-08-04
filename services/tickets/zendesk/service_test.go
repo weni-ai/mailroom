@@ -41,7 +41,7 @@ func TestOpenAndForward(t *testing.T) {
 	uuids.SetGenerator(uuids.NewSeededGenerator(12345))
 	dates.SetNowSource(dates.NewSequentialNowSource(time.Date(2019, 10, 7, 15, 21, 30, 0, time.UTC)))
 	httpx.SetRequestor(httpx.NewMockRequestor(map[string][]httpx.MockResponse{
-		"https://nyaruka.zendesk.com/api/v2/users/search?external_id=5d76d86b-3bb9-4d5a-b822-c9d86f5d8e4f": {
+		"https://nyaruka.zendesk.com/api/v2/users/search.json?external_id=5d76d86b-3bb9-4d5a-b822-c9d86f5d8e4f": {
 			httpx.NewMockResponse(200, nil, `{"users": [{"id": 35241, "name": "Dummy User"}], "count": 1, "next_page": "https://nyaruka.zendesk.com/api/v2/users.json?page=2"}`),
 			httpx.NewMockResponse(200, nil, `{"users": [{"id": 35241, "name": "Dummy User"}], "count": 1, "next_page": "https://nyaruka.zendesk.com/api/v2/users.json?page=2"}`),
 			httpx.NewMockResponse(200, nil, `{"users": [{"id": 35241, "name": "Dummy User"}], "count": 1, "next_page": "https://nyaruka.zendesk.com/api/v2/users.json?page=2"}`),

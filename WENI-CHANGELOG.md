@@ -1,3 +1,7 @@
+1.6.8-mailroom-7.1.22
+----------
+ * Fix zendesk ticketer client users endpoints
+
 1.6.7-mailroom-7.1.22
 ----------
  * Relates a zendesk user with external id equal to contact uuid when opening zendesk ticket
