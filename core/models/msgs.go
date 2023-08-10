@@ -331,6 +331,11 @@ func NewOutgoingFlowMsg(rt *runtime.Runtime, org *Org, channel *Channel, session
 	return newOutgoingMsg(rt, org, channel, session.ContactID(), out, createdOn, session, NilBroadcastID)
 }
 
+// NewOutgoingFlowMsgCatalog creates an outgoing message for the passed in flow message
+func NewOutgoingFlowMsgCatalog(rt *runtime.Runtime, org *Org, channel *Channel, session *Session, out *flows.MsgCatalog, createdOn time.Time) (*Msg, error) {
+	return newOutgoingMsgCatalog(rt, org, channel, session.ContactID(), out, createdOn, session, NilBroadcastID)
+}
+
 // NewOutgoingBroadcastMsg creates an outgoing message which is part of a broadcast
 func NewOutgoingBroadcastMsg(rt *runtime.Runtime, org *Org, channel *Channel, contactID ContactID, out *flows.MsgOut, createdOn time.Time, broadcastID BroadcastID) (*Msg, error) {
 	return newOutgoingMsg(rt, org, channel, contactID, out, createdOn, nil, broadcastID)
@@ -411,6 +416,80 @@ func newOutgoingMsg(rt *runtime.Runtime, org *Org, channel *Channel, contactID C
 		}
 		if out.TextLanguage != "" {
 			metadata["text_language"] = out.TextLanguage
+		}
+		m.Metadata = null.NewMap(metadata)
+	}
+
+	// if we're sending to a phone, message may have to be sent in multiple parts
+	if m.URN.Scheme() == urns.TelScheme {
+		m.MsgCount = gsm7.Segments(m.Text) + len(m.Attachments)
+	}
+
+	return msg, nil
+}
+
+func newOutgoingMsgCatalog(rt *runtime.Runtime, org *Org, channel *Channel, contactID ContactID, msgCatalog *flows.MsgCatalog, createdOn time.Time, session *Session, broadcastID BroadcastID) (*Msg, error) {
+	msg := &Msg{}
+	m := &msg.m
+	m.UUID = msgCatalog.UUID()
+	m.Text = msgCatalog.Text()
+	m.HighPriority = false
+	m.Direction = DirectionOut
+	m.Status = MsgStatusQueued
+	m.Visibility = VisibilityVisible
+	m.MsgType = MsgTypeFlow
+	m.MsgCount = 1
+	m.ContactID = contactID
+	m.BroadcastID = broadcastID
+	m.OrgID = org.ID()
+	m.TopupID = NilTopupID
+	m.CreatedOn = createdOn
+
+	msg.SetChannel(channel)
+	msg.SetURN(msgCatalog.URN())
+
+	if org.Suspended() {
+		// we fail messages for suspended orgs right away
+		m.Status = MsgStatusFailed
+		m.FailedReason = MsgFailedSuspended
+	} else if msg.URN() == urns.NilURN || channel == nil {
+		// if msg is missing the URN or channel, we also fail it
+		m.Status = MsgStatusFailed
+		m.FailedReason = MsgFailedNoDestination
+	}
+
+	// if we have a session, set fields on the message from that
+	if session != nil {
+		m.ResponseToExternalID = session.IncomingMsgExternalID()
+		m.SessionID = session.ID()
+		m.SessionStatus = session.Status()
+
+		// if we're responding to an incoming message, send as high priority
+		if session.IncomingMsgID() != NilMsgID {
+			m.HighPriority = true
+		}
+	}
+
+	// populate metadata if we have any
+	if msgCatalog.Topic() != flows.NilMsgTopic || msgCatalog.TextLanguage != "" || msgCatalog.Header() != "" || msgCatalog.Body() != "" || msgCatalog.Footer() != "" || len(msgCatalog.Products()) != 0 {
+		metadata := make(map[string]interface{})
+		if msgCatalog.Topic() != flows.NilMsgTopic {
+			metadata["topic"] = string(msgCatalog.Topic())
+		}
+		if msgCatalog.TextLanguage != "" {
+			metadata["text_language"] = msgCatalog.TextLanguage
+		}
+		if msgCatalog.Header() != "" {
+			metadata["header"] = string(msgCatalog.Header())
+		}
+		if msgCatalog.Body() != "" {
+			metadata["body"] = string(msgCatalog.Body())
+		}
+		if msgCatalog.Footer() != "" {
+			metadata["footer"] = string(msgCatalog.Footer())
+		}
+		if len(msgCatalog.Body()) != 0 {
+			metadata["products"] = msgCatalog.Products()
 		}
 		m.Metadata = null.NewMap(metadata)
 	}

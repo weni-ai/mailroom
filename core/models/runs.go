@@ -94,8 +94,9 @@ var exitToRunStatusMap = map[ExitType]RunStatus{
 }
 
 var keptEvents = map[string]bool{
-	events.TypeMsgCreated:  true,
-	events.TypeMsgReceived: true,
+	events.TypeMsgCreated:        true,
+	events.TypeMsgCatalogCreated: true,
+	events.TypeMsgReceived:       true,
 }
 
 // Session is the mailroom type for a FlowSession
