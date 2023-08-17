@@ -115,18 +115,18 @@ func (s *service) Open(session flows.Session, topic *flows.Topic, body string, a
 	roomData.FlowUUID = session.Runs()[0].Flow().UUID()
 	roomData.Contact.Groups = groups
 
+	// if body is not configured with custom fields properly, send all fields from contact
 	extra := &struct {
 		CustomFields map[string]interface{} `json:"custom_fields,omitempty"`
 	}{}
-
 	err := jsonx.Unmarshal([]byte(body), extra)
-	if err == nil {
+	if err == nil && len(extra.CustomFields) > 0 {
 		roomData.CustomFields = extra.CustomFields
-	}
-
-	for k, v := range contact.Fields() {
-		if v != nil {
-			roomData.CustomFields[k] = v.Text.Render()
+	} else {
+		for k, v := range contact.Fields() {
+			if v != nil {
+				roomData.CustomFields[k] = v.Text.Render()
+			}
 		}
 	}
 

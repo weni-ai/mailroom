@@ -1,3 +1,7 @@
+1.6.9-mailroom-7.1.22
+----------
+ * Wenichats open room receiving defined custom fields of body is properly configured or all fields if not
+
 1.6.8-mailroom-7.1.22
 ----------
  * Fix zendesk ticketer client users endpoints
