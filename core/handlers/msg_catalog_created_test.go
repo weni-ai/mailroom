@@ -35,18 +35,19 @@ func TestMsgCatalogCreated(t *testing.T) {
 				testdata.Cathy: []flows.Action{
 					actions.NewSendMsgCatalog(
 						handlers.NewActionUUID(),
-						"", "Some products", "",
+						"", "Some products", "", "View Products",
 						[]string{
 							"9f526c6f-b2cb-4457-8048-a7f1dc101e50",
 							"eb2305cc-bf39-43ad-a069-bbbfb6401acc",
 						},
+
 						true,
 					),
 				},
 				testdata.George: []flows.Action{
 					actions.NewSendMsgCatalog(
 						handlers.NewActionUUID(),
-						"Select The Service", "", "",
+						"Select The Service", "", "", "View Products",
 						[]string{
 							"cbd9ba07-7156-406e-8006-5b697d18d091",
 							"63157bd2-6f94-4dbb-b394-ea4eb07ce156",
@@ -55,7 +56,7 @@ func TestMsgCatalogCreated(t *testing.T) {
 					),
 				},
 				testdata.Bob: []flows.Action{
-					actions.NewSendMsgCatalog(handlers.NewActionUUID(), "No URNs", "", "", nil, false),
+					actions.NewSendMsgCatalog(handlers.NewActionUUID(), "No URNs", "", "", "View Products", nil, false),
 				},
 			},
 			Msgs: handlers.ContactMsgMap{

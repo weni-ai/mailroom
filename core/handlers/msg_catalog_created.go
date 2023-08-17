@@ -73,6 +73,7 @@ func handleMsgCatalogCreated(ctx context.Context, rt *runtime.Runtime, tx *sqlx.
 		"header":       event.Msg.Header(),
 		"products":     event.Msg.Products(),
 		"urn":          event.Msg.URN(),
+		"action":       event.Msg.Action(),
 	}).Debug("msg created event")
 
 	// messages in messaging flows must have urn id set on them, if not, go look it up
