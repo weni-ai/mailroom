@@ -76,6 +76,9 @@ type Config struct {
 	WenichatsServiceURL string `help:"wenichats external api url for ticketer service integration"`
 
 	FlowStartBatchTimeout int `help:"timeout config for flow start batch"`
+
+	ZeroshotAPIToken string `help:"secret token for zeroshot API authentication and authorization"`
+	ZeroshotAPIUrl   string `help:"zeroshot API base url"`
 }
 
 // NewDefaultConfig returns a new default configuration object
@@ -130,6 +133,9 @@ func NewDefaultConfig() *Config {
 		WenichatsServiceURL: "https://chats-engine.dev.cloud.weni.ai/v1/external",
 
 		FlowStartBatchTimeout: 15,
+
+		ZeroshotAPIToken: "",
+		ZeroshotAPIUrl:   "http://engine-ai.dev.cloud.weni.ai/",
 	}
 }
 
