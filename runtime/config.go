@@ -135,7 +135,7 @@ func NewDefaultConfig() *Config {
 		FlowStartBatchTimeout: 15,
 
 		ZeroshotAPIToken: "",
-		ZeroshotAPIUrl:   "http://engine-ai.dev.cloud.weni.ai/",
+		ZeroshotAPIUrl:   "http://engine-ai.dev.cloud.weni.ai",
 	}
 }
 
