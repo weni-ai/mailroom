@@ -9,7 +9,6 @@ import (
 	"github.com/nyaruka/goflow/assets"
 	"github.com/nyaruka/goflow/excellent/types"
 	"github.com/nyaruka/goflow/flows"
-	"github.com/nyaruka/goflow/flows/routers"
 	"github.com/nyaruka/goflow/flows/triggers"
 	"github.com/nyaruka/librato"
 	"github.com/nyaruka/mailroom/core/goflow"
@@ -84,14 +83,6 @@ func ResumeFlow(ctx context.Context, rt *runtime.Runtime, oa *models.OrgAssets, 
 	if err != nil {
 		return nil, errors.Wrapf(err, "unable to create session from output")
 	}
-
-	// set authentication token for zeroshot requests in goflow
-	apiToken := rt.Config.ZeroshotAPIToken
-	routers.SetToken(apiToken)
-
-	// set base url for zeroshot requests
-	baseURL := rt.Config.ZeroshotAPIUrl
-	routers.SetAPIURL(baseURL)
 
 	// resume our session
 	resumeStart := time.Now()
