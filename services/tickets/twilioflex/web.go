@@ -98,10 +98,10 @@ func handleEventCallback(ctx context.Context, rt *runtime.Runtime, r *http.Reque
 				return err, http.StatusBadRequest, nil
 			}
 			file, err := tickets.FetchFile(mediaContent.Links.ContentDirectTemporary, nil)
-			file.ContentType = mediaContent.ContentType
 			if err != nil {
 				return errors.Wrapf(err, "error fetching ticket file '%s'", mediaContent.Links.ContentDirectTemporary), http.StatusBadRequest, nil
 			}
+			file.ContentType = mediaContent.ContentType
 			_, err = tickets.SendReply(ctx, rt, ticket, request.Body, []*tickets.File{file})
 			if err != nil {
 				return err, http.StatusBadRequest, nil
