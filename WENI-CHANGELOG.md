@@ -1,3 +1,7 @@
+1.6.10-mailroom-7.1.22
+----------
+ * Fix twilioflex panic on fetch media error
+
 1.6.9-mailroom-7.1.22
 ----------
  * Wenichats open room receiving defined custom fields of body is properly configured or all fields if not
