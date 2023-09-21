@@ -1,3 +1,7 @@
+1.6.12-mailroom-7.1.22
+----------
+ * Changing function names for zeroshot variables
+
 1.6.11-mailroom-7.1.22
 ----------
  * Add new environment variables for zeroshot api
