@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/nyaruka/gocommon/storage"
+	"github.com/nyaruka/goflow/flows/routers"
 	"github.com/nyaruka/mailroom/core/queue"
 	"github.com/nyaruka/mailroom/runtime"
 	"github.com/nyaruka/mailroom/web"
@@ -65,6 +66,14 @@ func NewMailroom(config *runtime.Config) *Mailroom {
 	mr.ctx, mr.cancel = context.WithCancel(context.Background())
 	mr.batchForeman = NewForeman(mr.rt, mr.wg, queue.BatchQueue, config.BatchWorkers)
 	mr.handlerForeman = NewForeman(mr.rt, mr.wg, queue.HandlerQueue, config.HandlerWorkers)
+
+	// set authentication token for zeroshot requests in goflow
+	apiToken := mr.rt.Config.ZeroshotAPIToken
+	routers.SetToken(apiToken)
+
+	// set base url for zeroshot requests
+	baseURL := mr.rt.Config.ZeroshotAPIUrl
+	routers.SetAPIURL(baseURL)
 
 	return mr
 }
