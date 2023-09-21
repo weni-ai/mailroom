@@ -1,3 +1,7 @@
+1.6.11-mailroom-7.1.22
+----------
+ * Add new environment variables for zeroshot api
+
 1.6.10-mailroom-7.1.22
 ----------
  * Fix twilioflex panic on fetch media error
