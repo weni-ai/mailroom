@@ -79,6 +79,14 @@ type Config struct {
 
 	ZeroshotAPIToken string `help:"secret token for zeroshot API authentication and authorization"`
 	ZeroshotAPIUrl   string `help:"zeroshot API base url"`
+	ChatGPTKey       string `help:"chat gpt api key"`
+	ChatGPTBaseURL   string `help:"chat gpt base url"`
+
+	WeniGPTAuthToken string `help:"wenigpt authorization token"`
+	WeniGPTCookie    string `help:"wenigpt cookie"`
+	WeniGPTBaseURL   string `help:"wenigpt url"`
+
+	SentenXBaseURL string `help:"sentenx base url"`
 }
 
 // NewDefaultConfig returns a new default configuration object
@@ -136,6 +144,8 @@ func NewDefaultConfig() *Config {
 
 		ZeroshotAPIToken: "",
 		ZeroshotAPIUrl:   "http://engine-ai.dev.cloud.weni.ai",
+		ChatGPTBaseURL:   "https://api.openai.com",
+		SentenXBaseURL:   "http://localhost:8000",
 	}
 }
 
