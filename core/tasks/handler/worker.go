@@ -592,6 +592,7 @@ func handleMsgEvent(ctx context.Context, rt *runtime.Runtime, event *MsgEvent) e
 	msgIn.SetID(event.MsgID)
 
 	if event.Metadata != nil {
+		fmt.Println("Metadata: ", fmt.Sprint(event.Metadata))
 		var metadata map[string]interface{}
 		err := json.Unmarshal(event.Metadata, &metadata)
 		if err != nil {
@@ -672,7 +673,7 @@ func handleMsgEvent(ctx context.Context, rt *runtime.Runtime, event *MsgEvent) e
 	// if there is a session, resume it
 	if session != nil && flow != nil {
 		resume := resumes.NewMsg(oa.Env(), contact, msgIn)
-		_, err = runner.ResumeFlow(ctx, rt, oa, session, resume, flowMsgHook)
+		_, err = runner.ResumeFlow(ctx, rt, oa, session, resume, flowMsgHook) //atualiza o wait
 		if err != nil {
 			return errors.Wrapf(err, "error resuming flow for contact")
 		}
