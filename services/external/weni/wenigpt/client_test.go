@@ -5,7 +5,7 @@ import (
 	"testing"
 
 	"github.com/nyaruka/gocommon/httpx"
-	"github.com/nyaruka/mailroom/services/external/wenigpt"
+	"github.com/nyaruka/mailroom/services/external/weni/wenigpt"
 	"github.com/stretchr/testify/assert"
 )
 
