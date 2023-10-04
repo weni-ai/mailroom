@@ -592,7 +592,7 @@ func handleMsgEvent(ctx context.Context, rt *runtime.Runtime, event *MsgEvent) e
 	msgIn.SetID(event.MsgID)
 
 	if event.Metadata != nil {
-		fmt.Println("Metadata: ", fmt.Sprint(event.Metadata))
+		fmt.Println("Metadata: ", string(event.Metadata))
 		var metadata map[string]interface{}
 		err := json.Unmarshal(event.Metadata, &metadata)
 		if err != nil {
