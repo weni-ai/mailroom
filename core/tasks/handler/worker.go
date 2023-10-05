@@ -591,7 +591,7 @@ func handleMsgEvent(ctx context.Context, rt *runtime.Runtime, event *MsgEvent) e
 	msgIn.SetExternalID(string(event.MsgExternalID))
 	msgIn.SetID(event.MsgID)
 
-	if event.Metadata != nil {
+	if len(event.Metadata) > 0 {
 		fmt.Println("Metadata: ", string(event.Metadata))
 		var metadata map[string]interface{}
 		err := json.Unmarshal(event.Metadata, &metadata)
@@ -616,6 +616,7 @@ func handleMsgEvent(ctx context.Context, rt *runtime.Runtime, event *MsgEvent) e
 
 	// build our hook to mark a flow message as handled
 	flowMsgHook := func(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, oa *models.OrgAssets, sessions []*models.Session) error {
+		fmt.Println("DEBUG HOOK")
 		// set our incoming message event on our session
 		if len(sessions) != 1 {
 			return errors.Errorf("handle hook called with more than one session")
@@ -628,6 +629,9 @@ func handleMsgEvent(ctx context.Context, rt *runtime.Runtime, event *MsgEvent) e
 	// we found a trigger and their session is nil or doesn't ignore keywords
 	if (trigger != nil && trigger.TriggerType() != models.CatchallTriggerType && (flow == nil || !flow.IgnoreTriggers())) ||
 		(trigger != nil && trigger.TriggerType() == models.CatchallTriggerType && (flow == nil)) {
+
+		fmt.Println("DEBUG")
+
 		// load our flow
 		flow, err := oa.FlowByID(trigger.FlowID())
 		if err != nil && err != models.ErrNotFound {
@@ -636,6 +640,7 @@ func handleMsgEvent(ctx context.Context, rt *runtime.Runtime, event *MsgEvent) e
 
 		// trigger flow is still active, start it
 		if flow != nil {
+			fmt.Println("DEBUG1")
 			// if this is an IVR flow, we need to trigger that start (which happens in a different queue)
 			if flow.FlowType() == models.FlowTypeVoice {
 				ivrMsgHook := func(ctx context.Context, tx *sqlx.Tx) error {
@@ -652,6 +657,7 @@ func handleMsgEvent(ctx context.Context, rt *runtime.Runtime, event *MsgEvent) e
 			trigger := triggers.NewBuilder(oa.Env(), flow.FlowReference(), contact).Msg(msgIn).WithMatch(trigger.Match())
 
 			if event.Metadata != nil {
+				fmt.Println("DEBUG2")
 				var params *types.XObject
 				params, err = types.ReadXObject(event.Metadata)
 				if err != nil {
