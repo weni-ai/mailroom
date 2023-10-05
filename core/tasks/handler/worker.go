@@ -591,28 +591,28 @@ func handleMsgEvent(ctx context.Context, rt *runtime.Runtime, event *MsgEvent) e
 	msgIn.SetExternalID(string(event.MsgExternalID))
 	msgIn.SetID(event.MsgID)
 
-	// if len(event.Metadata) > 0 {
-	// 	fmt.Println("Metadata: ", string(event.Metadata))
-	// 	var metadata map[string]interface{}
-	// 	err := json.Unmarshal(event.Metadata, &metadata)
-	// 	if err != nil {
-	// 		log.WithError(err).Error("unable to unmarshal metadata from msg event")
-	// 	}
-	// 	// if metadata has order key set msg order
-	// 	mdValue, ok := metadata["order"]
-	// 	if ok {
-	// 		var order *types.XObject
-	// 		asJSON, err := json.Marshal(mdValue)
-	// 		if err != nil {
-	// 			log.WithError(err).Error("unable to marshal metadata from msg event")
-	// 		}
-	// 		order, err = types.ReadXObject(asJSON)
-	// 		if err != nil {
-	// 			log.WithError(err).Error("unable to marshal metadata from msg event")
-	// 		}
-	// 		msgIn.SetOrder(order)
-	// 	}
-	// }
+	if len(event.Metadata) > 0 {
+		fmt.Println("Metadata: ", string(event.Metadata))
+		var metadata map[string]interface{}
+		err := json.Unmarshal(event.Metadata, &metadata)
+		if err != nil {
+			log.WithError(err).Error("unable to unmarshal metadata from msg event")
+		}
+		// if metadata has order key set msg order
+		mdValue, ok := metadata["order"]
+		if ok {
+			var order *types.XObject
+			asJSON, err := json.Marshal(mdValue)
+			if err != nil {
+				log.WithError(err).Error("unable to marshal metadata from msg event")
+			}
+			order, err = types.ReadXObject(asJSON)
+			if err != nil {
+				log.WithError(err).Error("unable to marshal metadata from msg event")
+			}
+			msgIn.SetOrder(order)
+		}
+	}
 
 	// build our hook to mark a flow message as handled
 	flowMsgHook := func(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, oa *models.OrgAssets, sessions []*models.Session) error {
