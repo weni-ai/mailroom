@@ -600,14 +600,14 @@ func handleMsgEvent(ctx context.Context, rt *runtime.Runtime, event *MsgEvent) e
 		// if metadata has order key set msg order
 		mdValue, ok := metadata["order"]
 		if ok {
-			var order *types.XObject
+			var order *flows.Order
 			asJSON, err := json.Marshal(mdValue)
 			if err != nil {
 				log.WithError(err).Error("unable to marshal metadata from msg event")
 			}
-			order, err = types.ReadXObject(asJSON)
+			err = json.Unmarshal(asJSON, &order)
 			if err != nil {
-				log.WithError(err).Error("unable to marshal metadata from msg event")
+				log.WithError(err).Error("unable to unmarshal orderJSON from metadata[\"order\"]")
 			}
 			msgIn.SetOrder(order)
 		}
