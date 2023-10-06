@@ -1,3 +1,7 @@
+1.6.13-mailroom-7.1.22
+----------
+ * Fix/order trigger resume
+
 1.6.12-mailroom-7.1.22
 ----------
  * Changing function names for zeroshot variables
