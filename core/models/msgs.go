@@ -491,6 +491,9 @@ func newOutgoingMsgCatalog(rt *runtime.Runtime, org *Org, channel *Channel, cont
 		if len(msgCatalog.Body()) != 0 {
 			metadata["products"] = msgCatalog.Products()
 		}
+		if msgCatalog.Action() != "" {
+			metadata["action"] = msgCatalog.Action()
+		}
 		m.Metadata = null.NewMap(metadata)
 	}
 

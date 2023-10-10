@@ -4,6 +4,8 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"net/http"
+	"strconv"
 
 	"github.com/nyaruka/gocommon/urns"
 	"github.com/nyaruka/goflow/envs"
@@ -14,6 +16,7 @@ import (
 	"github.com/nyaruka/mailroom/core/models"
 	"github.com/nyaruka/mailroom/runtime"
 	"github.com/nyaruka/mailroom/services/external/openai/chatgpt"
+	"github.com/nyaruka/mailroom/services/external/weni/sentenx"
 	"github.com/nyaruka/mailroom/services/external/weni/wenigpt"
 
 	"github.com/jmoiron/sqlx"
@@ -112,28 +115,29 @@ func handleMsgCatalogCreated(ctx context.Context, rt *runtime.Runtime, tx *sqlx.
 				event.Msg.TextLanguage = envs.Language(languageCode)
 			}
 		}
-	} else {
-		return errors.New("channel is not defined")
 	}
 
+	// if is smart product catalog  msg
 	if len(event.Msg.Products()) == 0 && event.Msg.Smart() {
 		content := event.Msg.ProductSearch()
 		productList, err := GetProductListFromWeniGPT(ctx, rt, content)
 		if err != nil {
 			return err
 		}
-		fmt.Println(productList)
-		// TODO: implement SentenX call to retrieve product list
 		catalog, err := models.GetActiveCatalogFromChannel(ctx, *rt.DB, channel.ID())
 		if err != nil {
 			return err
 		}
-		threshold := channel.ConfigValue("threshold", "1.5")
+		channelThreshold := channel.ConfigValue("threshold", "1.5")
+		searchThreshold, err := strconv.ParseFloat(channelThreshold, 64)
+		if err != nil {
+			return err
+		}
 
 		productRetailerIDS := []string{}
 
 		for _, product := range productList {
-			searchResult, err := GetProductListFromSentenX(product, catalog.FacebookCatalogID(), threshold, rt)
+			searchResult, err := GetProductListFromSentenX(product, catalog.FacebookCatalogID(), searchThreshold, rt)
 			if err != nil {
 				return errors.Wrapf(err, "on iterate to search products on sentenx")
 			}
@@ -143,7 +147,7 @@ func handleMsgCatalogCreated(ctx context.Context, rt *runtime.Runtime, tx *sqlx.
 		}
 
 		event.Msg.Products_ = productRetailerIDS
-	}
+	} // if is not smart catalog, event already have products
 
 	msg, err := models.NewOutgoingFlowMsgCatalog(rt, oa.Org(), channel, scene.Session(), event.Msg, event.CreatedOn())
 	if err != nil {
@@ -227,8 +231,21 @@ func GetProductListFromChatGPT(ctx context.Context, rt *runtime.Runtime, content
 	return products["products"], nil
 }
 
-func GetProductListFromSentenX(productSearch string, catalogID string, threshold string, rt *runtime.Runtime) ([]map[string]string, error) {
-	// TODO: implement this GetProductListFromSentenX
-	return nil, nil
+func GetProductListFromSentenX(productSearch string, catalogID string, threshold float64, rt *runtime.Runtime) ([]map[string]string, error) {
+	client := sentenx.NewClient(http.DefaultClient, nil, rt.Config.SentenXBaseURL)
 
+	searchParams := sentenx.NewSearchRequest(productSearch, catalogID, threshold)
+
+	searchResponse, _, err := client.Search(searchParams)
+	if err != nil {
+		return nil, err
+	}
+
+	pmap := []map[string]string{}
+	for _, p := range searchResponse.Products {
+		mapElement := map[string]string{"product_retailer_id": p.ProductRetailerID}
+		pmap = append(pmap, mapElement)
+	}
+
+	return pmap, nil
 }
