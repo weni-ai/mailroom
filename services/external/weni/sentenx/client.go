@@ -2,7 +2,6 @@ package sentenx
 
 import (
 	"encoding/json"
-	"fmt"
 	"net/http"
 	"strings"
 
@@ -19,6 +18,18 @@ type SearchRequest struct {
 		CatalogID string `json:"catalog_id,omitempty"`
 	} `json:"filter,omitempty"`
 	Threshold float64 `json:"threshold,omitempty"`
+}
+
+func NewSearchRequest(search, catalogID string, threshold float64) *SearchRequest {
+	return &SearchRequest{
+		Search: search,
+		Filter: struct {
+			CatalogID string `json:"catalog_id,omitempty"`
+		}{
+			CatalogID: catalogID,
+		},
+		Threshold: threshold,
+	}
 }
 
 type SearchResponse struct {
@@ -63,12 +74,19 @@ func (c *Client) Request(method, url string, body, response interface{}) (*httpx
 	}
 
 	if trace.Response.StatusCode >= 400 {
-		var errorResponse []ErrorResponse
+		var errorResponse ErrorResponse
 		err = jsonx.Unmarshal(trace.ResponseBody, &errorResponse)
 		if err != nil {
 			return trace, err
 		}
-		return trace, errors.New(fmt.Sprint(errorResponse))
+		concatenatedErrorMsg := ""
+		for i, msg := range errorResponse.Detail {
+			concatenatedErrorMsg += msg.Msg
+			if i < len(errorResponse.Detail)-1 {
+				concatenatedErrorMsg += ". "
+			}
+		}
+		return trace, errors.New(concatenatedErrorMsg)
 	}
 
 	if response != nil {

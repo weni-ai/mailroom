@@ -1,6 +1,7 @@
 package sentenx_test
 
 import (
+	"fmt"
 	"net/http"
 	"testing"
 
@@ -44,4 +45,46 @@ func TestRequest(t *testing.T) {
 	response := new(interface{})
 	_, err = client.Request("GET", baseURL, nil, response)
 	assert.Error(t, err)
+}
+
+func TestSearch(t *testing.T) {
+	defer httpx.SetRequestor(httpx.DefaultRequestor)
+	httpx.SetRequestor(httpx.NewMockRequestor(map[string][]httpx.MockResponse{
+		fmt.Sprintf("%s/search", baseURL): {
+			httpx.NewMockResponse(400, nil, `{
+				"detail": [{"msg": "dummy error msg"}, {"msg": "dummy error msg 2"}]
+			}`),
+			httpx.NewMockResponse(200, nil, `{
+				"products": [
+					{
+            "facebook_id": "1234567891",
+            "title": "banana prata 1kg",
+            "org_id": "1",
+            "channel_id": "5",
+            "catalog_id": "asdfgh",
+            "product_retailer_id": "p1"
+					},
+					{
+            "facebook_id": "1234567892",
+            "title": "doce de banana 250g",
+            "org_id": "1",
+            "channel_id": "5",
+            "catalog_id": "asdfgh",
+            "product_retailer_id": "p2"
+        	}
+				]
+			}`),
+		},
+	}))
+
+	client := sentenx.NewClient(http.DefaultClient, nil, baseURL)
+
+	data := sentenx.NewSearchRequest("banana", "asdfgh", 1.6)
+
+	_, _, err := client.Search(data)
+	assert.EqualError(t, err, "dummy error msg. dummy error msg 2")
+
+	sres, _, err := client.Search(data)
+	assert.NoError(t, err)
+	assert.Equal(t, "p1", sres.Products[0].ProductRetailerID)
 }
