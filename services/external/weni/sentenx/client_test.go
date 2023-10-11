@@ -50,7 +50,7 @@ func TestRequest(t *testing.T) {
 func TestSearch(t *testing.T) {
 	defer httpx.SetRequestor(httpx.DefaultRequestor)
 	httpx.SetRequestor(httpx.NewMockRequestor(map[string][]httpx.MockResponse{
-		fmt.Sprintf("%s/search", baseURL): {
+		fmt.Sprintf("%s/products/search", baseURL): {
 			httpx.NewMockResponse(400, nil, `{
 				"detail": [{"msg": "dummy error msg"}, {"msg": "dummy error msg 2"}]
 			}`),
@@ -81,10 +81,10 @@ func TestSearch(t *testing.T) {
 
 	data := sentenx.NewSearchRequest("banana", "asdfgh", 1.6)
 
-	_, _, err := client.Search(data)
+	_, _, err := client.SearchProducts(data)
 	assert.EqualError(t, err, "dummy error msg. dummy error msg 2")
 
-	sres, _, err := client.Search(data)
+	sres, _, err := client.SearchProducts(data)
 	assert.NoError(t, err)
 	assert.Equal(t, "p1", sres.Products[0].ProductRetailerID)
 }

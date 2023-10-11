@@ -236,7 +236,7 @@ func GetProductListFromSentenX(productSearch string, catalogID string, threshold
 
 	searchParams := sentenx.NewSearchRequest(productSearch, catalogID, threshold)
 
-	searchResponse, _, err := client.Search(searchParams)
+	searchResponse, _, err := client.SearchProducts(searchParams)
 	if err != nil {
 		return nil, err
 	}

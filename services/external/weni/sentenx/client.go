@@ -96,8 +96,8 @@ func (c *Client) Request(method, url string, body, response interface{}) (*httpx
 	return trace, nil
 }
 
-func (c *Client) Search(data *SearchRequest) (*SearchResponse, *httpx.Trace, error) {
-	requestURL := c.baseURL + "/search"
+func (c *Client) SearchProducts(data *SearchRequest) (*SearchResponse, *httpx.Trace, error) {
+	requestURL := c.baseURL + "/products/search"
 	response := &SearchResponse{}
 
 	trace, err := c.Request("GET", requestURL, data, response)

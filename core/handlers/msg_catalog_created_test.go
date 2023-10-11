@@ -149,6 +149,7 @@ WHERE id=$1;`,
 	rt.Config.SentenXBaseURL = "https://sentenx.weni.ai"
 
 	httpx.SetRequestor(httpx.NewMockRequestor(map[string][]httpx.MockResponse{
+		// WeniGPT
 		rt.Config.WeniGPTBaseURL: {
 			httpx.NewMockResponse(200, nil, `{
 				"delayTime": 2,
@@ -160,7 +161,8 @@ WHERE id=$1;`,
 				}
 			}`),
 		},
-		rt.Config.SentenXBaseURL + "/search": {
+		// SentenX
+		rt.Config.SentenXBaseURL + "/products/search": {
 			httpx.NewMockResponse(200, nil, `{
 				"products": [
 					{
