@@ -79,6 +79,9 @@ type Config struct {
 
 	ZeroshotAPIToken string `help:"secret token for zeroshot API authentication and authorization"`
 	ZeroshotAPIUrl   string `help:"zeroshot API base url"`
+
+	WeniGPTAPIToken string `help:"secret token for wenigpt API authentication and authorization"`
+	WeniGPTAPIUrl   string `help:"wenigpt API base url"`
 }
 
 // NewDefaultConfig returns a new default configuration object
@@ -136,6 +139,9 @@ func NewDefaultConfig() *Config {
 
 		ZeroshotAPIToken: "",
 		ZeroshotAPIUrl:   "http://engine-ai.dev.cloud.weni.ai",
+
+		WeniGPTAPIToken: "",
+		WeniGPTAPIUrl:   "http://engine-ai.dev.cloud.weni.ai",
 	}
 }
 
