@@ -1,0 +1,235 @@
+package catalogs
+
+import (
+	"context"
+	"database/sql"
+	"encoding/json"
+	"fmt"
+	"net/http"
+	"strconv"
+	"sync"
+	"time"
+
+	"github.com/jmoiron/sqlx"
+	"github.com/nyaruka/gocommon/httpx"
+	"github.com/nyaruka/gocommon/uuids"
+	"github.com/nyaruka/goflow/assets"
+	"github.com/nyaruka/goflow/flows"
+	"github.com/nyaruka/goflow/utils"
+	"github.com/nyaruka/mailroom/core/goflow"
+	"github.com/nyaruka/mailroom/core/models"
+	"github.com/nyaruka/mailroom/runtime"
+	"github.com/nyaruka/mailroom/services/external/openai/chatgpt"
+	"github.com/nyaruka/mailroom/services/external/weni/sentenx"
+	"github.com/nyaruka/mailroom/services/external/weni/wenigpt"
+	"github.com/pkg/errors"
+)
+
+const (
+	serviceType = "msg_catalog"
+)
+
+var db *sqlx.DB
+var mu = &sync.Mutex{}
+
+func initDB(dbURL string) error {
+	mu.Lock()
+	defer mu.Unlock()
+	if db == nil {
+		newDB, err := sqlx.Open("postgres", dbURL)
+		if err != nil {
+			return errors.Wrap(err, "unable to open database connection")
+		}
+		SetDB(newDB)
+	}
+	return nil
+}
+
+func SetDB(newDB *sqlx.DB) {
+	db = newDB
+}
+
+func init() {
+	models.RegisterMsgCatalogService(serviceType, NewService)
+}
+
+type service struct {
+	rtConfig   *runtime.Config
+	restClient *http.Client
+	redactor   utils.Redactor
+}
+
+func NewService(rtCfg *runtime.Config, httpClient *http.Client, httpRetries *httpx.RetryConfig, msgCatalog *flows.MsgCatalog, config map[string]string) (models.MsgCatalogService, error) {
+
+	if err := initDB(rtCfg.DB); err != nil {
+		return nil, err
+	}
+
+	return &service{
+		rtConfig:   rtCfg,
+		restClient: httpClient,
+		redactor:   utils.NewRedactor(flows.RedactionMask),
+	}, nil
+}
+
+func (s *service) Call(session flows.Session, params assets.MsgCatalogParam, logHTTP flows.HTTPLogCallback) (*flows.MsgCatalogCall, error) {
+	callResult := &flows.MsgCatalogCall{}
+
+	content := params.ProductSearch
+	productList, err := GetProductListFromWeniGPT(s.rtConfig, content)
+	if err != nil {
+		return nil, err
+	}
+	channelUUID := params.ChannelUUID
+	channel, err := ChannelIDForChannelUUID(db, channelUUID)
+	if err != nil {
+		return nil, err
+	}
+	catalog, err := GetActiveCatalogFromChannel(db, channel.ID())
+	if err != nil {
+		return nil, err
+	}
+	channelThreshold := channel.ConfigValue("threshold", "1.5")
+	searchThreshold, err := strconv.ParseFloat(channelThreshold, 64)
+	if err != nil {
+		return nil, err
+	}
+
+	productRetailerIDS := []string{}
+
+	for _, product := range productList {
+		searchResult, err := GetProductListFromSentenX(product, catalog.FacebookCatalogID(), searchThreshold, s.rtConfig)
+		if err != nil {
+			return nil, errors.Wrapf(err, "on iterate to search products on sentenx")
+		}
+		for _, prod := range searchResult {
+			productRetailerIDS = append(productRetailerIDS, prod["product_retailer_id"])
+		}
+	}
+
+	callResult.ProductRetailerIDS = productRetailerIDS
+
+	return callResult, nil
+}
+
+// ChannelIDForChannelUUID returns the channel id for the passed in channel UUID if any
+func ChannelIDForChannelUUID(db *sqlx.DB, channelUUID uuids.UUID) (models.Channel, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second*30)
+	defer cancel()
+	var channel models.Channel
+	err := db.GetContext(ctx, &channel, `SELECT * FROM channels_channel WHERE uuid = $1 AND is_active = TRUE`, channelUUID)
+	if err != nil {
+		return models.Channel{}, errors.Wrapf(err, "no channel found with uuid: %s", channelUUID)
+	}
+	return channel, nil
+}
+
+func GetProductListFromWeniGPT(rtConfig *runtime.Config, content string) ([]string, error) {
+	httpClient, httpRetries, _ := goflow.HTTP(rtConfig)
+	weniGPTClient := wenigpt.NewClient(httpClient, httpRetries, rtConfig.WeniGPTBaseURL, rtConfig.WeniGPTAuthToken, rtConfig.WeniGPTCookie)
+
+	prompt := fmt.Sprintf(`Give me an unformatted JSON list containing strings with the name of each product taken from the user prompt. Never repeat the same product. Always use this pattern: {\"products\": []}. Request: %s. Response:`, content)
+
+	dr := wenigpt.NewWenigptRequest(
+		prompt,
+		0,
+		0.0,
+		0.0,
+		true,
+		wenigpt.DefaultStopSequences,
+	)
+
+	response, _, err := weniGPTClient.WeniGPTRequest(dr)
+	if err != nil {
+		return nil, errors.Wrapf(err, "error on wewnigpt call fot list products")
+	}
+
+	productsJson := response.Output.Text
+
+	var products map[string][]string
+	err = json.Unmarshal([]byte(productsJson), &products)
+	if err != nil {
+		return nil, errors.Wrapf(err, "error on unmarshalling product list")
+	}
+	return products["products"], nil
+}
+
+const getActiveCatalogSQL = `
+SELECT 
+	id, uuid, facebook_catalog_id, name, created_on, modified_on, is_active, channel_id, org_id
+FROM public.wpp_products_catalog
+WHERE channel_id = $1 AND is_active = true
+`
+
+// GetActiveCatalogFromChannel returns the active catalog from the given channel
+func GetActiveCatalogFromChannel(db *sqlx.DB, channelID models.ChannelID) (*models.CatalogProduct, error) {
+	var catalog models.CatalogProduct
+
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second*30)
+	defer cancel()
+
+	err := db.GetContext(ctx, &catalog, getActiveCatalogSQL, channelID)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return nil, nil
+		}
+		return nil, errors.Wrapf(err, "error getting active catalog for channelID: %d", channelID)
+	}
+
+	return &catalog, nil
+}
+
+func GetProductListFromSentenX(productSearch string, catalogID string, threshold float64, rtConfig *runtime.Config) ([]map[string]string, error) {
+	client := sentenx.NewClient(http.DefaultClient, nil, rtConfig.SentenXBaseURL)
+
+	searchParams := sentenx.NewSearchRequest(productSearch, catalogID, threshold)
+
+	searchResponse, _, err := client.SearchProducts(searchParams)
+	if err != nil {
+		return nil, err
+	}
+
+	pmap := []map[string]string{}
+	for _, p := range searchResponse.Products {
+		mapElement := map[string]string{"product_retailer_id": p.ProductRetailerID}
+		pmap = append(pmap, mapElement)
+	}
+
+	return pmap, nil
+}
+
+func GetProductListFromChatGPT(ctx context.Context, rt *runtime.Runtime, content string) ([]string, error) {
+	httpClient, httpRetries, _ := goflow.HTTP(rt.Config)
+	chatGPTClient := chatgpt.NewClient(httpClient, httpRetries, rt.Config.ChatGPTBaseURL, rt.Config.ChatGPTKey)
+
+	prompt1 := chatgpt.ChatCompletionMessage{
+		Role:    chatgpt.ChatMessageRoleSystem,
+		Content: "Give me an unformatted JSON list containing strings with the name of each product taken from the user prompt.",
+	}
+	prompt2 := chatgpt.ChatCompletionMessage{
+		Role:    chatgpt.ChatMessageRoleSystem,
+		Content: "Never repeat the same product.",
+	}
+	prompt3 := chatgpt.ChatCompletionMessage{
+		Role:    chatgpt.ChatMessageRoleSystem,
+		Content: "Always use this pattern: {\"products\": []}",
+	}
+	question := chatgpt.ChatCompletionMessage{
+		Role:    chatgpt.ChatMessageRoleUser,
+		Content: content,
+	}
+	completionRequest := chatgpt.NewChatCompletionRequest([]chatgpt.ChatCompletionMessage{prompt1, prompt2, prompt3, question})
+	response, _, err := chatGPTClient.CreateChatCompletion(completionRequest)
+	if err != nil {
+		return nil, errors.Wrapf(err, "error on chatgpt call for list products")
+	}
+
+	productsJson := response.Choices[0].Message.Content
+
+	var products map[string][]string
+	err = json.Unmarshal([]byte(productsJson), &products)
+	if err != nil {
+		return nil, errors.Wrapf(err, "error on unmarshalling product list")
+	}
+	return products["products"], nil
+}

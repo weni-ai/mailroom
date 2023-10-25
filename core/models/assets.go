@@ -79,6 +79,8 @@ type OrgAssets struct {
 	externalServices       []assets.ExternalService
 	externalServicesByID   map[ExternalServiceID]*ExternalService
 	externalServicesByUUID map[assets.ExternalServiceUUID]*ExternalService
+
+	msgCatalogs []assets.MsgCatalog
 }
 
 var ErrNotFound = errors.New("not found")
@@ -381,6 +383,10 @@ func NewOrgAssets(ctx context.Context, rt *runtime.Runtime, orgID OrgID, prev *O
 		oa.externalServicesByUUID = prev.externalServicesByUUID
 	}
 
+	if prev == nil || refresh&RefreshMsgCatalogs > 0 {
+		oa.msgCatalogs = []assets.MsgCatalog{}
+	}
+
 	// intialize our session assets
 	oa.sessionAssets, err = engine.NewSessionAssets(oa.Env(), oa, goflow.MigrationConfig(rt.Config))
 	if err != nil {
@@ -414,6 +420,7 @@ const (
 	RefreshTopics           = Refresh(1 << 15)
 	RefreshUsers            = Refresh(1 << 16)
 	RefreshExternalServices = Refresh(1 << 17)
+	RefreshMsgCatalogs      = Refresh(1 << 18)
 )
 
 // GetOrgAssets creates or gets org assets for the passed in org
@@ -705,4 +712,8 @@ func (a *OrgAssets) ExternalServiceByID(id ExternalServiceID) *ExternalService {
 
 func (a *OrgAssets) ExternalServiceByUUID(uuid assets.ExternalServiceUUID) *ExternalService {
 	return a.externalServicesByUUID[uuid]
+}
+
+func (a *OrgAssets) MsgCatalogs() ([]assets.MsgCatalog, error) {
+	return a.msgCatalogs, nil
 }

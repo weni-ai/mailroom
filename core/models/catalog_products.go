@@ -1,17 +1,37 @@
 package models
 
 import (
-	"context"
-	"database/sql"
+	"database/sql/driver"
+	"net/http"
 	"time"
 
-	"github.com/jmoiron/sqlx"
+	"github.com/nyaruka/gocommon/httpx"
 	"github.com/nyaruka/gocommon/uuids"
+	"github.com/nyaruka/goflow/flows"
+	"github.com/nyaruka/goflow/flows/engine"
+	"github.com/nyaruka/mailroom/core/goflow"
+	"github.com/nyaruka/mailroom/runtime"
 	"github.com/nyaruka/null"
 	"github.com/pkg/errors"
 )
 
 type CatalogID null.Int
+
+func (i CatalogID) MarshalJSON() ([]byte, error) {
+	return null.Int(i).MarshalJSON()
+}
+
+func (i *CatalogID) UnmarshalJSON(b []byte) error {
+	return null.UnmarshalInt(b, (*null.Int)(i))
+}
+
+func (i CatalogID) Value() (driver.Value, error) {
+	return null.Int(i).Value()
+}
+
+func (i *CatalogID) Scan(value interface{}) error {
+	return null.ScanInt(value, (*null.Int)(i))
+}
 
 // CatalogProduct represents a product catalog from Whatsapp channels.
 type CatalogProduct struct {
@@ -38,24 +58,50 @@ func (c *CatalogProduct) IsActive() bool            { return c.c.IsActive }
 func (c *CatalogProduct) ChannelID() ChannelID      { return c.c.ChannelID }
 func (c *CatalogProduct) OrgID() OrgID              { return c.c.OrgID }
 
-const getActiveCatalogSQL = `
-SELECT 
-	id, uuid, facebook_catalog_id, name, created_on, modified_on, is_active, channel_id, org_id
-FROM public.wpp_products_catalog
-WHERE channel_id = $1 AND is_active = true
-`
+type MsgCatalog struct {
+	e struct {
+		ID          CatalogID         `json:"id,omitempty"`
+		ChannelUUID uuids.UUID        `json:"uuid,omitempty"`
+		OrgID       OrgID             `json:"org_id,omitempty"`
+		Name        string            `json:"name,omitempty"`
+		Config      map[string]string `json:"config,omitempty"`
+		Type        string            `json:"type,omitempty"`
+	}
+}
 
-// GetActiveCatalogFromChannel returns the active catalog from the given channel
-func GetActiveCatalogFromChannel(ctx context.Context, db sqlx.DB, channelID ChannelID) (*CatalogProduct, error) {
-	var catalog CatalogProduct
+func (c *MsgCatalog) ChannelUUID() uuids.UUID { return c.e.ChannelUUID }
+func (c *MsgCatalog) Name() string            { return c.e.Name }
+func (c *MsgCatalog) Type() string            { return c.e.Type }
 
-	err := db.GetContext(ctx, &catalog.c, getActiveCatalogSQL, channelID)
-	if err != nil {
-		if err == sql.ErrNoRows {
-			return nil, nil
-		}
-		return nil, errors.Wrapf(err, "error getting active catalog for channelID: %d", channelID)
+func init() {
+	goflow.RegisterMsgCatalogServiceFactory(msgCatalogServiceFactory)
+}
+
+func msgCatalogServiceFactory(c *runtime.Config) engine.MsgCatalogServiceFactory {
+	return func(session flows.Session, msgCatalog *flows.MsgCatalog) (flows.MsgCatalogService, error) {
+		return msgCatalog.Asset().(*MsgCatalog).AsService(c, msgCatalog)
+	}
+}
+
+func (e *MsgCatalog) AsService(cfg *runtime.Config, msgCatalog *flows.MsgCatalog) (MsgCatalogService, error) {
+	httpClient, httpRetries, _ := goflow.HTTP(cfg)
+
+	initFunc := msgCatalogServices["msg_catalog"]
+	if initFunc != nil {
+		return initFunc(cfg, httpClient, httpRetries, msgCatalog, e.e.Config)
 	}
 
-	return &catalog, nil
+	return nil, errors.Errorf("unrecognized product catalog '%s'", e.e.Name)
+}
+
+type MsgCatalogServiceFunc func(*runtime.Config, *http.Client, *httpx.RetryConfig, *flows.MsgCatalog, map[string]string) (MsgCatalogService, error)
+
+var msgCatalogServices = map[string]MsgCatalogServiceFunc{}
+
+type MsgCatalogService interface {
+	flows.MsgCatalogService
+}
+
+func RegisterMsgCatalogService(name string, initFunc MsgCatalogServiceFunc) {
+	msgCatalogServices[name] = initFunc
 }

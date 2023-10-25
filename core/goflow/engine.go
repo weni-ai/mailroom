@@ -20,6 +20,7 @@ var classificationFactory func(*runtime.Config) engine.ClassificationServiceFact
 var ticketFactory func(*runtime.Config) engine.TicketServiceFactory
 var airtimeFactory func(*runtime.Config) engine.AirtimeServiceFactory
 var externalServiceFactory func(*runtime.Config) engine.ExternalServiceServiceFactory
+var msgCatalogFactory func(*runtime.Config) engine.MsgCatalogServiceFactory
 
 // RegisterEmailServiceFactory can be used by outside callers to register a email factory
 // for use by the engine
@@ -49,6 +50,10 @@ func RegisterExternalServiceServiceFactory(f func(*runtime.Config) engine.Extern
 	externalServiceFactory = f
 }
 
+func RegisterMsgCatalogServiceFactory(f func(*runtime.Config) engine.MsgCatalogServiceFactory) {
+	msgCatalogFactory = f
+}
+
 // Engine returns the global engine instance for use with real sessions
 func Engine(c *runtime.Config) flows.Engine {
 	engInit.Do(func() {
@@ -65,6 +70,7 @@ func Engine(c *runtime.Config) flows.Engine {
 			WithEmailServiceFactory(emailFactory(c)).
 			WithTicketServiceFactory(ticketFactory(c)).
 			WithExternalServiceServiceFactory(externalServiceFactory((c))).
+			WithMsgCatalogServiceFactory(msgCatalogFactory((c))). // msg catalog
 			WithAirtimeServiceFactory(airtimeFactory(c)).
 			WithMaxStepsPerSprint(c.MaxStepsPerSprint).
 			WithMaxResumesPerSession(c.MaxResumesPerSession).
@@ -88,6 +94,7 @@ func Simulator(c *runtime.Config) flows.Engine {
 			WithWebhookServiceFactory(webhooks.NewServiceFactory(httpClient, nil, httpAccess, webhookHeaders, c.WebhooksMaxBodyBytes)).
 			WithClassificationServiceFactory(classificationFactory(c)).     // simulated sessions do real classification
 			WithExternalServiceServiceFactory(externalServiceFactory((c))). // and real external services
+			WithMsgCatalogServiceFactory(msgCatalogFactory((c))).           // msg catalog
 			WithEmailServiceFactory(simulatorEmailServiceFactory).          // but faked emails
 			WithTicketServiceFactory(simulatorTicketServiceFactory).        // and faked tickets
 			WithAirtimeServiceFactory(simulatorAirtimeServiceFactory).      // and faked airtime transfers

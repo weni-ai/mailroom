@@ -332,7 +332,7 @@ func NewOutgoingFlowMsg(rt *runtime.Runtime, org *Org, channel *Channel, session
 }
 
 // NewOutgoingFlowMsgCatalog creates an outgoing message for the passed in flow message
-func NewOutgoingFlowMsgCatalog(rt *runtime.Runtime, org *Org, channel *Channel, session *Session, out *flows.MsgCatalog, createdOn time.Time) (*Msg, error) {
+func NewOutgoingFlowMsgCatalog(rt *runtime.Runtime, org *Org, channel *Channel, session *Session, out *flows.MsgCatalogOut, createdOn time.Time) (*Msg, error) {
 	return newOutgoingMsgCatalog(rt, org, channel, session.ContactID(), out, createdOn, session, NilBroadcastID)
 }
 
@@ -428,7 +428,7 @@ func newOutgoingMsg(rt *runtime.Runtime, org *Org, channel *Channel, contactID C
 	return msg, nil
 }
 
-func newOutgoingMsgCatalog(rt *runtime.Runtime, org *Org, channel *Channel, contactID ContactID, msgCatalog *flows.MsgCatalog, createdOn time.Time, session *Session, broadcastID BroadcastID) (*Msg, error) {
+func newOutgoingMsgCatalog(rt *runtime.Runtime, org *Org, channel *Channel, contactID ContactID, msgCatalog *flows.MsgCatalogOut, createdOn time.Time, session *Session, broadcastID BroadcastID) (*Msg, error) {
 	msg := &Msg{}
 	m := &msg.m
 	m.UUID = msgCatalog.UUID()
