@@ -80,7 +80,9 @@ type OrgAssets struct {
 	externalServicesByID   map[ExternalServiceID]*ExternalService
 	externalServicesByUUID map[assets.ExternalServiceUUID]*ExternalService
 
-	msgCatalogs []assets.MsgCatalog
+	msgCatalogs       []assets.MsgCatalog
+	msgCatalogsByID   map[CatalogID]*MsgCatalog
+	msgCatalogsByUUID map[assets.MsgCatalogUUID]*MsgCatalog
 }
 
 var ErrNotFound = errors.New("not found")
@@ -384,7 +386,20 @@ func NewOrgAssets(ctx context.Context, rt *runtime.Runtime, orgID OrgID, prev *O
 	}
 
 	if prev == nil || refresh&RefreshMsgCatalogs > 0 {
-		oa.msgCatalogs = []assets.MsgCatalog{}
+		oa.msgCatalogs, err = loadCatalog(ctx, db, orgID)
+		if err != nil {
+			return nil, errors.Wrapf(err, "error loading catalogs for org %d", orgID)
+		}
+		oa.msgCatalogsByID = make(map[CatalogID]*MsgCatalog)
+		oa.msgCatalogsByUUID = make(map[assets.MsgCatalogUUID]*MsgCatalog)
+		for _, a := range oa.msgCatalogs {
+			oa.msgCatalogsByID[a.(*MsgCatalog).c.ID] = a.(*MsgCatalog)
+			oa.msgCatalogsByUUID[a.UUID()] = a.(*MsgCatalog)
+		}
+	} else {
+		oa.msgCatalogs = prev.msgCatalogs
+		oa.msgCatalogsByID = prev.msgCatalogsByID
+		oa.msgCatalogsByUUID = prev.msgCatalogsByUUID
 	}
 
 	// intialize our session assets

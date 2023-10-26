@@ -2,7 +2,6 @@ package catalogs
 
 import (
 	"context"
-	"database/sql"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -85,7 +84,11 @@ func (s *service) Call(session flows.Session, params assets.MsgCatalogParam, log
 	if err != nil {
 		return nil, err
 	}
-	catalog, err := GetActiveCatalogFromChannel(db, channel.ID())
+
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second*30)
+	defer cancel()
+
+	catalog, err := models.GetActiveCatalogFromChannel(ctx, *db, channel.ID())
 	if err != nil {
 		return nil, err
 	}
@@ -152,31 +155,6 @@ func GetProductListFromWeniGPT(rtConfig *runtime.Config, content string) ([]stri
 		return nil, errors.Wrapf(err, "error on unmarshalling product list")
 	}
 	return products["products"], nil
-}
-
-const getActiveCatalogSQL = `
-SELECT 
-	id, uuid, facebook_catalog_id, name, created_on, modified_on, is_active, channel_id, org_id
-FROM public.wpp_products_catalog
-WHERE channel_id = $1 AND is_active = true
-`
-
-// GetActiveCatalogFromChannel returns the active catalog from the given channel
-func GetActiveCatalogFromChannel(db *sqlx.DB, channelID models.ChannelID) (*models.CatalogProduct, error) {
-	var catalog models.CatalogProduct
-
-	ctx, cancel := context.WithTimeout(context.Background(), time.Second*30)
-	defer cancel()
-
-	err := db.GetContext(ctx, &catalog, getActiveCatalogSQL, channelID)
-	if err != nil {
-		if err == sql.ErrNoRows {
-			return nil, nil
-		}
-		return nil, errors.Wrapf(err, "error getting active catalog for channelID: %d", channelID)
-	}
-
-	return &catalog, nil
 }
 
 func GetProductListFromSentenX(productSearch string, catalogID string, threshold float64, rtConfig *runtime.Config) ([]map[string]string, error) {

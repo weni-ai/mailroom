@@ -1,18 +1,23 @@
 package models
 
 import (
+	"context"
+	"database/sql"
 	"database/sql/driver"
 	"net/http"
 	"time"
 
+	"github.com/jmoiron/sqlx"
 	"github.com/nyaruka/gocommon/httpx"
-	"github.com/nyaruka/gocommon/uuids"
+	"github.com/nyaruka/goflow/assets"
 	"github.com/nyaruka/goflow/flows"
 	"github.com/nyaruka/goflow/flows/engine"
 	"github.com/nyaruka/mailroom/core/goflow"
 	"github.com/nyaruka/mailroom/runtime"
+	"github.com/nyaruka/mailroom/utils/dbutil"
 	"github.com/nyaruka/null"
 	"github.com/pkg/errors"
+	"github.com/sirupsen/logrus"
 )
 
 type CatalogID null.Int
@@ -33,45 +38,47 @@ func (i *CatalogID) Scan(value interface{}) error {
 	return null.ScanInt(value, (*null.Int)(i))
 }
 
-// CatalogProduct represents a product catalog from Whatsapp channels.
-type CatalogProduct struct {
-	c struct {
-		ID                CatalogID  `db:"id"`
-		UUID              uuids.UUID `db:"uuid"`
-		FacebookCatalogID string     `db:"facebook_catalog_id"`
-		Name              string     `db:"name"`
-		CreatedOn         time.Time  `db:"created_on"`
-		ModifiedOn        time.Time  `db:"modified_on"`
-		IsActive          bool       `db:"is_active"`
-		ChannelID         ChannelID  `db:"channel_id"`
-		OrgID             OrgID      `db:"org_id"`
-	}
-}
-
-func (c *CatalogProduct) ID() CatalogID             { return c.c.ID }
-func (c *CatalogProduct) UUID() uuids.UUID          { return c.c.UUID }
-func (c *CatalogProduct) FacebookCatalogID() string { return c.c.FacebookCatalogID }
-func (c *CatalogProduct) Name() string              { return c.c.Name }
-func (c *CatalogProduct) CreatedOn() time.Time      { return c.c.CreatedOn }
-func (c *CatalogProduct) ModifiedOn() time.Time     { return c.c.ModifiedOn }
-func (c *CatalogProduct) IsActive() bool            { return c.c.IsActive }
-func (c *CatalogProduct) ChannelID() ChannelID      { return c.c.ChannelID }
-func (c *CatalogProduct) OrgID() OrgID              { return c.c.OrgID }
-
+// MsgCatalog represents a product catalog from Whatsapp channels.
 type MsgCatalog struct {
-	e struct {
-		ID          CatalogID         `json:"id,omitempty"`
-		ChannelUUID uuids.UUID        `json:"uuid,omitempty"`
-		OrgID       OrgID             `json:"org_id,omitempty"`
-		Name        string            `json:"name,omitempty"`
-		Config      map[string]string `json:"config,omitempty"`
-		Type        string            `json:"type,omitempty"`
+	c struct {
+		ID                CatalogID             `db:"id"`
+		UUID              assets.MsgCatalogUUID `db:"uuid"`
+		FacebookCatalogID string                `db:"facebook_catalog_id"`
+		Name              string                `db:"name"`
+		CreatedOn         time.Time             `db:"created_on"`
+		ModifiedOn        time.Time             `db:"modified_on"`
+		IsActive          bool                  `db:"is_active"`
+		ChannelID         ChannelID             `db:"channel_id"`
+		OrgID             OrgID                 `db:"org_id"`
+		Type              string
 	}
 }
 
-func (c *MsgCatalog) ChannelUUID() uuids.UUID { return c.e.ChannelUUID }
-func (c *MsgCatalog) Name() string            { return c.e.Name }
-func (c *MsgCatalog) Type() string            { return c.e.Type }
+func (c *MsgCatalog) ID() CatalogID               { return c.c.ID }
+func (c *MsgCatalog) UUID() assets.MsgCatalogUUID { return c.c.UUID }
+func (c *MsgCatalog) FacebookCatalogID() string   { return c.c.FacebookCatalogID }
+func (c *MsgCatalog) Name() string                { return c.c.Name }
+func (c *MsgCatalog) CreatedOn() time.Time        { return c.c.CreatedOn }
+func (c *MsgCatalog) ModifiedOn() time.Time       { return c.c.ModifiedOn }
+func (c *MsgCatalog) IsActive() bool              { return c.c.IsActive }
+func (c *MsgCatalog) ChannelID() ChannelID        { return c.c.ChannelID }
+func (c *MsgCatalog) OrgID() OrgID                { return c.c.OrgID }
+func (c *MsgCatalog) Type() string                { return c.c.Type }
+
+// type MsgCatalog struct {
+// 	e struct {
+// 		ID          CatalogID         `json:"id,omitempty"`
+// 		ChannelUUID uuids.UUID        `json:"uuid,omitempty"`
+// 		OrgID       OrgID             `json:"org_id,omitempty"`
+// 		Name        string            `json:"name,omitempty"`
+// 		Config      map[string]string `json:"config,omitempty"`
+// 		Type        string            `json:"type,omitempty"`
+// 	}
+// }
+
+// func (c *MsgCatalog) ChannelUUID() uuids.UUID { return c.e.ChannelUUID }
+// func (c *MsgCatalog) Name() string            { return c.e.Name }
+// func (c *MsgCatalog) Type() string            { return c.e.Type }
 
 func init() {
 	goflow.RegisterMsgCatalogServiceFactory(msgCatalogServiceFactory)
@@ -88,10 +95,10 @@ func (e *MsgCatalog) AsService(cfg *runtime.Config, msgCatalog *flows.MsgCatalog
 
 	initFunc := msgCatalogServices["msg_catalog"]
 	if initFunc != nil {
-		return initFunc(cfg, httpClient, httpRetries, msgCatalog, e.e.Config)
+		return initFunc(cfg, httpClient, httpRetries, msgCatalog, nil)
 	}
 
-	return nil, errors.Errorf("unrecognized product catalog '%s'", e.e.Name)
+	return nil, errors.Errorf("unrecognized product catalog '%s'", e.Name)
 }
 
 type MsgCatalogServiceFunc func(*runtime.Config, *http.Client, *httpx.RetryConfig, *flows.MsgCatalog, map[string]string) (MsgCatalogService, error)
@@ -105,3 +112,70 @@ type MsgCatalogService interface {
 func RegisterMsgCatalogService(name string, initFunc MsgCatalogServiceFunc) {
 	msgCatalogServices[name] = initFunc
 }
+
+const getActiveCatalogSQL = `
+SELECT 
+	id, uuid, facebook_catalog_id, name, created_on, modified_on, is_active, channel_id, org_id
+FROM public.wpp_products_catalog
+WHERE channel_id = $1 AND is_active = true
+`
+
+// GetActiveCatalogFromChannel returns the active catalog from the given channel
+func GetActiveCatalogFromChannel(ctx context.Context, db sqlx.DB, channelID ChannelID) (*MsgCatalog, error) {
+	var catalog MsgCatalog
+
+	err := db.GetContext(ctx, &catalog.c, getActiveCatalogSQL, channelID)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return nil, nil
+		}
+		return nil, errors.Wrapf(err, "error getting active catalog for channelID: %d", channelID)
+	}
+
+	return &catalog, nil
+}
+
+func loadCatalog(ctx context.Context, db sqlx.Queryer, orgID OrgID) ([]assets.MsgCatalog, error) {
+	start := time.Now()
+
+	rows, err := db.Queryx(selectOrgCatalogSQL, orgID)
+	if err != nil && err != sql.ErrNoRows {
+		return nil, errors.Wrapf(err, "error querying external service for org: %d", orgID)
+	}
+	defer rows.Close()
+
+	catalog := make([]assets.MsgCatalog, 0)
+	for rows.Next() {
+		msgCatalog := &MsgCatalog{}
+		err := dbutil.ReadJSONRow(rows, &msgCatalog.c)
+		if err != nil {
+			return nil, errors.Wrapf(err, "error unmarshalling external service")
+		}
+		catalog = append(catalog, msgCatalog)
+	}
+
+	logrus.WithField("elapsed", time.Since(start)).WithField("org_id", orgID).WithField("count", len(catalog)).Debug("loaded external services")
+
+	return catalog, nil
+}
+
+const selectOrgCatalogSQL = `
+SELECT ROW_TO_JSON(r) FROM (SELECT
+	c.id as id,
+	c.uuid as uuid,
+	c.facebook_catalog_id as facebook_catalog_id,
+	c.name as name,
+	c.created_on as created_on,
+	c.org_id as org_id,
+	c.modified_on as modified_on,
+	c.is_active as is_active,
+	c.channel_id as channel_id
+FROM
+    public.wpp_products_catalog c
+WHERE
+	c.org_id = $1 AND
+	c.is_active = TRUE
+ORDER BY
+	c.created_on ASC
+) r;
+`
