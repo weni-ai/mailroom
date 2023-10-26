@@ -50,35 +50,22 @@ type MsgCatalog struct {
 		IsActive          bool                  `db:"is_active"`
 		ChannelID         ChannelID             `db:"channel_id"`
 		OrgID             OrgID                 `db:"org_id"`
+		ChannelUUID       assets.ChannelUUID
 		Type              string
 	}
 }
 
-func (c *MsgCatalog) ID() CatalogID               { return c.c.ID }
-func (c *MsgCatalog) UUID() assets.MsgCatalogUUID { return c.c.UUID }
-func (c *MsgCatalog) FacebookCatalogID() string   { return c.c.FacebookCatalogID }
-func (c *MsgCatalog) Name() string                { return c.c.Name }
-func (c *MsgCatalog) CreatedOn() time.Time        { return c.c.CreatedOn }
-func (c *MsgCatalog) ModifiedOn() time.Time       { return c.c.ModifiedOn }
-func (c *MsgCatalog) IsActive() bool              { return c.c.IsActive }
-func (c *MsgCatalog) ChannelID() ChannelID        { return c.c.ChannelID }
-func (c *MsgCatalog) OrgID() OrgID                { return c.c.OrgID }
-func (c *MsgCatalog) Type() string                { return c.c.Type }
-
-// type MsgCatalog struct {
-// 	e struct {
-// 		ID          CatalogID         `json:"id,omitempty"`
-// 		ChannelUUID uuids.UUID        `json:"uuid,omitempty"`
-// 		OrgID       OrgID             `json:"org_id,omitempty"`
-// 		Name        string            `json:"name,omitempty"`
-// 		Config      map[string]string `json:"config,omitempty"`
-// 		Type        string            `json:"type,omitempty"`
-// 	}
-// }
-
-// func (c *MsgCatalog) ChannelUUID() uuids.UUID { return c.e.ChannelUUID }
-// func (c *MsgCatalog) Name() string            { return c.e.Name }
-// func (c *MsgCatalog) Type() string            { return c.e.Type }
+func (c *MsgCatalog) ID() CatalogID                   { return c.c.ID }
+func (c *MsgCatalog) UUID() assets.MsgCatalogUUID     { return c.c.UUID }
+func (c *MsgCatalog) FacebookCatalogID() string       { return c.c.FacebookCatalogID }
+func (c *MsgCatalog) Name() string                    { return c.c.Name }
+func (c *MsgCatalog) CreatedOn() time.Time            { return c.c.CreatedOn }
+func (c *MsgCatalog) ModifiedOn() time.Time           { return c.c.ModifiedOn }
+func (c *MsgCatalog) IsActive() bool                  { return c.c.IsActive }
+func (c *MsgCatalog) ChannelID() ChannelID            { return c.c.ChannelID }
+func (c *MsgCatalog) OrgID() OrgID                    { return c.c.OrgID }
+func (c *MsgCatalog) Type() string                    { return c.c.Type }
+func (c *MsgCatalog) ChannelUUID() assets.ChannelUUID { return c.c.ChannelUUID }
 
 func init() {
 	goflow.RegisterMsgCatalogServiceFactory(msgCatalogServiceFactory)
@@ -135,7 +122,7 @@ func GetActiveCatalogFromChannel(ctx context.Context, db sqlx.DB, channelID Chan
 	return &catalog, nil
 }
 
-func loadCatalog(ctx context.Context, db sqlx.Queryer, orgID OrgID) ([]assets.MsgCatalog, error) {
+func loadCatalog(ctx context.Context, db *sqlx.DB, orgID OrgID) ([]assets.MsgCatalog, error) {
 	start := time.Now()
 
 	rows, err := db.Queryx(selectOrgCatalogSQL, orgID)
@@ -151,6 +138,11 @@ func loadCatalog(ctx context.Context, db sqlx.Queryer, orgID OrgID) ([]assets.Ms
 		if err != nil {
 			return nil, errors.Wrapf(err, "error unmarshalling external service")
 		}
+		channelUUID, err := ChannelUUIDForChannelID(ctx, db, msgCatalog.ChannelID())
+		if err != nil {
+			return nil, err
+		}
+		msgCatalog.c.ChannelUUID = channelUUID
 		catalog = append(catalog, msgCatalog)
 	}
 
@@ -179,3 +171,13 @@ ORDER BY
 	c.created_on ASC
 ) r;
 `
+
+// ChannelForChannelID returns the channel for the passed in channel ID if any
+func ChannelUUIDForChannelID(ctx context.Context, db *sqlx.DB, channelID ChannelID) (assets.ChannelUUID, error) {
+	var channelUUID assets.ChannelUUID
+	err := db.GetContext(ctx, &channelUUID, `SELECT uuid FROM channels_channel WHERE id = $1 AND is_active = TRUE`, channelID)
+	if err != nil {
+		return assets.ChannelUUID(""), errors.Wrapf(err, "no channel found with id: %s", channelID)
+	}
+	return channelUUID, nil
+}
