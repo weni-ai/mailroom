@@ -41,17 +41,17 @@ func (i *CatalogID) Scan(value interface{}) error {
 // MsgCatalog represents a product catalog from Whatsapp channels.
 type MsgCatalog struct {
 	c struct {
-		ID                CatalogID             `db:"id"`
-		UUID              assets.MsgCatalogUUID `db:"uuid"`
-		FacebookCatalogID string                `db:"facebook_catalog_id"`
-		Name              string                `db:"name"`
-		CreatedOn         time.Time             `db:"created_on"`
-		ModifiedOn        time.Time             `db:"modified_on"`
-		IsActive          bool                  `db:"is_active"`
-		ChannelID         ChannelID             `db:"channel_id"`
-		OrgID             OrgID                 `db:"org_id"`
-		ChannelUUID       assets.ChannelUUID
-		Type              string
+		ID                CatalogID             `json:"id"`
+		UUID              assets.MsgCatalogUUID `json:"uuid"`
+		FacebookCatalogID string                `json:"facebook_catalog_id"`
+		Name              string                `json:"name"`
+		CreatedOn         time.Time             `json:"created_on"`
+		ModifiedOn        time.Time             `json:"modified_on"`
+		IsActive          bool                  `json:"is_active"`
+		ChannelID         ChannelID             `json:"channel_id"`
+		OrgID             OrgID                 `json:"org_id"`
+		ChannelUUID       assets.ChannelUUID    `json:"channel_uuid"`
+		Type              string                `json:"type"`
 	}
 }
 
@@ -143,6 +143,7 @@ func loadCatalog(ctx context.Context, db *sqlx.DB, orgID OrgID) ([]assets.MsgCat
 			return nil, err
 		}
 		msgCatalog.c.ChannelUUID = channelUUID
+		msgCatalog.c.Type = "msg_catalog"
 		catalog = append(catalog, msgCatalog)
 	}
 

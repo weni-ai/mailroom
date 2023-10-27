@@ -25,7 +25,7 @@ type Input struct {
 }
 
 type Output struct {
-	Text string `json:"text"`
+	Text []string `json:"text"`
 }
 
 type SamplingParams struct {

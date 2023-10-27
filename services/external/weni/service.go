@@ -80,7 +80,7 @@ func (s *service) Call(session flows.Session, params assets.MsgCatalogParam, log
 		return nil, err
 	}
 	channelUUID := params.ChannelUUID
-	channel, err := ChannelIDForChannelUUID(db, channelUUID)
+	channel, err := ChannelForChannelUUID(db, channelUUID)
 	if err != nil {
 		return nil, err
 	}
@@ -115,12 +115,12 @@ func (s *service) Call(session flows.Session, params assets.MsgCatalogParam, log
 	return callResult, nil
 }
 
-// ChannelIDForChannelUUID returns the channel id for the passed in channel UUID if any
-func ChannelIDForChannelUUID(db *sqlx.DB, channelUUID uuids.UUID) (models.Channel, error) {
+// ChannelForChannelUUID returns the channel id for the passed in channel UUID if any
+func ChannelForChannelUUID(db *sqlx.DB, channelUUID uuids.UUID) (models.Channel, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*30)
 	defer cancel()
 	var channel models.Channel
-	err := db.GetContext(ctx, &channel, `SELECT * FROM channels_channel WHERE uuid = $1 AND is_active = TRUE`, channelUUID)
+	err := db.GetContext(ctx, &channel, `SELECT id, uuid, parent_id, name, address, channel_type, tps, country, scheme, roles, match_prefixes, allow_international, machine_detection, config FROM channels_channel WHERE uuid = $1 AND is_active = TRUE`, channelUUID)
 	if err != nil {
 		return models.Channel{}, errors.Wrapf(err, "no channel found with uuid: %s", channelUUID)
 	}
@@ -131,7 +131,7 @@ func GetProductListFromWeniGPT(rtConfig *runtime.Config, content string) ([]stri
 	httpClient, httpRetries, _ := goflow.HTTP(rtConfig)
 	weniGPTClient := wenigpt.NewClient(httpClient, httpRetries, rtConfig.WeniGPTBaseURL, rtConfig.WeniGPTAuthToken, rtConfig.WeniGPTCookie)
 
-	prompt := fmt.Sprintf(`Give me an unformatted JSON list containing strings with the name of each product taken from the user prompt. Never repeat the same product. Always use this pattern: {\"products\": []}. Request: %s. Response:`, content)
+	prompt := fmt.Sprintf(`Give me an unformatted JSON list containing strings with the name of each product taken from the user prompt. Never repeat the same product. Always return a valid json using this pattern: {\"products\": []} Request: %s. Response:`, content)
 
 	dr := wenigpt.NewWenigptRequest(
 		prompt,
@@ -147,7 +147,7 @@ func GetProductListFromWeniGPT(rtConfig *runtime.Config, content string) ([]stri
 		return nil, errors.Wrapf(err, "error on wewnigpt call fot list products")
 	}
 
-	productsJson := response.Output.Text
+	productsJson := response.Output.Text[0]
 
 	var products map[string][]string
 	err = json.Unmarshal([]byte(productsJson), &products)
