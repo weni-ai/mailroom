@@ -154,6 +154,10 @@ func GetProductListFromSentenX(productSearch string, catalogID string, threshold
 		return nil, err
 	}
 
+	if len(searchResponse.Products) < 1 {
+		return nil, errors.New("no products found on sentenx")
+	}
+
 	pmap := []map[string]string{}
 	for _, p := range searchResponse.Products {
 		mapElement := map[string]string{"product_retailer_id": p.ProductRetailerID}
