@@ -496,7 +496,6 @@ func newOutgoingMsgCatalog(rt *runtime.Runtime, org *Org, channel *Channel, cont
 		}
 		if msgCatalog.Smart() {
 			metadata["send_catalog"] = false
-			metadata["products"] = []string{}
 		}
 
 		m.Metadata = null.NewMap(metadata)
