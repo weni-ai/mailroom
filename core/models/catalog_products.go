@@ -101,22 +101,41 @@ func RegisterMsgCatalogService(name string, initFunc MsgCatalogServiceFunc) {
 }
 
 const getActiveCatalogSQL = `
-SELECT 
-	id, uuid, facebook_catalog_id, name, created_on, modified_on, is_active, channel_id, org_id
-FROM public.wpp_products_catalog
-WHERE channel_id = $1 AND is_active = true
+SELECT  ROW_TO_JSON(r) FROM (SELECT 
+	c.id as id,
+	c.uuid as uuid,
+	c.facebook_catalog_id  as facebook_catalog_id,
+	c.name as name,
+	c.created_on as created_on,
+	c.modified_on as modified_on,
+	c.is_active as is_active,
+	c.channel_id as channel_id,
+	c.org_id as org_id
+FROM 
+	public.wpp_products_catalog c
+WHERE
+	channel_id = $1 AND is_active = true
+) r;
 `
 
 // GetActiveCatalogFromChannel returns the active catalog from the given channel
 func GetActiveCatalogFromChannel(ctx context.Context, db sqlx.DB, channelID ChannelID) (*MsgCatalog, error) {
 	var catalog MsgCatalog
 
-	err := db.GetContext(ctx, &catalog.c, getActiveCatalogSQL, channelID)
+	rows, err := db.QueryxContext(ctx, getActiveCatalogSQL, channelID)
 	if err != nil {
 		if err == sql.ErrNoRows {
 			return nil, nil
 		}
 		return nil, errors.Wrapf(err, "error getting active catalog for channelID: %d", channelID)
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		err = dbutil.ReadJSONRow(rows, &catalog.c)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	return &catalog, nil

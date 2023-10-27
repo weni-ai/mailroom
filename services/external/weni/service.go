@@ -11,7 +11,6 @@ import (
 
 	"github.com/jmoiron/sqlx"
 	"github.com/nyaruka/gocommon/httpx"
-	"github.com/nyaruka/gocommon/uuids"
 	"github.com/nyaruka/goflow/assets"
 	"github.com/nyaruka/goflow/flows"
 	"github.com/nyaruka/goflow/utils"
@@ -74,19 +73,19 @@ func NewService(rtCfg *runtime.Config, httpClient *http.Client, httpRetries *htt
 func (s *service) Call(session flows.Session, params assets.MsgCatalogParam, logHTTP flows.HTTPLogCallback) (*flows.MsgCatalogCall, error) {
 	callResult := &flows.MsgCatalogCall{}
 
+	ctx, cancel := context.WithTimeout(context.Background(), time.Minute*5)
+	defer cancel()
+
 	content := params.ProductSearch
 	productList, err := GetProductListFromWeniGPT(s.rtConfig, content)
 	if err != nil {
 		return nil, err
 	}
 	channelUUID := params.ChannelUUID
-	channel, err := ChannelForChannelUUID(db, channelUUID)
+	channel, err := models.GetActiveChannelByUUID(ctx, db, channelUUID)
 	if err != nil {
 		return nil, err
 	}
-
-	ctx, cancel := context.WithTimeout(context.Background(), time.Second*30)
-	defer cancel()
 
 	catalog, err := models.GetActiveCatalogFromChannel(ctx, *db, channel.ID())
 	if err != nil {
@@ -115,18 +114,6 @@ func (s *service) Call(session flows.Session, params assets.MsgCatalogParam, log
 	return callResult, nil
 }
 
-// ChannelForChannelUUID returns the channel id for the passed in channel UUID if any
-func ChannelForChannelUUID(db *sqlx.DB, channelUUID uuids.UUID) (models.Channel, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), time.Second*30)
-	defer cancel()
-	var channel models.Channel
-	err := db.GetContext(ctx, &channel, `SELECT id, uuid, parent_id, name, address, channel_type, tps, country, scheme, roles, match_prefixes, allow_international, machine_detection, config FROM channels_channel WHERE uuid = $1 AND is_active = TRUE`, channelUUID)
-	if err != nil {
-		return models.Channel{}, errors.Wrapf(err, "no channel found with uuid: %s", channelUUID)
-	}
-	return channel, nil
-}
-
 func GetProductListFromWeniGPT(rtConfig *runtime.Config, content string) ([]string, error) {
 	httpClient, httpRetries, _ := goflow.HTTP(rtConfig)
 	weniGPTClient := wenigpt.NewClient(httpClient, httpRetries, rtConfig.WeniGPTBaseURL, rtConfig.WeniGPTAuthToken, rtConfig.WeniGPTCookie)
@@ -144,7 +131,7 @@ func GetProductListFromWeniGPT(rtConfig *runtime.Config, content string) ([]stri
 
 	response, _, err := weniGPTClient.WeniGPTRequest(dr)
 	if err != nil {
-		return nil, errors.Wrapf(err, "error on wewnigpt call fot list products")
+		return nil, errors.Wrapf(err, "error on wenigpt call fot list products")
 	}
 
 	productsJson := response.Output.Text[0]
