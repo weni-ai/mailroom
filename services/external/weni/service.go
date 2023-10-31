@@ -77,7 +77,7 @@ func (s *service) Call(session flows.Session, params assets.MsgCatalogParam, log
 	defer cancel()
 
 	content := params.ProductSearch
-	productList, traceWeniGPT, err := GetProductListFromWeniGPT(s.rtConfig, content)
+	productList, traceWeniGPT, err := GetProductListFromChatGPT(ctx, s.rtConfig, content)
 	callResult.TraceWeniGPT = traceWeniGPT
 	if err != nil {
 		return callResult, err
@@ -169,9 +169,9 @@ func GetProductListFromSentenX(productSearch string, catalogID string, threshold
 	return pmap, trace, nil
 }
 
-func GetProductListFromChatGPT(ctx context.Context, rt *runtime.Runtime, content string) ([]string, error) {
-	httpClient, httpRetries, _ := goflow.HTTP(rt.Config)
-	chatGPTClient := chatgpt.NewClient(httpClient, httpRetries, rt.Config.ChatGPTBaseURL, rt.Config.ChatGPTKey)
+func GetProductListFromChatGPT(ctx context.Context, rtConfig *runtime.Config, content string) ([]string, *httpx.Trace, error) {
+	httpClient, httpRetries, _ := goflow.HTTP(rtConfig)
+	chatGPTClient := chatgpt.NewClient(httpClient, httpRetries, rtConfig.ChatGPTBaseURL, rtConfig.ChatGPTKey)
 
 	prompt1 := chatgpt.ChatCompletionMessage{
 		Role:    chatgpt.ChatMessageRoleSystem,
@@ -190,9 +190,9 @@ func GetProductListFromChatGPT(ctx context.Context, rt *runtime.Runtime, content
 		Content: content,
 	}
 	completionRequest := chatgpt.NewChatCompletionRequest([]chatgpt.ChatCompletionMessage{prompt1, prompt2, prompt3, question})
-	response, _, err := chatGPTClient.CreateChatCompletion(completionRequest)
+	response, trace, err := chatGPTClient.CreateChatCompletion(completionRequest)
 	if err != nil {
-		return nil, errors.Wrapf(err, "error on chatgpt call for list products")
+		return nil, trace, errors.Wrapf(err, "error on chatgpt call for list products")
 	}
 
 	productsJson := response.Choices[0].Message.Content
@@ -200,7 +200,7 @@ func GetProductListFromChatGPT(ctx context.Context, rt *runtime.Runtime, content
 	var products map[string][]string
 	err = json.Unmarshal([]byte(productsJson), &products)
 	if err != nil {
-		return nil, errors.Wrapf(err, "error on unmarshalling product list")
+		return nil, trace, errors.Wrapf(err, "error on unmarshalling product list")
 	}
-	return products["products"], nil
+	return products["products"], trace, nil
 }
