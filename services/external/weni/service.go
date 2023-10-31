@@ -77,32 +77,34 @@ func (s *service) Call(session flows.Session, params assets.MsgCatalogParam, log
 	defer cancel()
 
 	content := params.ProductSearch
-	productList, err := GetProductListFromWeniGPT(s.rtConfig, content)
+	productList, traceWeniGPT, err := GetProductListFromWeniGPT(s.rtConfig, content)
+	callResult.TraceWeniGPT = traceWeniGPT
 	if err != nil {
-		return nil, err
+		return callResult, err
 	}
 	channelUUID := params.ChannelUUID
 	channel, err := models.GetActiveChannelByUUID(ctx, db, channelUUID)
 	if err != nil {
-		return nil, err
+		return callResult, err
 	}
 
 	catalog, err := models.GetActiveCatalogFromChannel(ctx, *db, channel.ID())
 	if err != nil {
-		return nil, err
+		return callResult, err
 	}
 	channelThreshold := channel.ConfigValue("threshold", "1.5")
 	searchThreshold, err := strconv.ParseFloat(channelThreshold, 64)
 	if err != nil {
-		return nil, err
+		return callResult, err
 	}
 
 	productRetailerIDS := []string{}
 
 	for _, product := range productList {
-		searchResult, err := GetProductListFromSentenX(product, catalog.FacebookCatalogID(), searchThreshold, s.rtConfig)
+		searchResult, trace, err := GetProductListFromSentenX(product, catalog.FacebookCatalogID(), searchThreshold, s.rtConfig)
+		callResult.TraceSentenx = trace
 		if err != nil {
-			return nil, errors.Wrapf(err, "on iterate to search products on sentenx")
+			return callResult, errors.Wrapf(err, "on iterate to search products on sentenx")
 		}
 		for _, prod := range searchResult {
 			productRetailerIDS = append(productRetailerIDS, prod["product_retailer_id"])
@@ -114,7 +116,7 @@ func (s *service) Call(session flows.Session, params assets.MsgCatalogParam, log
 	return callResult, nil
 }
 
-func GetProductListFromWeniGPT(rtConfig *runtime.Config, content string) ([]string, error) {
+func GetProductListFromWeniGPT(rtConfig *runtime.Config, content string) ([]string, *httpx.Trace, error) {
 	httpClient, httpRetries, _ := goflow.HTTP(rtConfig)
 	weniGPTClient := wenigpt.NewClient(httpClient, httpRetries, rtConfig.WeniGPTBaseURL, rtConfig.WeniGPTAuthToken, rtConfig.WeniGPTCookie)
 
@@ -129,9 +131,9 @@ func GetProductListFromWeniGPT(rtConfig *runtime.Config, content string) ([]stri
 		wenigpt.DefaultStopSequences,
 	)
 
-	response, _, err := weniGPTClient.WeniGPTRequest(dr)
+	response, trace, err := weniGPTClient.WeniGPTRequest(dr)
 	if err != nil {
-		return nil, errors.Wrapf(err, "error on wenigpt call fot list products")
+		return nil, trace, errors.Wrapf(err, "error on wenigpt call fot list products")
 	}
 
 	productsJson := response.Output.Text[0]
@@ -139,23 +141,23 @@ func GetProductListFromWeniGPT(rtConfig *runtime.Config, content string) ([]stri
 	var products map[string][]string
 	err = json.Unmarshal([]byte(productsJson), &products)
 	if err != nil {
-		return nil, errors.Wrapf(err, "error on unmarshalling product list")
+		return nil, trace, errors.Wrapf(err, "error on unmarshalling product list")
 	}
-	return products["products"], nil
+	return products["products"], trace, nil
 }
 
-func GetProductListFromSentenX(productSearch string, catalogID string, threshold float64, rtConfig *runtime.Config) ([]map[string]string, error) {
+func GetProductListFromSentenX(productSearch string, catalogID string, threshold float64, rtConfig *runtime.Config) ([]map[string]string, *httpx.Trace, error) {
 	client := sentenx.NewClient(http.DefaultClient, nil, rtConfig.SentenXBaseURL)
 
 	searchParams := sentenx.NewSearchRequest(productSearch, catalogID, threshold)
 
-	searchResponse, _, err := client.SearchProducts(searchParams)
+	searchResponse, trace, err := client.SearchProducts(searchParams)
 	if err != nil {
-		return nil, err
+		return nil, trace, err
 	}
 
 	if len(searchResponse.Products) < 1 {
-		return nil, errors.New("no products found on sentenx")
+		return nil, trace, errors.New("no products found on sentenx")
 	}
 
 	pmap := []map[string]string{}
@@ -164,7 +166,7 @@ func GetProductListFromSentenX(productSearch string, catalogID string, threshold
 		pmap = append(pmap, mapElement)
 	}
 
-	return pmap, nil
+	return pmap, trace, nil
 }
 
 func GetProductListFromChatGPT(ctx context.Context, rt *runtime.Runtime, content string) ([]string, error) {
