@@ -85,7 +85,7 @@ func (e *MsgCatalog) AsService(cfg *runtime.Config, msgCatalog *flows.MsgCatalog
 		return initFunc(cfg, httpClient, httpRetries, msgCatalog, nil)
 	}
 
-	return nil, errors.Errorf("unrecognized product catalog '%s'", e.Name)
+	return nil, errors.Errorf("unrecognized product catalog %s", e.Name())
 }
 
 type MsgCatalogServiceFunc func(*runtime.Config, *http.Client, *httpx.RetryConfig, *flows.MsgCatalog, map[string]string) (MsgCatalogService, error)
@@ -197,7 +197,7 @@ func ChannelUUIDForChannelID(ctx context.Context, db *sqlx.DB, channelID Channel
 	var channelUUID assets.ChannelUUID
 	err := db.GetContext(ctx, &channelUUID, `SELECT uuid FROM channels_channel WHERE id = $1 AND is_active = TRUE`, channelID)
 	if err != nil {
-		return assets.ChannelUUID(""), errors.Wrapf(err, "no channel found with id: %s", channelID)
+		return assets.ChannelUUID(""), errors.Wrapf(err, "no channel found with id: %d", channelID)
 	}
 	return channelUUID, nil
 }

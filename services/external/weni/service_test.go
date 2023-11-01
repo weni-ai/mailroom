@@ -14,6 +14,7 @@ import (
 	"github.com/nyaruka/goflow/test"
 	catalogs "github.com/nyaruka/mailroom/services/external/weni"
 	"github.com/nyaruka/mailroom/testsuite"
+	"github.com/nyaruka/mailroom/testsuite/testdata"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -31,15 +32,27 @@ func TestService(t *testing.T) {
 	uuids.SetGenerator(uuids.NewSeededGenerator(12345))
 
 	httpx.SetRequestor(httpx.NewMockRequestor(map[string][]httpx.MockResponse{
-		"https://wenigpt.weni.ai": {
+		"https://api.openai.com/v1/chat/completions": {
 			httpx.NewMockResponse(200, nil, `{
-				"delayTime": 2,
-				"executionTime": 2,
-				"id": "66b6a02c-b6e5-4e94-be8b-c631875b24d1",
-				"status": "COMPLETED",
-				"output": {
-					"text": "weni gpt response output text"
-				}
+				"id": "chatcmpl-7IfBIQsTVKbwOiHPgcrpthaCn7K1t",
+				"object": "chat.completion",
+				"created":1684682560,
+				"model":"gpt-3.5-turbo-0301",
+				"usage":{
+					"prompt_tokens":26,
+					"completion_tokens":8,
+					"total_tokens":34
+				},
+				"choices":[
+					{
+						"message":{
+							"role":"assistant",
+							"content":"{\"products\": [\"banana\"]}"
+						},
+						"finish_reason":"stop",
+						"index":0
+					}
+				]
 			}`),
 		},
 		"https://sentenx.weni.ai/products/search": {
@@ -66,7 +79,7 @@ func TestService(t *testing.T) {
 		},
 	}))
 
-	catalogService := flows.NewMsgCatalog(static.NewMsgCatalog(assets.MsgCatalogUUID(uuids.New()), "msg_catalog", "msg_catalog", assets.ChannelUUID(uuids.New())))
+	catalogService := flows.NewMsgCatalog(static.NewMsgCatalog(assets.MsgCatalogUUID(testdata.Org1.UUID), "msg_catalog", "msg_catalog", assets.ChannelUUID(uuids.New())))
 
 	svc, err := catalogs.NewService(rt.Config, http.DefaultClient, nil, catalogService, map[string]string{})
 
@@ -76,7 +89,7 @@ func TestService(t *testing.T) {
 
 	params := assets.MsgCatalogParam{
 		ProductSearch: "",
-		ChannelUUID:   uuids.New(),
+		ChannelUUID:   testdata.Org1.UUID,
 	}
 	call, err := svc.Call(session, params, logger.Log)
 	assert.NoError(t, err)

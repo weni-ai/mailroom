@@ -145,7 +145,7 @@ func NewDefaultConfig() *Config {
 		ZeroshotAPIToken: "",
 		ZeroshotAPIUrl:   "http://engine-ai.dev.cloud.weni.ai",
 		ChatGPTBaseURL:   "https://api.openai.com",
-		SentenXBaseURL:   "http://localhost:8000",
+		SentenXBaseURL:   "https://sentenx.weni.ai",
 	}
 }
 
