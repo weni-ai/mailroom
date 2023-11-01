@@ -118,7 +118,7 @@ func (s *service) Call(session flows.Session, params assets.MsgCatalogParam, log
 
 func GetProductListFromWeniGPT(rtConfig *runtime.Config, content string) ([]string, *httpx.Trace, error) {
 	httpClient, httpRetries, _ := goflow.HTTP(rtConfig)
-	weniGPTClient := wenigpt.NewClient(httpClient, httpRetries, rtConfig.WeniGPTBaseURL, rtConfig.WeniGPTAuthToken, rtConfig.WeniGPTCookie)
+	weniGPTClient := wenigpt.NewClient(httpClient, httpRetries, rtConfig.WenigptBaseURL, rtConfig.WenigptAuthToken, rtConfig.WenigptCookie)
 
 	prompt := fmt.Sprintf(`Give me an unformatted JSON list containing strings with the name of each product taken from the user prompt. Never repeat the same product. Always return a valid json using this pattern: {\"products\": []} Request: %s. Response:`, content)
 
@@ -147,7 +147,7 @@ func GetProductListFromWeniGPT(rtConfig *runtime.Config, content string) ([]stri
 }
 
 func GetProductListFromSentenX(productSearch string, catalogID string, threshold float64, rtConfig *runtime.Config) ([]map[string]string, *httpx.Trace, error) {
-	client := sentenx.NewClient(http.DefaultClient, nil, rtConfig.SentenXBaseURL)
+	client := sentenx.NewClient(http.DefaultClient, nil, rtConfig.SentenxBaseURL)
 
 	searchParams := sentenx.NewSearchRequest(productSearch, catalogID, threshold)
 
@@ -171,7 +171,7 @@ func GetProductListFromSentenX(productSearch string, catalogID string, threshold
 
 func GetProductListFromChatGPT(ctx context.Context, rtConfig *runtime.Config, content string) ([]string, *httpx.Trace, error) {
 	httpClient, httpRetries, _ := goflow.HTTP(rtConfig)
-	chatGPTClient := chatgpt.NewClient(httpClient, httpRetries, rtConfig.ChatGPTBaseURL, rtConfig.ChatGPTKey)
+	chatGPTClient := chatgpt.NewClient(httpClient, httpRetries, rtConfig.ChatgptBaseURL, rtConfig.ChatgptKey)
 
 	prompt1 := chatgpt.ChatCompletionMessage{
 		Role:    chatgpt.ChatMessageRoleSystem,
