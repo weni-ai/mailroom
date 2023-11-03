@@ -65,15 +65,7 @@ func TestService(t *testing.T) {
             "channel_id": "5",
             "catalog_id": "asdfgh",
             "product_retailer_id": "p1"
-					},
-					{
-            "facebook_id": "1234567892",
-            "title": "doce de banana 250g",
-            "org_id": "1",
-            "channel_id": "5",
-            "catalog_id": "asdfgh",
-            "product_retailer_id": "p2"
-        	}
+					}
 				]
 			}`),
 		},
