@@ -146,7 +146,7 @@ func loadCatalog(ctx context.Context, db *sqlx.DB, orgID OrgID) ([]assets.MsgCat
 
 	rows, err := db.Queryx(selectOrgCatalogSQL, orgID)
 	if err != nil && err != sql.ErrNoRows {
-		return nil, errors.Wrapf(err, "error querying external service for org: %d", orgID)
+		return nil, errors.Wrapf(err, "error querying catalog for org: %d", orgID)
 	}
 	defer rows.Close()
 
@@ -155,7 +155,7 @@ func loadCatalog(ctx context.Context, db *sqlx.DB, orgID OrgID) ([]assets.MsgCat
 		msgCatalog := &MsgCatalog{}
 		err := dbutil.ReadJSONRow(rows, &msgCatalog.c)
 		if err != nil {
-			return nil, errors.Wrapf(err, "error unmarshalling external service")
+			return nil, errors.Wrapf(err, "error unmarshalling catalog")
 		}
 		channelUUID, err := ChannelUUIDForChannelID(ctx, db, msgCatalog.ChannelID())
 		if err != nil {
@@ -166,7 +166,7 @@ func loadCatalog(ctx context.Context, db *sqlx.DB, orgID OrgID) ([]assets.MsgCat
 		catalog = append(catalog, msgCatalog)
 	}
 
-	logrus.WithField("elapsed", time.Since(start)).WithField("org_id", orgID).WithField("count", len(catalog)).Debug("loaded external services")
+	logrus.WithField("elapsed", time.Since(start)).WithField("org_id", orgID).WithField("count", len(catalog)).Debug("loaded catalog")
 
 	return catalog, nil
 }
