@@ -160,13 +160,18 @@ func GetProductListFromSentenX(productSearch string, catalogID string, threshold
 		return nil, trace, errors.New("no products found on sentenx")
 	}
 
-	pmap := []map[string]string{}
+	pmap := make(map[string]struct{})
 	for _, p := range searchResponse.Products {
-		mapElement := map[string]string{"product_retailer_id": p.ProductRetailerID}
-		pmap = append(pmap, mapElement)
+		pmap[p.ProductRetailerID] = struct{}{}
 	}
 
-	return pmap, trace, nil
+	result := []map[string]string{}
+	for k := range pmap {
+		mapElement := map[string]string{"product_retailer_id": k}
+		result = append(result, mapElement)
+	}
+
+	return result, trace, nil
 }
 
 func GetProductListFromChatGPT(ctx context.Context, rtConfig *runtime.Config, content string) ([]string, *httpx.Trace, error) {
