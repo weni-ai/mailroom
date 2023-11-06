@@ -1,3 +1,7 @@
+1.7.0-mailroom-7.1.22
+----------
+ * Catalog message support
+
 1.6.14-mailroom-7.1.22
 ----------
  * Update goflow version
