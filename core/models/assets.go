@@ -79,6 +79,10 @@ type OrgAssets struct {
 	externalServices       []assets.ExternalService
 	externalServicesByID   map[ExternalServiceID]*ExternalService
 	externalServicesByUUID map[assets.ExternalServiceUUID]*ExternalService
+
+	msgCatalogs       []assets.MsgCatalog
+	msgCatalogsByID   map[CatalogID]*MsgCatalog
+	msgCatalogsByUUID map[assets.ChannelUUID]*MsgCatalog
 }
 
 var ErrNotFound = errors.New("not found")
@@ -381,6 +385,24 @@ func NewOrgAssets(ctx context.Context, rt *runtime.Runtime, orgID OrgID, prev *O
 		oa.externalServicesByUUID = prev.externalServicesByUUID
 	}
 
+	if prev == nil || refresh&RefreshMsgCatalogs > 0 {
+		oa.msgCatalogs, err = loadCatalog(ctx, db, orgID)
+		if err != nil {
+			return nil, errors.Wrapf(err, "error loading catalogs for org %d", orgID)
+		}
+		oa.msgCatalogsByID = make(map[CatalogID]*MsgCatalog)
+		oa.msgCatalogsByUUID = make(map[assets.ChannelUUID]*MsgCatalog)
+
+		for _, a := range oa.msgCatalogs {
+			oa.msgCatalogsByID[a.(*MsgCatalog).c.ID] = a.(*MsgCatalog)
+			oa.msgCatalogsByUUID[a.(*MsgCatalog).c.ChannelUUID] = a.(*MsgCatalog)
+		}
+	} else {
+		oa.msgCatalogs = prev.msgCatalogs
+		oa.msgCatalogsByID = prev.msgCatalogsByID
+		oa.msgCatalogsByUUID = prev.msgCatalogsByUUID
+	}
+
 	// intialize our session assets
 	oa.sessionAssets, err = engine.NewSessionAssets(oa.Env(), oa, goflow.MigrationConfig(rt.Config))
 	if err != nil {
@@ -414,6 +436,7 @@ const (
 	RefreshTopics           = Refresh(1 << 15)
 	RefreshUsers            = Refresh(1 << 16)
 	RefreshExternalServices = Refresh(1 << 17)
+	RefreshMsgCatalogs      = Refresh(1 << 18)
 )
 
 // GetOrgAssets creates or gets org assets for the passed in org
@@ -705,4 +728,8 @@ func (a *OrgAssets) ExternalServiceByID(id ExternalServiceID) *ExternalService {
 
 func (a *OrgAssets) ExternalServiceByUUID(uuid assets.ExternalServiceUUID) *ExternalService {
 	return a.externalServicesByUUID[uuid]
+}
+
+func (a *OrgAssets) MsgCatalogs() ([]assets.MsgCatalog, error) {
+	return a.msgCatalogs, nil
 }

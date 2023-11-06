@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/lib/pq"
+	"github.com/nyaruka/gocommon/uuids"
 	"github.com/nyaruka/goflow/assets"
 	"github.com/nyaruka/goflow/envs"
 	"github.com/nyaruka/mailroom/utils/dbutil"
@@ -144,6 +145,40 @@ func GetChannelsByID(ctx context.Context, db Queryer, ids []ChannelID) ([]*Chann
 	}
 
 	return channels, nil
+}
+
+const selectActiveChannelByUUIDSQL = `
+SELECT ROW_TO_JSON(r) FROM (SELECT
+	c.id as id,
+	c.uuid as uuid,
+	c.name as name,
+	c.channel_type as channel_type,
+	COALESCE(c.tps, 10) as tps,
+	COALESCE(c.config, '{}')::json as config
+FROM 
+	channels_channel c
+WHERE 
+	c.uuid = $1
+	and c.is_active = TRUE
+) r;
+`
+
+func GetActiveChannelByUUID(ctx context.Context, db Queryer, channelUUID uuids.UUID) (*Channel, error) {
+	rows, err := db.QueryxContext(ctx, selectActiveChannelByUUIDSQL, channelUUID)
+	if err != nil {
+		return nil, errors.Wrapf(err, "error querying channel by uuid")
+	}
+	defer rows.Close()
+
+	channel := &Channel{}
+	for rows.Next() {
+		err := dbutil.ReadJSONRow(rows, &channel.c)
+		if err != nil {
+			return nil, errors.Wrapf(err, "error unmarshalling channel")
+		}
+	}
+
+	return channel, nil
 }
 
 const selectChannelsByIDSQL = `
