@@ -61,7 +61,7 @@ func TestWeniGPTRequest(t *testing.T) {
 				"id": "66b6a02c-b6e5-4e94-be8b-c631875b24d1",
 				"status": "COMPLETED",
 				"output": {
-					"text": "weni gpt response output text"
+					"text": ["banana"]
 				}
 			}`),
 		},
@@ -76,5 +76,5 @@ func TestWeniGPTRequest(t *testing.T) {
 
 	wmsg, _, err := client.WeniGPTRequest(data)
 	assert.NoError(t, err)
-	assert.Equal(t, "weni gpt response output text", wmsg.Output.Text[0])
+	assert.Equal(t, "banana", wmsg.Output.Text[0])
 }
