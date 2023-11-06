@@ -62,8 +62,8 @@ func TestService(t *testing.T) {
             "facebook_id": "1234567891",
             "title": "banana prata 1kg",
             "org_id": "1",
-            "channel_id": "5",
-            "catalog_id": "asdfgh",
+            "channel_id": "10000",
+            "catalog_id": "123456789",
             "product_retailer_id": "p1"
 					}
 				]
@@ -81,7 +81,7 @@ func TestService(t *testing.T) {
 
 	params := assets.MsgCatalogParam{
 		ProductSearch: "",
-		ChannelUUID:   testdata.Org1.UUID,
+		ChannelUUID:   uuids.UUID(testdata.TwilioChannel.UUID),
 	}
 	call, err := svc.Call(session, params, logger.Log)
 	assert.NoError(t, err)

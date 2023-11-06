@@ -76,5 +76,5 @@ func TestWeniGPTRequest(t *testing.T) {
 
 	wmsg, _, err := client.WeniGPTRequest(data)
 	assert.NoError(t, err)
-	assert.Equal(t, "weni gpt response output text", wmsg.Output.Text)
+	assert.Equal(t, "weni gpt response output text", wmsg.Output.Text[0])
 }
