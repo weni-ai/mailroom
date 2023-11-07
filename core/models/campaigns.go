@@ -494,6 +494,33 @@ func DeleteUnfiredContactEvents(ctx context.Context, tx Queryer, contactIDs []Co
 	return nil
 }
 
+func DeleteUnfiredContactEventsFromGroups(ctx context.Context, tx Queryer, contactIDs []ContactID, groupIDs []GroupID) error {
+	if len(contactIDs) == 0 || len(groupIDs) == 0 {
+		return nil
+	}
+	_, err := tx.ExecContext(ctx, deleteUnfiredContactEventsFromGroupsSQL, pq.Array(contactIDs), pq.Array(groupIDs))
+	if err != nil {
+		return errors.Wrapf(err, "error deleting unfired contacts events by groups")
+	}
+	return nil
+}
+
+const deleteUnfiredContactEventsFromGroupsSQL = `
+DELETE FROM 
+  public.campaigns_eventfire
+WHERE contact_id = ANY ($1)
+  AND event_id = ANY (
+    SELECT id
+    FROM public.campaigns_campaignevent
+    WHERE campaign_id IN (
+      SELECT id
+      FROM public.campaigns_campaign
+      WHERE group_id = ANY ($2)
+    )
+  )
+  AND fired IS NULL;
+`
+
 const insertEventFiresSQL = `
 INSERT INTO campaigns_eventfire(contact_id,  event_id,  scheduled)
                          VALUES(:contact_id, :event_id, :scheduled)

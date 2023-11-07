@@ -604,7 +604,6 @@ func CreateContact(ctx context.Context, db QueryerWithTx, oa *OrgAssets, userID 
 // * If URNs exist but are orphaned it creates a new contact and assigns those URNs to them.
 // * If URNs exists and belongs to a single contact it returns that contact (other URNs are not assigned to the contact).
 // * If URNs exists and belongs to multiple contacts it will return an error.
-//
 func GetOrCreateContact(ctx context.Context, db QueryerWithTx, oa *OrgAssets, urnz []urns.URN, channelID ChannelID) (*Contact, *flows.Contact, bool, error) {
 	// ensure all URNs are normalized
 	for i, urn := range urnz {
@@ -962,8 +961,13 @@ func CalculateDynamicGroups(ctx context.Context, db Queryer, org *OrgAssets, con
 		return errors.Wrapf(err, "error removing contact from group")
 	}
 
-	// clear any unfired campaign events for this contact
-	err = DeleteUnfiredContactEvents(ctx, db, contactIDs)
+	removedGroupsIDs := []GroupID{}
+	for _, grs := range groupRemoves {
+		removedGroupsIDs = append(removedGroupsIDs, grs.GroupID)
+	}
+
+	// clear any unfired campaign events for this contact referent to removed groups
+	err = DeleteUnfiredContactEventsFromGroups(ctx, db, contactIDs, removedGroupsIDs)
 	if err != nil {
 		return errors.Wrapf(err, "error deleting unfired events")
 	}
