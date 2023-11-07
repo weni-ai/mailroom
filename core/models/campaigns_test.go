@@ -114,3 +114,40 @@ func TestAddEventFires(t *testing.T) {
 	testsuite.AssertQuery(t, db, `SELECT count(*) FROM campaigns_eventfire WHERE contact_id = $1 AND event_id = $2`, testdata.Cathy.ID, testdata.RemindersEvent1.ID).Returns(2)
 	testsuite.AssertQuery(t, db, `SELECT count(*) FROM campaigns_eventfire WHERE contact_id = $1`, testdata.Bob.ID).Returns(2)
 }
+
+func TestDeleteEventContactFiresFromGroups(t *testing.T) {
+	ctx, rt, db, _ := testsuite.Get()
+
+	defer testsuite.Reset(testsuite.ResetDB)
+
+	// create a test group
+	testdata.InsertContactGroup(db, testdata.Org1, "94c816d7-cc87-42db-a577-ce072ceaab81", "GroupTest", "")
+
+	// create a campaign related to the created group
+	db.MustExec(`INSERT INTO public.campaigns_campaign
+		(id, is_active, created_on, modified_on, uuid, "name", is_archived, created_by_id, group_id, modified_by_id, org_id)
+		VALUES(30001, true, '2021-12-20 11:31:42.996', '2021-12-20 11:31:42.996', '72aa12c5-cc11-4bc7-9406-044047845c72', 'Doctor Reminders 2', false, 2, 30000, 2, 1);
+	`)
+	db.MustExec(`INSERT INTO public.campaigns_campaignevent
+	(id, is_active, created_on, modified_on, uuid, event_type, "offset", unit, start_mode, message, delivery_hour, campaign_id, created_by_id, flow_id, modified_by_id, relative_to_id)
+	VALUES(30001, true, '2021-12-20 11:31:43.038', '2021-12-20 11:31:43.038', 'aff4b8ac-2534-420f-a353-66a3e74b6e10', 'M', 10, 'M', 'I', '"eng"=>"Hi @contact.name, it is time to consult with your patients.", "fra"=>"Bonjour @contact.name, il est temps de consulter vos patients."', -1, 30001, 2, 10009, 2, 8);
+	`)
+	// insert a event fire for cathy from  the created event
+	db.MustExec(`INSERT INTO public.campaigns_eventfire
+	(id, scheduled, fired, fired_result, contact_id, event_id)
+	VALUES(1, '2023-11-07 11:03:18.416', NULL, NULL, 10000, 30001);`)
+
+	// previous event fire created must be present here as 1 row returned
+	testsuite.AssertQuery(t, db, `SELECT count(*) FROM public.campaigns_eventfire`).Returns(1)
+
+	oa, err := models.GetOrgAssetsWithRefresh(ctx, rt, testdata.Org1.ID, models.RefreshNone)
+	require.NoError(t, err)
+
+	_, cathy := testdata.Cathy.Load(db, oa)
+
+	err = models.DeleteUnfiredContactEventsFromGroups(ctx, db, []models.ContactID{models.ContactID(cathy.ID())}, []models.GroupID{models.GroupID(30000)})
+	require.NoError(t, err)
+
+	// after delete the event fire returned rows must be 0
+	testsuite.AssertQuery(t, db, `SELECT count(*)	FROM public.campaigns_eventfire;`).Returns(0)
+}
