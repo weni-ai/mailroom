@@ -20,7 +20,9 @@ import (
 )
 
 func TestService(t *testing.T) {
-	_, rt, _, _ := testsuite.Get()
+	_, rt, db, _ := testsuite.Get()
+
+	catalogs.SetDB(db)
 
 	defer dates.SetNowSource(dates.DefaultNowSource)
 	session, _, err := test.CreateTestSession("", envs.RedactionPolicyNone)
