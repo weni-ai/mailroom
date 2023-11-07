@@ -83,7 +83,7 @@ func (s *service) Call(session flows.Session, params assets.MsgCatalogParam, log
 		return callResult, err
 	}
 	channelUUID := params.ChannelUUID
-	channel, err := models.GetActiveChannelByUUID(ctx, db, channelUUID)
+	channel, err := models.GetActiveChannelByUUID(ctx, *db, channelUUID)
 	if err != nil {
 		return callResult, err
 	}
@@ -160,15 +160,19 @@ func GetProductListFromSentenX(productSearch string, catalogID string, threshold
 		return nil, trace, errors.New("no products found on sentenx")
 	}
 
-	pmap := make(map[string]struct{})
-	for _, p := range searchResponse.Products {
-		pmap[p.ProductRetailerID] = struct{}{}
-	}
-
+	productMap := make(map[string]struct{})
 	result := []map[string]string{}
-	for k := range pmap {
-		mapElement := map[string]string{"product_retailer_id": k}
-		result = append(result, mapElement)
+
+	for _, p := range searchResponse.Products {
+		productID := p.ProductRetailerID
+
+		_, exists := productMap[productID]
+		if !exists {
+			mapElement := map[string]string{"product_retailer_id": productID}
+			result = append(result, mapElement)
+
+			productMap[productID] = struct{}{}
+		}
 	}
 
 	return result, trace, nil
