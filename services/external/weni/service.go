@@ -83,7 +83,7 @@ func (s *service) Call(session flows.Session, params assets.MsgCatalogParam, log
 		return callResult, err
 	}
 	channelUUID := params.ChannelUUID
-	channel, err := models.GetActiveChannelByUUID(ctx, *db, channelUUID)
+	channel, err := models.GetActiveChannelByUUID(ctx, db, channelUUID)
 	if err != nil {
 		return callResult, err
 	}
