@@ -1,3 +1,7 @@
+1.7.1-mailroom-7.1.22
+----------
+ * Tweaks for close ticket behaviour to not delete unfired campaign contact events
+
 1.7.0-mailroom-7.1.22
 ----------
  * Catalog message support
