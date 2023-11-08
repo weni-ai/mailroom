@@ -99,7 +99,7 @@ func (s *service) Call(session flows.Session, params assets.MsgCatalogParam, log
 	}
 
 	productRetailerIDS := []string{}
-	productMap := make(map[string]struct{})
+	productRetailerIDMap := make(map[string]struct{})
 
 	for _, product := range productList {
 		searchResult, trace, err := GetProductListFromSentenX(product, catalog.FacebookCatalogID(), searchThreshold, s.rtConfig)
@@ -108,9 +108,11 @@ func (s *service) Call(session flows.Session, params assets.MsgCatalogParam, log
 			return callResult, errors.Wrapf(err, "on iterate to search products on sentenx")
 		}
 		for _, prod := range searchResult {
-			_, exists := productMap[prod["product_retailer_id"]]
+			productRetailerID := prod["product_retailer_id"]
+			_, exists := productRetailerIDMap[productRetailerID]
 			if !exists {
-				productRetailerIDS = append(productRetailerIDS, prod["product_retailer_id"])
+				productRetailerIDS = append(productRetailerIDS, productRetailerID)
+				productRetailerIDMap[productRetailerID] = struct{}{}
 			}
 		}
 	}
