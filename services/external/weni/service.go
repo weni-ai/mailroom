@@ -99,6 +99,7 @@ func (s *service) Call(session flows.Session, params assets.MsgCatalogParam, log
 	}
 
 	productRetailerIDS := []string{}
+	productMap := make(map[string]struct{})
 
 	for _, product := range productList {
 		searchResult, trace, err := GetProductListFromSentenX(product, catalog.FacebookCatalogID(), searchThreshold, s.rtConfig)
@@ -107,7 +108,10 @@ func (s *service) Call(session flows.Session, params assets.MsgCatalogParam, log
 			return callResult, errors.Wrapf(err, "on iterate to search products on sentenx")
 		}
 		for _, prod := range searchResult {
-			productRetailerIDS = append(productRetailerIDS, prod["product_retailer_id"])
+			_, exists := productMap[prod["product_retailer_id"]]
+			if !exists {
+				productRetailerIDS = append(productRetailerIDS, prod["product_retailer_id"])
+			}
 		}
 	}
 
@@ -160,26 +164,13 @@ func GetProductListFromSentenX(productSearch string, catalogID string, threshold
 		return nil, trace, errors.New("no products found on sentenx")
 	}
 
-	productMap := make(map[string]struct{})
-	result := []map[string]string{}
-
-	fmt.Printf("Products com duplicatas: %+v", searchResponse.Products)
-
+	pmap := []map[string]string{}
 	for _, p := range searchResponse.Products {
-		productID := p.ProductRetailerID
-
-		_, exists := productMap[productID]
-		if !exists {
-			mapElement := map[string]string{"product_retailer_id": productID}
-			result = append(result, mapElement)
-
-			productMap[productID] = struct{}{}
-		}
+		mapElement := map[string]string{"product_retailer_id": p.ProductRetailerID}
+		pmap = append(pmap, mapElement)
 	}
 
-	fmt.Println("MAP RESULT (sem duplicatas): ", result)
-
-	return result, trace, nil
+	return pmap, trace, nil
 }
 
 func GetProductListFromChatGPT(ctx context.Context, rtConfig *runtime.Config, content string) ([]string, *httpx.Trace, error) {
