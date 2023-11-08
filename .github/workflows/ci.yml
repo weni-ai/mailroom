@@ -26,8 +26,6 @@ jobs:
         postgresql version: ${{ matrix.pg-version }}
         postgis version: ${{ env.postgis-version }}
         postgresql password: temba
-        postgresql config: |
-          max_connections = 1000
 
     - name: Install Linux packages
       run: sudo apt install -y --no-install-recommends postgresql-client
@@ -39,6 +37,7 @@ jobs:
         psql -h localhost -U postgres --no-password -c "CREATE USER mailroom_test PASSWORD 'temba';"
         psql -h localhost -U postgres --no-password -c "ALTER ROLE mailroom_test WITH SUPERUSER;"
         psql -h localhost -U postgres --no-password -c "CREATE DATABASE mailroom_test;"
+        psql -h localhost -U postgres -d mailroom_test -c "ALTER SYSTEM SET max_connections = '1000';"
 
     - name: Install Go
       uses: actions/setup-go@v1
