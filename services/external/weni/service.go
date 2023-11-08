@@ -163,6 +163,8 @@ func GetProductListFromSentenX(productSearch string, catalogID string, threshold
 	productMap := make(map[string]struct{})
 	result := []map[string]string{}
 
+	fmt.Printf("Products com duplicatas: %+v", searchResponse.Products)
+
 	for _, p := range searchResponse.Products {
 		productID := p.ProductRetailerID
 
@@ -174,6 +176,8 @@ func GetProductListFromSentenX(productSearch string, catalogID string, threshold
 			productMap[productID] = struct{}{}
 		}
 	}
+
+	fmt.Println("MAP RESULT (sem duplicatas): ", result)
 
 	return result, trace, nil
 }
