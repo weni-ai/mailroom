@@ -26,6 +26,8 @@ jobs:
         postgresql version: ${{ matrix.pg-version }}
         postgis version: ${{ env.postgis-version }}
         postgresql password: temba
+        postgresql config: |
+          max_connections = 1000
 
     - name: Install Linux packages
       run: sudo apt install -y --no-install-recommends postgresql-client
