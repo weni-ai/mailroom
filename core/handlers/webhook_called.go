@@ -54,6 +54,7 @@ func handleWebhookCalled(ctx context.Context, rt *runtime.Runtime, tx *sqlx.Tx, 
 			time.Millisecond*time.Duration(event.ElapsedMS),
 			event.Retries,
 			event.CreatedOn(),
+			scene.ContactID(),
 		)
 		scene.AppendToEventPreCommitHook(hooks.InsertHTTPLogsHook, httpLog)
 	}
