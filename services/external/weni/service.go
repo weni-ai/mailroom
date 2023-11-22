@@ -5,12 +5,14 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"net/url"
 	"strconv"
 	"sync"
 	"time"
 
 	"github.com/jmoiron/sqlx"
 	"github.com/nyaruka/gocommon/httpx"
+	"github.com/nyaruka/gocommon/jsonx"
 	"github.com/nyaruka/goflow/assets"
 	"github.com/nyaruka/goflow/flows"
 	"github.com/nyaruka/goflow/utils"
@@ -78,7 +80,7 @@ func (s *service) Call(session flows.Session, params assets.MsgCatalogParam, log
 
 	content := params.ProductSearch
 	productList, traceWeniGPT, err := GetProductListFromChatGPT(ctx, s.rtConfig, content)
-	callResult.TraceWeniGPT = traceWeniGPT
+	callResult.Traces = append(callResult.Traces, traceWeniGPT)
 	if err != nil {
 		return callResult, err
 	}
@@ -98,20 +100,30 @@ func (s *service) Call(session flows.Session, params assets.MsgCatalogParam, log
 		return callResult, err
 	}
 
-	productRetailerIDS := []string{}
+	productRetailerIDS := map[string][]string{}
 	productRetailerIDMap := make(map[string]struct{})
+	searchResult := []string{}
+	var trace *httpx.Trace
 
 	for _, product := range productList {
-		searchResult, trace, err := GetProductListFromSentenX(product, catalog.FacebookCatalogID(), searchThreshold, s.rtConfig)
-		callResult.TraceSentenx = trace
+		if params.SearchType == "default" {
+			searchResult, trace, err = GetProductListFromSentenX(product, catalog.FacebookCatalogID(), searchThreshold, s.rtConfig)
+			callResult.Traces = append(callResult.Traces, trace)
+		} else if params.SearchType == "vtex" {
+			searchResult, trace, err = GetProductListFromVtex(product, params.SearchUrl, params.ApiType)
+			callResult.Traces = append(callResult.Traces, trace)
+			if searchResult == nil {
+				continue
+			}
+		}
 		if err != nil {
-			return callResult, errors.Wrapf(err, "on iterate to search products on sentenx")
+			return callResult, errors.Wrapf(err, "on iterate to search products")
 		}
 		for _, prod := range searchResult {
-			productRetailerID := prod["product_retailer_id"]
+			productRetailerID := prod
 			_, exists := productRetailerIDMap[productRetailerID]
 			if !exists {
-				productRetailerIDS = append(productRetailerIDS, productRetailerID)
+				productRetailerIDS[product] = append(productRetailerIDS[product], productRetailerID)
 				productRetailerIDMap[productRetailerID] = struct{}{}
 			}
 		}
@@ -152,7 +164,7 @@ func GetProductListFromWeniGPT(rtConfig *runtime.Config, content string) ([]stri
 	return products["products"], trace, nil
 }
 
-func GetProductListFromSentenX(productSearch string, catalogID string, threshold float64, rtConfig *runtime.Config) ([]map[string]string, *httpx.Trace, error) {
+func GetProductListFromSentenX(productSearch string, catalogID string, threshold float64, rtConfig *runtime.Config) ([]string, *httpx.Trace, error) {
 	client := sentenx.NewClient(http.DefaultClient, nil, rtConfig.SentenxBaseURL)
 
 	searchParams := sentenx.NewSearchRequest(productSearch, catalogID, threshold)
@@ -166,18 +178,12 @@ func GetProductListFromSentenX(productSearch string, catalogID string, threshold
 		return nil, trace, errors.New("no products found on sentenx")
 	}
 
-	pmap := make(map[string]struct{})
+	pmap := []string{}
 	for _, p := range searchResponse.Products {
-		pmap[p.ProductRetailerID] = struct{}{}
+		pmap = append(pmap, p.ProductRetailerID)
 	}
 
-	result := []map[string]string{}
-	for k := range pmap {
-		mapElement := map[string]string{"product_retailer_id": k}
-		result = append(result, mapElement)
-	}
-
-	return result, trace, nil
+	return pmap, trace, nil
 }
 
 func GetProductListFromChatGPT(ctx context.Context, rtConfig *runtime.Config, content string) ([]string, *httpx.Trace, error) {
@@ -214,4 +220,104 @@ func GetProductListFromChatGPT(ctx context.Context, rtConfig *runtime.Config, co
 		return nil, trace, errors.Wrapf(err, "error on unmarshalling product list")
 	}
 	return products["products"], trace, nil
+}
+
+func GetProductListFromVtex(productSearch string, searchUrl string, apiType string) ([]string, *httpx.Trace, error) {
+	var result []string
+	var trace *httpx.Trace
+	var err error
+
+	if apiType == "legacy" {
+		result, trace, err = VtexLegacySearch(searchUrl, productSearch)
+		if err != nil {
+			return nil, trace, err
+		}
+	} else if apiType == "intelligent" {
+		result, trace, err = VtexIntelligentSearch(searchUrl, productSearch)
+		if err != nil {
+			return nil, trace, err
+		}
+	}
+
+	return result, trace, nil
+}
+
+func VtexLegacySearch(searchUrl string, productSearch string) ([]string, *httpx.Trace, error) {
+	url := fmt.Sprintf("%s/%s", searchUrl, productSearch)
+
+	req, err := httpx.NewRequest("GET", url, nil, nil)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	client := &http.Client{}
+	trace, err := httpx.DoTrace(client, req, nil, nil, -1)
+	if err != nil {
+		return nil, trace, err
+	}
+
+	response := []struct {
+		Items []struct {
+			ItemId string `json:"itemId"`
+		} `json:"items"`
+	}{}
+
+	err = jsonx.Unmarshal(trace.ResponseBody, response)
+	if err != nil {
+		return nil, trace, err
+	}
+
+	result := []string{}
+
+	if len(response) == 0 {
+		return result, trace, nil
+	}
+
+	for _, product := range response[0:5] {
+		product_retailer_id := product.Items[0].ItemId
+		result = append(result, product_retailer_id)
+	}
+
+	return result, trace, nil
+}
+
+func VtexIntelligentSearch(searchUrl string, productSearch string) ([]string, *httpx.Trace, error) {
+	query := url.Values{}
+	query.Add("query", productSearch)
+	query.Add("locale", "pt-BR")
+	query.Add("hideUnavailableItems", "true")
+
+	url_ := fmt.Sprintf("%s?%s", searchUrl, query.Encode())
+
+	req, err := httpx.NewRequest("GET", url_, nil, nil)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	client := &http.Client{}
+	trace, err := httpx.DoTrace(client, req, nil, nil, -1)
+	if err != nil {
+		return nil, trace, err
+	}
+
+	response := &struct {
+		Products []struct {
+			Items []struct {
+				ItemId string `json:"itemId"`
+			} `json:"items"`
+		} `json:"products"`
+	}{}
+
+	err = jsonx.Unmarshal(trace.ResponseBody, response)
+	if err != nil {
+		return nil, trace, err
+	}
+
+	result := []string{}
+	for _, product := range response.Products[0:5] {
+		product_retailer_id := product.Items[0].ItemId
+		result = append(result, product_retailer_id)
+	}
+
+	return result, trace, nil
 }
