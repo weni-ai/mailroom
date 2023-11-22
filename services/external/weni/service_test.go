@@ -1,6 +1,7 @@
 package catalogs_test
 
 import (
+	"fmt"
 	"net/http"
 	"testing"
 
@@ -20,7 +21,7 @@ import (
 )
 
 func TestService(t *testing.T) {
-	_, rt, _, _ := testsuite.Get()
+	_, rt, db, _ := testsuite.Get()
 
 	defer dates.SetNowSource(dates.DefaultNowSource)
 	session, _, err := test.CreateTestSession("", envs.RedactionPolicyNone)
@@ -69,8 +70,35 @@ func TestService(t *testing.T) {
 				]
 			}`),
 		},
+		"https://vtex.com.br/legacy/search": {
+			httpx.NewMockResponse(200, nil, `{
+				[
+					{
+						"items": [
+							{
+								"itemId": "1236"
+							}
+						]
+					}
+				]
+			}`),
+		},
+		"https://vtex.com.br/intelligent/search": {
+			httpx.NewMockResponse(200, nil, `{
+				"products": [
+					{
+						"items": [
+							{
+								"itemId": "1234"
+							}
+						]
+					}
+					
+				]
+			}`),
+		},
 	}))
-
+	catalogs.SetDB(db)
 	catalogService := flows.NewMsgCatalog(static.NewMsgCatalog(assets.MsgCatalogUUID(testdata.Org1.UUID), "msg_catalog", "msg_catalog", assets.ChannelUUID(uuids.New())))
 
 	svc, err := catalogs.NewService(rt.Config, http.DefaultClient, nil, catalogService, map[string]string{})
@@ -82,13 +110,40 @@ func TestService(t *testing.T) {
 	params := assets.MsgCatalogParam{
 		ProductSearch: "",
 		ChannelUUID:   uuids.UUID(testdata.TwilioChannel.UUID),
+		SearchType:    "default",
+		SearchUrl:     "",
+		ApiType:       "",
 	}
 	call, err := svc.Call(session, params, logger.Log)
 	assert.NoError(t, err)
 	assert.NotNil(t, call)
+	fmt.Println(call.ProductRetailerIDS)
+	assert.Equal(t, "p1", call.ProductRetailerIDS["banana"])
+	assert.NotNil(t, call.Traces)
 
-	assert.Equal(t, "p1", call.ProductRetailerIDS[0])
-	assert.NotNil(t, call.TraceWeniGPT)
-	assert.NotNil(t, call.TraceSentenx)
+	params = assets.MsgCatalogParam{
+		ProductSearch: "",
+		ChannelUUID:   uuids.UUID(testdata.TwilioChannel.UUID),
+		SearchType:    "vtex",
+		SearchUrl:     "https://vtex.com.br/legacy/search",
+		ApiType:       "legacy",
+	}
+	call, err = svc.Call(session, params, logger.Log)
+	assert.NoError(t, err)
+	assert.NotNil(t, call)
+	assert.Equal(t, "1236", call.ProductRetailerIDS["banana"])
+	assert.NotNil(t, call.Traces)
 
+	params = assets.MsgCatalogParam{
+		ProductSearch: "",
+		ChannelUUID:   uuids.UUID(testdata.TwilioChannel.UUID),
+		SearchType:    "vtex",
+		SearchUrl:     "https://vtex.com.br/intelligent/search",
+		ApiType:       "intelligent",
+	}
+	call, err = svc.Call(session, params, logger.Log)
+	assert.NoError(t, err)
+	assert.NotNil(t, call)
+	assert.Equal(t, "1234", call.ProductRetailerIDS["banana"])
+	assert.NotNil(t, call.Traces)
 }

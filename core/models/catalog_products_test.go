@@ -1,10 +1,8 @@
 package models_test
 
 import (
-	"context"
 	"fmt"
 	"testing"
-	"time"
 
 	"github.com/nyaruka/mailroom/core/models"
 	"github.com/nyaruka/mailroom/testsuite"
@@ -15,11 +13,6 @@ import (
 func TestCatalogProducts(t *testing.T) {
 	ctx, _, db, _ := testsuite.Get()
 	defer testsuite.Reset(testsuite.ResetDB)
-
-	// _, err := db.Exec(catalogProductDDL)
-	// if err != nil {
-	// 	t.Fatal(err)
-	// }
 
 	_, err := db.Exec(`INSERT INTO public.wpp_products_catalog
 	(uuid, facebook_catalog_id, "name", created_on, modified_on, is_active, channel_id, org_id)
@@ -52,10 +45,7 @@ func TestChannelUUIDForChannelID(t *testing.T) {
 	ctx, _, db, _ := testsuite.Get()
 	defer testsuite.Reset(testsuite.ResetAll)
 
-	ctxp, cancelp := context.WithTimeout(ctx, time.Second*5)
-	defer cancelp()
-
-	ctp, err := models.ChannelUUIDForChannelID(ctxp, db, testdata.TwilioChannel.ID)
+	ctp, err := models.ChannelUUIDForChannelID(ctx, db, testdata.TwilioChannel.ID)
 	assert.NoError(t, err)
-	assert.Equal(t, ctp, testdata.Org2Channel.UUID)
+	assert.Equal(t, ctp, testdata.TwilioChannel.ID)
 }
