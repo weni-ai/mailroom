@@ -262,7 +262,7 @@ func VtexLegacySearch(searchUrl string, productSearch string) ([]string, *httpx.
 		} `json:"items"`
 	}{}
 
-	err = jsonx.Unmarshal(trace.ResponseBody, response)
+	err = jsonx.Unmarshal(trace.ResponseBody, &response)
 	if err != nil {
 		return nil, trace, err
 	}
@@ -308,7 +308,7 @@ func VtexIntelligentSearch(searchUrl string, productSearch string) ([]string, *h
 		} `json:"products"`
 	}{}
 
-	err = jsonx.Unmarshal(trace.ResponseBody, response)
+	err = jsonx.Unmarshal(trace.ResponseBody, &response)
 	if err != nil {
 		return nil, trace, err
 	}
