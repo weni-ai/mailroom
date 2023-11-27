@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"net/url"
 	"strconv"
+	"strings"
 	"sync"
 	"time"
 
@@ -243,7 +244,8 @@ func GetProductListFromVtex(productSearch string, searchUrl string, apiType stri
 }
 
 func VtexLegacySearch(searchUrl string, productSearch string) ([]string, *httpx.Trace, error) {
-	url := fmt.Sprintf("%s/%s", searchUrl, productSearch)
+	urlAfter := strings.TrimSuffix(searchUrl, "/")
+	url := fmt.Sprintf("%s/%s", urlAfter, productSearch)
 
 	req, err := httpx.NewRequest("GET", url, nil, nil)
 	if err != nil {
@@ -287,7 +289,9 @@ func VtexIntelligentSearch(searchUrl string, productSearch string) ([]string, *h
 	query.Add("locale", "pt-BR")
 	query.Add("hideUnavailableItems", "true")
 
-	url_ := fmt.Sprintf("%s?%s", searchUrl, query.Encode())
+	urlAfter := strings.TrimSuffix(searchUrl, "/")
+
+	url_ := fmt.Sprintf("%s?%s", urlAfter, query.Encode())
 
 	req, err := httpx.NewRequest("GET", url_, nil, nil)
 	if err != nil {
