@@ -275,7 +275,10 @@ func VtexLegacySearch(searchUrl string, productSearch string) ([]string, *httpx.
 		return result, trace, nil
 	}
 
-	for _, product := range response[0:5] {
+	for i, product := range response {
+		if i == 5 {
+			break
+		}
 		product_retailer_id := product.Items[0].ItemId
 		result = append(result, product_retailer_id)
 	}
@@ -318,7 +321,10 @@ func VtexIntelligentSearch(searchUrl string, productSearch string) ([]string, *h
 	}
 
 	result := []string{}
-	for _, product := range response.Products[0:5] {
+	for i, product := range response.Products {
+		if i == 5 {
+			break
+		}
 		product_retailer_id := product.Items[0].ItemId
 		result = append(result, product_retailer_id)
 	}
