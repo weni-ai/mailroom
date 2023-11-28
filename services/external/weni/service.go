@@ -203,11 +203,15 @@ func GetProductListFromChatGPT(ctx context.Context, rtConfig *runtime.Config, co
 		Role:    chatgpt.ChatMessageRoleSystem,
 		Content: "Always use this pattern: {\"products\": []}",
 	}
+	prompt4 := chatgpt.ChatCompletionMessage{
+		Role:    chatgpt.ChatMessageRoleSystem,
+		Content: "Ensure that no product names are repeated, and each product should be in singular form without any numbers or quantities.",
+	}
 	question := chatgpt.ChatCompletionMessage{
 		Role:    chatgpt.ChatMessageRoleUser,
 		Content: content,
 	}
-	completionRequest := chatgpt.NewChatCompletionRequest([]chatgpt.ChatCompletionMessage{prompt1, prompt2, prompt3, question})
+	completionRequest := chatgpt.NewChatCompletionRequest([]chatgpt.ChatCompletionMessage{prompt1, prompt2, prompt3, prompt4, question})
 	response, trace, err := chatGPTClient.CreateChatCompletion(completionRequest)
 	if err != nil {
 		return nil, trace, errors.Wrapf(err, "error on chatgpt call for list products")
