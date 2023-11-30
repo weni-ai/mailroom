@@ -1,19 +1,38 @@
-FROM golang:1.17.5-alpine3.14
+FROM golang:1.17.5-alpine3.14 AS builder
 
 WORKDIR /app
 
-RUN apk update \
-  && apk add --virtual build-deps gcc git curl tar \
-  && rm -rf /var/cache/apk/*
+RUN apk add --no-cache --virtual build-deps curl gcc
 
-RUN addgroup -S golang \
-  && adduser -S -G golang golang
+COPY go.mod go.sum .
+RUN --mount=type=cache,target=/go/pkg/mod/ \
+    go mod download -x
+
+RUN curl -L https://github.com/weni-ai/goflow/releases/download/$(grep weni-ai/goflow go.mod | cut -d" " -f5)/docs.tar.gz --output docs.tar.gz \
+    && tar -xf docs.tar.gz \
+    && rm docs.tar.gz
 
 COPY . .
+RUN --mount=type=cache,target=/go/pkg/mod/ \
+    go install -v ./cmd/...
 
-RUN curl -L https://github.com/weni-ai/goflow/releases/download/$(grep weni-ai/goflow go.mod | cut -d" " -f5)/docs.tar.gz --output docs.tar.gz && tar -xf docs.tar.gz && rm docs.tar.gz
+FROM alpine:3.18.4
 
-RUN go install -v ./cmd/...
+ENV APP_USER=app \
+    APP_GROUP=app \
+    USER_ID=11999 \
+    GROUP_ID=11999
+
+RUN addgroup --system --gid ${GROUP_ID} ${APP_GROUP} \
+    && adduser --system --disabled-password --home /home/${APP_USER} \
+    --uid ${USER_ID} --ingroup ${APP_GROUP} ${APP_USER}
+
+COPY --from=builder --chown=${APP_USER}:${APP_GROUP} /go/bin/ /app/
+COPY --from=builder --chown=${APP_USER}:${APP_GROUP} /app/docs /app/docs
+
+WORKDIR /app
+
+USER ${APP_USER}:${APP_GROUP}
 
 EXPOSE 8000
-ENTRYPOINT ["mailroom"]
+ENTRYPOINT ["./mailroom"]
