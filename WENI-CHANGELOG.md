@@ -1,3 +1,7 @@
+1.7.3-mailroom-7.1.22
+----------
+ * Add support for searching for Vtex products
+
 1.7.2-mailroom-7.1.22
 ----------
  * Remove duplicate products for catalog messages
