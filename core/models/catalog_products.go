@@ -150,10 +150,6 @@ func loadCatalog(ctx context.Context, db *sqlx.DB, orgID OrgID) ([]assets.MsgCat
 	}
 	defer rows.Close()
 
-	if err == sql.ErrNoRows || !rows.Next() {
-		return nil, nil
-	}
-
 	catalog := make([]assets.MsgCatalog, 0)
 	for rows.Next() {
 		msgCatalog := &MsgCatalog{}
@@ -173,6 +169,10 @@ func loadCatalog(ctx context.Context, db *sqlx.DB, orgID OrgID) ([]assets.MsgCat
 		msgCatalog.c.ChannelUUID = channelUUID
 		msgCatalog.c.Type = "msg_catalog"
 		catalog = append(catalog, msgCatalog)
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, errors.Wrap(err, "error iterating through rows")
 	}
 
 	logrus.WithField("elapsed", time.Since(start)).WithField("org_id", orgID).WithField("count", len(catalog)).Debug("loaded catalog")
