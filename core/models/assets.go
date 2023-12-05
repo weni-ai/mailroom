@@ -388,12 +388,14 @@ func NewOrgAssets(ctx context.Context, rt *runtime.Runtime, orgID OrgID, prev *O
 	if prev == nil || refresh&RefreshMsgCatalogs > 0 {
 		oa.msgCatalogs, err = loadCatalog(ctx, db, orgID)
 		if err != nil {
+			fmt.Println("ERROR 8")
 			return nil, errors.Wrapf(err, "error loading catalogs for org %d", orgID)
 		}
 		oa.msgCatalogsByID = make(map[CatalogID]*MsgCatalog)
 		oa.msgCatalogsByUUID = make(map[assets.ChannelUUID]*MsgCatalog)
 
 		for _, a := range oa.msgCatalogs {
+			fmt.Println("MAPEANDO CATALOGOS --> UUID: ", a.(*MsgCatalog).c.ChannelUUID)
 			oa.msgCatalogsByID[a.(*MsgCatalog).c.ID] = a.(*MsgCatalog)
 			oa.msgCatalogsByUUID[a.(*MsgCatalog).c.ChannelUUID] = a.(*MsgCatalog)
 		}
