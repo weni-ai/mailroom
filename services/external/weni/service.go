@@ -303,15 +303,17 @@ func VtexLegacySearch(searchUrl string, productSearch string, sellerId string) (
 			break
 		}
 		product_retailer_id := product.Items[0].ItemId
-		result = append(result, product_retailer_id)
 
 		if sellerId != "" {
+			result = append(result, product_retailer_id)
 			body.Items = append(body.Items, struct {
 				ID           string "json:\"id\""
 				Quantity     int    "json:\"quantity\""
 				Seller       string "json:\"seller\""
 				Availability string "json:\"availability,omitempty\""
 			}{ID: product_retailer_id, Quantity: 1, Seller: sellerId})
+		} else {
+			result = append(result, product_retailer_id+"#1")
 		}
 	}
 
