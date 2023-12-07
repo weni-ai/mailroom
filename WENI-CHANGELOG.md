@@ -1,3 +1,8 @@
+1.8.0-mailroom-7.1.22
+----------
+ * Vtex search support with sellerId
+ * [FLOWS-285] - Add contact in httplog model
+
 1.7.3-mailroom-7.1.22
 ----------
  * Add support for searching for Vtex products
