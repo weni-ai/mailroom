@@ -51,6 +51,7 @@ type HTTPLog struct {
 	FlowID       FlowID       `db:"flow_id"`
 	ClassifierID ClassifierID `db:"classifier_id"`
 	TicketerID   TicketerID   `db:"ticketer_id"`
+	ContactID    ContactID    `db:"contact_id"`
 	//ExternalServiceID ExternalServiceID `db:"external_service_id"`
 	AirtimeTransferID AirtimeTransferID `db:"airtime_transfer_id"`
 }
@@ -71,9 +72,10 @@ func newHTTPLog(orgID OrgID, logType HTTPLogType, url string, statusCode int, re
 }
 
 // NewWebhookCalledLog creates a new HTTP log for an in-flow webhook call
-func NewWebhookCalledLog(orgID OrgID, fid FlowID, url string, statusCode int, request, response string, isError bool, elapsed time.Duration, retries int, createdOn time.Time) *HTTPLog {
+func NewWebhookCalledLog(orgID OrgID, fid FlowID, url string, statusCode int, request, response string, isError bool, elapsed time.Duration, retries int, createdOn time.Time, contactID ContactID) *HTTPLog {
 	h := newHTTPLog(orgID, LogTypeWebhookCalled, url, statusCode, request, response, isError, elapsed, retries, createdOn)
 	h.FlowID = fid
+	h.ContactID = contactID
 	return h
 }
 
@@ -108,8 +110,8 @@ func (h *HTTPLog) SetAirtimeTransferID(tid AirtimeTransferID) {
 }
 
 const insertHTTPLogsSQL = `
-INSERT INTO request_logs_httplog( log_type,  org_id,  url,  status_code,  flow_id,  classifier_id,  ticketer_id, airtime_transfer_id,  request,  response,  is_error,  request_time,  num_retries,  created_on)
-					      VALUES(:log_type, :org_id, :url, :status_code, :flow_id, :classifier_id, :ticketer_id, :airtime_transfer_id, :request, :response, :is_error, :request_time, :num_retries, :created_on)
+INSERT INTO request_logs_httplog( log_type,  org_id,  url,  status_code,  flow_id,  classifier_id,  ticketer_id, airtime_transfer_id,  request,  response,  is_error,  request_time,  num_retries,  created_on, contact_id)
+					      VALUES(:log_type, :org_id, :url, :status_code, :flow_id, :classifier_id, :ticketer_id, :airtime_transfer_id, :request, :response, :is_error, :request_time, :num_retries, :created_on, :contact_id)
 RETURNING id
 `
 
