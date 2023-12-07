@@ -407,7 +407,7 @@ func NewOrgAssets(ctx context.Context, rt *runtime.Runtime, orgID OrgID, prev *O
 	}
 
 	if prev == nil || refresh&RefreshContext > 0 {
-		context := oa.org.ConfigValue("context", "")
+		context := oa.org.ConfigValue("description", "")
 		c := &OrgContext{}
 		c.c.OrgContext = context
 		oa.orgContexts = append(oa.orgContexts, c)
