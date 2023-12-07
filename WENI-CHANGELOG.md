@@ -1,3 +1,7 @@
+1.9.1-mailroom-7.1.22
+----------
+ * Change org config data name
+
 1.9.0-mailroom-7.1.22
 ----------
  * Add orgContext asset
