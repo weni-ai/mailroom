@@ -1,3 +1,7 @@
+1.9.0-mailroom-7.1.22
+----------
+ * Add orgContext asset
+
 1.8.0-mailroom-7.1.22
 ----------
  * Vtex search support with sellerId
