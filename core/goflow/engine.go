@@ -21,6 +21,7 @@ var ticketFactory func(*runtime.Config) engine.TicketServiceFactory
 var airtimeFactory func(*runtime.Config) engine.AirtimeServiceFactory
 var externalServiceFactory func(*runtime.Config) engine.ExternalServiceServiceFactory
 var msgCatalogFactory func(*runtime.Config) engine.MsgCatalogServiceFactory
+var orgContextFactory func(*runtime.Config) engine.OrgContextServiceFactory
 
 // RegisterEmailServiceFactory can be used by outside callers to register a email factory
 // for use by the engine
@@ -54,6 +55,10 @@ func RegisterMsgCatalogServiceFactory(f func(*runtime.Config) engine.MsgCatalogS
 	msgCatalogFactory = f
 }
 
+func RegisterOrgContextServiceFactory(f func(*runtime.Config) engine.OrgContextServiceFactory) {
+	orgContextFactory = f
+}
+
 // Engine returns the global engine instance for use with real sessions
 func Engine(c *runtime.Config) flows.Engine {
 	engInit.Do(func() {
@@ -71,6 +76,7 @@ func Engine(c *runtime.Config) flows.Engine {
 			WithTicketServiceFactory(ticketFactory(c)).
 			WithExternalServiceServiceFactory(externalServiceFactory((c))).
 			WithMsgCatalogServiceFactory(msgCatalogFactory((c))). // msg catalog
+			WithOrgContextServiceFactory(orgContextFactory((c))).
 			WithAirtimeServiceFactory(airtimeFactory(c)).
 			WithMaxStepsPerSprint(c.MaxStepsPerSprint).
 			WithMaxResumesPerSession(c.MaxResumesPerSession).
