@@ -1,3 +1,7 @@
+1.10.0-mailroom-7.1.22
+----------
+ * Update goflow version to v0.5.1-goflow-0.144.3
+
 1.9.1-mailroom-7.1.22
 ----------
  * Change org config data name
