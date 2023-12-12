@@ -1,10 +1,10 @@
 FROM golang:1.17.5-alpine3.14 AS builder
 
 WORKDIR /app
- 
-RUN apk add --no-cache --virtual build-deps curl gcc git
 
-COPY go.mod go.sum ./
+RUN apk add --no-cache --virtual build-deps curl gcc
+
+COPY go.mod go.sum .
 RUN --mount=type=cache,target=/go/pkg/mod/ \
     go mod download -x
 
@@ -16,7 +16,7 @@ COPY . .
 RUN --mount=type=cache,target=/go/pkg/mod/ \
     go install -v ./cmd/...
 
-FROM alpine:3.14
+FROM alpine:3.18.4
 
 ENV APP_USER=app \
     APP_GROUP=app \
