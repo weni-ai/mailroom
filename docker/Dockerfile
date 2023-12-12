@@ -4,7 +4,7 @@ WORKDIR /app
 
 RUN apk add --no-cache --virtual build-deps curl gcc
 
-COPY go.mod go.sum .
+COPY go.mod go.sum ./
 RUN --mount=type=cache,target=/go/pkg/mod/ \
     go mod download -x
 
@@ -17,6 +17,8 @@ RUN --mount=type=cache,target=/go/pkg/mod/ \
     go install -v ./cmd/...
 
 FROM alpine:3.18.4
+
+RUN apk add --no-cache tzdata
 
 ENV APP_USER=app \
     APP_GROUP=app \
