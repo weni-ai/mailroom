@@ -45,5 +45,5 @@ func TestChannelUUIDForChannelID(t *testing.T) {
 
 	ctp, err := models.ChannelUUIDForChannelID(ctx, db, testdata.TwilioChannel.ID)
 	assert.NoError(t, err)
-	assert.Equal(t, ctp, testdata.TwilioChannel.ID)
+	assert.Equal(t, ctp, testdata.TwilioChannel.UUID)
 }
