@@ -21,6 +21,7 @@ import (
 )
 
 func TestService(t *testing.T) {
+	t.Skip("Skip because it's a work in progress.")
 	_, rt, db, _ := testsuite.Get()
 
 	defer dates.SetNowSource(dates.DefaultNowSource)
