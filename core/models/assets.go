@@ -27,6 +27,9 @@ type OrgAssets struct {
 
 	org *Org
 
+	orgContexts   []assets.OrgContext
+	contextByUUID map[assets.ChannelUUID]*OrgContext
+
 	sessionAssets flows.SessionAssets
 
 	flowByUUID    map[assets.FlowUUID]assets.Flow
@@ -79,6 +82,10 @@ type OrgAssets struct {
 	externalServices       []assets.ExternalService
 	externalServicesByID   map[ExternalServiceID]*ExternalService
 	externalServicesByUUID map[assets.ExternalServiceUUID]*ExternalService
+
+	msgCatalogs       []assets.MsgCatalog
+	msgCatalogsByID   map[CatalogID]*MsgCatalog
+	msgCatalogsByUUID map[assets.ChannelUUID]*MsgCatalog
 }
 
 var ErrNotFound = errors.New("not found")
@@ -381,6 +388,45 @@ func NewOrgAssets(ctx context.Context, rt *runtime.Runtime, orgID OrgID, prev *O
 		oa.externalServicesByUUID = prev.externalServicesByUUID
 	}
 
+	if prev == nil || refresh&RefreshMsgCatalogs > 0 {
+		oa.msgCatalogs, err = loadCatalog(ctx, db, orgID)
+		if err != nil {
+			return nil, errors.Wrapf(err, "error loading catalogs for org %d", orgID)
+		}
+		oa.msgCatalogsByID = make(map[CatalogID]*MsgCatalog)
+		oa.msgCatalogsByUUID = make(map[assets.ChannelUUID]*MsgCatalog)
+
+		for _, a := range oa.msgCatalogs {
+			oa.msgCatalogsByID[a.(*MsgCatalog).c.ID] = a.(*MsgCatalog)
+			oa.msgCatalogsByUUID[a.(*MsgCatalog).c.ChannelUUID] = a.(*MsgCatalog)
+		}
+	} else {
+		oa.msgCatalogs = prev.msgCatalogs
+		oa.msgCatalogsByID = prev.msgCatalogsByID
+		oa.msgCatalogsByUUID = prev.msgCatalogsByUUID
+	}
+
+	if prev == nil || refresh&RefreshContext > 0 {
+		context := oa.org.ConfigValue("description", "")
+		c := &OrgContext{}
+		c.c.OrgContext = context
+		oa.orgContexts = append(oa.orgContexts, c)
+		if err != nil {
+			return nil, errors.Wrapf(err, "error loading context for org %d", orgID)
+		}
+
+		oa.contextByUUID = make(map[assets.ChannelUUID]*OrgContext)
+		for _, a := range oa.orgContexts {
+			for c, _ := range oa.channelsByUUID {
+				oa.contextByUUID[c] = a.(*OrgContext)
+			}
+		}
+
+	} else {
+		oa.orgContexts = prev.orgContexts
+		oa.contextByUUID = prev.contextByUUID
+	}
+
 	// intialize our session assets
 	oa.sessionAssets, err = engine.NewSessionAssets(oa.Env(), oa, goflow.MigrationConfig(rt.Config))
 	if err != nil {
@@ -414,6 +460,8 @@ const (
 	RefreshTopics           = Refresh(1 << 15)
 	RefreshUsers            = Refresh(1 << 16)
 	RefreshExternalServices = Refresh(1 << 17)
+	RefreshMsgCatalogs      = Refresh(1 << 18)
+	RefreshContext          = Refresh(1 << 19)
 )
 
 // GetOrgAssets creates or gets org assets for the passed in org
@@ -705,4 +753,12 @@ func (a *OrgAssets) ExternalServiceByID(id ExternalServiceID) *ExternalService {
 
 func (a *OrgAssets) ExternalServiceByUUID(uuid assets.ExternalServiceUUID) *ExternalService {
 	return a.externalServicesByUUID[uuid]
+}
+
+func (a *OrgAssets) MsgCatalogs() ([]assets.MsgCatalog, error) {
+	return a.msgCatalogs, nil
+}
+
+func (a *OrgAssets) OrgContexts() ([]assets.OrgContext, error) {
+	return a.orgContexts, nil
 }

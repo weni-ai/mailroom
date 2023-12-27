@@ -75,10 +75,10 @@ func NewMailroom(config *runtime.Config) *Mailroom {
 	routers.SetZeroshotAPIURL(mr.rt.Config.ZeroshotAPIUrl)
 
 	// set authentication token for wenigpt requests in goflow
-	actions.SetWeniGPTToken(mr.rt.Config.WeniGPTAPIToken)
+	actions.SetWeniGPTToken(mr.rt.Config.WenigptAuthToken)
 
 	// set base url for wenigpt requests
-	actions.SetWeniGPTAPIURL(mr.rt.Config.WeniGPTAPIUrl)
+	actions.SetWeniGPTAPIURL(mr.rt.Config.WenigptBaseURL)
 
 	return mr
 }

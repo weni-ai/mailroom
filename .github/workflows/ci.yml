@@ -21,11 +21,12 @@ jobs:
         redis version: ${{ env.redis-version }}
 
     - name: Install PostgreSQL
-      uses: nyaruka/postgis-action@v2
+      uses: nyaruka/postgis-action@v2.1.0
       with:
         postgresql version: ${{ matrix.pg-version }}
         postgis version: ${{ env.postgis-version }}
         postgresql password: temba
+        postgresql arguments: postgres -N 300
 
     - name: Install Linux packages
       run: sudo apt install -y --no-install-recommends postgresql-client

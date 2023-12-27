@@ -35,7 +35,7 @@ func TestHTTPLogs(t *testing.T) {
 	testsuite.AssertQuery(t, db, `SELECT count(*) from request_logs_httplog WHERE org_id = $1 AND status_code = 0 AND classifier_id = $2 AND is_error = TRUE AND response IS NULL`, testdata.Org1.ID, testdata.Wit.ID).Returns(1)
 
 	// insert a webhook log
-	log = models.NewWebhookCalledLog(testdata.Org1.ID, testdata.Favorites.ID, "http://foo.bar", 400, "GET /", "HTTP 200", false, time.Second, 2, time.Now())
+	log = models.NewWebhookCalledLog(testdata.Org1.ID, testdata.Favorites.ID, "http://foo.bar", 400, "GET /", "HTTP 200", false, time.Second, 2, time.Now(), testdata.Cathy.ID)
 	err = models.InsertHTTPLogs(ctx, db, []*models.HTTPLog{log})
 	assert.Nil(t, err)
 

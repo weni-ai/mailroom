@@ -1,3 +1,44 @@
+1.11.0-mailroom-7.1.22
+----------
+ * Update goflow version to v0.5.2-goflow-0.144.3
+
+1.10.0-mailroom-7.1.22
+----------
+ * Update goflow version to v0.5.1-goflow-0.144.3
+
+1.9.1-mailroom-7.1.22
+----------
+ * Change org config data name
+
+1.9.0-mailroom-7.1.22
+----------
+ * Add orgContext asset
+
+1.8.0-mailroom-7.1.22
+----------
+ * Vtex search support with sellerId
+ * [FLOWS-285] - Add contact in httplog model
+
+1.7.3-mailroom-7.1.22
+----------
+ * Add support for searching for Vtex products
+
+1.7.2-mailroom-7.1.22
+----------
+ * Remove duplicate products for catalog messages
+
+1.7.1-mailroom-7.1.22
+----------
+ * Tweaks for close ticket behaviour to not delete unfired campaign contact events
+
+1.7.0-mailroom-7.1.22
+----------
+ * Catalog message support
+
+1.6.14-mailroom-7.1.22
+----------
+ * Update goflow version
+
 1.6.13-mailroom-7.1.22
 ----------
  * Fix/order trigger resume
