@@ -710,6 +710,56 @@ func SelectContactMessages(ctx context.Context, db Queryer, contactID int, after
 	return msgs, nil
 }
 
+const selectMsgByFlowrunUUID = `
+SELECT 
+	id,
+	broadcast_id,
+	uuid,
+	text,
+	created_on,
+	direction,
+	status,
+	visibility,
+	msg_count,
+	error_count,
+	next_attempt,
+	external_id,
+	attachments,
+	metadata,
+	channel_id,
+	contact_id,
+	contact_urn_id,
+	org_id,
+	topup_id
+FROM public.msgs_msg
+JOIN (
+    SELECT (jsonb_array_elements(events)->'msg'->>'uuid')::uuid AS msg_uuid
+    FROM public.flows_flowrun
+    WHERE "uuid" = $1
+) AS flow_events
+ON flow_events.msg_uuid = public.msgs_msg."uuid";
+`
+
+// SelectMessagesByFlowRun loads the given messages for the passed in contact, created after the passed in time
+func SelectMessagesByFlowRun(ctx context.Context, db Queryer, flowrunUUID string) ([]*Msg, error) {
+	rows, err := db.QueryxContext(ctx, selectMsgByFlowrunUUID, flowrunUUID)
+	if err != nil {
+		return nil, errors.Wrapf(err, "error querying msgs for flowrun UUID %v", flowrunUUID)
+	}
+	defer rows.Close()
+
+	msgs := make([]*Msg, 0)
+	for rows.Next() {
+		msg := &Msg{}
+		err = rows.StructScan(&msg.m)
+		if err != nil {
+			return nil, errors.Wrapf(err, "error scanning msg row")
+		}
+		msgs = append(msgs, msg)
+	}
+	return msgs, nil
+}
+
 // NormalizeAttachment will turn any relative URL in the passed in attachment and normalize it to
 // include the full host for attachment domains
 func NormalizeAttachment(cfg *runtime.Config, attachment utils.Attachment) utils.Attachment {

@@ -10,12 +10,14 @@ import (
 	"github.com/nyaruka/gocommon/dates"
 	"github.com/nyaruka/gocommon/jsonx"
 	"github.com/nyaruka/gocommon/urns"
+	"github.com/nyaruka/gocommon/uuids"
 	"github.com/nyaruka/goflow/assets"
 	"github.com/nyaruka/goflow/envs"
 	"github.com/nyaruka/goflow/flows"
 	"github.com/nyaruka/goflow/test"
 	"github.com/nyaruka/goflow/utils"
 	"github.com/nyaruka/mailroom/core/models"
+	"github.com/nyaruka/mailroom/core/runner"
 	"github.com/nyaruka/mailroom/runtime"
 	"github.com/nyaruka/mailroom/testsuite"
 	"github.com/nyaruka/mailroom/testsuite/testdata"
@@ -622,4 +624,34 @@ func TestSelectContactMessages(t *testing.T) {
 	// shoud only return messages for testdata.Cathy
 	assert.NoError(t, err)
 	assert.Equal(t, 3, len(msgs))
+}
+
+func TestSelectMsgByFlowrunUUID(t *testing.T) {
+	ctx, rt, db, _ := testsuite.Get()
+	defer testsuite.Reset(testsuite.ResetAll)
+	defer uuids.SetGenerator(uuids.DefaultGenerator)
+	uuids.SetGenerator(uuids.NewSeededGenerator(12345))
+
+	oa, err := models.GetOrgAssetsWithRefresh(ctx, rt, testdata.Org1.ID, models.RefreshFlows)
+	assert.NoError(t, err)
+
+	rt.Config.DB = "postgres://mailroom_test:temba@localhost/mailroom_test?sslmode=disable&Timezone=UTC"
+
+	contactIDs := []models.ContactID{testdata.Cathy.ID}
+	start := models.NewFlowStart(models.OrgID(1), models.StartTypeManual, models.FlowTypeMessaging, testdata.SingleMessage.ID, true, true).
+		WithContactIDs(contactIDs)
+	batch := start.CreateBatch(contactIDs, true, len(contactIDs))
+
+	sessions, err := runner.StartFlowBatch(ctx, rt, batch)
+	assert.NoError(t, err)
+
+	csession := sessions[0]
+
+	fcs, err := csession.FlowSession(rt.Config, oa.SessionAssets(), oa.Env())
+	assert.NoError(t, err)
+
+	fruuid := string(fcs.Runs()[0].UUID())
+	msgs, err := models.SelectMessagesByFlowRun(ctx, db, fruuid)
+	assert.NoError(t, err)
+	assert.Equal(t, 1, len(msgs))
 }
