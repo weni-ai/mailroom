@@ -22,7 +22,7 @@ type WeniGPTCall struct {
 }
 
 func handleWeniGPTCalled(ctx context.Context, rt *runtime.Runtime, tx *sqlx.Tx, oa *models.OrgAssets, scene *models.Scene, e flows.Event) error {
-	event := e.(*events.WeniGPTCalledEvent)
+	event := e.(*events.WebhookCalledEvent)
 	logrus.WithFields(logrus.Fields{
 		"contact_uuid": scene.ContactUUID(),
 		"session_id":   scene.SessionID(),
@@ -35,7 +35,7 @@ func handleWeniGPTCalled(ctx context.Context, rt *runtime.Runtime, tx *sqlx.Tx, 
 	_, step := scene.Session().FindStep(e.StepUUID())
 
 	// pass node and response time to the hook that monitors webhook health
-	scene.AppendToEventPreCommitHook(hooks.MonitorWebhooks, WeniGPTCall{NodeUUID: step.NodeUUID(), Event: event})
+	scene.AppendToEventPreCommitHook(hooks.MonitorWebhooks, &hooks.WebhookCall{NodeUUID: step.NodeUUID(), Event: event})
 
 	return nil
 }
