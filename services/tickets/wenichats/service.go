@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"net/http"
+	"sort"
 	"strconv"
 	"strings"
 	"sync"
@@ -167,6 +168,10 @@ func (s *service) Open(session flows.Session, topic *flows.Topic, body string, a
 		}
 		msgs = append(msgs, frmsgs...)
 	}
+
+	sort.Slice(msgs, func(i, j int) bool {
+		return msgs[i].CreatedOn().Before(msgs[j].CreatedOn())
+	})
 
 	//send history
 	for _, msg := range msgs {
