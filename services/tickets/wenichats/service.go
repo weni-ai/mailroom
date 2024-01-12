@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"net/http"
+	"sort"
 	"strconv"
 	"strings"
 	"sync"
@@ -156,13 +157,29 @@ func (s *service) Open(session flows.Session, topic *flows.Topic, body string, a
 		return nil, errors.Wrap(err, "failed to create wenichats room webhook")
 	}
 
-	// get messages for history
-	after := session.Runs()[0].CreatedOn()
 	cx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 	defer cancel()
-	msgs, err := models.SelectContactMessages(cx, db, int(contact.ID()), after)
-	if err != nil {
-		return nil, errors.Wrap(err, "failed to get history messages")
+	msgs := make([]*models.Msg, 0)
+	for _, fr := range session.Runs() {
+		fruuid := string(fr.UUID())
+		frmsgs, err := models.SelectMessagesByFlowRun(cx, db, fruuid)
+		if err != nil {
+			return nil, errors.Wrap(err, "failed to get history messages")
+		}
+		msgs = append(msgs, frmsgs...)
+	}
+
+	sort.Slice(msgs, func(i, j int) bool {
+		return msgs[i].CreatedOn().Before(msgs[j].CreatedOn())
+	})
+
+	if len(msgs) > 0 {
+		after := msgs[0].CreatedOn()
+		contactID := int(session.Contact().ID())
+		msgs, err = models.SelectContactMessages(cx, db, contactID, after)
+		if err != nil {
+			return nil, errors.Wrap(err, "failed to get history messages")
+		}
 	}
 
 	//send history

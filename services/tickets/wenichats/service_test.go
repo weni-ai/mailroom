@@ -6,8 +6,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/DATA-DOG/go-sqlmock"
-	"github.com/jmoiron/sqlx"
 	"github.com/nyaruka/gocommon/dates"
 	"github.com/nyaruka/gocommon/httpx"
 	"github.com/nyaruka/gocommon/uuids"
@@ -26,7 +24,7 @@ import (
 )
 
 func TestOpenAndForward(t *testing.T) {
-	ctx, rt, _, _ := testsuite.Get()
+	ctx, rt, db, _ := testsuite.Get()
 	testsuite.Reset(testsuite.ResetData | testsuite.ResetStorage)
 
 	defer dates.SetNowSource(dates.DefaultNowSource)
@@ -260,20 +258,7 @@ func TestOpenAndForward(t *testing.T) {
 	)
 	assert.EqualError(t, err, "missing project_auth or sector_uuid")
 
-	mockDB, mock, _ := sqlmock.New()
-	defer mockDB.Close()
-	sqlxDB := sqlx.NewDb(mockDB, "sqlmock")
-
-	rows := sqlmock.NewRows([]string{"id", "uuid", "text", "high_priority", "created_on", "modified_on", "sent_on", "queued_on", "direction", "status", "visibility", "msg_type", "msg_count", "error_count", "next_attempt", "external_id", "attachments", "metadata", "broadcast_id", "channel_id", "contact_id", "contact_urn_id", "org_id", "topup_id"})
-
-	after, err := time.Parse("2006-01-02T15:04:05", "2019-10-07T15:21:30")
-	assert.NoError(t, err)
-
-	mock.ExpectQuery("SELECT").
-		WithArgs(1234567, after).
-		WillReturnRows(rows)
-
-	wenichats.SetDB(sqlxDB)
+	wenichats.SetDB(db)
 
 	svc, err := wenichats.NewService(
 		rt.Config,
