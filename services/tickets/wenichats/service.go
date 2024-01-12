@@ -173,6 +173,13 @@ func (s *service) Open(session flows.Session, topic *flows.Topic, body string, a
 		return msgs[i].CreatedOn().Before(msgs[j].CreatedOn())
 	})
 
+	after := msgs[0].CreatedOn()
+	contactID := int(session.Contact().ID())
+	msgs, err = models.SelectContactMessages(cx, db, contactID, after)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to get history messages")
+	}
+
 	//send history
 	for _, msg := range msgs {
 		var direction string
