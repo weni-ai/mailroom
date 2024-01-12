@@ -16,11 +16,6 @@ func init() {
 	models.RegisterEventHandler(events.TypeWeniGPTCalled, handleWeniGPTCalled)
 }
 
-type WeniGPTCall struct {
-	NodeUUID flows.NodeUUID
-	Event    *events.WebhookCalledEvent
-}
-
 func handleWeniGPTCalled(ctx context.Context, rt *runtime.Runtime, tx *sqlx.Tx, oa *models.OrgAssets, scene *models.Scene, e flows.Event) error {
 	event := e.(*events.WebhookCalledEvent)
 	logrus.WithFields(logrus.Fields{
