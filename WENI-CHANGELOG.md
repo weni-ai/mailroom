@@ -1,3 +1,7 @@
+1.11.1-mailroom-7.1.22
+----------
+ * fix wenichats send history on open ticket based on first message and flowrun events
+
 1.11.0-mailroom-7.1.22
 ----------
  * Update goflow version to v0.5.2-goflow-0.144.3
