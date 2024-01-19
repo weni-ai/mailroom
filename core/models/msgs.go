@@ -559,33 +559,37 @@ func newOutgoingMsgWpp(rt *runtime.Runtime, org *Org, channel *Channel, contactI
 	}
 
 	// if we have attachments, add them
-	if len(msgWpp.Header().Attachments) > 0 {
-		for _, a := range msgWpp.Header().Attachments {
+	if len(msgWpp.Attachments()) > 0 {
+		for _, a := range msgWpp.Attachments() {
 			m.Attachments = append(m.Attachments, string(NormalizeAttachment(rt.Config, a)))
 		}
 	}
 
-	if len(msgWpp.ReplyButtons()) > 0 || len(msgWpp.ListMessages().Options) > 0 || msgWpp.Topic() != flows.NilMsgTopic || msgWpp.Body() != "" || msgWpp.Footer() != "" || msgWpp.Header().Text != "" {
+	if len(msgWpp.ReplyButtons()) > 0 || len(msgWpp.ListMessages().ListItems) > 0 || msgWpp.Topic() != flows.NilMsgTopic || msgWpp.Text() != "" || msgWpp.Footer() != "" || msgWpp.HeaderType() != "" || msgWpp.InteractionType() != "" {
 		metadata := make(map[string]interface{})
 		if msgWpp.Topic() != flows.NilMsgTopic {
 			metadata["topic"] = string(msgWpp.Topic())
 		}
-		if msgWpp.Header().Text != "" {
-			metadata["header"] = string(msgWpp.Header().Text)
+		if msgWpp.HeaderText() != "" {
+			metadata["header_text"] = string(msgWpp.HeaderText())
 		}
-		if msgWpp.Body() != "" {
-			metadata["body"] = string(msgWpp.Body())
+		if msgWpp.Text() != "" {
+			metadata["text"] = string(msgWpp.Text())
 		}
 		if msgWpp.Footer() != "" {
 			metadata["footer"] = string(msgWpp.Footer())
 		}
 		if len(msgWpp.ReplyButtons()) > 0 {
 			metadata["quick_replies"] = msgWpp.ReplyButtons()
-			metadata["is_buttons"] = true
 		}
-		if len(msgWpp.ListMessages().Options) > 0 {
+		if len(msgWpp.ListMessages().ListItems) > 0 {
 			metadata["list_messages"] = msgWpp.ListMessages()
-			metadata["is_buttons"] = false
+		}
+		if msgWpp.HeaderType() != "" {
+			metadata["header_type"] = string(msgWpp.HeaderType())
+		}
+		if msgWpp.InteractionType() != "" {
+			metadata["interaction_type"] = string(msgWpp.InteractionType())
 		}
 
 		m.Metadata = null.NewMap(metadata)

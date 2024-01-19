@@ -68,7 +68,7 @@ func handleMsgWppCreated(ctx context.Context, rt *runtime.Runtime, tx *sqlx.Tx, 
 	logrus.WithFields(logrus.Fields{
 		"contact_uuid": scene.ContactUUID(),
 		"session_id":   scene.SessionID(),
-		"text":         event.Msg.Body(),
+		"text":         event.Msg.Text(),
 		"urn":          event.Msg.URN(),
 	}).Debug("msg created event")
 
