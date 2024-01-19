@@ -565,7 +565,7 @@ func newOutgoingMsgWpp(rt *runtime.Runtime, org *Org, channel *Channel, contactI
 		}
 	}
 
-	if len(msgWpp.ReplyButtons()) > 0 || len(msgWpp.ListMessages().ListItems) > 0 || msgWpp.Topic() != flows.NilMsgTopic || msgWpp.Text() != "" || msgWpp.Footer() != "" || msgWpp.HeaderType() != "" || msgWpp.InteractionType() != "" {
+	if len(msgWpp.QuickReplies()) > 0 || len(msgWpp.ListMessages().ListItems) > 0 || msgWpp.Topic() != flows.NilMsgTopic || msgWpp.Text() != "" || msgWpp.Footer() != "" || msgWpp.HeaderType() != "" || msgWpp.InteractionType() != "" {
 		metadata := make(map[string]interface{})
 		if msgWpp.Topic() != flows.NilMsgTopic {
 			metadata["topic"] = string(msgWpp.Topic())
@@ -579,8 +579,8 @@ func newOutgoingMsgWpp(rt *runtime.Runtime, org *Org, channel *Channel, contactI
 		if msgWpp.Footer() != "" {
 			metadata["footer"] = string(msgWpp.Footer())
 		}
-		if len(msgWpp.ReplyButtons()) > 0 {
-			metadata["quick_replies"] = msgWpp.ReplyButtons()
+		if len(msgWpp.QuickReplies()) > 0 {
+			metadata["quick_replies"] = msgWpp.QuickReplies()
 		}
 		if len(msgWpp.ListMessages().ListItems) > 0 {
 			metadata["list_messages"] = msgWpp.ListMessages()
