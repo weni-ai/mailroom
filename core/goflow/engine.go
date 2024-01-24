@@ -100,6 +100,7 @@ func Simulator(c *runtime.Config) flows.Engine {
 
 		simulator = engine.NewBuilder().
 			WithWebhookServiceFactory(webhooks.NewServiceFactory(httpClient, nil, httpAccess, webhookHeaders, c.WebhooksMaxBodyBytes)).
+			WithWeniGPTServiceFactory(wenigpt.NewServiceFactory(httpClient, nil, httpAccess, webhookHeaders, c.WebhooksMaxBodyBytes, c.WenigptAuthToken, c.WenigptBaseURL)).
 			WithClassificationServiceFactory(classificationFactory(c)).     // simulated sessions do real classification
 			WithExternalServiceServiceFactory(externalServiceFactory((c))). // and real external services
 			WithMsgCatalogServiceFactory(msgCatalogFactory((c))).           // msg catalog
