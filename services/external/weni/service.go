@@ -236,13 +236,15 @@ func GetProductListFromVtex(productSearch string, searchUrl string, apiType stri
 	var trace *httpx.Trace
 	var err error
 
+	sellerID = strings.TrimSpace(sellerID)
+
 	if apiType == "legacy" {
 		result, traces, err = VtexLegacySearch(searchUrl, productSearch, sellerID)
 		if err != nil {
 			return nil, traces, err
 		}
 	} else if apiType == "intelligent" {
-		result, trace, err = VtexIntelligentSearch(searchUrl, productSearch)
+		result, trace, err = VtexIntelligentSearch(searchUrl, productSearch, sellerID)
 		traces = append(traces, trace)
 		if err != nil {
 			return nil, traces, err
@@ -366,7 +368,7 @@ func VtexLegacySearch(searchUrl string, productSearch string, sellerId string) (
 	return result, traces, nil
 }
 
-func VtexIntelligentSearch(searchUrl string, productSearch string) ([]string, *httpx.Trace, error) {
+func VtexIntelligentSearch(searchUrl string, productSearch string, sellerId string) ([]string, *httpx.Trace, error) {
 	query := url.Values{}
 	query.Add("query", productSearch)
 	query.Add("locale", "pt-BR")
@@ -400,13 +402,17 @@ func VtexIntelligentSearch(searchUrl string, productSearch string) ([]string, *h
 		return nil, trace, err
 	}
 
+	if sellerId == "" {
+		sellerId = "1"
+	}
+
 	result := []string{}
 	for i, product := range response.Products {
 		if i == 5 {
 			break
 		}
 		product_retailer_id := product.Items[0].ItemId
-		result = append(result, product_retailer_id)
+		result = append(result, product_retailer_id+"#"+sellerId)
 	}
 
 	return result, trace, nil
