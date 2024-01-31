@@ -1,3 +1,7 @@
+1.12.0-mailroom-7.1.22
+----------
+ * Add handle for weniGPTCalled type events
+
 1.11.2-mailroom-7.1.22
 ----------
  * Fix sellerId logic for intelligent vtex search request
