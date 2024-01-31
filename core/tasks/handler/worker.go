@@ -611,6 +611,19 @@ func handleMsgEvent(ctx context.Context, rt *runtime.Runtime, event *MsgEvent) e
 			}
 			msgIn.SetOrder(order)
 		}
+		mdValue, ok = metadata["nfm_reply"]
+		if ok {
+			var nfmReply *flows.NFMReply
+			asJSON, err := json.Marshal(mdValue)
+			if err != nil {
+				log.WithError(err).Error("unable to marshal metadata from msg event")
+			}
+			err = json.Unmarshal(asJSON, &nfmReply)
+			if err != nil {
+				log.WithError(err).Error("unable to unmarshal orderJSON from metadata[\"nfm_reply\"]")
+			}
+			msgIn.SetNFMReply(nfmReply)
+		}
 	}
 
 	// build our hook to mark a flow message as handled
