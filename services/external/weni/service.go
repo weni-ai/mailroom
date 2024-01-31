@@ -236,6 +236,8 @@ func GetProductListFromVtex(productSearch string, searchUrl string, apiType stri
 	var trace *httpx.Trace
 	var err error
 
+	sellerID = strings.TrimSpace(sellerID)
+
 	if apiType == "legacy" {
 		result, traces, err = VtexLegacySearch(searchUrl, productSearch, sellerID)
 		if err != nil {
