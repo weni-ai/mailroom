@@ -400,7 +400,7 @@ func VtexIntelligentSearch(searchUrl string, productSearch string, sellerId stri
 		return nil, trace, err
 	}
 
-	if sellerId != "" {
+	if sellerId == "" {
 		sellerId = "1"
 	}
 
