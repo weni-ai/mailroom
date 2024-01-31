@@ -1,3 +1,7 @@
+1.11.2-mailroom-7.1.22
+----------
+ * Fix sellerId logic for intelligent vtex search request
+
 1.11.1-mailroom-7.1.22
 ----------
  * fix wenichats send history on open ticket based on first message and flowrun events
