@@ -1,6 +1,11 @@
+1.13.0-mailroom-7.1.22
+----------
+ * Implement the nfm_reply field in input
+
 1.12.0-mailroom-7.1.22
 ----------
  * Add handle for weniGPTCalled type events
+ * Revert "Merge pull request #70 from weni-ai/fix/wenichats-send-history"
 
 1.11.2-mailroom-7.1.22
 ----------
