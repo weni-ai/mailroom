@@ -266,7 +266,7 @@ func TestOpenAndForward(t *testing.T) {
 
 	rows := sqlmock.NewRows([]string{"id", "uuid", "text", "high_priority", "created_on", "modified_on", "sent_on", "queued_on", "direction", "status", "visibility", "msg_type", "msg_count", "error_count", "next_attempt", "external_id", "attachments", "metadata", "broadcast_id", "channel_id", "contact_id", "contact_urn_id", "org_id", "topup_id"})
 
-	after, err := time.Parse("2006-01-02T15:04:05", "2019-10-07T15:21:30")
+	after, err := time.Parse("2006-01-02T15:04:05", "2019-10-07T15:21:29")
 	assert.NoError(t, err)
 
 	mock.ExpectQuery("SELECT").

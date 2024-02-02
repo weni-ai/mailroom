@@ -157,7 +157,8 @@ func (s *service) Open(session flows.Session, topic *flows.Topic, body string, a
 	}
 
 	// get messages for history
-	after := session.Runs()[0].CreatedOn()
+	startMargin := -time.Second * 1
+	after := session.Runs()[0].CreatedOn().Add(startMargin)
 	cx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 	defer cancel()
 	msgs, err := models.SelectContactMessages(cx, db, int(contact.ID()), after)
