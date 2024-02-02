@@ -1,3 +1,7 @@
+1.13.1-mailroom-7.1.22
+----------
+ * fix wenichats sending history when opening ticket, adding a margin time in the selection parameter to avoid omitting the first message that was created before the flowrun
+
 1.13.0-mailroom-7.1.22
 ----------
  * Implement the nfm_reply field in input
