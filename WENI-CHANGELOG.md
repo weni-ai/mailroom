@@ -1,3 +1,7 @@
+1.14.0-mailroom-7.1.22
+----------
+ * Update goflow version to v0.6.2-goflow-0.144.3
+
 1.13.1-mailroom-7.1.22
 ----------
  * fix wenichats sending history when opening ticket, adding a margin time in the selection parameter to avoid omitting the first message that was created before the flowrun
