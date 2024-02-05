@@ -1,3 +1,7 @@
+1.15.0-mailroom-7.1.22
+----------
+ * Update goflow version to v0.6.3-goflow-0.144.3
+
 1.14.0-mailroom-7.1.22
 ----------
  * Update goflow version to v0.6.2-goflow-0.144.3
