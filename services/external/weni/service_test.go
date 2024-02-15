@@ -120,7 +120,7 @@ func TestService(t *testing.T) {
 	assert.NoError(t, err)
 	assert.NotNil(t, call)
 	fmt.Println(call.ProductRetailerIDS)
-	assert.Equal(t, "p1", call.ProductRetailerIDS["banana"])
+	assert.Equal(t, "p1", call.ProductRetailerIDS[0].ProductRetailerIDs[0])
 	assert.NotNil(t, call.Traces)
 
 	params = assets.MsgCatalogParam{
@@ -134,7 +134,7 @@ func TestService(t *testing.T) {
 	call, err = svc.Call(session, params, logger.Log)
 	assert.NoError(t, err)
 	assert.NotNil(t, call)
-	assert.Equal(t, "1236", call.ProductRetailerIDS["banana"])
+	assert.Equal(t, "1236", call.ProductRetailerIDS[0].ProductRetailerIDs[0])
 	assert.NotNil(t, call.Traces)
 
 	params = assets.MsgCatalogParam{
@@ -148,6 +148,6 @@ func TestService(t *testing.T) {
 	call, err = svc.Call(session, params, logger.Log)
 	assert.NoError(t, err)
 	assert.NotNil(t, call)
-	assert.Equal(t, "1234", call.ProductRetailerIDS["banana"])
+	assert.Equal(t, "1234", call.ProductRetailerIDS[0].ProductRetailerIDs[0])
 	assert.NotNil(t, call.Traces)
 }

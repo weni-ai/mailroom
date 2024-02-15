@@ -103,8 +103,10 @@ func (s *service) Call(session flows.Session, params assets.MsgCatalogParam, log
 		return callResult, err
 	}
 
-	productRetailerIDS := map[string][]string{}
+	productRetailerIDS := []string{}
 	productRetailerIDMap := make(map[string]struct{})
+	var productEntries []flows.ProductEntry
+	var productEntry flows.ProductEntry
 	searchResult := []string{}
 	var trace *httpx.Trace
 	var traces []*httpx.Trace
@@ -127,13 +129,19 @@ func (s *service) Call(session flows.Session, params assets.MsgCatalogParam, log
 			productRetailerID := prod
 			_, exists := productRetailerIDMap[productRetailerID]
 			if !exists {
-				productRetailerIDS[product] = append(productRetailerIDS[product], productRetailerID)
+				productRetailerIDS = append(productRetailerIDS, productRetailerID)
 				productRetailerIDMap[productRetailerID] = struct{}{}
 			}
 		}
+
+		productEntry = flows.ProductEntry{
+			Product:            product,
+			ProductRetailerIDs: productRetailerIDS,
+		}
+		productEntries = append(productEntries, productEntry)
 	}
 
-	callResult.ProductRetailerIDS = productRetailerIDS
+	callResult.ProductRetailerIDS = productEntries
 
 	return callResult, nil
 }
