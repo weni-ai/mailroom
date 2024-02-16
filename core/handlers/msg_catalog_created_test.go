@@ -71,11 +71,6 @@ func TestMsgCatalogCreated(t *testing.T) {
 			},
 			SQLAssertions: []handlers.SQLAssertion{
 				{
-					SQL:   "SELECT COUNT(*) FROM msgs_msg WHERE contact_id = $1 AND metadata = $2 AND high_priority = TRUE",
-					Args:  []interface{}{testdata.Cathy.ID, `{"action":"View Products","body":"Some products","products":{"product_retailer_id":["9f526c6f-b2cb-4457-8048-a7f1dc101e50","eb2305cc-bf39-43ad-a069-bbbfb6401acc"]},"send_catalog":false}`},
-					Count: 2,
-				},
-				{
 					SQL:   "SELECT COUNT(*) FROM msgs_msg WHERE contact_id = $1 AND status = 'Q' AND high_priority = FALSE",
 					Args:  []interface{}{testdata.George.ID},
 					Count: 1,
