@@ -1,3 +1,7 @@
+1.16.0-mailroom-7.1.22
+----------
+ * Implement changes to preserve the insertion order in the product list
+
 1.15.0-mailroom-7.1.22
 ----------
  * Update goflow version to v0.6.3-goflow-0.144.3
