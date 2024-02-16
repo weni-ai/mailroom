@@ -139,6 +139,7 @@ func (s *service) Call(session flows.Session, params assets.MsgCatalogParam, log
 			ProductRetailerIDs: productRetailerIDS,
 		}
 		productEntries = append(productEntries, productEntry)
+		productRetailerIDS = nil
 	}
 
 	callResult.ProductRetailerIDS = productEntries
