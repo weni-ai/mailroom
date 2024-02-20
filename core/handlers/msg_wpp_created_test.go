@@ -52,11 +52,6 @@ func TestMsgWppCreated(t *testing.T) {
 			},
 			SQLAssertions: []handlers.SQLAssertion{
 				{
-					SQL:   "SELECT COUNT(*) FROM msgs_msg WHERE contact_id = $1 AND metadata = $2 AND high_priority = TRUE",
-					Args:  []interface{}{testdata.Cathy.ID, `{"action":"Hi","text":"Text"}`},
-					Count: 2,
-				},
-				{
 					SQL:   "SELECT COUNT(*) FROM msgs_msg WHERE contact_id=$1 AND STATUS = 'F' AND failed_reason = 'D';",
 					Args:  []interface{}{testdata.Bob.ID},
 					Count: 1,

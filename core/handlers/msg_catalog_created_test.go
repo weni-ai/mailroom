@@ -3,10 +3,8 @@ package handlers_test
 import (
 	"fmt"
 	"testing"
-	"time"
 
 	"github.com/nyaruka/gocommon/urns"
-	"github.com/nyaruka/gocommon/uuids"
 	"github.com/nyaruka/goflow/flows"
 	"github.com/nyaruka/goflow/flows/actions"
 	"github.com/nyaruka/mailroom/core/handlers"
@@ -28,10 +26,6 @@ func TestMsgCatalogCreated(t *testing.T) {
 
 	// delete all URNs for bob
 	db.MustExec(`DELETE FROM contacts_contacturn WHERE contact_id = $1`, testdata.Bob.ID)
-
-	db.MustExec(`INSERT INTO msgs_msg(uuid, org_id, channel_id, contact_id, contact_urn_id, text, direction, status, created_on, visibility, msg_count, error_count, next_attempt) 
-	VALUES($1,   $2,     $3,         $4,         $5,             $6,   $7,        $8,     $9,         'V',        1,         0,           NOW())`,
-		uuids.New(), testdata.Org1.ID, testdata.TwilioChannel.ID, testdata.George.ID, testdata.George.URNID, "Hi", models.DirectionOut, models.MsgStatusQueued, time.Now())
 
 	msg1 := testdata.InsertIncomingMsg(db, testdata.Org1, testdata.TwilioChannel, testdata.Cathy, "start", models.MsgStatusHandled)
 
@@ -79,6 +73,11 @@ func TestMsgCatalogCreated(t *testing.T) {
 				{
 					SQL:   "SELECT COUNT(*) FROM msgs_msg WHERE contact_id = $1 AND status = 'Q' AND high_priority = FALSE",
 					Args:  []interface{}{testdata.George.ID},
+					Count: 1,
+				},
+				{
+					SQL:   "SELECT COUNT(*) FROM msgs_msg WHERE contact_id=$1 AND STATUS = 'F' AND failed_reason = 'D';",
+					Args:  []interface{}{testdata.Bob.ID},
 					Count: 1,
 				},
 			},
