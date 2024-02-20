@@ -161,9 +161,18 @@ func loadCatalog(ctx context.Context, db *sqlx.DB, orgID OrgID) ([]assets.MsgCat
 		if err != nil {
 			return nil, err
 		}
+
+		if err == nil && channelUUID == assets.ChannelUUID("") {
+			return nil, nil
+		}
+
 		msgCatalog.c.ChannelUUID = channelUUID
 		msgCatalog.c.Type = "msg_catalog"
 		catalog = append(catalog, msgCatalog)
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, errors.Wrap(err, "error iterating through rows")
 	}
 
 	logrus.WithField("elapsed", time.Since(start)).WithField("org_id", orgID).WithField("count", len(catalog)).Debug("loaded catalog")
@@ -196,8 +205,13 @@ ORDER BY
 func ChannelUUIDForChannelID(ctx context.Context, db *sqlx.DB, channelID ChannelID) (assets.ChannelUUID, error) {
 	var channelUUID assets.ChannelUUID
 	err := db.GetContext(ctx, &channelUUID, `SELECT uuid FROM channels_channel WHERE id = $1 AND is_active = TRUE`, channelID)
-	if err != nil {
+	if err != nil && err != sql.ErrNoRows {
 		return assets.ChannelUUID(""), errors.Wrapf(err, "no channel found with id: %d", channelID)
 	}
+
+	if err == sql.ErrNoRows {
+		return assets.ChannelUUID(""), nil
+	}
+
 	return channelUUID, nil
 }

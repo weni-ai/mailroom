@@ -1,3 +1,61 @@
+1.16.0-mailroom-7.1.22
+----------
+ * Implement changes to preserve the insertion order in the product list
+
+1.15.0-mailroom-7.1.22
+----------
+ * Update goflow version to v0.6.3-goflow-0.144.3
+
+1.14.0-mailroom-7.1.22
+----------
+ * Update goflow version to v0.6.2-goflow-0.144.3
+
+1.13.1-mailroom-7.1.22
+----------
+ * fix wenichats sending history when opening ticket, adding a margin time in the selection parameter to avoid omitting the first message that was created before the flowrun
+
+1.13.0-mailroom-7.1.22
+----------
+ * Implement the nfm_reply field in input
+
+1.12.0-mailroom-7.1.22
+----------
+ * Add handle for weniGPTCalled type events
+ * Revert "Merge pull request #70 from weni-ai/fix/wenichats-send-history"
+
+1.11.2-mailroom-7.1.22
+----------
+ * Fix sellerId logic for intelligent vtex search request
+
+1.11.1-mailroom-7.1.22
+----------
+ * fix wenichats send history on open ticket based on first message and flowrun events
+
+1.11.0-mailroom-7.1.22
+----------
+ * Update goflow version to v0.5.2-goflow-0.144.3
+
+1.10.0-mailroom-7.1.22
+----------
+ * Update goflow version to v0.5.1-goflow-0.144.3
+
+1.9.1-mailroom-7.1.22
+----------
+ * Change org config data name
+
+1.9.0-mailroom-7.1.22
+----------
+ * Add orgContext asset
+
+1.8.0-mailroom-7.1.22
+----------
+ * Vtex search support with sellerId
+ * [FLOWS-285] - Add contact in httplog model
+
+1.7.3-mailroom-7.1.22
+----------
+ * Add support for searching for Vtex products
+
 1.7.2-mailroom-7.1.22
 ----------
  * Remove duplicate products for catalog messages

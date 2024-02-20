@@ -1,7 +1,7 @@
 #!/bin/bash
 
 #MAILROOM_TAG=v7.1.22 # uncomment this line if you want to use a specific tag from nyaruka and set it as desired
-rm -f mailroom_test.dump
+# rm -f mailroom_test.dump
 
 sleep 1
 

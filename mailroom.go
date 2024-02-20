@@ -68,12 +68,10 @@ func NewMailroom(config *runtime.Config) *Mailroom {
 	mr.handlerForeman = NewForeman(mr.rt, mr.wg, queue.HandlerQueue, config.HandlerWorkers)
 
 	// set authentication token for zeroshot requests in goflow
-	apiToken := mr.rt.Config.ZeroshotAPIToken
-	routers.SetZeroshotToken(apiToken)
+	routers.SetZeroshotToken(mr.rt.Config.ZeroshotAPIToken)
 
 	// set base url for zeroshot requests
-	baseURL := mr.rt.Config.ZeroshotAPIUrl
-	routers.SetZeroshotAPIURL(baseURL)
+	routers.SetZeroshotAPIURL(mr.rt.Config.ZeroshotAPIUrl)
 
 	return mr
 }
