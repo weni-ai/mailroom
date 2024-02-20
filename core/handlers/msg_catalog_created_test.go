@@ -31,7 +31,7 @@ func TestMsgCatalogCreated(t *testing.T) {
 
 	db.MustExec(`INSERT INTO msgs_msg(uuid, org_id, channel_id, contact_id, contact_urn_id, text, direction, status, created_on, visibility, msg_count, error_count, next_attempt) 
 	VALUES($1,   $2,     $3,         $4,         $5,             $6,   $7,        $8,     $9,         'V',        1,         0,           NOW())`,
-		uuids.New(), testdata.Org1.ID, testdata.TwilioChannel.ID, testdata.George.ID, testdata.George.URNID, "Hi", models.DirectionIn, models.MsgStatusQueued, time.Now())
+		uuids.New(), testdata.Org1.ID, testdata.TwilioChannel.ID, testdata.George.ID, testdata.George.URNID, "Hi", models.DirectionOut, models.MsgStatusQueued, time.Now())
 
 	msg1 := testdata.InsertIncomingMsg(db, testdata.Org1, testdata.TwilioChannel, testdata.Cathy, "start", models.MsgStatusHandled)
 
