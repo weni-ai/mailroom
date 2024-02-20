@@ -26,6 +26,10 @@ func TestMsgWppCreated(t *testing.T) {
 	// delete all URNs for bob
 	db.MustExec(`DELETE FROM contacts_contacturn WHERE contact_id = $1`, testdata.Bob.ID)
 
+	// change alexandrias URN to a twitter URN and set her language to eng so that a template gets used for her
+	db.MustExec(`UPDATE contacts_contacturn SET identity = 'twitter:12345', path='12345', scheme='twitter' WHERE contact_id = $1`, testdata.Alexandria.ID)
+	db.MustExec(`UPDATE contacts_contact SET language='eng' WHERE id = $1`, testdata.Alexandria.ID)
+
 	msg1 := testdata.InsertIncomingMsg(db, testdata.Org1, testdata.TwilioChannel, testdata.Cathy, "start", models.MsgStatusHandled)
 
 	tcs := []handlers.TestCase{
@@ -34,7 +38,7 @@ func TestMsgWppCreated(t *testing.T) {
 				testdata.Cathy: []flows.Action{
 					actions.NewSendWppMsg(
 						handlers.NewActionUUID(),
-						"text", "Hi", "", "Hi there.", "Footer",
+						"text", "Hi", "", "Hi there.", "footer",
 						[]flows.ListItems{},
 						"",
 						"",
@@ -51,6 +55,11 @@ func TestMsgWppCreated(t *testing.T) {
 				testdata.Cathy: msg1,
 			},
 			SQLAssertions: []handlers.SQLAssertion{
+				{
+					SQL:   "SELECT COUNT(*) FROM msgs_msg WHERE text='Hi there.' AND contact_id = $1 AND metadata = $2 AND high_priority = TRUE",
+					Args:  []interface{}{testdata.Cathy.ID, `{"footer":"footer"}`},
+					Count: 2,
+				},
 				{
 					SQL:   "SELECT COUNT(*) FROM msgs_msg WHERE contact_id=$1 AND STATUS = 'F' AND failed_reason = 'D';",
 					Args:  []interface{}{testdata.Bob.ID},
@@ -70,7 +79,6 @@ func TestMsgWppCreated(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, 1, count)
 
-	// One bulk for George
 	count, err = redis.Int(rc.Do("zcard", fmt.Sprintf("msgs:%s|10/0", testdata.TwilioChannel.UUID)))
 	assert.NoError(t, err)
 	assert.Equal(t, 1, count)
