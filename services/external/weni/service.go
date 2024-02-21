@@ -134,12 +134,15 @@ func (s *service) Call(session flows.Session, params assets.MsgCatalogParam, log
 			}
 		}
 
-		productEntry = flows.ProductEntry{
-			Product:            product,
-			ProductRetailerIDs: productRetailerIDS,
+		if len(productRetailerIDS) > 0 {
+			productEntry = flows.ProductEntry{
+				Product:            product,
+				ProductRetailerIDs: productRetailerIDS,
+			}
+			productEntries = append(productEntries, productEntry)
+			productRetailerIDS = nil
 		}
-		productEntries = append(productEntries, productEntry)
-		productRetailerIDS = nil
+		productRetailerIDMap = make(map[string]struct{})
 	}
 
 	callResult.ProductRetailerIDS = productEntries
