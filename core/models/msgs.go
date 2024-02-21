@@ -471,7 +471,7 @@ func newOutgoingMsgCatalog(rt *runtime.Runtime, org *Org, channel *Channel, cont
 	}
 
 	// populate metadata if we have any
-	if msgCatalog.Topic() != flows.NilMsgTopic || msgCatalog.TextLanguage != "" || msgCatalog.Header() != "" || msgCatalog.Body() != "" || msgCatalog.Footer() != "" || len(msgCatalog.Products()) != 0 {
+	if (msgCatalog.Topic() != flows.NilMsgTopic || msgCatalog.TextLanguage != "" || msgCatalog.Header() != "" || msgCatalog.Body() != "" || msgCatalog.Footer() != "") && len(msgCatalog.Products()) != 0 {
 		metadata := make(map[string]interface{})
 		if msgCatalog.Topic() != flows.NilMsgTopic {
 			metadata["topic"] = string(msgCatalog.Topic())
