@@ -1,3 +1,7 @@
+1.17.0-mailroom-7.1.22
+----------
+ * Fix errors for duplicate products
+
 1.16.0-mailroom-7.1.22
 ----------
  * Implement changes to preserve the insertion order in the product list
