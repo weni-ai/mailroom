@@ -142,7 +142,7 @@ func (s *service) Call(session flows.Session, params assets.MsgCatalogParam, log
 			productEntries = append(productEntries, productEntry)
 			productRetailerIDS = nil
 		}
-		productRetailerIDMap = nil
+		productRetailerIDMap = make(map[string]struct{})
 	}
 
 	callResult.ProductRetailerIDS = productEntries
