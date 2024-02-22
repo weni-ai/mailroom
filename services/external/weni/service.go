@@ -145,6 +145,30 @@ func (s *service) Call(session flows.Session, params assets.MsgCatalogParam, log
 		productRetailerIDMap = make(map[string]struct{})
 	}
 
+	url := params.SearchUrl
+
+	client := &http.Client{}
+	req, err := httpx.NewRequest("POST", url, nil, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	trace, err = httpx.DoTrace(client, req, nil, nil, -1)
+	if err != nil {
+		return nil, err
+	}
+
+	response := []struct {
+		Items []struct {
+			ItemId string `json:"itemId"`
+		} `json:"items"`
+	}{}
+
+	err = jsonx.Unmarshal(trace.ResponseBody, &response)
+	if err != nil {
+		return nil, err
+	}
+
 	callResult.ProductRetailerIDS = productEntries
 
 	return callResult, nil
@@ -249,7 +273,6 @@ func GetProductListFromChatGPT(ctx context.Context, rtConfig *runtime.Config, co
 func GetProductListFromVtex(productSearch string, searchUrl string, apiType string, sellerID string) ([]string, []*httpx.Trace, error) {
 	var result []string
 	var traces []*httpx.Trace
-	var trace *httpx.Trace
 	var err error
 
 	sellerID = strings.TrimSpace(sellerID)
@@ -260,8 +283,7 @@ func GetProductListFromVtex(productSearch string, searchUrl string, apiType stri
 			return nil, traces, err
 		}
 	} else if apiType == "intelligent" {
-		result, trace, err = VtexIntelligentSearch(searchUrl, productSearch, sellerID)
-		traces = append(traces, trace)
+		result, traces, err = VtexIntelligentSearch(searchUrl, productSearch, sellerID)
 		if err != nil {
 			return nil, traces, err
 		}
@@ -279,7 +301,13 @@ type SearchSeller struct {
 	} `json:"items"`
 }
 
-func VtexLegacySearch(searchUrl string, productSearch string, sellerId string) ([]string, []*httpx.Trace, error) {
+type ProductsList struct {
+	Items []struct {
+		ItemId string `json:"itemId"`
+	} `json:"items"`
+}
+
+func VtexLegacySearch(searchUrl string, productSearch string, sellerID string) ([]string, []*httpx.Trace, error) {
 	urlAfter := strings.TrimSuffix(searchUrl, "/")
 	url := fmt.Sprintf("%s/%s", urlAfter, productSearch)
 
@@ -297,11 +325,7 @@ func VtexLegacySearch(searchUrl string, productSearch string, sellerId string) (
 		return nil, traces, err
 	}
 
-	response := []struct {
-		Items []struct {
-			ItemId string `json:"itemId"`
-		} `json:"items"`
-	}{}
+	response := []ProductsList{}
 
 	err = jsonx.Unmarshal(trace.ResponseBody, &response)
 	if err != nil {
@@ -314,22 +338,80 @@ func VtexLegacySearch(searchUrl string, productSearch string, sellerId string) (
 		return result, traces, nil
 	}
 
-	var body SearchSeller
+	result, traces, err = CartSimulation(response, sellerID, traces, urlAfter)
+	if err != nil {
+		return nil, traces, err
+	}
 
-	for i, product := range response {
+	return result, traces, nil
+}
+
+func VtexIntelligentSearch(searchUrl string, productSearch string, sellerID string) ([]string, []*httpx.Trace, error) {
+
+	traces := []*httpx.Trace{}
+
+	query := url.Values{}
+	query.Add("query", productSearch)
+	query.Add("locale", "pt-BR")
+	query.Add("hideUnavailableItems", "true")
+
+	urlAfter := strings.TrimSuffix(searchUrl, "/")
+
+	url_ := fmt.Sprintf("%s?%s", urlAfter, query.Encode())
+
+	req, err := httpx.NewRequest("GET", url_, nil, nil)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	client := &http.Client{}
+	trace, err := httpx.DoTrace(client, req, nil, nil, -1)
+	traces = append(traces, trace)
+	if err != nil {
+		return nil, traces, err
+	}
+
+	response := &struct {
+		Products []ProductsList `json:"products"`
+	}{}
+
+	err = jsonx.Unmarshal(trace.ResponseBody, &response)
+	if err != nil {
+		return nil, traces, err
+	}
+
+	result := []string{}
+
+	if len(response.Products) == 0 {
+		return result, traces, nil
+	}
+
+	result, traces, err = CartSimulation(response.Products, sellerID, traces, urlAfter)
+	if err != nil {
+		return nil, traces, err
+	}
+
+	return result, traces, nil
+}
+
+func CartSimulation(products []ProductsList, sellerID string, traces []*httpx.Trace, url string) ([]string, []*httpx.Trace, error) {
+	var body SearchSeller
+	result := []string{}
+
+	for i, product := range products {
 		if i == 5 {
 			break
 		}
 		product_retailer_id := product.Items[0].ItemId
 
-		if sellerId != "" {
+		if sellerID != "" {
 			result = append(result, product_retailer_id)
 			body.Items = append(body.Items, struct {
 				ID           string "json:\"id\""
 				Quantity     int    "json:\"quantity\""
 				Seller       string "json:\"seller\""
 				Availability string "json:\"availability,omitempty\""
-			}{ID: product_retailer_id, Quantity: 1, Seller: sellerId})
+			}{ID: product_retailer_id, Quantity: 1, Seller: sellerID})
 		} else {
 			result = append(result, product_retailer_id+"#1")
 		}
@@ -337,7 +419,7 @@ func VtexLegacySearch(searchUrl string, productSearch string, sellerId string) (
 
 	if len(body.Items) > 0 {
 
-		urlSplit := strings.Split(urlAfter, "api")
+		urlSplit := strings.Split(url, "api")
 
 		urlSimulation := urlSplit[0] + "api/checkout/pub/orderForms/simulation"
 
@@ -356,6 +438,7 @@ func VtexLegacySearch(searchUrl string, productSearch string, sellerId string) (
 			return nil, traces, err
 		}
 
+		client := &http.Client{}
 		trace, err := httpx.DoTrace(client, req, nil, nil, -1)
 		traces = append(traces, trace)
 		if err != nil {
@@ -376,60 +459,11 @@ func VtexLegacySearch(searchUrl string, productSearch string, sellerId string) (
 		availableProducts := []string{}
 		for _, item := range response.Items {
 			if item.Availability == "available" {
-				availableProducts = append(availableProducts, item.ID+"#"+sellerId)
+				availableProducts = append(availableProducts, item.ID+"#"+sellerID)
 			}
 		}
 		return availableProducts, traces, nil
 	}
+
 	return result, traces, nil
-}
-
-func VtexIntelligentSearch(searchUrl string, productSearch string, sellerId string) ([]string, *httpx.Trace, error) {
-	query := url.Values{}
-	query.Add("query", productSearch)
-	query.Add("locale", "pt-BR")
-	query.Add("hideUnavailableItems", "true")
-
-	urlAfter := strings.TrimSuffix(searchUrl, "/")
-
-	url_ := fmt.Sprintf("%s?%s", urlAfter, query.Encode())
-
-	req, err := httpx.NewRequest("GET", url_, nil, nil)
-	if err != nil {
-		return nil, nil, err
-	}
-
-	client := &http.Client{}
-	trace, err := httpx.DoTrace(client, req, nil, nil, -1)
-	if err != nil {
-		return nil, trace, err
-	}
-
-	response := &struct {
-		Products []struct {
-			Items []struct {
-				ItemId string `json:"itemId"`
-			} `json:"items"`
-		} `json:"products"`
-	}{}
-
-	err = jsonx.Unmarshal(trace.ResponseBody, &response)
-	if err != nil {
-		return nil, trace, err
-	}
-
-	if sellerId == "" {
-		sellerId = "1"
-	}
-
-	result := []string{}
-	for i, product := range response.Products {
-		if i == 5 {
-			break
-		}
-		product_retailer_id := product.Items[0].ItemId
-		result = append(result, product_retailer_id+"#"+sellerId)
-	}
-
-	return result, trace, nil
 }
