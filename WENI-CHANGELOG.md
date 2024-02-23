@@ -1,3 +1,7 @@
+1.17.1-mailroom-7.1.22
+----------
+ * Improve prompt for chatGPT in product listings
+
 1.17.0-mailroom-7.1.22
 ----------
  * Fix errors for duplicate products
