@@ -421,7 +421,7 @@ func CartSimulation(products []ProductsList, sellerID string, traces []*httpx.Tr
 
 		urlSplit := strings.Split(url, "api")
 
-		urlSimulation := urlSplit[0] + "api/checkout/pub/orderForms/simulation"
+		urlSimulation := urlSplit[0] + "/api/checkout/pub/orderForms/simulation"
 
 		headers := map[string]string{
 			"Accept": "application/json",
