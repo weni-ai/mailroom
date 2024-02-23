@@ -208,7 +208,7 @@ func GetProductListFromChatGPT(ctx context.Context, rtConfig *runtime.Config, co
 
 	prompt1 := chatgpt.ChatCompletionMessage{
 		Role:    chatgpt.ChatMessageRoleSystem,
-		Content: "Give me an unformatted JSON list containing strings with the name of each product taken from the user prompt.",
+		Content: "Give me an unformatted JSON list containing strings with the full name of each product taken from the user prompt, preserving any multiple-word product names.",
 	}
 	prompt2 := chatgpt.ChatCompletionMessage{
 		Role:    chatgpt.ChatMessageRoleSystem,
