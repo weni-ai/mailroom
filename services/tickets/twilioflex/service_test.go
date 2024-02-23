@@ -574,7 +574,7 @@ func TestSendHistory(t *testing.T) {
 		AddRow(101, "b9568e35-3a59-4f91-882f-fa021f591b13", "Where are you from?", true, dummyTime, dummyTime, dummyTime, dummyTime, "O", "W", "V", "F", 1, 0, nil, "399", nil, nil, nil, 3, 2, 2, 3, 3).
 		AddRow(102, "c864c4e0-9863-4fd3-9f76-bee481b4a138", "I'm from Brazil", false, dummyTime, dummyTime, dummyTime, dummyTime, "I", "P", "V", "F", 1, 0, nil, "400", nil, nil, nil, 3, 2, 2, 3, nil)
 
-	after, err := time.Parse("2006-01-02T15:04:05", "2019-10-07T15:21:30")
+	after, err := time.Parse("2006-01-02T15:04:05", "2019-10-07T15:21:29")
 	assert.NoError(t, err)
 
 	mock.ExpectQuery("SELECT").

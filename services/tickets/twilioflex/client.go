@@ -270,6 +270,17 @@ func (c *Client) FetchMedia(mediaSid string) (*Media, *httpx.Trace, error) {
 	return response, trace, err
 }
 
+func (c *Client) DeleteFlexChannel(channelSid string) (*httpx.Trace, error) {
+	url := fmt.Sprintf("https://flex-api.twilio.com/v1/Channels/%s", channelSid)
+
+	trace, err := c.request("DELETE", url, nil, nil, nil)
+	if err != nil {
+		return trace, err
+	}
+
+	return trace, err
+}
+
 // https://www.twilio.com/docs/chat/rest/user-resource#user-properties
 type ChatUser struct {
 	AccountSid   string                 `json:"account_sid,omitempty"`

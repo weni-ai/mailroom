@@ -438,3 +438,27 @@ func TestFetchMedia(t *testing.T) {
 	assert.Equal(t, "ME59b872f1e52fbd6fe6ad956bbb4fa9bd", response.Sid)
 	assert.Equal(t, "HTTP/1.0 200 OK\r\nContent-Length: 1342\r\n\r\n", string(trace.ResponseTrace))
 }
+
+func TestDeleteFlexChannel(t *testing.T) {
+	channelSid := "CH6442c09c93ba4d13966fa42e9b78f620"
+	defer httpx.SetRequestor(httpx.DefaultRequestor)
+	httpx.SetRequestor(httpx.NewMockRequestor(map[string][]httpx.MockResponse{
+		fmt.Sprintf("https://flex-api.twilio.com/v1/Channels/%s", channelSid): {
+			httpx.MockConnectionError,
+			httpx.NewMockResponse(400, nil, `{"message": "Something went wrong", "detail": "Unknown", "code": 1234, "more_info": "https://www.twilio.com/docs/errors/1234"}`),
+			httpx.NewMockResponse(204, nil, ``),
+		},
+	}))
+
+	client := twilioflex.NewClient(http.DefaultClient, nil, authToken, accountSid, serviceSid, workspaceSid, flexFlowSid)
+
+	_, err := client.DeleteFlexChannel(channelSid)
+	assert.EqualError(t, err, "unable to connect to server")
+
+	_, err = client.DeleteFlexChannel(channelSid)
+	assert.EqualError(t, err, "Something went wrong")
+
+	trace, err := client.DeleteFlexChannel(channelSid)
+	assert.NoError(t, err)
+	assert.Equal(t, "HTTP/1.0 204 No Content\r\n\r\n", string(trace.ResponseTrace))
+}
