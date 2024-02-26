@@ -48,6 +48,25 @@ func TestOpenAndForward(t *testing.T) {
 				"more_info": "https://www.twilio.com/docs/errors/20404",
 				"status": 404
 			}`),
+			httpx.NewMockResponse(200, nil, `{
+				"is_notifiable": null,
+				"date_updated": "2022-03-08T22:18:23Z",
+				"is_online": null,
+				"friendly_name": "dummy user",
+				"account_sid": "AC81d44315e19372138bdaffcc13cf3b94",
+				"url": "https://chat.twilio.com/v2/Services/IS38067ec392f1486bb6e4de4610f26fb3/Users/USf4015a97250d482889459f8e8819e09f",
+				"date_created": "2022-03-08T22:18:23Z",
+				"role_sid": "RL6f3f490b35534130845f98202673ffb9",
+				"sid": "USf4015a97250d482889459f8e8819e09f",
+				"attributes": "{}",
+				"service_sid": "IS38067ec392f1486bb6e4de4610f26fb3",
+				"joined_channels_count": 0,
+				"identity": "10000",
+				"links": {
+						"user_channels": "https://chat.twilio.com/v2/Services/IS38067ec392f1486bb6e4de4610f26fb3/Users/USf4015a97250d482889459f8e8819e09f/Channels",
+						"user_bindings": "https://chat.twilio.com/v2/Services/IS38067ec392f1486bb6e4de4610f26fb3/Users/USf4015a97250d482889459f8e8819e09f/Bindings"
+				}
+			}`),
 		},
 		"https://chat.twilio.com/v2/Services/IS38067ec392f1486bb6e4de4610f26fb3/Users": {
 			httpx.NewMockResponse(201, nil, `{
@@ -81,8 +100,19 @@ func TestOpenAndForward(t *testing.T) {
 				"sid": "CH6442c09c93ba4d13966fa42e9b78f620",
 				"date_created": "2022-03-08T22:38:30Z"
 			}`),
+			httpx.NewMockResponse(201, nil, `{
+				"task_sid": "WT1d187abc335f7f16ff050a66f9b6a6b2",
+				"flex_flow_sid": "FOedbb8c9e54f04afaef409246f728a44d",
+				"account_sid": "AC81d44315e19372138bdaffcc13cf3b94",
+				"user_sid": "USf4015a97250d482889459f8e8819e09f",
+				"url": "https://flex-api.twilio.com/v1/Channels/CH6442c09c93ba4d13966fa42e9b78f620",
+				"date_updated": "2022-03-08T22:38:30Z",
+				"sid": "CH6442c09c93ba4d13966fa42e9b78f620",
+				"date_created": "2022-03-08T22:38:30Z"
+			}`),
 		},
 		"https://chat.twilio.com/v2/Services/IS38067ec392f1486bb6e4de4610f26fb3/Channels/CH6442c09c93ba4d13966fa42e9b78f620/Webhooks": {
+			httpx.NewMockResponse(500, nil, `{"message": "Something went wrong", "detail": "Unknown", "code": 1234, "more_info": "https://www.twilio.com/docs/errors/1234"}`),
 			httpx.NewMockResponse(201, nil, `{
 				"channel_sid": "CH6442c09c93ba4d13966fa42e9b78f620",
 				"url": "https://chat.twilio.com/v2/Services/IS38067ec392f1486bb6e4de4610f26fb3/Channels/CH6442c09c93ba4d13966fa42e9b78f620/Webhooks/WHa8a9ae86063e494d9f3b754a8da85f8e",
@@ -101,6 +131,9 @@ func TestOpenAndForward(t *testing.T) {
 				"service_sid": "IS38067ec392f1486bb6e4de4610f26fb3",
 				"type": "webhook"
 			}`),
+		},
+		"https://flex-api.twilio.com/v1/Channels/CH6442c09c93ba4d13966fa42e9b78f620": {
+			httpx.NewMockResponse(204, nil, ``),
 		},
 		"https://chat.twilio.com/v2/Services/IS38067ec392f1486bb6e4de4610f26fb3/Channels/CH6442c09c93ba4d13966fa42e9b78f620/Messages": {
 			httpx.MockConnectionError,
@@ -314,13 +347,19 @@ func TestOpenAndForward(t *testing.T) {
 
 	logger := &flows.HTTPLogger{}
 	ticket, err := svc.Open(session, defaultTopic, `{"flex_flow_sid":"FO123456abcdefg789ijklm","extra_field":"foo","custom_fields":{"bar_field":"bar"}}`, nil, logger.Log)
+	assert.Error(t, err)
+	assert.Nil(t, ticket)
+	assert.Equal(t, 5, len(logger.Logs))
+
+	logger = &flows.HTTPLogger{}
+	ticket, err = svc.Open(session, defaultTopic, `{"flex_flow_sid":"FO123456abcdefg789ijklm","extra_field":"foo","custom_fields":{"bar_field":"bar"}}`, nil, logger.Log)
 
 	assert.NoError(t, err)
-	assert.Equal(t, flows.TicketUUID("e7187099-7d38-4f60-955c-325957214c42"), ticket.UUID())
+	assert.Equal(t, flows.TicketUUID("59d74b86-3e2f-4a93-aece-b05d2fdcde0c"), ticket.UUID())
 	assert.Equal(t, "General", ticket.Topic().Name())
 	assert.Equal(t, `{"flex_flow_sid":"FO123456abcdefg789ijklm","extra_field":"foo","custom_fields":{"bar_field":"bar"}}`, ticket.Body())
 	assert.Equal(t, "CH6442c09c93ba4d13966fa42e9b78f620", ticket.ExternalID())
-	assert.Equal(t, 4, len(logger.Logs))
+	assert.Equal(t, 3, len(logger.Logs))
 	test.AssertSnapshot(t, "open_ticket", logger.Logs[0].Request)
 
 	dbTicket := models.NewTicket(ticket.UUID(), testdata.Org1.ID, testdata.Cathy.ID, testdata.Twilioflex.ID, "CH6442c09c93ba4d13966fa42e9b78f620", testdata.DefaultTopic.ID, "Where are my cookies?", models.NilUserID, map[string]interface{}{
