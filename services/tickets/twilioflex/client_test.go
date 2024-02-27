@@ -462,3 +462,27 @@ func TestDeleteFlexChannel(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, "HTTP/1.0 204 No Content\r\n\r\n", string(trace.ResponseTrace))
 }
+
+func TestDeleteTask(t *testing.T) {
+	taskSID := "CH6442c09c93ba4d13966fa42e9b78f620"
+	defer httpx.SetRequestor(httpx.DefaultRequestor)
+	httpx.SetRequestor(httpx.NewMockRequestor(map[string][]httpx.MockResponse{
+		fmt.Sprintf("https://taskrouter.twilio.com/v1/Workspaces/%s/Tasks/%s", workspaceSid, taskSID): {
+			httpx.MockConnectionError,
+			httpx.NewMockResponse(400, nil, `{"message": "Something went wrong", "detail": "Unknown", "code": 1234, "more_info": "https://www.twilio.com/docs/errors/1234"}`),
+			httpx.NewMockResponse(204, nil, ``),
+		},
+	}))
+
+	client := twilioflex.NewClient(http.DefaultClient, nil, authToken, accountSid, serviceSid, workspaceSid, flexFlowSid)
+
+	_, err := client.DeleteTask(taskSID)
+	assert.EqualError(t, err, "unable to connect to server")
+
+	_, err = client.DeleteTask(taskSID)
+	assert.EqualError(t, err, "Something went wrong")
+
+	trace, err := client.DeleteTask(taskSID)
+	assert.NoError(t, err)
+	assert.Equal(t, "HTTP/1.0 204 No Content\r\n\r\n", string(trace.ResponseTrace))
+}

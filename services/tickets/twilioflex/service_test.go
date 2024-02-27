@@ -135,6 +135,9 @@ func TestOpenAndForward(t *testing.T) {
 		"https://flex-api.twilio.com/v1/Channels/CH6442c09c93ba4d13966fa42e9b78f620": {
 			httpx.NewMockResponse(204, nil, ``),
 		},
+		"https://taskrouter.twilio.com/v1/Workspaces/WS954611f5aebc7672d71de836c0179113/Tasks/WT1d187abc335f7f16ff050a66f9b6a6b2": {
+			httpx.NewMockResponse(204, nil, ``),
+		},
 		"https://chat.twilio.com/v2/Services/IS38067ec392f1486bb6e4de4610f26fb3/Channels/CH6442c09c93ba4d13966fa42e9b78f620/Messages": {
 			httpx.MockConnectionError,
 			httpx.NewMockResponse(201, nil, `{
@@ -349,7 +352,7 @@ func TestOpenAndForward(t *testing.T) {
 	ticket, err := svc.Open(session, defaultTopic, `{"flex_flow_sid":"FO123456abcdefg789ijklm","extra_field":"foo","custom_fields":{"bar_field":"bar"}}`, nil, logger.Log)
 	assert.Error(t, err)
 	assert.Nil(t, ticket)
-	assert.Equal(t, 5, len(logger.Logs))
+	assert.Equal(t, 6, len(logger.Logs))
 
 	logger = &flows.HTTPLogger{}
 	ticket, err = svc.Open(session, defaultTopic, `{"flex_flow_sid":"FO123456abcdefg789ijklm","extra_field":"foo","custom_fields":{"bar_field":"bar"}}`, nil, logger.Log)

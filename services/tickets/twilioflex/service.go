@@ -161,13 +161,26 @@ func (s *service) Open(session flows.Session, topic *flows.Topic, body string, a
 	}
 	if err != nil {
 		newError := errors.Wrap(err, "failed to create channel webhook")
-		trace, err := s.restClient.DeleteFlexChannel(newFlexChannel.Sid)
-		if trace != nil {
-			logHTTP(flows.NewHTTPLog(trace, flows.HTTPStatusFromCode, s.redactor))
+		// To cleanup we need to do 2 actions on twilio apis: 1) - Delete flex Channel; 2) - Delete task from this channel
+		{ // 1) - Delete Channel
+			trace, err := s.restClient.DeleteFlexChannel(newFlexChannel.Sid)
+			if trace != nil {
+				logHTTP(flows.NewHTTPLog(trace, flows.HTTPStatusFromCode, s.redactor))
+			}
+			if err != nil {
+				return nil, errors.Wrap(newError, "failed to delete FlexChannel to cleanup failed ticket opening")
+			}
 		}
-		if err != nil {
-			return nil, errors.Wrap(newError, "failed to delete FlexChannel to cleanup failed ticket opening")
+		{ // 2) - Delete Task
+			trace, err := s.restClient.DeleteTask(newFlexChannel.TaskSid)
+			if trace != nil {
+				logHTTP(flows.NewHTTPLog(trace, flows.HTTPStatusFromCode, s.redactor))
+			}
+			if err != nil {
+				return nil, errors.Wrap(newError, "failed to delete Task to cleanup failed ticket opening")
+			}
 		}
+
 		return nil, newError
 	}
 

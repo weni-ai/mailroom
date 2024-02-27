@@ -281,6 +281,17 @@ func (c *Client) DeleteFlexChannel(channelSid string) (*httpx.Trace, error) {
 	return trace, err
 }
 
+func (c *Client) DeleteTask(taskSID string) (*httpx.Trace, error) {
+	url := fmt.Sprintf("https://taskrouter.twilio.com/v1/Workspaces/%s/Tasks/%s", c.workspaceSid, taskSID)
+
+	trace, err := c.request("DELETE", url, nil, nil, nil)
+	if err != nil {
+		return trace, err
+	}
+
+	return trace, err
+}
+
 // https://www.twilio.com/docs/chat/rest/user-resource#user-properties
 type ChatUser struct {
 	AccountSid   string                 `json:"account_sid,omitempty"`
