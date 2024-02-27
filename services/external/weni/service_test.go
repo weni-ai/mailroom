@@ -114,7 +114,7 @@ func TestService(t *testing.T) {
 		SearchType:    "default",
 		SearchUrl:     "",
 		ApiType:       "",
-		SellerId:      "",
+		PostalCode:    "",
 	}
 	call, err := svc.Call(session, params, logger.Log)
 	assert.NoError(t, err)
@@ -129,7 +129,7 @@ func TestService(t *testing.T) {
 		SearchType:    "vtex",
 		SearchUrl:     "https://vtex.com.br/legacy/search",
 		ApiType:       "legacy",
-		SellerId:      "",
+		PostalCode:    "",
 	}
 	call, err = svc.Call(session, params, logger.Log)
 	assert.NoError(t, err)
@@ -143,7 +143,7 @@ func TestService(t *testing.T) {
 		SearchType:    "vtex",
 		SearchUrl:     "https://vtex.com.br/intelligent/search",
 		ApiType:       "intelligent",
-		SellerId:      "",
+		PostalCode:    "",
 	}
 	call, err = svc.Call(session, params, logger.Log)
 	assert.NoError(t, err)

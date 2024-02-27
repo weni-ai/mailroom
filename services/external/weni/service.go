@@ -116,7 +116,7 @@ func (s *service) Call(session flows.Session, params assets.MsgCatalogParam, log
 			searchResult, trace, err = GetProductListFromSentenX(product, catalog.FacebookCatalogID(), searchThreshold, s.rtConfig)
 			callResult.Traces = append(callResult.Traces, trace)
 		} else if params.SearchType == "vtex" {
-			searchResult, traces, err = GetProductListFromVtex(product, params.SearchUrl, params.ApiType, params.SellerId)
+			searchResult, traces, err = GetProductListFromVtex(product, params.SearchUrl, params.ApiType, params.PostalCode)
 			callResult.Traces = append(callResult.Traces, traces...)
 			if searchResult == nil {
 				continue
@@ -270,20 +270,21 @@ func GetProductListFromChatGPT(ctx context.Context, rtConfig *runtime.Config, co
 	return products["products"], trace, nil
 }
 
-func GetProductListFromVtex(productSearch string, searchUrl string, apiType string, sellerID string) ([]string, []*httpx.Trace, error) {
+func GetProductListFromVtex(productSearch string, searchUrl string, apiType string, postalCode string) ([]string, []*httpx.Trace, error) {
 	var result []string
 	var traces []*httpx.Trace
 	var err error
 
-	sellerID = strings.TrimSpace(sellerID)
+	postalCode_ := strings.ReplaceAll(postalCode, "-", "")
+	postalCode_ = strings.ReplaceAll(postalCode_, ".", "")
 
 	if apiType == "legacy" {
-		result, traces, err = VtexLegacySearch(searchUrl, productSearch, sellerID)
+		result, traces, err = VtexLegacySearch(searchUrl, productSearch, postalCode_)
 		if err != nil {
 			return nil, traces, err
 		}
 	} else if apiType == "intelligent" {
-		result, traces, err = VtexIntelligentSearch(searchUrl, productSearch, sellerID)
+		result, traces, err = VtexIntelligentSearch(searchUrl, productSearch, postalCode_)
 		if err != nil {
 			return nil, traces, err
 		}
@@ -299,6 +300,8 @@ type SearchSeller struct {
 		Seller       string `json:"seller"`
 		Availability string `json:"availability,omitempty"`
 	} `json:"items"`
+	PostalCode string `json:"postalCode"`
+	Country    string `json:"country"`
 }
 
 type ProductsList struct {
@@ -307,7 +310,7 @@ type ProductsList struct {
 	} `json:"items"`
 }
 
-func VtexLegacySearch(searchUrl string, productSearch string, sellerID string) ([]string, []*httpx.Trace, error) {
+func VtexLegacySearch(searchUrl string, productSearch string, postalCode string) ([]string, []*httpx.Trace, error) {
 	urlAfter := strings.TrimSuffix(searchUrl, "/")
 	url := fmt.Sprintf("%s/%s", urlAfter, productSearch)
 
@@ -338,7 +341,16 @@ func VtexLegacySearch(searchUrl string, productSearch string, sellerID string) (
 		return result, traces, nil
 	}
 
-	result, traces, err = CartSimulation(response, sellerID, traces, urlAfter)
+	var sellerID string
+
+	if postalCode != "" {
+		sellerID, traces, err = GetSellerByPostalCode(postalCode, urlAfter, traces)
+		if err != nil {
+			return nil, traces, err
+		}
+	}
+
+	result, traces, err = CartSimulation(response, sellerID, traces, urlAfter, postalCode)
 	if err != nil {
 		return nil, traces, err
 	}
@@ -346,7 +358,7 @@ func VtexLegacySearch(searchUrl string, productSearch string, sellerID string) (
 	return result, traces, nil
 }
 
-func VtexIntelligentSearch(searchUrl string, productSearch string, sellerID string) ([]string, []*httpx.Trace, error) {
+func VtexIntelligentSearch(searchUrl string, productSearch string, postalCode string) ([]string, []*httpx.Trace, error) {
 
 	traces := []*httpx.Trace{}
 
@@ -386,7 +398,16 @@ func VtexIntelligentSearch(searchUrl string, productSearch string, sellerID stri
 		return result, traces, nil
 	}
 
-	result, traces, err = CartSimulation(response.Products, sellerID, traces, urlAfter)
+	var sellerID string
+
+	if postalCode != "" {
+		sellerID, traces, err = GetSellerByPostalCode(postalCode, urlAfter, traces)
+		if err != nil {
+			return nil, traces, err
+		}
+	}
+
+	result, traces, err = CartSimulation(response.Products, sellerID, traces, urlAfter, postalCode)
 	if err != nil {
 		return nil, traces, err
 	}
@@ -394,7 +415,45 @@ func VtexIntelligentSearch(searchUrl string, productSearch string, sellerID stri
 	return result, traces, nil
 }
 
-func CartSimulation(products []ProductsList, sellerID string, traces []*httpx.Trace, url string) ([]string, []*httpx.Trace, error) {
+func GetSellerByPostalCode(postalCode string, url_ string, traces []*httpx.Trace) (string, []*httpx.Trace, error) {
+
+	query := url.Values{}
+	query.Add("country", "BRA")
+	query.Add("postalCode", postalCode)
+
+	url_ = fmt.Sprintf("%s?%s", url_, query.Encode())
+
+	req, err := httpx.NewRequest("GET", url_, nil, nil)
+	if err != nil {
+		return "", traces, err
+	}
+
+	client := &http.Client{}
+	trace, err := httpx.DoTrace(client, req, nil, nil, -1)
+	traces = append(traces, trace)
+	if err != nil {
+		return "", traces, err
+	}
+
+	response := &struct {
+		Sellers []struct {
+			ID string `json:"id"`
+		} `json:"sellers"`
+	}{}
+
+	err = jsonx.Unmarshal(trace.ResponseBody, &response)
+	if err != nil {
+		return "", traces, err
+	}
+
+	if len(response.Sellers) == 0 {
+		return "", traces, fmt.Errorf("there are no sellers registered for this postal code")
+	}
+
+	return response.Sellers[0].ID, traces, nil
+}
+
+func CartSimulation(products []ProductsList, sellerID string, traces []*httpx.Trace, url string, postalCode string) ([]string, []*httpx.Trace, error) {
 	var body SearchSeller
 	result := []string{}
 
@@ -405,7 +464,7 @@ func CartSimulation(products []ProductsList, sellerID string, traces []*httpx.Tr
 		product_retailer_id := product.Items[0].ItemId
 
 		if sellerID != "" {
-			result = append(result, product_retailer_id)
+			result = append(result, product_retailer_id+"#"+sellerID)
 			body.Items = append(body.Items, struct {
 				ID           string "json:\"id\""
 				Quantity     int    "json:\"quantity\""
@@ -419,9 +478,14 @@ func CartSimulation(products []ProductsList, sellerID string, traces []*httpx.Tr
 
 	if len(body.Items) > 0 {
 
+		if postalCode != "" {
+			body.PostalCode = postalCode
+			body.Country = "BRA"
+		}
+
 		urlSplit := strings.Split(url, "api")
 
-		urlSimulation := urlSplit[0] + "/api/checkout/pub/orderForms/simulation"
+		urlSimulation := urlSplit[0] + "api/checkout/pub/orderForms/simulation"
 
 		headers := map[string]string{
 			"Accept": "application/json",
