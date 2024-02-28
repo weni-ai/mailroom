@@ -110,13 +110,22 @@ func (s *service) Call(session flows.Session, params assets.MsgCatalogParam, log
 	searchResult := []string{}
 	var trace *httpx.Trace
 	var traces []*httpx.Trace
+	var sellerID string
+
+	if params.PostalCode != "" {
+		sellerID, trace, err = GetSellerByPostalCode(params.PostalCode, params.SearchUrl)
+		callResult.Traces = append(callResult.Traces, trace)
+		if err != nil {
+			return nil, err
+		}
+	}
 
 	for _, product := range productList {
 		if params.SearchType == "default" {
 			searchResult, trace, err = GetProductListFromSentenX(product, catalog.FacebookCatalogID(), searchThreshold, s.rtConfig)
 			callResult.Traces = append(callResult.Traces, trace)
 		} else if params.SearchType == "vtex" {
-			searchResult, traces, err = GetProductListFromVtex(product, params.SearchUrl, params.ApiType, params.PostalCode)
+			searchResult, traces, err = GetProductListFromVtex(product, params.SearchUrl, params.ApiType, sellerID, params.PostalCode)
 			callResult.Traces = append(callResult.Traces, traces...)
 			if searchResult == nil {
 				continue
@@ -143,30 +152,6 @@ func (s *service) Call(session flows.Session, params assets.MsgCatalogParam, log
 			productRetailerIDS = nil
 		}
 		productRetailerIDMap = make(map[string]struct{})
-	}
-
-	url := params.SearchUrl
-
-	client := &http.Client{}
-	req, err := httpx.NewRequest("POST", url, nil, nil)
-	if err != nil {
-		return nil, err
-	}
-
-	trace, err = httpx.DoTrace(client, req, nil, nil, -1)
-	if err != nil {
-		return nil, err
-	}
-
-	response := []struct {
-		Items []struct {
-			ItemId string `json:"itemId"`
-		} `json:"items"`
-	}{}
-
-	err = jsonx.Unmarshal(trace.ResponseBody, &response)
-	if err != nil {
-		return nil, err
 	}
 
 	callResult.ProductRetailerIDS = productEntries
@@ -270,7 +255,7 @@ func GetProductListFromChatGPT(ctx context.Context, rtConfig *runtime.Config, co
 	return products["products"], trace, nil
 }
 
-func GetProductListFromVtex(productSearch string, searchUrl string, apiType string, postalCode string) ([]string, []*httpx.Trace, error) {
+func GetProductListFromVtex(productSearch string, searchUrl string, apiType string, sellerID string, postalCode string) ([]string, []*httpx.Trace, error) {
 	var result []string
 	var traces []*httpx.Trace
 	var err error
@@ -279,12 +264,12 @@ func GetProductListFromVtex(productSearch string, searchUrl string, apiType stri
 	postalCode_ = strings.ReplaceAll(postalCode_, ".", "")
 
 	if apiType == "legacy" {
-		result, traces, err = VtexLegacySearch(searchUrl, productSearch, postalCode_)
+		result, traces, err = VtexLegacySearch(searchUrl, productSearch, sellerID, postalCode_)
 		if err != nil {
 			return nil, traces, err
 		}
 	} else if apiType == "intelligent" {
-		result, traces, err = VtexIntelligentSearch(searchUrl, productSearch, postalCode_)
+		result, traces, err = VtexIntelligentSearch(searchUrl, productSearch, sellerID, postalCode_)
 		if err != nil {
 			return nil, traces, err
 		}
@@ -310,7 +295,7 @@ type ProductsList struct {
 	} `json:"items"`
 }
 
-func VtexLegacySearch(searchUrl string, productSearch string, postalCode string) ([]string, []*httpx.Trace, error) {
+func VtexLegacySearch(searchUrl string, productSearch string, sellerID string, postalCode string) ([]string, []*httpx.Trace, error) {
 	urlAfter := strings.TrimSuffix(searchUrl, "/")
 	url := fmt.Sprintf("%s/%s", urlAfter, productSearch)
 
@@ -341,15 +326,6 @@ func VtexLegacySearch(searchUrl string, productSearch string, postalCode string)
 		return result, traces, nil
 	}
 
-	var sellerID string
-
-	if postalCode != "" {
-		sellerID, traces, err = GetSellerByPostalCode(postalCode, urlAfter, traces)
-		if err != nil {
-			return nil, traces, err
-		}
-	}
-
 	result, traces, err = CartSimulation(response, sellerID, traces, urlAfter, postalCode)
 	if err != nil {
 		return nil, traces, err
@@ -358,7 +334,7 @@ func VtexLegacySearch(searchUrl string, productSearch string, postalCode string)
 	return result, traces, nil
 }
 
-func VtexIntelligentSearch(searchUrl string, productSearch string, postalCode string) ([]string, []*httpx.Trace, error) {
+func VtexIntelligentSearch(searchUrl string, productSearch string, sellerID string, postalCode string) ([]string, []*httpx.Trace, error) {
 
 	traces := []*httpx.Trace{}
 
@@ -398,15 +374,6 @@ func VtexIntelligentSearch(searchUrl string, productSearch string, postalCode st
 		return result, traces, nil
 	}
 
-	var sellerID string
-
-	if postalCode != "" {
-		sellerID, traces, err = GetSellerByPostalCode(postalCode, urlAfter, traces)
-		if err != nil {
-			return nil, traces, err
-		}
-	}
-
 	result, traces, err = CartSimulation(response.Products, sellerID, traces, urlAfter, postalCode)
 	if err != nil {
 		return nil, traces, err
@@ -415,24 +382,27 @@ func VtexIntelligentSearch(searchUrl string, productSearch string, postalCode st
 	return result, traces, nil
 }
 
-func GetSellerByPostalCode(postalCode string, url_ string, traces []*httpx.Trace) (string, []*httpx.Trace, error) {
+func GetSellerByPostalCode(postalCode string, url_ string) (string, *httpx.Trace, error) {
+
+	var trace *httpx.Trace
 
 	query := url.Values{}
 	query.Add("country", "BRA")
 	query.Add("postalCode", postalCode)
 
-	url_ = fmt.Sprintf("%s?%s", url_, query.Encode())
+	urlSplit := strings.Split(url_, "api")
+	urlRegions := urlSplit[0] + "api/checkout/pub/regions"
+	urlRegions = fmt.Sprintf("%s?%s", urlRegions, query.Encode())
 
-	req, err := httpx.NewRequest("GET", url_, nil, nil)
+	req, err := httpx.NewRequest("GET", urlRegions, nil, nil)
 	if err != nil {
-		return "", traces, err
+		return "", trace, err
 	}
 
 	client := &http.Client{}
-	trace, err := httpx.DoTrace(client, req, nil, nil, -1)
-	traces = append(traces, trace)
+	trace, err = httpx.DoTrace(client, req, nil, nil, -1)
 	if err != nil {
-		return "", traces, err
+		return "", trace, err
 	}
 
 	response := &struct {
@@ -443,14 +413,14 @@ func GetSellerByPostalCode(postalCode string, url_ string, traces []*httpx.Trace
 
 	err = jsonx.Unmarshal(trace.ResponseBody, &response)
 	if err != nil {
-		return "", traces, err
+		return "", trace, err
 	}
 
 	if len(response.Sellers) == 0 {
-		return "", traces, fmt.Errorf("there are no sellers registered for this postal code")
+		return "", trace, fmt.Errorf("there are no sellers registered for this postal code")
 	}
 
-	return response.Sellers[0].ID, traces, nil
+	return response.Sellers[0].ID, trace, nil
 }
 
 func CartSimulation(products []ProductsList, sellerID string, traces []*httpx.Trace, url string, postalCode string) ([]string, []*httpx.Trace, error) {
