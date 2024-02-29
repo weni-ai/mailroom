@@ -160,7 +160,28 @@ func (s *service) Open(session flows.Session, topic *flows.Topic, body string, a
 		logHTTP(flows.NewHTTPLog(trace, flows.HTTPStatusFromCode, s.redactor))
 	}
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to create channel webhook")
+		newError := errors.Wrap(err, "failed to create channel webhook")
+		// To cleanup we need to do 2 actions on twilio apis: 1) - Delete flex Channel; 2) - Delete task from this channel
+		{ // 1) - Delete Channel
+			trace, err := s.restClient.DeleteFlexChannel(newFlexChannel.Sid)
+			if trace != nil {
+				logHTTP(flows.NewHTTPLog(trace, flows.HTTPStatusFromCode, s.redactor))
+			}
+			if err != nil {
+				return nil, errors.Wrap(newError, "failed to delete FlexChannel to cleanup failed ticket opening")
+			}
+		}
+		{ // 2) - Delete Task
+			trace, err := s.restClient.DeleteTask(newFlexChannel.TaskSid)
+			if trace != nil {
+				logHTTP(flows.NewHTTPLog(trace, flows.HTTPStatusFromCode, s.redactor))
+			}
+			if err != nil {
+				return nil, errors.Wrap(newError, "failed to delete Task to cleanup failed ticket opening")
+			}
+		}
+
+		return nil, newError
 	}
 
 	go func() {
@@ -275,7 +296,7 @@ func (s *service) Reopen(tickets []*models.Ticket, logHTTP flows.HTTPLogCallback
 }
 
 func SendHistory(session flows.Session, contactID flows.ContactID, newFlexChannel *FlexChannel, logHTTP flows.HTTPLogCallback, restClient *Client, redactor utils.Redactor) {
-	after := session.Runs()[0].CreatedOn()
+	after := session.Runs()[0].CreatedOn().Add(time.Second * -1)
 	cx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 	defer cancel()
 	// get messages for history
