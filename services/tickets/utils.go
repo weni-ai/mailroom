@@ -109,7 +109,10 @@ func SendReply(ctx context.Context, rt *runtime.Runtime, ticket *models.Ticket, 
 	}
 
 	msgio.SendMessages(ctx, rt, rt.DB, nil, msgs)
-	return msgs[0], nil
+	if len(msgs) > 0 {
+		return msgs[0], nil
+	}
+	return nil, nil
 }
 
 var retries = httpx.NewFixedRetries(time.Second*5, time.Second*10)
