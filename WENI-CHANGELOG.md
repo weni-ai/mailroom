@@ -1,3 +1,8 @@
+1.17.2-mailroom-7.1.22
+----------
+ * handling tickets/utils SendReply msg return
+ * twilioflex open ticket handling to close cleanup flex resource if webhook conf fail
+
 1.17.1-mailroom-7.1.22
 ----------
  * Improve prompt for chatGPT in product listings
