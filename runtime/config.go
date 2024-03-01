@@ -88,6 +88,8 @@ type Config struct {
 	WenigptBaseURL   string `help:"wenigpt url"`
 
 	SentenxBaseURL string `help:"sentenx base url"`
+
+	CampaignIsHighPriority bool `help:"indicate if campaign is high priority, if not it will be default"`
 }
 
 // NewDefaultConfig returns a new default configuration object
@@ -148,6 +150,8 @@ func NewDefaultConfig() *Config {
 
 		ChatgptBaseURL: "https://api.openai.com",
 		SentenxBaseURL: "https://sentenx.weni.ai",
+
+		CampaignIsHighPriority: true,
 	}
 }
 

@@ -75,7 +75,13 @@ func fireCampaignEvents(ctx context.Context, rt *runtime.Runtime) error {
 			task.FireIDs = fireIDs[:batchSize]
 			fireIDs = fireIDs[batchSize:]
 
-			err = queue.AddTask(rc, queue.BatchQueue, TypeFireCampaignEvent, int(orgID), task, queue.DefaultPriority)
+			priority := queue.DefaultPriority
+
+			if rt.Config.CampaignIsHighPriority {
+				priority = queue.HighPriority
+			}
+
+			err = queue.AddTask(rc, queue.BatchQueue, TypeFireCampaignEvent, int(orgID), task, priority)
 			if err != nil {
 				return errors.Wrap(err, "error queuing task")
 			}
