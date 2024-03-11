@@ -118,12 +118,10 @@ func (s *service) Call(session flows.Session, params assets.MsgCatalogParam, log
 		postalCode_ = strings.ReplaceAll(params.PostalCode, "-", "")
 		postalCode_ = strings.ReplaceAll(postalCode_, ".", "")
 
-		sellerID, trace, err = GetSellerByPostalCode(postalCode_, params.SearchUrl)
-		callResult.Traces = append(callResult.Traces, trace)
-		if err != nil {
-			return callResult, err
-		}
-	} else {
+	}
+
+	sellerID = params.SellerId
+	if sellerID != "" {
 		sellerID = "1"
 	}
 
@@ -164,10 +162,14 @@ func (s *service) Call(session flows.Session, params assets.MsgCatalogParam, log
 
 	callResult.ProductRetailerIDS = productEntries
 
-	existingProductsIds, trace, err := CartSimulation(allProducts, sellerID, params.SearchUrl, postalCode_)
-	callResult.Traces = append(callResult.Traces, trace)
-	if err != nil {
-		return nil, err
+	existingProductsIds := []string{}
+
+	if postalCode_ != "" {
+		existingProductsIds, trace, err = CartSimulation(allProducts, sellerID, params.SearchUrl, postalCode_)
+		callResult.Traces = append(callResult.Traces, trace)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	finalResult := &flows.MsgCatalogCall{}
@@ -179,11 +181,17 @@ func (s *service) Call(session flows.Session, params assets.MsgCatalogParam, log
 		newEntry.ProductRetailerIDs = []string{}
 
 		for _, productRetailerID := range productEntry.ProductRetailerIDs {
-			for _, existingProductId := range existingProductsIds {
-				if productRetailerID == existingProductId {
-					if len(newEntry.ProductRetailerIDs) < 5 {
-						newEntry.ProductRetailerIDs = append(newEntry.ProductRetailerIDs, productRetailerID+"#"+sellerID)
+			if len(existingProductsIds) > 0 {
+				for _, existingProductId := range existingProductsIds {
+					if productRetailerID == existingProductId {
+						if len(newEntry.ProductRetailerIDs) < 5 {
+							newEntry.ProductRetailerIDs = append(newEntry.ProductRetailerIDs, productRetailerID+"#"+sellerID)
+						}
 					}
+				}
+			} else {
+				if len(newEntry.ProductRetailerIDs) < 5 {
+					newEntry.ProductRetailerIDs = append(newEntry.ProductRetailerIDs, productRetailerID+"#"+sellerID)
 				}
 			}
 		}
@@ -420,47 +428,6 @@ func VtexIntelligentSearch(searchUrl string, productSearch string) ([]string, []
 	}
 
 	return allItems, traces, nil
-}
-
-func GetSellerByPostalCode(postalCode string, url_ string) (string, *httpx.Trace, error) {
-
-	var trace *httpx.Trace
-
-	query := url.Values{}
-	query.Add("country", "BRA")
-	query.Add("postalCode", postalCode)
-
-	urlSplit := strings.Split(url_, "api")
-	urlRegions := urlSplit[0] + "api/checkout/pub/regions"
-	urlRegions = fmt.Sprintf("%s?%s", urlRegions, query.Encode())
-
-	req, err := httpx.NewRequest("GET", urlRegions, nil, nil)
-	if err != nil {
-		return "", trace, err
-	}
-
-	client := &http.Client{}
-	trace, err = httpx.DoTrace(client, req, nil, nil, -1)
-	if err != nil {
-		return "", trace, err
-	}
-
-	response := &[]struct {
-		Sellers []struct {
-			ID string `json:"id"`
-		} `json:"sellers"`
-	}{}
-
-	err = jsonx.Unmarshal(trace.ResponseBody, &response)
-	if err != nil {
-		return "", trace, err
-	}
-
-	if len(*response) == 0 {
-		return "", trace, fmt.Errorf("there are no sellers registered for this postal code")
-	}
-
-	return (*response)[0].Sellers[0].ID, trace, nil
 }
 
 func CartSimulation(products []string, sellerID string, url string, postalCode string) ([]string, *httpx.Trace, error) {
