@@ -44,6 +44,7 @@ func TestMsgCatalogCreated(t *testing.T) {
 						"",
 						"",
 						"",
+						"",
 						true,
 					),
 				},
@@ -59,11 +60,12 @@ func TestMsgCatalogCreated(t *testing.T) {
 						"",
 						"",
 						"",
+						"",
 						true,
 					),
 				},
 				testdata.Bob: []flows.Action{
-					actions.NewSendMsgCatalog(handlers.NewActionUUID(), "No URNs", "", "", "View Products", "i want a water bottle", nil, false, "", "", "", false),
+					actions.NewSendMsgCatalog(handlers.NewActionUUID(), "No URNs", "", "", "View Products", "i want a water bottle", nil, false, "", "", "", "", false),
 				},
 			},
 			Msgs: handlers.ContactMsgMap{
