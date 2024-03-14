@@ -47,5 +47,33 @@
             "url": "/mr/",
             "version": "Dev"
         }
+    },
+    {
+        "label": "healthcheck page if GET /mr/health",
+        "method": "GET",
+        "path": "/mr/health",
+        "status": 200,
+        "response": {
+            "details": {
+                "database": {
+                    "message": "database ok",
+                    "status": "Ok"
+                },
+                "redis": {
+                    "message": "redis ok",
+                    "status": "Ok"
+                },
+                "s3": {
+                    "message": "s3 ok",
+                    "status": "Ok"
+                },
+                "sentry": {
+                    "message": "sentry dsn isn't configured",
+                    "status": "Error"
+                }
+            },
+            "message": "sentry dsn isn't configured",
+            "status": "Error"
+        }
     }
 ]
