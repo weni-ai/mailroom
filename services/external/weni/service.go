@@ -113,15 +113,15 @@ func (s *service) Call(session flows.Session, params assets.MsgCatalogParam, log
 	var sellerID string
 	var allProducts []string
 
-	postalCode_ := params.PostalCode
+	postalCode_ := strings.TrimSpace(params.PostalCode)
 	if params.PostalCode != "" {
 		postalCode_ = strings.ReplaceAll(params.PostalCode, "-", "")
 		postalCode_ = strings.ReplaceAll(postalCode_, ".", "")
 
 	}
 
-	sellerID = params.SellerId
-	if sellerID != "" {
+	sellerID = strings.TrimSpace(params.SellerId)
+	if sellerID == "" {
 		sellerID = "1"
 	}
 
@@ -164,7 +164,9 @@ func (s *service) Call(session flows.Session, params assets.MsgCatalogParam, log
 
 	existingProductsIds := []string{}
 
-	if postalCode_ != "" {
+	hasSimulation := false
+	if postalCode_ != "" && sellerID != "1" {
+		hasSimulation = true
 		existingProductsIds, trace, err = CartSimulation(allProducts, sellerID, params.SearchUrl, postalCode_)
 		callResult.Traces = append(callResult.Traces, trace)
 		if err != nil {
@@ -181,7 +183,7 @@ func (s *service) Call(session flows.Session, params assets.MsgCatalogParam, log
 		newEntry.ProductRetailerIDs = []string{}
 
 		for _, productRetailerID := range productEntry.ProductRetailerIDs {
-			if len(existingProductsIds) > 0 {
+			if hasSimulation {
 				for _, existingProductId := range existingProductsIds {
 					if productRetailerID == existingProductId {
 						if len(newEntry.ProductRetailerIDs) < 5 {
