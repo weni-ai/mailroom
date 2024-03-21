@@ -228,7 +228,7 @@ func GetProductListFromChatGPT(ctx context.Context, rtConfig *runtime.Config, co
 	}
 	prompt6 := chatgpt.ChatCompletionMessage{
 		Role:    chatgpt.ChatMessageRoleSystem,
-		Content: "If the user does not provide a list of products, return an empty list of products.",
+		Content: "If the user does not provide a list of products or provides an invalid input, return an empty list of products.",
 	}
 	question := chatgpt.ChatCompletionMessage{
 		Role:    chatgpt.ChatMessageRoleUser,
