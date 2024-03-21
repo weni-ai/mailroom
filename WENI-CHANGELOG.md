@@ -1,3 +1,7 @@
+1.17.3-mailroom-7.1.22
+----------
+ * /mr/health do health check for redis, database, sentry and s3
+
 1.17.2-mailroom-7.1.22
 ----------
  * handling tickets/utils SendReply msg return
