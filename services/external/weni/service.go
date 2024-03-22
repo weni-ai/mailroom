@@ -282,11 +282,15 @@ func GetProductListFromChatGPT(ctx context.Context, rtConfig *runtime.Config, co
 		Role:    chatgpt.ChatMessageRoleSystem,
 		Content: "Preserve the order of products as they appear in the user prompt.",
 	}
+	prompt6 := chatgpt.ChatCompletionMessage{
+		Role:    chatgpt.ChatMessageRoleSystem,
+		Content: "If the user does not provide a list of products or provides an invalid input, return an empty list of products.",
+	}
 	question := chatgpt.ChatCompletionMessage{
 		Role:    chatgpt.ChatMessageRoleUser,
 		Content: content,
 	}
-	completionRequest := chatgpt.NewChatCompletionRequest([]chatgpt.ChatCompletionMessage{prompt1, prompt2, prompt3, prompt4, prompt5, question})
+	completionRequest := chatgpt.NewChatCompletionRequest([]chatgpt.ChatCompletionMessage{prompt1, prompt2, prompt3, prompt4, prompt5, prompt6, question})
 	response, trace, err := chatGPTClient.CreateChatCompletion(completionRequest)
 	if err != nil {
 		return nil, trace, errors.Wrapf(err, "error on chatgpt call for list products")
