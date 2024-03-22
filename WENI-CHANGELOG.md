@@ -1,3 +1,8 @@
+1.18.0-mailroom-7.1.22
+----------
+ * Adjust chatgpt prompt for product list
+ * Perform cart simulation for product list using postal code
+
 1.17.3-mailroom-7.1.22
 ----------
  * /mr/health do health check for redis, database, sentry and s3
