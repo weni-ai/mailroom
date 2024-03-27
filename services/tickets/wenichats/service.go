@@ -162,8 +162,8 @@ func (s *service) Open(session flows.Session, topic *flows.Topic, body string, a
 	var after time.Time
 	if historyAfter != "" {
 		// get msgs for history based on history_after param inside ticket body
-		after1, err1 := time.Parse(time.DateTime, historyAfter)
-		after2, err2 := time.Parse(time.RFC3339, historyAfter)
+		after1, err1 := time.Parse("2006-01-02 15:04:05", historyAfter)
+		after2, err2 := time.Parse("2006-01-02T15:04:05Z", historyAfter)
 		if err1 != nil && err2 != nil {
 			return nil, errors.Wrap(err, fmt.Sprintf("failed to parse history_after from value from format DateTime or RFC3339. Expected format \"2006-01-02 15:04:05\" or \"2006-01-02T15:04:05Z\", current value is \"%s\"", historyAfter))
 		}
