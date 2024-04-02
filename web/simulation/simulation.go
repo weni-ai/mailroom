@@ -83,16 +83,15 @@ func newSimulationResponse(session flows.Session, sprint flows.Sprint) *simulati
 
 // Starts a new engine session
 //
-//   {
-//     "org_id": 1,
-//     "flows": [{
-//        "uuid": uuidv4,
-//        "definition": {...},
-//     },.. ],
-//     "trigger": {...},
-//     "assets": {...}
-//   }
-//
+//	{
+//	  "org_id": 1,
+//	  "flows": [{
+//	     "uuid": uuidv4,
+//	     "definition": {...},
+//	  },.. ],
+//	  "trigger": {...},
+//	  "assets": {...}
+//	}
 type startRequest struct {
 	sessionRequest
 	Trigger json.RawMessage `json:"trigger" validate:"required"`
@@ -123,6 +122,15 @@ func handleStart(ctx context.Context, rt *runtime.Runtime, r *http.Request) (int
 	request := &startRequest{}
 	if err := utils.UnmarshalAndValidateWithLimit(r.Body, request, web.MaxRequestBytes); err != nil {
 		return nil, http.StatusBadRequest, errors.Wrapf(err, "request failed validation")
+	}
+
+	var requestTrigger map[string]interface{}
+	json.Unmarshal(request.Trigger, &requestTrigger)
+	environment, _ := requestTrigger["environment"].(map[string]interface{})
+	if v := environment["max_value_length"]; v == nil {
+		environment["max_value_length"] = rt.Config.MaxValueLength
+		requestTrigger["environment"] = environment
+		request.Trigger, _ = json.Marshal(requestTrigger)
 	}
 
 	// grab our org assets
@@ -164,17 +172,16 @@ func triggerFlow(ctx context.Context, rt *runtime.Runtime, oa *models.OrgAssets,
 
 // Resumes an existing engine session
 //
-//   {
-//     "org_id": 1,
-//     "flows": [{
-//        "uuid": uuidv4,
-//        "definition": {...},
-//     },.. ],
-//     "session": {"uuid": "468621a8-32e6-4cd2-afc1-04416f7151f0", "runs": [...], ...},
-//     "resume": {...},
-//     "assets": {...}
-//   }
-//
+//	{
+//	  "org_id": 1,
+//	  "flows": [{
+//	     "uuid": uuidv4,
+//	     "definition": {...},
+//	  },.. ],
+//	  "session": {"uuid": "468621a8-32e6-4cd2-afc1-04416f7151f0", "runs": [...], ...},
+//	  "resume": {...},
+//	  "assets": {...}
+//	}
 type resumeRequest struct {
 	sessionRequest
 
