@@ -1,3 +1,8 @@
+1.19.0-mailroom-7.1.22
+----------
+ * Fix simulator max value length
+ * Wenichats history_after on body param
+
 1.18.0-mailroom-7.1.22
 ----------
  * Adjust chatgpt prompt for product list
