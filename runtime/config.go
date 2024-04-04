@@ -88,6 +88,9 @@ type Config struct {
 	WenigptBaseURL   string `help:"wenigpt url"`
 
 	SentenxBaseURL string `help:"sentenx base url"`
+
+	RouterBaseURL   string `help:"router base url"`
+	RouterAuthToken string `help:"router authorization token"`
 }
 
 // NewDefaultConfig returns a new default configuration object
@@ -148,6 +151,7 @@ func NewDefaultConfig() *Config {
 
 		ChatgptBaseURL: "https://api.openai.com",
 		SentenxBaseURL: "https://sentenx.weni.ai",
+		RouterBaseURL:  "https://nexus.stg.cloud.weni.ai",
 	}
 }
 
