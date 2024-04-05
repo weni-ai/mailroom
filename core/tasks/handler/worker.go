@@ -948,7 +948,7 @@ func requestToRouter(event *MsgEvent, rtConfig *runtime.Config, projectUUID uuid
 
 	params := url.Values{}
 	params.Add("token", rtConfig.RouterAuthToken)
-	url_ := fmt.Sprintf("%s?%s", rtConfig.RouterBaseURL, params.Encode())
+	url_ := fmt.Sprintf("%s/messages?%s", rtConfig.RouterBaseURL, params.Encode())
 	req, err := httpx.NewRequest("POST", url_, b, nil)
 	if err != nil {
 		return err
