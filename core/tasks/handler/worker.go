@@ -16,6 +16,7 @@ import (
 	"github.com/nyaruka/gocommon/httpx"
 	"github.com/nyaruka/gocommon/jsonx"
 	"github.com/nyaruka/gocommon/urns"
+	"github.com/nyaruka/gocommon/uuids"
 	"github.com/nyaruka/goflow/excellent/types"
 	"github.com/nyaruka/goflow/flows"
 	"github.com/nyaruka/goflow/flows/events"
@@ -700,8 +701,8 @@ func handleMsgEvent(ctx context.Context, rt *runtime.Runtime, event *MsgEvent) e
 
 	if oa.Org().BrainOn() {
 		db := rt.ReadonlyDB
-		var projectUUID string
-		err := db.GetContext(ctx, &projectUUID, `SELECT project_uuid FROM internal_project WHERE org_ptr = $1`, oa.OrgID())
+		var projectUUID uuids.UUID
+		err := db.GetContext(ctx, &projectUUID, `SELECT project_uuid FROM internal_project WHERE org_ptr_id = $1;`, oa.OrgID())
 		if err != nil && err != sql.ErrNoRows {
 			return errors.Wrapf(err, "error when searching for project uuid with org id %d", oa.OrgID())
 		}
@@ -909,11 +910,11 @@ type StopEvent struct {
 	OccurredOn time.Time        `json:"occurred_on"`
 }
 
-func requestToRouter(event *MsgEvent, rtConfig *runtime.Config, projectUUID string, order *flows.Order, nfmReply *flows.NFMReply) error {
+func requestToRouter(event *MsgEvent, rtConfig *runtime.Config, projectUUID uuids.UUID, order *flows.Order, nfmReply *flows.NFMReply) error {
 	httpClient, httpRetries, _ := goflow.HTTP(rtConfig)
 
 	body := struct {
-		ProjectUUID string             `json:"project_uuid"`
+		ProjectUUID uuids.UUID         `json:"project_uuid"`
 		ContactURN  urns.URN           `json:"contact_urn"`
 		Text        string             `json:"text"`
 		Attachments []utils.Attachment `json:"attachments"`
