@@ -716,6 +716,11 @@ func handleMsgEvent(ctx context.Context, rt *runtime.Runtime, event *MsgEvent) e
 			return errors.Wrap(err, "unable to send message to router")
 		}
 
+		err = models.UpdateMessage(ctx, rt.DB, event.MsgID, models.MsgStatusHandled, models.VisibilityVisible, models.MsgTypeInbox, topupID)
+		if err != nil {
+			return errors.Wrapf(err, "error marking message as handled")
+		}
+
 		return nil
 
 	} else {
