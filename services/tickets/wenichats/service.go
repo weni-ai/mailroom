@@ -204,7 +204,11 @@ func (s *service) Open(session flows.Session, topic *flows.Topic, body string, a
 			logHTTP(flows.NewHTTPLog(trace, flows.HTTPStatusFromCode, s.redactor))
 		}
 		if err != nil {
-			return nil, errors.Wrap(err, "error calling wenichats to create a history message")
+			_, _, err = s.restClient.CloseRoom(newRoom.UUID)
+			if err != nil {
+				return nil, errors.Wrap(err, "error closing ticket after failing to send history messages to wenichats")
+			}
+			return nil, errors.Wrap(err, "error calling wenichats to create a history message, closing newly opened ticket")
 		}
 	}
 
