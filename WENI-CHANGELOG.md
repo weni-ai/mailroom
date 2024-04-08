@@ -1,3 +1,7 @@
+1.19.1-mailroom-7.1.22
+----------
+ * close wenichats ticket on history failure
+
 1.19.0-mailroom-7.1.22
 ----------
  * Fix simulator max value length
