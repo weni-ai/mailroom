@@ -711,7 +711,7 @@ func handleMsgEvent(ctx context.Context, rt *runtime.Runtime, event *MsgEvent) e
 			return fmt.Errorf("no project uuid found")
 		}
 
-		err = requestToRouter(event, rt.Config, projectUUID, order, nfmReply)
+		err = requestToRouter(event, rt.Config, projectUUID)
 		if err != nil {
 			return errors.Wrap(err, "unable to send message to router")
 		}
@@ -915,7 +915,7 @@ type StopEvent struct {
 	OccurredOn time.Time        `json:"occurred_on"`
 }
 
-func requestToRouter(event *MsgEvent, rtConfig *runtime.Config, projectUUID uuids.UUID, order *flows.Order, nfmReply *flows.NFMReply) error {
+func requestToRouter(event *MsgEvent, rtConfig *runtime.Config, projectUUID uuids.UUID) error {
 	httpClient, httpRetries, _ := goflow.HTTP(rtConfig)
 
 	body := struct {
@@ -923,10 +923,7 @@ func requestToRouter(event *MsgEvent, rtConfig *runtime.Config, projectUUID uuid
 		ContactURN  urns.URN           `json:"contact_urn"`
 		Text        string             `json:"text"`
 		Attachments []utils.Attachment `json:"attachments"`
-		// Order        flows.Order        `json:"order"`
-		// NFMReply     flows.NFMReply     `json:"nfm_reply"`
-		// QuickReplies []string           `json:"quick_replies"`
-		Metadata json.RawMessage `json:"metadata"`
+		Metadata    json.RawMessage    `json:"metadata"`
 	}{
 		ProjectUUID: projectUUID,
 		ContactURN:  event.URN,
@@ -941,15 +938,6 @@ func requestToRouter(event *MsgEvent, rtConfig *runtime.Config, projectUUID uuid
 		return err
 	}
 	b = bytes.NewReader(data)
-
-	// if event.Metadata != nil {
-	// 	var metadata map[string]interface{}
-	// 	err := json.Unmarshal(event.Metadata, &metadata)
-	// 	if err != nil {
-	// 		log.WithError(err).Error("unable to unmarshal metadata from msg event")
-	// 	}
-	// 	body.Order = metadata["order"]
-	// }
 
 	params := url.Values{}
 	params.Add("token", rtConfig.RouterAuthToken)
