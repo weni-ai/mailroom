@@ -645,8 +645,8 @@ func handleMsgEvent(ctx context.Context, rt *runtime.Runtime, event *MsgEvent) e
 	}
 
 	// we found a trigger and their session is nil or doesn't ignore keywords
-	if (trigger != nil && trigger.TriggerType() != models.CatchallTriggerType && (flow == nil || !flow.IgnoreTriggers()) && !oa.Org().BrainOn()) ||
-		(trigger != nil && trigger.TriggerType() == models.CatchallTriggerType && (flow == nil) && !oa.Org().BrainOn()) {
+	if (trigger != nil && trigger.TriggerType() != models.CatchallTriggerType && (flow == nil || !flow.IgnoreTriggers())) ||
+		(trigger != nil && trigger.TriggerType() == models.CatchallTriggerType && (flow == nil)) && !oa.Org().BrainOn() && len(tickets) == 0 {
 		// load our flow
 		flow, err := oa.FlowByID(trigger.FlowID())
 		if err != nil && err != models.ErrNotFound {
@@ -699,7 +699,7 @@ func handleMsgEvent(ctx context.Context, rt *runtime.Runtime, event *MsgEvent) e
 		return nil
 	}
 
-	if oa.Org().BrainOn() {
+	if oa.Org().BrainOn() && len(tickets) == 0 {
 		db := rt.ReadonlyDB
 		var projectUUID uuids.UUID
 		err := db.GetContext(ctx, &projectUUID, `SELECT project_uuid FROM internal_project WHERE org_ptr_id = $1;`, oa.OrgID())
@@ -723,12 +723,12 @@ func handleMsgEvent(ctx context.Context, rt *runtime.Runtime, event *MsgEvent) e
 
 		return nil
 
-	} else {
-		// this message didn't trigger and new sessions or resume any existing ones, so handle as inbox
-		err = handleAsInbox(ctx, rt, oa, contact, msgIn, topupID, tickets)
-		if err != nil {
-			return errors.Wrapf(err, "error handling inbox message")
-		}
+	}
+
+	// this message didn't trigger and new sessions or resume any existing ones, so handle as inbox
+	err = handleAsInbox(ctx, rt, oa, contact, msgIn, topupID, tickets)
+	if err != nil {
+		return errors.Wrapf(err, "error handling inbox message")
 	}
 
 	return nil
