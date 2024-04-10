@@ -149,9 +149,10 @@ func NewDefaultConfig() *Config {
 		ZeroshotAPIToken: "",
 		ZeroshotAPIUrl:   "http://engine-ai.dev.cloud.weni.ai",
 
-		ChatgptBaseURL: "https://api.openai.com",
-		SentenxBaseURL: "https://sentenx.weni.ai",
-		RouterBaseURL:  "https://nexus.stg.cloud.weni.ai",
+		ChatgptBaseURL:  "https://api.openai.com",
+		SentenxBaseURL:  "https://sentenx.weni.ai",
+		RouterBaseURL:   "https://nexus.stg.cloud.weni.ai",
+		RouterAuthToken: "",
 	}
 }
 

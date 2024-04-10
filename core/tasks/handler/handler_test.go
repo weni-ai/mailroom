@@ -6,6 +6,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/nyaruka/gocommon/httpx"
 	"github.com/nyaruka/gocommon/urns"
 	"github.com/nyaruka/gocommon/uuids"
 	"github.com/nyaruka/goflow/flows"
@@ -59,6 +60,9 @@ func TestMsgEvents(t *testing.T) {
 	// insert a dummy message into the database that will get the updates from handling each message event which pretends to be it
 	dbMsg := testdata.InsertIncomingMsg(db, testdata.Org1, testdata.TwilioChannel, testdata.Cathy, "", models.MsgStatusPending)
 
+	db.MustExec(`INSERT INTO public.orgs_org (id, is_active, created_on, modified_on, uuid, name, plan, timezone, date_format, is_anon, is_flagged, is_suspended, uses_topups, is_multi_org, is_multi_user, brand, created_by_id, modified_by_id, limits,flow_languages, brain_on) 
+	VALUES (3, true, NOW(), NOW(), '6ff4ea5d-2ae4-41a0-a01e-a9480b6a1dda'::uuid, 'BrainOn Org', 'basic', 'UTC', 'D', false, false, false, false, false, false, 'Sample Brand', 1, 1, '{"limit1": 10}', '{}', true);`)
+
 	tcs := []struct {
 		Hook          func()
 		Org           *testdata.Org
@@ -99,6 +103,9 @@ func TestMsgEvents(t *testing.T) {
 		{func() {
 			db.MustExec(`UPDATE flows_flow SET is_active = TRUE WHERE id = $1`, testdata.Org2Favorites.ID)
 		}, testdata.Org2, testdata.Org2Channel, testdata.Org2Contact, "start", "What is your favorite color?", models.MsgTypeFlow},
+
+		//brain_on test
+		{nil, testdata.Org3, testdata.TwitterChannel, testdata.Alexandria, "brain_on test", "", models.MsgTypeInbox},
 	}
 
 	makeMsgTask := func(org *testdata.Org, channel *testdata.Channel, contact *testdata.Contact, text string) *queue.Task {
@@ -126,6 +133,10 @@ func TestMsgEvents(t *testing.T) {
 	}
 
 	last := time.Now()
+
+	httpx.SetRequestor(httpx.NewMockRequestor(map[string][]httpx.MockResponse{
+		"https://nexus.stg.cloud.weni.ai/messages?token=": {
+			httpx.NewMockResponse(200, nil, ``)}}))
 
 	for i, tc := range tcs {
 		models.FlushCache()
@@ -232,6 +243,7 @@ func TestMsgEvents(t *testing.T) {
 	assert.NoError(t, err)
 
 	testsuite.AssertQuery(t, db, `SELECT count(*) FROM msgs_msg WHERE contact_id = $1 AND direction = 'O' AND created_on > $2`, testdata.Org2Contact.ID, previous).Returns(0)
+
 }
 
 func TestChannelEvents(t *testing.T) {

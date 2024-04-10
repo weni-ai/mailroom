@@ -953,7 +953,7 @@ func requestToRouter(event *MsgEvent, rtConfig *runtime.Config, projectUUID uuid
 	}
 
 	if trace.Response.StatusCode >= 400 {
-		return fmt.Errorf("error: status code %d", trace.Response.StatusCode)
+		return fmt.Errorf("router call error: status code %d", trace.Response.StatusCode)
 	}
 
 	return nil
