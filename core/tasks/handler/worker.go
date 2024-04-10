@@ -646,7 +646,7 @@ func handleMsgEvent(ctx context.Context, rt *runtime.Runtime, event *MsgEvent) e
 
 	// we found a trigger and their session is nil or doesn't ignore keywords
 	if (trigger != nil && trigger.TriggerType() != models.CatchallTriggerType && (flow == nil || !flow.IgnoreTriggers())) ||
-		(trigger != nil && trigger.TriggerType() == models.CatchallTriggerType && (flow == nil)) && !oa.Org().BrainOn() && len(tickets) == 0 {
+		(trigger != nil && trigger.TriggerType() == models.CatchallTriggerType && (flow == nil)) && !oa.Org().BrainOn() {
 		// load our flow
 		flow, err := oa.FlowByID(trigger.FlowID())
 		if err != nil && err != models.ErrNotFound {
