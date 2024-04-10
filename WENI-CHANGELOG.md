@@ -1,3 +1,7 @@
+1.19.2-mailroom-7.1.22
+----------
+ * add env for flow start batch size
+
 1.19.1-mailroom-7.1.22
 ----------
  * close wenichats ticket on history failure
