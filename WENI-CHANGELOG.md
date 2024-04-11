@@ -1,3 +1,7 @@
+1.20.0-mailroom-7.1.22
+----------
+ * Add brain_on field to Org and send messages to the Router
+
 1.19.2-mailroom-7.1.22
 ----------
  * add env for flow start batch size
