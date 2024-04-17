@@ -105,7 +105,7 @@ func TestTwilioIVR(t *testing.T) {
 	require.NoError(t, err)
 
 	// start our task
-	task, err := queue.PopNextTask(rc, queue.BatchQueue)
+	task, err := queue.PopNextTask(rc, queue.FlowBatchQueue)
 	require.NoError(t, err)
 	batch := &models.FlowStartBatch{}
 	jsonx.MustUnmarshal(task.Task, batch)
