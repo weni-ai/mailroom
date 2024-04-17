@@ -31,7 +31,7 @@ func (h *startStartHook) Apply(ctx context.Context, rt *runtime.Runtime, tx *sql
 
 			// if we are starting groups, queue to our batch queue instead, but with high priority
 			if len(start.GroupIDs()) > 0 || start.Query() != "" {
-				taskQ = queue.BatchQueue
+				taskQ = queue.FlowBatchQueue
 				priority = queue.HighPriority
 			}
 

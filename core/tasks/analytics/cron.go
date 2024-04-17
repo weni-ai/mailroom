@@ -60,17 +60,25 @@ func reportAnalytics(ctx context.Context, rt *runtime.Runtime) error {
 		logrus.WithError(err).Error("error calculating handler queue size")
 	}
 
+	// and size of flow batch queue
+	flowBatchSize, err := queue.Size(rc, queue.FlowBatchQueue)
+	if err != nil {
+		logrus.WithError(err).Error("error calculating flow batch queue size")
+	}
+
 	logrus.WithFields(logrus.Fields{
-		"db_idle":      dbStats.Idle,
-		"db_busy":      dbStats.InUse,
-		"db_waiting":   dbStats.WaitCount - waitCount,
-		"db_wait":      dbStats.WaitDuration - waitDuration,
-		"batch_size":   batchSize,
-		"handler_size": handlerSize,
+		"db_idle":         dbStats.Idle,
+		"db_busy":         dbStats.InUse,
+		"db_waiting":      dbStats.WaitCount - waitCount,
+		"db_wait":         dbStats.WaitDuration - waitDuration,
+		"batch_size":      batchSize,
+		"handler_size":    handlerSize,
+		"flow_batch_size": flowBatchSize,
 	}).Info("current analytics")
 
 	librato.Gauge("mr.handler_queue", float64(handlerSize))
 	librato.Gauge("mr.batch_queue", float64(batchSize))
+	librato.Gauge("mr.flow_batch_queue", float64(flowBatchSize))
 	librato.Gauge("mr.db_busy", float64(dbStats.InUse))
 	librato.Gauge("mr.db_idle", float64(dbStats.Idle))
 	librato.Gauge("mr.db_waiting", float64(dbStats.WaitCount-waitCount))
