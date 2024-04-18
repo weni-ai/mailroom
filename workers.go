@@ -8,6 +8,7 @@ import (
 
 	"github.com/nyaruka/mailroom/core/queue"
 	"github.com/nyaruka/mailroom/runtime"
+	"github.com/nyaruka/mailroom/runtime/metrics"
 
 	"github.com/sirupsen/logrus"
 )
@@ -42,6 +43,8 @@ func NewForeman(rt *runtime.Runtime, wg *sync.WaitGroup, queue string, maxWorker
 
 // Start starts the foreman and all its workers, assigning jobs while there are some
 func (f *Foreman) Start() {
+	metrics.SetAvailableWorkers(f.queue, len(f.workers))
+
 	for _, worker := range f.workers {
 		worker.Start()
 	}
@@ -50,6 +53,8 @@ func (f *Foreman) Start() {
 
 // Stop stops the foreman and all its workers, the wait group of the worker can be used to track progress
 func (f *Foreman) Stop() {
+	metrics.SetAvailableWorkers(f.queue, 0)
+
 	for _, worker := range f.workers {
 		worker.Stop()
 	}
@@ -81,6 +86,7 @@ func (f *Foreman) Assign() {
 
 		// otherwise, grab the next task and assign it to a worker
 		case worker := <-f.availableWorkers:
+			metrics.AddWorker(f.queue)
 			// see if we have a task to work on
 			rc := f.rt.RP.Get()
 			task, err := queue.PopNextTask(rc, f.queue)
@@ -102,6 +108,7 @@ func (f *Foreman) Assign() {
 					lastSleep = true
 				}
 				f.availableWorkers <- worker
+				metrics.RemoveWorker(f.queue)
 				time.Sleep(250 * time.Millisecond)
 			}
 		}
