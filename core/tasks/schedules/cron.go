@@ -83,6 +83,7 @@ func checkSchedules(ctx context.Context, rt *runtime.Runtime) error {
 
 		var task interface{}
 		var taskName string
+		taskQueue := queue.BatchQueue
 
 		// if it is a broadcast
 		if s.Broadcast() != nil {
@@ -113,6 +114,7 @@ func checkSchedules(ctx context.Context, rt *runtime.Runtime) error {
 			// add our flow start task
 			task = start
 			taskName = queue.StartFlow
+			taskQueue = queue.FlowBatchQueue
 			triggers++
 		} else {
 			log.Info("schedule found with no associated active broadcast or trigger, ignoring")
@@ -137,7 +139,7 @@ func checkSchedules(ctx context.Context, rt *runtime.Runtime) error {
 
 		// add our task if we have one
 		if task != nil {
-			err = queue.AddTask(rc, queue.BatchQueue, taskName, int(s.OrgID()), task, queue.HighPriority)
+			err = queue.AddTask(rc, taskQueue, taskName, int(s.OrgID()), task, queue.HighPriority)
 			if err != nil {
 				log.WithError(err).Error("error firing task with name: ", taskName)
 			}
