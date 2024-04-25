@@ -92,21 +92,26 @@ func TestCheckSchedules(t *testing.T) {
 	// we shouldn't have any pending schedules since there were all one time fires, but all should have last fire
 	testsuite.AssertQuery(t, db, `SELECT count(*) FROM schedules_schedule WHERE next_fire IS NULL and last_fire < NOW();`).Returns(3)
 
-	// check the tasks created
-	task, err := queue.PopNextTask(rc, queue.BatchQueue)
+	// check the tasks created, first is a flow start that should be in the flow batch queue
+	task, err := queue.PopNextTask(rc, queue.FlowBatchQueue)
 
 	// first should be the flow start
 	assert.NoError(t, err)
 	assert.NotNil(t, task)
 	assert.Equal(t, queue.StartFlow, task.Type)
 
-	// then the broadacast
+	// then the broadacast, now in the batch queue
 	task, err = queue.PopNextTask(rc, queue.BatchQueue)
 	assert.NoError(t, err)
 	assert.NotNil(t, task)
 	assert.Equal(t, queue.SendBroadcast, task.Type)
 
-	// nothing more
+	// nothing more on the flow batch queue
+	task, err = queue.PopNextTask(rc, queue.FlowBatchQueue)
+	assert.NoError(t, err)
+	assert.Nil(t, task)
+
+	// nothing more on the batch queue
 	task, err = queue.PopNextTask(rc, queue.BatchQueue)
 	assert.NoError(t, err)
 	assert.Nil(t, task)

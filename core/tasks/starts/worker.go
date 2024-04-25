@@ -158,7 +158,7 @@ func CreateFlowBatches(ctx context.Context, rt *runtime.Runtime, start *models.F
 	}
 
 	// by default we start in the batch queue unless we have two or fewer contacts
-	q := queue.BatchQueue
+	q := queue.FlowBatchQueue
 	if len(contactIDs) <= 2 {
 		q = queue.HandlerQueue
 	}

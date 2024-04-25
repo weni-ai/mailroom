@@ -33,6 +33,7 @@ type Config struct {
 
 	BatchWorkers         int  `help:"the number of go routines that will be used to handle batch events"`
 	HandlerWorkers       int  `help:"the number of go routines that will be used to handle messages"`
+	FlowBatchWorkers     int  `help:"the number of go routines that will be used to handle flow batch events"`
 	RetryPendingMessages bool `help:"whether to requeue pending messages older than five minutes to retry"`
 
 	WebhooksTimeout              int     `help:"the timeout in milliseconds for webhook calls from engine"`
@@ -110,6 +111,7 @@ func NewDefaultConfig() *Config {
 
 		BatchWorkers:         4,
 		HandlerWorkers:       32,
+		FlowBatchWorkers:     8,
 		RetryPendingMessages: true,
 
 		WebhooksTimeout:              15000,
