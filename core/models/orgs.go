@@ -288,3 +288,64 @@ SELECT ROW_TO_JSON(o) FROM (SELECT
 	WHERE
 		o.id = $1
 ) o`
+
+func LoadOrgByProjectUUID(ctx context.Context, cfg *runtime.Config, db sqlx.Queryer, projectUUID string) (*Org, error) {
+	start := time.Now()
+
+	org := &Org{}
+	rows, err := db.Queryx(selectOrgByProjectUUID, projectUUID, cfg.MaxValueLength)
+	if err != nil {
+		return nil, errors.Wrapf(err, "error loading org by project uuid: %s", projectUUID)
+	}
+	defer rows.Close()
+	if !rows.Next() {
+		return nil, errors.Errorf("no org with project uuid: %s", projectUUID)
+	}
+
+	err = dbutil.ReadJSONRow(rows, org)
+	if err != nil {
+		return nil, errors.Wrapf(err, "error unmarshalling org")
+	}
+
+	logrus.WithField("elapsed", time.Since(start)).WithField("project_uuid", projectUUID).Debug("loaded org environment")
+
+	return org, nil
+}
+
+const selectOrgByProjectUUID = `
+SELECT ROW_TO_JSON(o) FROM (SELECT
+	id,
+	is_suspended,
+	uses_topups,
+	brain_on,
+	COALESCE(o.config::json,'{}'::json) AS config,
+	(SELECT CASE date_format WHEN 'D' THEN 'DD-MM-YYYY' WHEN 'M' THEN 'MM-DD-YYYY' END) AS date_format, 
+	'tt:mm' AS time_format,
+	timezone,
+	(SELECT CASE is_anon WHEN TRUE THEN 'urns' WHEN FALSE THEN 'none' END) AS redaction_policy,
+	$2::int AS max_value_length,
+	flow_languages AS allowed_languages,
+	COALESCE(
+		(
+			SELECT
+				country
+			FROM
+				channels_channel c
+			WHERE
+				c.org_id = o.id AND
+				c.is_active = TRUE AND
+				c.country IS NOT NULL
+			GROUP BY
+				c.country
+			ORDER BY
+				count(c.country) desc,
+				country
+			LIMIT 1
+	), '') AS default_country
+	FROM 
+		orgs_org o
+	INNER JOIN internal_project p
+	ON o.id = p.org_ptr_id
+	WHERE
+		p.project_uuid = $1
+) o`

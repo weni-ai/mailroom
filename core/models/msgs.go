@@ -341,6 +341,11 @@ func NewOutgoingBroadcastMsg(rt *runtime.Runtime, org *Org, channel *Channel, co
 	return newOutgoingMsg(rt, org, channel, contactID, out, createdOn, nil, broadcastID)
 }
 
+// NewOutgoingMsg creates an outgoing message that does not belong to any flow or broadcast, it's used to the a direct message to the contact
+func NewOutgoingMsg(rt *runtime.Runtime, org *Org, channel *Channel, contactID ContactID, out *flows.MsgOut, createdOn time.Time) (*Msg, error) {
+	return newOutgoingMsg(rt, org, channel, contactID, out, createdOn, nil, NilBroadcastID)
+}
+
 func newOutgoingMsg(rt *runtime.Runtime, org *Org, channel *Channel, contactID ContactID, out *flows.MsgOut, createdOn time.Time, session *Session, broadcastID BroadcastID) (*Msg, error) {
 	msg := &Msg{}
 	m := &msg.m
@@ -1367,6 +1372,140 @@ func MarkBroadcastSent(ctx context.Context, db Queryer, id BroadcastID) error {
 		return errors.Wrapf(err, "error setting broadcast with id %d as sent", id)
 	}
 	return nil
+}
+
+func CreateOutgoingMessages(ctx context.Context, rt *runtime.Runtime, oa *OrgAssets, URNs []urns.URN, msgText string) ([]*Msg, error) {
+	// grab our contacts from the passed urns
+	urnContactIDs, err := GetOrCreateContactIDsFromURNs(ctx, rt.DB, oa, URNs)
+	if err != nil {
+		return nil, errors.Wrapf(err, "unable to load or create contact ids for urns")
+	}
+
+	// create a second map for easier id->urn lookup
+	contactIDsUrn := make(map[ContactID]urns.URN)
+
+	// create our contactIDs list removing any duplicates
+	repeatedContacts := make(map[ContactID]bool)
+	contactIDs := make([]ContactID, 0, len(urnContactIDs))
+	for u, id := range urnContactIDs {
+		contactIDsUrn[id] = u
+		if !repeatedContacts[id] {
+			contactIDs = append(contactIDs, id)
+			repeatedContacts[id] = true
+		}
+	}
+
+	// load all our contacts
+	contacts, err := LoadContacts(ctx, rt.DB, oa, contactIDs)
+	if err != nil {
+		return nil, errors.Wrapf(err, "error loading contacts for")
+	}
+
+	channels := oa.SessionAssets().Channels()
+
+	// for each contact, build our message
+	msgs := make([]*Msg, 0, len(contacts))
+
+	// utility method to build up our message
+	buildMessage := func(c *Contact, forceURN urns.URN) (*Msg, error) {
+		if c.Status() != ContactStatusActive {
+			return nil, nil
+		}
+
+		contact, err := c.FlowContact(oa)
+		if err != nil {
+			return nil, errors.Wrapf(err, "error creating flow contact")
+		}
+
+		urn := urns.NilURN
+		var channel *Channel
+
+		// we are forcing to send to a non-preferred URN, find the channel
+		if forceURN != urns.NilURN {
+			for _, u := range contact.URNs() {
+				if u.URN().Identity() == forceURN.Identity() {
+					c := channels.GetForURN(u, assets.ChannelRoleSend)
+					if c == nil {
+						return nil, nil
+					}
+					urn = u.URN()
+					channel = oa.ChannelByUUID(c.UUID())
+					break
+				}
+			}
+		} else {
+			// no forced URN, find the first URN we can send to
+			for _, u := range contact.URNs() {
+				c := channels.GetForURN(u, assets.ChannelRoleSend)
+				if c != nil {
+					urn = u.URN()
+					channel = oa.ChannelByUUID(c.UUID())
+					break
+				}
+			}
+		}
+
+		// no urn and channel? move on
+		if channel == nil {
+			return nil, nil
+		}
+
+		// create our outgoing message
+		out := flows.NewMsgOut(urn, channel.ChannelReference(), msgText, nil, nil, nil, flows.NilMsgTopic)
+		msg, err := NewOutgoingMsg(rt, oa.Org(), channel, c.ID(), out, time.Now())
+		if err != nil {
+			return nil, errors.Wrapf(err, "error creating outgoing message")
+		}
+
+		return msg, nil
+	}
+
+	// run through all our contacts to create our messages
+	for _, c := range contacts {
+		// use the preferred URN if present
+		urn := contactIDsUrn[c.ID()]
+		msg, err := buildMessage(c, urn)
+		if err != nil {
+			return nil, errors.Wrapf(err, "error building new message")
+		}
+		if msg != nil {
+			msgs = append(msgs, msg)
+		}
+
+		// if this is a contact that will receive two messages, calculate that one as well
+		if repeatedContacts[c.ID()] {
+			m2, err := buildMessage(c, urns.NilURN)
+			if err != nil {
+				return nil, errors.Wrapf(err, "error building new message")
+			}
+
+			// add this message if it isn't a duplicate
+			if m2 != nil && m2.URN() != msg.URN() {
+				msgs = append(msgs, m2)
+			}
+		}
+	}
+
+	// allocate a topup for these message if org uses topups
+	topup, err := AllocateTopups(ctx, rt.DB, rt.RP, oa.Org(), len(msgs))
+	if err != nil {
+		return nil, errors.Wrapf(err, "error allocating topup for new messages")
+	}
+
+	// if we have an active topup, assign it to our messages
+	if topup != NilTopupID {
+		for _, m := range msgs {
+			m.SetTopup(topup)
+		}
+	}
+
+	// insert them in a single request
+	err = InsertMessages(ctx, rt.DB, msgs)
+	if err != nil {
+		return nil, errors.Wrapf(err, "error inserting new messages")
+	}
+
+	return msgs, nil
 }
 
 // NilID implementations

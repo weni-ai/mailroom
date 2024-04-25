@@ -1,3 +1,7 @@
+1.20.1-mailroom-7.1.22
+----------
+ * Update goflow version to v0.8.1-goflow-0.144.3
+
 1.20.0-mailroom-7.1.22
 ----------
  * Add brain_on field to Org and send messages to the Router
