@@ -1,3 +1,9 @@
+1.21.0-mailroom-7.1.22
+----------
+ * New flow batch queue
+ * Send direct message endpoint
+ * Add workers prometheus metrics
+
 1.20.1-mailroom-7.1.22
 ----------
  * Update goflow version to v0.8.1-goflow-0.144.3
