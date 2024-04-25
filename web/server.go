@@ -15,6 +15,8 @@ import (
 	"github.com/go-chi/chi/middleware"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
+
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
 
 const (
@@ -75,6 +77,7 @@ func NewServer(ctx context.Context, rt *runtime.Runtime, wg *sync.WaitGroup) *Se
 	router.Get("/", s.WrapJSONHandler(handleIndex))
 	router.Get("/mr/", s.WrapJSONHandler(handleIndex))
 	router.Get("/mr/health", s.WrapJSONHandler(handleHealth))
+	router.Handle("/mr/metrics", promhttp.Handler())
 
 	// add any registered json routes
 	for _, route := range jsonRoutes {
