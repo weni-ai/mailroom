@@ -18,6 +18,7 @@ import (
 	"github.com/nyaruka/goflow/flows"
 	"github.com/nyaruka/goflow/flows/events"
 	"github.com/nyaruka/mailroom/core/goflow"
+	"github.com/nyaruka/mailroom/core/insights"
 	"github.com/nyaruka/mailroom/runtime"
 	"github.com/nyaruka/null"
 
@@ -685,6 +686,22 @@ func (s *Session) WriteUpdatedSession(ctx context.Context, rt *runtime.Runtime, 
 	if err != nil {
 		logrus.WithError(err).WithField("session", string(output)).Error("error while updating runs for session")
 		return errors.Wrapf(err, "error updating runs")
+	}
+
+	for _, urun := range updatedRuns {
+		r, ok := urun.(FlowRun)
+		if ok {
+			rc, err := rt.RP.Dial()
+			if err != nil {
+				logrus.WithError(err).Error("error get redis connection for insights integration")
+			}
+			data := map[string]interface{}{
+				"uuid": r.UUID(),
+			}
+			if err := insights.PushData(rc, insights.RunType, data); err != nil {
+				logrus.WithError(err).Error("error pushing data to insights integration")
+			}
+		}
 	}
 
 	// insert all new runs at once
