@@ -1,23 +1,17 @@
 package insights
 
 import (
-	"encoding/json"
-	"fmt"
-
 	"github.com/gomodule/redigo/redis"
 )
 
-type DataType string
-
 const (
-	Prefix  string   = "insights"
-	RunType DataType = "run"
+	RunKey string = "flowruns:wait"
 )
 
-func PushData(rc redis.Conn, dataType DataType, data map[string]interface{}) error {
-	jsonData, err := json.Marshal(data)
-	if err != nil {
-		return err
-	}
-	return rc.Send("rpush", fmt.Sprintf("%s:%s", Prefix, dataType), jsonData)
+func PushRun(rc redis.Conn, run_uuid string) error {
+	return PushData(rc, RunKey, run_uuid)
+}
+
+func PushData(rc redis.Conn, key string, data string) error {
+	return rc.Send("rpush", key, data)
 }

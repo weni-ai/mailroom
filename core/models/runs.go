@@ -691,14 +691,9 @@ func (s *Session) WriteUpdatedSession(ctx context.Context, rt *runtime.Runtime, 
 	for _, urun := range updatedRuns {
 		r, ok := urun.(FlowRun)
 		if ok {
-			rc, err := rt.RP.Dial()
-			if err != nil {
-				logrus.WithError(err).Error("error get redis connection for insights integration")
-			}
-			data := map[string]interface{}{
-				"uuid": r.UUID(),
-			}
-			if err := insights.PushData(rc, insights.RunType, data); err != nil {
+			rc := rt.IRP.Get()
+			defer rc.Close()
+			if err := insights.PushRun(rc, string(r.UUID())); err != nil {
 				logrus.WithError(err).Error("error pushing data to insights integration")
 			}
 		}
@@ -708,6 +703,17 @@ func (s *Session) WriteUpdatedSession(ctx context.Context, rt *runtime.Runtime, 
 	err = BulkQuery(ctx, "insert runs", tx, insertRunSQL, newRuns)
 	if err != nil {
 		return errors.Wrapf(err, "error writing runs")
+	}
+
+	for _, urun := range newRuns {
+		r, ok := urun.(FlowRun)
+		if ok {
+			rc := rt.IRP.Get()
+			defer rc.Close()
+			if err := insights.PushRun(rc, string(r.UUID())); err != nil {
+				logrus.WithError(err).Error("error pushing data to insights integration")
+			}
+		}
 	}
 
 	if err := RecordFlowStatistics(ctx, rt, tx, []flows.Session{fs}, []flows.Sprint{sprint}); err != nil {
@@ -881,6 +887,17 @@ func WriteSessions(ctx context.Context, rt *runtime.Runtime, tx *sqlx.Tx, org *O
 	err = BulkQuery(ctx, "insert runs", tx, insertRunSQL, runs)
 	if err != nil {
 		return nil, errors.Wrapf(err, "error writing runs")
+	}
+
+	for _, urun := range runs {
+		r, ok := urun.(FlowRun)
+		if ok {
+			rc := rt.IRP.Get()
+			defer rc.Close()
+			if err := insights.PushRun(rc, string(r.UUID())); err != nil {
+				logrus.WithError(err).Error("error pushing data to insights integration")
+			}
+		}
 	}
 
 	if err := RecordFlowStatistics(ctx, rt, tx, ss, sprints); err != nil {
@@ -1241,4 +1258,61 @@ const expireRunsSQL = `
 		modified_on = NOW()
 	WHERE
 		id = ANY($1)
+`
+
+func SelectRunUUIDsBySessionIDs(ctx context.Context, db *sqlx.DB, sessionIDs []SessionID) ([]string, error) {
+	var flowrunUUIDs []string
+	err := db.SelectContext(ctx, &flowrunUUIDs, selectRunsBySessionIDs, pq.Array(sessionIDs))
+	if err != nil {
+		return nil, errors.Wrapf(err, "error selecting flow run uuids by session ids")
+	}
+	return flowrunUUIDs, nil
+}
+
+func SelectRunUUIDsByContactsIDs(ctx context.Context, db *sqlx.DB, flowType FlowType, contactsIDs []ContactID) ([]string, error) {
+	var flowrunUUIDs []string
+	err := db.SelectContext(ctx, &flowrunUUIDs, selectRunsByContacts, flowType, pq.Array(contactsIDs))
+	if err != nil {
+		return nil, errors.Wrapf(err, "error selecting flow run uuids by contact ids")
+	}
+	return flowrunUUIDs, nil
+}
+
+func SelectRunUUIDsByIDs(ctx context.Context, db *sqlx.DB, runIDs []FlowRunID) ([]string, error) {
+	var flowrunUUIDs []string
+	err := db.SelectContext(ctx, &flowrunUUIDs, selectRunUUIDsByIDs, pq.Array(runIDs))
+	if err != nil {
+		return nil, errors.Wrapf(err, "error selecting flow run uuids by flow run ids")
+	}
+	return flowrunUUIDs, nil
+}
+
+const selectRunsBySessionIDs = `
+SELECT
+	fr.uuid
+FROM 
+	flows_flowrun fr
+WHERE
+	session_id = ANY($1) AND is_active = TRUE
+`
+
+const selectRunsByContacts = `
+SELECT 
+	fr.uuid 
+FROM
+	flows_flowrun fr
+	JOIN flows_flow ff ON fr.flow_id = ff.id
+WHERE 
+	fr.contact_id = ANY($2) AND 
+	fr.is_active = TRUE AND
+	ff.flow_type = $1
+`
+
+const selectRunUUIDsByIDs = `
+SELECT
+	fr.uuid
+FROM
+	flows_flowrun fr
+WHERE
+	fr.id = ANY($1)
 `

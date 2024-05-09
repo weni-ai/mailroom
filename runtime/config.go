@@ -93,6 +93,8 @@ type Config struct {
 
 	RouterBaseURL   string `help:"router base url"`
 	RouterAuthToken string `help:"router authorization token"`
+
+	InsightsRedis string `help:"insights redis url"`
 }
 
 // NewDefaultConfig returns a new default configuration object
@@ -157,6 +159,8 @@ func NewDefaultConfig() *Config {
 		SentenxBaseURL:  "https://sentenx.weni.ai",
 		RouterBaseURL:   "https://nexus.stg.cloud.weni.ai",
 		RouterAuthToken: "",
+
+		InsightsRedis: "redis://localhost:6379/15",
 	}
 }
 

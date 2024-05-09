@@ -8,6 +8,7 @@ import (
 
 	"github.com/nyaruka/goflow/flows"
 	"github.com/nyaruka/mailroom"
+	"github.com/nyaruka/mailroom/core/insights"
 	"github.com/nyaruka/mailroom/core/models"
 	"github.com/nyaruka/mailroom/core/tasks/handler"
 	"github.com/nyaruka/mailroom/runtime"
@@ -88,6 +89,20 @@ func expireRuns(ctx context.Context, rt *runtime.Runtime) error {
 				}
 				expiredRuns = expiredRuns[:0]
 				expiredSessions = expiredSessions[:0]
+
+				// TODO Atualiza RUN expirada
+				{ // insights integration
+					rc := rt.IRP.Get()
+					defer rc.Close()
+					runUUIDs, err := models.SelectRunUUIDsByIDs(ctx, rt.DB, expiredRuns)
+					if err != nil {
+						logrus.WithError(errors.Wrapf(err, "error selecting flow runs uuids"))
+					} else {
+						for _, ruuid := range runUUIDs {
+							insights.PushRun(rc, ruuid)
+						}
+					}
+				}
 			}
 
 			continue
@@ -124,6 +139,18 @@ func expireRuns(ctx context.Context, rt *runtime.Runtime) error {
 		err = models.ExpireRunsAndSessions(ctx, rt.DB, expiredRuns, expiredSessions)
 		if err != nil {
 			return errors.Wrapf(err, "error expiring runs and sessions")
+		}
+		{ // insights integration
+			rc := rt.IRP.Get()
+			defer rc.Close()
+			runUUIDs, err := models.SelectRunUUIDsByIDs(ctx, rt.DB, expiredRuns)
+			if err != nil {
+				logrus.WithError(errors.Wrapf(err, "error selecting flow runs uuids"))
+			} else {
+				for _, ruuid := range runUUIDs {
+					insights.PushRun(rc, ruuid)
+				}
+			}
 		}
 	}
 

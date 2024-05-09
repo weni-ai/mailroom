@@ -112,6 +112,13 @@ func (mr *Mailroom) Start() error {
 		log.Info("redis ok")
 	}
 
+	mr.rt.IRP, err = openAndCheckRedisPool(c.InsightsRedis)
+	if err != nil {
+		log.WithError(err).Error("redis not reachable")
+	} else {
+		log.Info("redis ok")
+	}
+
 	// create our storage (S3 or file system)
 	if mr.rt.Config.AWSAccessKeyID != "" {
 		s3Client, err := storage.NewS3Client(&storage.S3Options{
