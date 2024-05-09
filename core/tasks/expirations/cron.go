@@ -87,10 +87,7 @@ func expireRuns(ctx context.Context, rt *runtime.Runtime) error {
 				if err != nil {
 					return errors.Wrapf(err, "error expiring runs and sessions")
 				}
-				expiredRuns = expiredRuns[:0]
-				expiredSessions = expiredSessions[:0]
 
-				// TODO Atualiza RUN expirada
 				{ // insights integration
 					rc := rt.IRP.Get()
 					defer rc.Close()
@@ -103,6 +100,9 @@ func expireRuns(ctx context.Context, rt *runtime.Runtime) error {
 						}
 					}
 				}
+
+				expiredRuns = expiredRuns[:0]
+				expiredSessions = expiredSessions[:0]
 			}
 
 			continue

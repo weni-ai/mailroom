@@ -688,26 +688,14 @@ func (s *Session) WriteUpdatedSession(ctx context.Context, rt *runtime.Runtime, 
 		return errors.Wrapf(err, "error updating runs")
 	}
 
-	for _, urun := range updatedRuns {
-		r, ok := urun.(FlowRun)
-		if ok {
-			rc := rt.IRP.Get()
-			defer rc.Close()
-			if err := insights.PushRun(rc, string(r.UUID())); err != nil {
-				logrus.WithError(err).Error("error pushing data to insights integration")
-			}
-		}
-	}
-
 	// insert all new runs at once
 	err = BulkQuery(ctx, "insert runs", tx, insertRunSQL, newRuns)
 	if err != nil {
 		return errors.Wrapf(err, "error writing runs")
 	}
 
-	for _, urun := range newRuns {
-		r, ok := urun.(FlowRun)
-		if ok {
+	{ // insights integration for new and updated runs
+		for _, r := range s.Runs() {
 			rc := rt.IRP.Get()
 			defer rc.Close()
 			if err := insights.PushRun(rc, string(r.UUID())); err != nil {

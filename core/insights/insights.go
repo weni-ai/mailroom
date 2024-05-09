@@ -17,7 +17,7 @@ func PushData(rc redis.Conn, key string, data string) error {
 	logrus.Debugf("send data: %s to insights redis for key: %s", data, key)
 	err := rc.Send("rpush", key, data)
 	if err != nil {
-		logrus.Errorf("errror on push data to insights integration: %s", err)
+		logrus.Errorf("error on push data to insights integration: %s", err)
 	}
 	return nil
 }
