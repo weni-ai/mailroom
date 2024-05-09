@@ -2,10 +2,11 @@ package insights
 
 import (
 	"github.com/gomodule/redigo/redis"
+	"github.com/sirupsen/logrus"
 )
 
 const (
-	RunKey string = "flowruns:wait"
+	RunKey string = "flows:flowruns:wait"
 )
 
 func PushRun(rc redis.Conn, run_uuid string) error {
@@ -13,5 +14,10 @@ func PushRun(rc redis.Conn, run_uuid string) error {
 }
 
 func PushData(rc redis.Conn, key string, data string) error {
-	return rc.Send("rpush", key, data)
+	logrus.Debugf("send data: %s to insights redis for key: %s", data, key)
+	err := rc.Send("rpush", key, data)
+	if err != nil {
+		logrus.Errorf("errror on push data to insights integration: %s", err)
+	}
+	return nil
 }
