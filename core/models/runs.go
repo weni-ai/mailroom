@@ -695,9 +695,9 @@ func (s *Session) WriteUpdatedSession(ctx context.Context, rt *runtime.Runtime, 
 	}
 
 	{ // insights integration for new and updated runs
+		rc := rt.IRP.Get()
+		defer rc.Close()
 		for _, r := range s.Runs() {
-			rc := rt.IRP.Get()
-			defer rc.Close()
 			if err := insights.PushRun(rc, string(r.UUID())); err != nil {
 				logrus.WithError(err).Error("error pushing data to insights integration")
 			}
@@ -877,13 +877,14 @@ func WriteSessions(ctx context.Context, rt *runtime.Runtime, tx *sqlx.Tx, org *O
 		return nil, errors.Wrapf(err, "error writing runs")
 	}
 
-	for _, urun := range runs {
-		r, ok := urun.(FlowRun)
-		if ok {
-			rc := rt.IRP.Get()
-			defer rc.Close()
-			if err := insights.PushRun(rc, string(r.UUID())); err != nil {
-				logrus.WithError(err).Error("error pushing data to insights integration")
+	{
+		rc := rt.IRP.Get()
+		defer rc.Close()
+		for _, s := range sessions {
+			for _, r := range s.runs {
+				if err := insights.PushRun(rc, string(r.UUID())); err != nil {
+					logrus.WithError(err).Error("error pushing data to insights integration")
+				}
 			}
 		}
 	}

@@ -74,6 +74,20 @@ func ResumeFlow(ctx context.Context, rt *runtime.Runtime, oa *models.OrgAssets, 
 		// if this flow just isn't available anymore, log this error
 		if err == models.ErrNotFound {
 			logrus.WithField("contact_uuid", session.Contact().UUID()).WithField("session_id", session.ID()).WithField("flow_id", session.CurrentFlowID()).Error("unable to find flow in resume")
+
+			{ // insights integration
+				rc := rt.IRP.Get()
+				defer rc.Close()
+				runUUIDs, err := models.SelectRunUUIDsBySessionIDs(ctx, rt.DB, []models.SessionID{session.ID()})
+				if err != nil {
+					logrus.WithError(errors.Wrapf(err, "error selecting flow runs uuids"))
+				} else {
+					for _, ruuid := range runUUIDs {
+						insights.PushRun(rc, ruuid)
+					}
+				}
+			}
+
 			return nil, models.ExitSessions(ctx, rt.DB, []models.SessionID{session.ID()}, models.ExitFailed)
 		}
 		return nil, errors.Wrapf(err, "error loading session flow: %d", session.CurrentFlowID())
