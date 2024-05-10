@@ -9,6 +9,7 @@ import (
 
 	"github.com/nyaruka/gocommon/storage"
 	"github.com/nyaruka/goflow/flows/routers"
+	"github.com/nyaruka/goflow/services/webhooks"
 	"github.com/nyaruka/mailroom/core/queue"
 	"github.com/nyaruka/mailroom/runtime"
 	"github.com/nyaruka/mailroom/web"
@@ -74,6 +75,9 @@ func NewMailroom(config *runtime.Config) *Mailroom {
 
 	// set base url for zeroshot requests
 	routers.SetZeroshotAPIURL(mr.rt.Config.ZeroshotAPIUrl)
+
+	// set whatsapp system user token to be used in goflow
+	webhooks.SetWhatsAppSystemUserToken(mr.rt.Config.WhatsappSystemUserToken)
 
 	return mr
 }
