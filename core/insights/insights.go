@@ -6,7 +6,7 @@ import (
 )
 
 const (
-	RunKey string = "flows:flowruns:wait"
+	RunKey string = "flowruns:wait"
 )
 
 func PushRun(rc redis.Conn, run_uuid string) error {

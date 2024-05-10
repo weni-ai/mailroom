@@ -26,6 +26,7 @@ import (
 	"github.com/nyaruka/librato"
 	"github.com/nyaruka/mailroom"
 	"github.com/nyaruka/mailroom/core/goflow"
+	"github.com/nyaruka/mailroom/core/insights"
 	"github.com/nyaruka/mailroom/core/models"
 	"github.com/nyaruka/mailroom/core/queue"
 	"github.com/nyaruka/mailroom/core/runner"
@@ -244,6 +245,18 @@ func handleTimedEvent(ctx context.Context, rt *runtime.Runtime, eventType string
 	// if we didn't find a session or it is another session then this flow got interrupted and this is a race, fail it
 	if session == nil || session.ID() != event.SessionID {
 		log.Error("expiring run with mismatched session, session for run no longer active, failing runs and session")
+		{ // insights integration
+			rc := rt.IRP.Get()
+			defer rc.Close()
+			runUUIDs, err := models.SelectRunUUIDsBySessionIDs(ctx, rt.DB, []models.SessionID{session.ID()})
+			if err != nil {
+				logrus.WithError(errors.Wrapf(err, "error selecting flow runs uuids"))
+			} else {
+				for _, ruuid := range runUUIDs {
+					insights.PushRun(rc, ruuid)
+				}
+			}
+		}
 		err = models.ExitSessions(ctx, rt.DB, []models.SessionID{event.SessionID}, models.ExitFailed)
 		if err != nil {
 			return errors.Wrapf(err, "error failing expired runs for session that is no longer active")
@@ -586,6 +599,18 @@ func handleMsgEvent(ctx context.Context, rt *runtime.Runtime, event *MsgEvent) e
 
 		// flow this session is in is gone, interrupt our session and reset it
 		if err == models.ErrNotFound {
+			{ // insights integration
+				rc := rt.IRP.Get()
+				defer rc.Close()
+				runUUIDs, err := models.SelectRunUUIDsBySessionIDs(ctx, rt.DB, []models.SessionID{session.ID()})
+				if err != nil {
+					logrus.WithError(errors.Wrapf(err, "error selecting flow runs uuids"))
+				} else {
+					for _, ruuid := range runUUIDs {
+						insights.PushRun(rc, ruuid)
+					}
+				}
+			}
 			err = models.ExitSessions(ctx, rt.DB, []models.SessionID{session.ID()}, models.ExitFailed)
 			session = nil
 		}
