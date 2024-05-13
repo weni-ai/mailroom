@@ -1,13 +1,22 @@
 package insights
 
 import (
+	"os"
+
 	"github.com/gomodule/redigo/redis"
 	"github.com/sirupsen/logrus"
 )
 
-const (
+var (
 	RunKey string = "flowruns:wait"
 )
+
+func init() {
+	rk := os.Getenv("MAILROOM_INSIGHTS_RUNS_KEY")
+	if rk != "" {
+		RunKey = rk
+	}
+}
 
 func PushRun(rc redis.Conn, run_uuid string) error {
 	return PushData(rc, RunKey, run_uuid)
