@@ -41,14 +41,13 @@ func TestMsgWppCreated(t *testing.T) {
 						"text", "Hi", "", "Hi there.", "footer",
 						[]flows.ListItems{},
 						"",
-						"",
 						nil,
 						"",
 						true,
 					),
 				},
 				testdata.Bob: []flows.Action{
-					actions.NewSendWppMsg(handlers.NewActionUUID(), "", "", "", "Text", "footer", []flows.ListItems{}, "", "", nil, "", false),
+					actions.NewSendWppMsg(handlers.NewActionUUID(), "", "", "", "Text", "footer", []flows.ListItems{}, "", nil, "", false),
 				},
 			},
 			Msgs: handlers.ContactMsgMap{
