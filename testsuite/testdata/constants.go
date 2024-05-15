@@ -87,6 +87,8 @@ var Org2Contact = &Contact{20000, "26d20b72-f7d8-44dc-87f2-aae046dbff95", "tel:+
 var Org2Favorites = &Flow{20000, "f161bd16-3c60-40bd-8c92-228ce815b9cd"}
 var Org2SingleMessage = &Flow{20001, "5277916d-6011-41ac-a4a4-f6ac6a4f1dd9"}
 
+var Org3 = &Org{3, "6ff4ea5d-2ae4-41a0-a01e-a9480b6a1dda"}
+
 func must(err error, checks ...bool) {
 	if err != nil {
 		panic(err)

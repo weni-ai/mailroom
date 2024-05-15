@@ -1,15 +1,22 @@
 package handler
 
 import (
+	"bytes"
 	"context"
+	"database/sql"
 	"encoding/json"
 	"fmt"
+	"io"
+	"net/url"
 	"time"
 
 	"github.com/apex/log"
 	"github.com/gomodule/redigo/redis"
 	"github.com/jmoiron/sqlx"
+	"github.com/nyaruka/gocommon/httpx"
+	"github.com/nyaruka/gocommon/jsonx"
 	"github.com/nyaruka/gocommon/urns"
+	"github.com/nyaruka/gocommon/uuids"
 	"github.com/nyaruka/goflow/excellent/types"
 	"github.com/nyaruka/goflow/flows"
 	"github.com/nyaruka/goflow/flows/events"
@@ -18,6 +25,7 @@ import (
 	"github.com/nyaruka/goflow/utils"
 	"github.com/nyaruka/librato"
 	"github.com/nyaruka/mailroom"
+	"github.com/nyaruka/mailroom/core/goflow"
 	"github.com/nyaruka/mailroom/core/models"
 	"github.com/nyaruka/mailroom/core/queue"
 	"github.com/nyaruka/mailroom/core/runner"
@@ -590,7 +598,8 @@ func handleMsgEvent(ctx context.Context, rt *runtime.Runtime, event *MsgEvent) e
 	msgIn := flows.NewMsgIn(event.MsgUUID, event.URN, channel.ChannelReference(), event.Text, event.Attachments)
 	msgIn.SetExternalID(string(event.MsgExternalID))
 	msgIn.SetID(event.MsgID)
-
+	var order *flows.Order
+	var nfmReply *flows.NFMReply
 	if event.Metadata != nil {
 		var metadata map[string]interface{}
 		err := json.Unmarshal(event.Metadata, &metadata)
@@ -598,9 +607,8 @@ func handleMsgEvent(ctx context.Context, rt *runtime.Runtime, event *MsgEvent) e
 			log.WithError(err).Error("unable to unmarshal metadata from msg event")
 		}
 		// if metadata has order key set msg order
-		mdValue, ok := metadata["order"]
-		if ok {
-			var order *flows.Order
+		mdValue, isOrder := metadata["order"]
+		if isOrder {
 			asJSON, err := json.Marshal(mdValue)
 			if err != nil {
 				log.WithError(err).Error("unable to marshal metadata from msg event")
@@ -611,9 +619,8 @@ func handleMsgEvent(ctx context.Context, rt *runtime.Runtime, event *MsgEvent) e
 			}
 			msgIn.SetOrder(order)
 		}
-		mdValue, ok = metadata["nfm_reply"]
+		mdValue, ok := metadata["nfm_reply"]
 		if ok {
-			var nfmReply *flows.NFMReply
 			asJSON, err := json.Marshal(mdValue)
 			if err != nil {
 				log.WithError(err).Error("unable to marshal metadata from msg event")
@@ -638,8 +645,8 @@ func handleMsgEvent(ctx context.Context, rt *runtime.Runtime, event *MsgEvent) e
 	}
 
 	// we found a trigger and their session is nil or doesn't ignore keywords
-	if (trigger != nil && trigger.TriggerType() != models.CatchallTriggerType && (flow == nil || !flow.IgnoreTriggers())) ||
-		(trigger != nil && trigger.TriggerType() == models.CatchallTriggerType && (flow == nil)) {
+	if ((trigger != nil && trigger.TriggerType() != models.CatchallTriggerType && (flow == nil || !flow.IgnoreTriggers())) ||
+		(trigger != nil && trigger.TriggerType() == models.CatchallTriggerType && (flow == nil))) && !oa.Org().BrainOn() {
 		// load our flow
 		flow, err := oa.FlowByID(trigger.FlowID())
 		if err != nil && err != models.ErrNotFound {
@@ -692,11 +699,38 @@ func handleMsgEvent(ctx context.Context, rt *runtime.Runtime, event *MsgEvent) e
 		return nil
 	}
 
+	if oa.Org().BrainOn() && len(tickets) == 0 {
+		db := rt.ReadonlyDB
+		var projectUUID uuids.UUID
+		err := db.GetContext(ctx, &projectUUID, `SELECT project_uuid FROM internal_project WHERE org_ptr_id = $1;`, oa.OrgID())
+		if err != nil && err != sql.ErrNoRows {
+			return errors.Wrapf(err, "error when searching for project uuid with org id %d", oa.OrgID())
+		}
+
+		if err == sql.ErrNoRows {
+			return fmt.Errorf("no project uuid found")
+		}
+
+		err = requestToRouter(event, rt.Config, projectUUID)
+		if err != nil {
+			return errors.Wrap(err, "unable to send message to router")
+		}
+
+		err = models.UpdateMessage(ctx, rt.DB, event.MsgID, models.MsgStatusHandled, models.VisibilityVisible, models.MsgTypeInbox, topupID)
+		if err != nil {
+			return errors.Wrapf(err, "error marking message as handled")
+		}
+
+		return nil
+
+	}
+
 	// this message didn't trigger and new sessions or resume any existing ones, so handle as inbox
 	err = handleAsInbox(ctx, rt, oa, contact, msgIn, topupID, tickets)
 	if err != nil {
 		return errors.Wrapf(err, "error handling inbox message")
 	}
+
 	return nil
 }
 
@@ -879,6 +913,50 @@ type StopEvent struct {
 	ContactID  models.ContactID `json:"contact_id"`
 	OrgID      models.OrgID     `json:"org_id"`
 	OccurredOn time.Time        `json:"occurred_on"`
+}
+
+func requestToRouter(event *MsgEvent, rtConfig *runtime.Config, projectUUID uuids.UUID) error {
+	httpClient, httpRetries, _ := goflow.HTTP(rtConfig)
+
+	body := struct {
+		ProjectUUID uuids.UUID         `json:"project_uuid"`
+		ContactURN  urns.URN           `json:"contact_urn"`
+		Text        string             `json:"text"`
+		Attachments []utils.Attachment `json:"attachments"`
+		Metadata    json.RawMessage    `json:"metadata"`
+	}{
+		ProjectUUID: projectUUID,
+		ContactURN:  event.URN,
+		Text:        event.Text,
+		Attachments: event.Attachments,
+		Metadata:    event.Metadata,
+	}
+
+	var b io.Reader
+	data, err := jsonx.Marshal(body)
+	if err != nil {
+		return err
+	}
+	b = bytes.NewReader(data)
+
+	params := url.Values{}
+	params.Add("token", rtConfig.RouterAuthToken)
+	url_ := fmt.Sprintf("%s/messages?%s", rtConfig.RouterBaseURL, params.Encode())
+	req, err := httpx.NewRequest("POST", url_, b, nil)
+	if err != nil {
+		return err
+	}
+
+	trace, err := httpx.DoTrace(httpClient, req, httpRetries, nil, -1)
+	if err != nil {
+		return err
+	}
+
+	if trace.Response.StatusCode >= 400 {
+		return fmt.Errorf("router call error: status code %d", trace.Response.StatusCode)
+	}
+
+	return nil
 }
 
 // creates a new event task for the passed in timeout event

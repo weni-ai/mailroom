@@ -74,6 +74,7 @@ func NewServer(ctx context.Context, rt *runtime.Runtime, wg *sync.WaitGroup) *Se
 	router.MethodNotAllowed(s.WrapJSONHandler(handle405))
 	router.Get("/", s.WrapJSONHandler(handleIndex))
 	router.Get("/mr/", s.WrapJSONHandler(handleIndex))
+	router.Get("/mr/health", s.WrapJSONHandler(handleHealth))
 
 	// add any registered json routes
 	for _, route := range jsonRoutes {
@@ -192,6 +193,41 @@ func handle404(ctx context.Context, rt *runtime.Runtime, r *http.Request) (inter
 
 func handle405(ctx context.Context, rt *runtime.Runtime, r *http.Request) (interface{}, int, error) {
 	return errors.Errorf("illegal method: %s", r.Method), http.StatusMethodNotAllowed, nil
+}
+
+func handleHealth(ctx context.Context, rt *runtime.Runtime, r *http.Request) (interface{}, int, error) {
+	healthcheck := NewHealthCheck()
+
+	healthcheck.AddCheck("redis", func() error {
+		conn := rt.RP.Get()
+		defer conn.Close()
+		_, err := conn.Do("PING")
+		return err
+	})
+	healthcheck.AddCheck("database", func() error {
+		ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+		err := rt.DB.PingContext(ctx)
+		cancel()
+		return err
+	})
+	healthcheck.AddCheck("sentry", func() error {
+		if rt.Config.SentryDSN == "" {
+			return errors.New("sentry dsn isn't configured")
+		}
+		return nil
+	})
+	healthcheck.AddCheck("s3", func() error {
+		ctx, cancel := context.WithTimeout(context.Background(), time.Second*10)
+		err := rt.MediaStorage.Test(ctx)
+		cancel()
+		return err
+	})
+
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second*15)
+	defer cancel()
+	healthcheck.CheckUp(ctx)
+
+	return healthcheck.HealthStatus, http.StatusOK, nil
 }
 
 type Server struct {

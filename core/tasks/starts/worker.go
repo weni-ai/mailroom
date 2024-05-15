@@ -18,10 +18,6 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-const (
-	startBatchSize = 100
-)
-
 func init() {
 	mailroom.AddTaskFunction(queue.StartFlow, handleFlowStart)
 	mailroom.AddTaskFunction(queue.StartFlowBatch, handleFlowStartBatch)
@@ -186,7 +182,7 @@ func CreateFlowBatches(ctx context.Context, rt *runtime.Runtime, start *models.F
 
 	// build up batches of contacts to start
 	for c := range contactIDs {
-		if len(contacts) == startBatchSize {
+		if len(contacts) == rt.Config.FlowStartBatchSize {
 			queueBatch(false)
 		}
 		contacts = append(contacts, c)

@@ -112,6 +112,41 @@ func TestOpenAndForward(t *testing.T) {
 				},
 				"callback_url": "http://example.com"
 			}`),
+			httpx.NewMockResponse(201, nil, `{
+				"uuid": "9688d21d-95aa-4bed-afc7-f31b35731a3d",
+				"user": {
+					"first_name": "John",
+					"last_name": "Doe",
+					"email": "john.doe@chats.weni.ai"
+				},
+				"contact": {
+					"external_id": "095be615-a8ad-4c33-8e9c-c7612fbf6c9f",
+					"name": "Foo Bar",
+					"email": "FooBar@weni.ai",
+					"status": "string",
+					"phone": "+250788123123",
+					"custom_fields": {},
+					"created_on": "2019-08-24T14:15:22Z"
+				},
+				"queue": {
+					"uuid": "449f48d9-4905-4d6f-8abf-f1ff6afb803e",
+					"created_on": "2019-08-24T14:15:22Z",
+					"modified_on": "2019-08-24T14:15:22Z",
+					"name": "CHATS",
+					"sector": "f3d496ff-c154-4a96-a678-6a8879583ddb"
+				},
+				"created_on": "2019-08-24T14:15:22Z",
+				"modified_on": "2019-08-24T14:15:22Z",
+				"is_active": true,
+				"custom_fields": {
+					"country": "brazil",
+					"mood": "angry",
+					"age": 23,
+					"join_date": "2017-12-02",
+					"gender": "male"
+				},
+				"callback_url": "http://example.com"
+			}`),
 		},
 		fmt.Sprintf("%s/rooms/8ecb1e4a-b457-4645-a161-e2b02ddffa88/", baseURL): {
 			httpx.NewMockResponse(200, nil, `{
@@ -181,7 +216,42 @@ func TestOpenAndForward(t *testing.T) {
 				"callback_url": "http://example.com"
 			}`),
 		},
+		fmt.Sprintf("%s/rooms/9688d21d-95aa-4bed-afc7-f31b35731a3d/", baseURL): {
+			httpx.NewMockResponse(200, nil, `{
+				"uuid": "9688d21d-95aa-4bed-afc7-f31b35731a3d",
+				"user": {
+					"first_name": "John",
+					"last_name": "Doe",
+					"email": "john.doe@chats.weni.ai"
+				},
+				"contact": {
+					"external_id": "095be615-a8ad-4c33-8e9c-c7612fbf6c9f",
+					"name": "Foo Bar",
+					"email": "FooBar@weni.ai",
+					"status": "string",
+					"phone": "+250788123123",
+					"custom_fields": {},
+					"created_on": "2019-08-24T14:15:22Z"
+				},
+				"queue": {
+					"uuid": "449f48d9-4905-4d6f-8abf-f1ff6afb803e",
+					"created_on": "2019-08-24T14:15:22Z",
+					"modified_on": "2019-08-24T14:15:22Z",
+					"name": "CHATS",
+					"sector": "f3d496ff-c154-4a96-a678-6a8879583ddb"
+				},
+				"created_on": "2019-08-24T14:15:22Z",
+				"modified_on": "2019-08-24T14:15:22Z",
+				"is_active": true,
+				"custom_fields": {
+					"country": "brazil",
+					"mood": "angry"
+				},
+				"callback_url": "http://example.com"
+			}`),
+		},
 		fmt.Sprintf("%s/msgs/", baseURL): {
+			httpx.NewMockResponse(200, nil, `{}`),
 			httpx.MockConnectionError,
 			httpx.NewMockResponse(200, nil, `{
 				"uuid": "b9312612-c26d-45ec-b9bb-7f116771fdd6",
@@ -264,7 +334,11 @@ func TestOpenAndForward(t *testing.T) {
 	defer mockDB.Close()
 	sqlxDB := sqlx.NewDb(mockDB, "sqlmock")
 
-	rows := sqlmock.NewRows([]string{"id", "uuid", "text", "high_priority", "created_on", "modified_on", "sent_on", "queued_on", "direction", "status", "visibility", "msg_type", "msg_count", "error_count", "next_attempt", "external_id", "attachments", "metadata", "broadcast_id", "channel_id", "contact_id", "contact_urn_id", "org_id", "topup_id"})
+	rows := sqlmock.NewRows([]string{
+		"id", "broadcast_id", "uuid", "text", "created_on", "direction", "status", "visibility", "msg_count", "error_count", "next_attempt", "external_id", "attachments", "metadata", "channel_id", "contact_id", "contact_urn_id", "org_id", "topup_id",
+	})
+	msgTime, _ := time.Parse(time.RFC3339, "2019-10-07T15:21:30Z")
+	rows.AddRow(464, nil, "eb234953-38e7-491f-8a50-b03056a7d002", "ahoy", msgTime, "I", "H", "V", 1, 0, msgTime, "1026", nil, nil, 3, 1234567, 1, 1, 1)
 
 	after, err := time.Parse("2006-01-02T15:04:05", "2019-10-07T15:21:29")
 	assert.NoError(t, err)
@@ -299,7 +373,7 @@ func TestOpenAndForward(t *testing.T) {
 	assert.Equal(t, "General", ticket.Topic().Name())
 	assert.Equal(t, `{"custom_fields":{"country": "brazil","mood": "angry"}}`, ticket.Body())
 	assert.Equal(t, "8ecb1e4a-b457-4645-a161-e2b02ddffa88", ticket.ExternalID())
-	assert.Equal(t, 2, len(logger.Logs))
+	assert.Equal(t, 3, len(logger.Logs))
 	test.AssertSnapshot(t, "open_ticket", logger.Logs[0].Request)
 
 	dbTicket := models.NewTicket(ticket.UUID(), testdata.Org1.ID, testdata.Cathy.ID, testdata.Wenichats.ID, "8ecb1e4a-b457-4645-a161-e2b02ddffa88", testdata.DefaultTopic.ID, "Where are my cookies?", models.NilUserID, map[string]interface{}{
@@ -336,17 +410,17 @@ func TestOpenAndForward(t *testing.T) {
 	logger2 := &flows.HTTPLogger{}
 
 	wenichats.SetDB(rt.DB)
-	svc, err = wenichats.NewService(
-		rt.Config,
-		http.DefaultClient,
-		nil,
-		ticketer,
-		map[string]string{
-			"project_auth": authToken,
-			"sector_uuid":  "1a4bae05-993c-4f3b-91b5-80f4e09951f2",
-		},
-	)
-	assert.NoError(t, err)
+	// svc, err = wenichats.NewService(
+	// 	rt.Config,
+	// 	http.DefaultClient,
+	// 	nil,
+	// 	ticketer,
+	// 	map[string]string{
+	// 		"project_auth": authToken,
+	// 		"sector_uuid":  "1a4bae05-993c-4f3b-91b5-80f4e09951f2",
+	// 	},
+	// )
+	// assert.NoError(t, err)
 
 	oa, err = models.GetOrgAssets(ctx, rt, testdata.Org1.ID)
 	require.NoError(t, err)
@@ -361,6 +435,24 @@ func TestOpenAndForward(t *testing.T) {
 	assert.Equal(t, "e5cbc781-4e0e-4954-b078-0373308e11c3", ticket.ExternalID())
 	assert.Equal(t, 2, len(logger2.Logs))
 	test.AssertSnapshot(t, "open_ticket_empty_body", logger2.Logs[0].Request)
+
+	//test with history after option
+	logger3 := &flows.HTTPLogger{}
+
+	wenichats.SetDB(rt.DB)
+	oa, err = models.GetOrgAssets(ctx, rt, testdata.Org1.ID)
+	require.NoError(t, err)
+	defaultTopic = oa.SessionAssets().Topics().FindByName("General")
+
+	ticket, err = svc.Open(session, defaultTopic, "{\"history_after\":\"2019-10-07 15:21:30\"}", nil, logger3.Log)
+
+	assert.NoError(t, err)
+	assert.Equal(t, flows.TicketUUID("9688d21d-95aa-4bed-afc7-f31b35731a3d"), ticket.UUID())
+	assert.Equal(t, "General", ticket.Topic().Name())
+	assert.Equal(t, "{\"history_after\":\"2019-10-07 15:21:30\"}", ticket.Body())
+	assert.Equal(t, "9688d21d-95aa-4bed-afc7-f31b35731a3d", ticket.ExternalID())
+	assert.Equal(t, 2, len(logger3.Logs))
+	test.AssertSnapshot(t, "open_ticket_empty_body", logger3.Logs[0].Request)
 }
 
 func TestCloseAndReopen(t *testing.T) {

@@ -1,3 +1,42 @@
+1.20.0-mailroom-7.1.22
+----------
+ * Add brain_on field to Org and send messages to the Router
+
+1.19.2-mailroom-7.1.22
+----------
+ * add env for flow start batch size
+
+1.19.1-mailroom-7.1.22
+----------
+ * close wenichats ticket on history failure
+
+1.19.0-mailroom-7.1.22
+----------
+ * Fix simulator max value length
+ * Wenichats history_after on body param
+
+1.18.0-mailroom-7.1.22
+----------
+ * Adjust chatgpt prompt for product list
+ * Perform cart simulation for product list using postal code
+
+1.17.3-mailroom-7.1.22
+----------
+ * /mr/health do health check for redis, database, sentry and s3
+
+1.17.2-mailroom-7.1.22
+----------
+ * handling tickets/utils SendReply msg return
+ * twilioflex open ticket handling to close cleanup flex resource if webhook conf fail
+
+1.17.1-mailroom-7.1.22
+----------
+ * Improve prompt for chatGPT in product listings
+
+1.17.0-mailroom-7.1.22
+----------
+ * Fix errors for duplicate products
+
 1.16.0-mailroom-7.1.22
 ----------
  * Implement changes to preserve the insertion order in the product list
