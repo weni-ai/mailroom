@@ -39,15 +39,15 @@ func TestMsgWppCreated(t *testing.T) {
 					actions.NewSendWppMsg(
 						handlers.NewActionUUID(),
 						"text", "Hi", "", "Hi there.", "footer",
-						[]flows.ListItems{},
-						"",
+						[]flows.ListItems{{Title: "title", UUID: "62276b09-b712-478c-a658-fcf1c187f4cf", Description: "title description"}},
+						"Menu",
 						nil,
-						"",
+						"list",
 						true,
 					),
 				},
 				testdata.Bob: []flows.Action{
-					actions.NewSendWppMsg(handlers.NewActionUUID(), "", "", "", "Text", "footer", []flows.ListItems{}, "", nil, "", false),
+					actions.NewSendWppMsg(handlers.NewActionUUID(), "", "", "", "Text", "footer", []flows.ListItems{}, "Menu", nil, "", false),
 				},
 			},
 			Msgs: handlers.ContactMsgMap{
@@ -55,8 +55,8 @@ func TestMsgWppCreated(t *testing.T) {
 			},
 			SQLAssertions: []handlers.SQLAssertion{
 				{
-					SQL:   "SELECT COUNT(*) FROM msgs_msg WHERE text='Hi there.' AND contact_id = $1 AND metadata = $2 AND high_priority = TRUE",
-					Args:  []interface{}{testdata.Cathy.ID, `{"footer":"footer"}`},
+					SQL:   "SELECT COUNT(*) FROM msgs_msg WHERE contact_id = $1 AND status = 'Q' AND high_priority = FALSE",
+					Args:  []interface{}{testdata.Cathy.ID},
 					Count: 2,
 				},
 				{
