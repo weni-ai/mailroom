@@ -74,7 +74,7 @@ func TestSessionTriggered(t *testing.T) {
 					rc := rt.RP.Get()
 					defer rc.Close()
 
-					task, err := queue.PopNextTask(rc, queue.BatchQueue)
+					task, err := queue.PopNextTask(rc, queue.FlowBatchQueue)
 					assert.NoError(t, err)
 					assert.NotNil(t, task)
 					start := models.FlowStart{}
@@ -125,7 +125,7 @@ func TestQuerySessionTriggered(t *testing.T) {
 					rc := rp.Get()
 					defer rc.Close()
 
-					task, err := queue.PopNextTask(rc, queue.BatchQueue)
+					task, err := queue.PopNextTask(rc, queue.FlowBatchQueue)
 					assert.NoError(t, err)
 					assert.NotNil(t, task)
 					start := models.FlowStart{}

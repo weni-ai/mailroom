@@ -9,6 +9,7 @@ import (
 
 	"github.com/nyaruka/gocommon/storage"
 	"github.com/nyaruka/goflow/flows/routers"
+	"github.com/nyaruka/goflow/services/webhooks"
 	"github.com/nyaruka/mailroom/core/queue"
 	"github.com/nyaruka/mailroom/runtime"
 	"github.com/nyaruka/mailroom/web"
@@ -50,8 +51,9 @@ type Mailroom struct {
 	wg   *sync.WaitGroup
 	quit chan bool
 
-	batchForeman   *Foreman
-	handlerForeman *Foreman
+	batchForeman     *Foreman
+	handlerForeman   *Foreman
+	flowBatchForeman *Foreman
 
 	webserver *web.Server
 }
@@ -66,12 +68,16 @@ func NewMailroom(config *runtime.Config) *Mailroom {
 	mr.ctx, mr.cancel = context.WithCancel(context.Background())
 	mr.batchForeman = NewForeman(mr.rt, mr.wg, queue.BatchQueue, config.BatchWorkers)
 	mr.handlerForeman = NewForeman(mr.rt, mr.wg, queue.HandlerQueue, config.HandlerWorkers)
+	mr.flowBatchForeman = NewForeman(mr.rt, mr.wg, queue.FlowBatchQueue, config.FlowBatchWorkers)
 
 	// set authentication token for zeroshot requests in goflow
 	routers.SetZeroshotToken(mr.rt.Config.ZeroshotAPIToken)
 
 	// set base url for zeroshot requests
 	routers.SetZeroshotAPIURL(mr.rt.Config.ZeroshotAPIUrl)
+
+	// set whatsapp system user token to be used in goflow
+	webhooks.SetWhatsAppSystemUserToken(mr.rt.Config.WhatsappSystemUserToken)
 
 	return mr
 }
@@ -178,6 +184,7 @@ func (mr *Mailroom) Start() error {
 	// init our foremen and start it
 	mr.batchForeman.Start()
 	mr.handlerForeman.Start()
+	mr.flowBatchForeman.Start()
 
 	// start our web server
 	mr.webserver = web.NewServer(mr.ctx, mr.rt, mr.wg)
@@ -193,6 +200,7 @@ func (mr *Mailroom) Stop() error {
 	logrus.Info("mailroom stopping")
 	mr.batchForeman.Stop()
 	mr.handlerForeman.Stop()
+	mr.flowBatchForeman.Stop()
 	librato.Stop()
 	close(mr.quit)
 	mr.cancel()

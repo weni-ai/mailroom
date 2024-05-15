@@ -33,6 +33,7 @@ type Config struct {
 
 	BatchWorkers         int  `help:"the number of go routines that will be used to handle batch events"`
 	HandlerWorkers       int  `help:"the number of go routines that will be used to handle messages"`
+	FlowBatchWorkers     int  `help:"the number of go routines that will be used to handle flow batch events"`
 	RetryPendingMessages bool `help:"whether to requeue pending messages older than five minutes to retry"`
 
 	WebhooksTimeout              int     `help:"the timeout in milliseconds for webhook calls from engine"`
@@ -92,6 +93,8 @@ type Config struct {
 
 	RouterBaseURL   string `help:"router base url"`
 	RouterAuthToken string `help:"router authorization token"`
+
+	WhatsappSystemUserToken string `help:"WhatsApp system user token"`
 }
 
 // NewDefaultConfig returns a new default configuration object
@@ -110,6 +113,7 @@ func NewDefaultConfig() *Config {
 
 		BatchWorkers:         4,
 		HandlerWorkers:       32,
+		FlowBatchWorkers:     8,
 		RetryPendingMessages: true,
 
 		WebhooksTimeout:              15000,
@@ -155,6 +159,8 @@ func NewDefaultConfig() *Config {
 		SentenxBaseURL:  "https://sentenx.weni.ai",
 		RouterBaseURL:   "https://nexus.stg.cloud.weni.ai",
 		RouterAuthToken: "",
+
+		WhatsappSystemUserToken: "",
 	}
 }
 

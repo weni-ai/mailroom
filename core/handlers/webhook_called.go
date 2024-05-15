@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"context"
+	"strings"
 	"time"
 
 	"github.com/jmoiron/sqlx"
@@ -39,6 +40,10 @@ func handleWebhookCalled(ctx context.Context, rt *runtime.Runtime, tx *sqlx.Tx, 
 		}
 
 		scene.AppendToEventPreCommitHook(hooks.UnsubscribeResthookHook, unsub)
+	}
+
+	if rt.Config.WhatsappSystemUserToken != "" {
+		event.Request = strings.Replace(event.Request, rt.Config.WhatsappSystemUserToken, "******", -1)
 	}
 
 	run, step := scene.Session().FindStep(e.StepUUID())

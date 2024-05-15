@@ -8,6 +8,7 @@ import (
 
 	"github.com/nyaruka/mailroom/core/queue"
 	"github.com/nyaruka/mailroom/runtime"
+	"github.com/nyaruka/mailroom/runtime/metrics"
 
 	"github.com/sirupsen/logrus"
 )
@@ -42,6 +43,9 @@ func NewForeman(rt *runtime.Runtime, wg *sync.WaitGroup, queue string, maxWorker
 
 // Start starts the foreman and all its workers, assigning jobs while there are some
 func (f *Foreman) Start() {
+	metrics.SetAvailableWorkers(f.queue, len(f.workers))
+	metrics.SetUsedWorkers(f.queue, 0)
+
 	for _, worker := range f.workers {
 		worker.Start()
 	}
@@ -55,6 +59,9 @@ func (f *Foreman) Stop() {
 	}
 	close(f.quit)
 	logrus.WithField("comp", "foreman").WithField("queue", f.queue).WithField("state", "stopping").Info("foreman stopping")
+
+	metrics.SetAvailableWorkers(f.queue, 0)
+	metrics.SetUsedWorkers(f.queue, 0)
 }
 
 // Assign is our main loop for the Foreman, it takes care of popping the next outgoing task from our
@@ -73,6 +80,8 @@ func (f *Foreman) Assign() {
 	lastSleep := false
 
 	for {
+		metrics.SetAvailableWorkers(f.queue, len(f.availableWorkers))
+		metrics.SetUsedWorkers(f.queue, len(f.workers)-len(f.availableWorkers))
 		select {
 		// return if we have been told to stop
 		case <-f.quit:

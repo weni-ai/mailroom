@@ -41,6 +41,9 @@ const (
 	// HandlerQueue is our queue for message handling or other tasks related to just one contact
 	HandlerQueue = "handler"
 
+	// FlowBatchQueue is our queue for flow batch tasks
+	FlowBatchQueue = "flow_batch"
+
 	// SendBroadcast is our type for sending a broadcast
 	SendBroadcast = "send_broadcast"
 
