@@ -1,3 +1,7 @@
+1.22.0-mailroom-7.1.22
+----------
+ * Add WhatsApp token header on callWebhook actions
+
 1.21.0-mailroom-7.1.22
 ----------
  * New flow batch queue

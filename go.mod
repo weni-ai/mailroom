@@ -64,12 +64,14 @@ require (
 	gopkg.in/yaml.v3 v3.0.0-20200313102051-9f266ea9e77c // indirect
 )
 
-require github.com/gabriel-vasile/mimetype v1.4.1
+require (
+	github.com/gabriel-vasile/mimetype v1.4.1
+	github.com/prometheus/client_golang v1.14.0
+)
 
 require (
 	github.com/beorn7/perks v1.0.1 // indirect
 	github.com/cespare/xxhash/v2 v2.1.2 // indirect
-	github.com/prometheus/client_golang v1.14.0 // indirect
 	github.com/prometheus/procfs v0.8.0 // indirect
 )
 
@@ -77,4 +79,4 @@ go 1.17
 
 replace github.com/nyaruka/gocommon => github.com/Ilhasoft/gocommon v1.16.2-weni
 
-replace github.com/nyaruka/goflow => github.com/weni-ai/goflow v0.8.1-goflow-0.144.3
+replace github.com/nyaruka/goflow => github.com/weni-ai/goflow v0.8.2-goflow-0.144.3
