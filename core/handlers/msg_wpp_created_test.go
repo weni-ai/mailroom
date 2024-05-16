@@ -46,6 +46,17 @@ func TestMsgWppCreated(t *testing.T) {
 						true,
 					),
 				},
+				testdata.George: []flows.Action{
+					actions.NewSendWppMsg(
+						handlers.NewActionUUID(),
+						"text", "Hi", "image/png:https://foo.bar.com/images/image1.png", "Hi", "footer",
+						[]flows.ListItems{{Title: "title", UUID: "62276b09-b712-478c-a658-fcf1c187f4cf", Description: "title description"}},
+						"Menu",
+						nil,
+						"list",
+						true,
+					),
+				},
 				testdata.Bob: []flows.Action{
 					actions.NewSendWppMsg(handlers.NewActionUUID(), "", "", "", "Text", "footer", []flows.ListItems{}, "Menu", nil, "", false),
 				},
@@ -55,9 +66,14 @@ func TestMsgWppCreated(t *testing.T) {
 			},
 			SQLAssertions: []handlers.SQLAssertion{
 				{
-					SQL:   "SELECT COUNT(*) FROM msgs_msg WHERE contact_id = $1 AND status = 'Q' AND high_priority = FALSE",
+					SQL:   "SELECT COUNT(*) FROM msgs_msg WHERE text='Hi there.' AND contact_id = $1 AND high_priority = TRUE",
 					Args:  []interface{}{testdata.Cathy.ID},
 					Count: 2,
+				},
+				{
+					SQL:   "SELECT COUNT(*) FROM msgs_msg WHERE text='Hi' AND contact_id = $1 AND attachments[1] = $2 AND status = 'Q' AND high_priority = FALSE",
+					Args:  []interface{}{testdata.George.ID, "image/png:https://foo.bar.com/images/image1.png"},
+					Count: 1,
 				},
 				{
 					SQL:   "SELECT COUNT(*) FROM msgs_msg WHERE contact_id=$1 AND STATUS = 'F' AND failed_reason = 'D';",
@@ -78,6 +94,7 @@ func TestMsgWppCreated(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, 1, count)
 
+	// One bulk for George
 	count, err = redis.Int(rc.Do("zcard", fmt.Sprintf("msgs:%s|10/0", testdata.TwilioChannel.UUID)))
 	assert.NoError(t, err)
 	assert.Equal(t, 1, count)
