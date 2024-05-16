@@ -8,6 +8,7 @@ import (
 )
 
 func TestInsights(t *testing.T) {
+	Enabled = true
 	rc, err := redis.Dial("tcp", "localhost:6379")
 	assert.NoError(t, err)
 	rc.Do("del", RunKey)
