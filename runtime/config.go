@@ -96,6 +96,7 @@ type Config struct {
 
 	InsightsRedis   string `help:"insights redis url"`
 	InsightsRunsKey string `help:"insights runs key"`
+	InsightsEnabled bool   `help:"insights enabled. true or false"`
 }
 
 // NewDefaultConfig returns a new default configuration object
@@ -163,6 +164,7 @@ func NewDefaultConfig() *Config {
 
 		InsightsRedis:   "redis://localhost:6379/15",
 		InsightsRunsKey: "flowruns:wait",
+		InsightsEnabled: false,
 	}
 }
 

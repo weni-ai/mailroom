@@ -2,13 +2,15 @@ package insights
 
 import (
 	"os"
+	"strconv"
 
 	"github.com/gomodule/redigo/redis"
 	"github.com/sirupsen/logrus"
 )
 
 var (
-	RunKey string = "flowruns:wait"
+	RunKey  string = "flowruns:wait"
+	Enabled bool   = false
 )
 
 func init() {
@@ -16,6 +18,14 @@ func init() {
 	if rk != "" {
 		RunKey = rk
 	}
+	en := os.Getenv("MAILROOM_INSIGHTS_ENABLED")
+	if en != "" {
+		enabled, _ := strconv.ParseBool(en)
+		if enabled {
+			Enabled = enabled
+		}
+	}
+
 }
 
 func PushRun(rc redis.Conn, run_uuid string) error {
@@ -23,6 +33,9 @@ func PushRun(rc redis.Conn, run_uuid string) error {
 }
 
 func PushData(rc redis.Conn, key string, data string) error {
+	if !Enabled {
+		return nil
+	}
 	logrus.Debugf("send data: %s to insights redis for key: %s", data, key)
 	err := rc.Send("rpush", key, data)
 	if err != nil {
