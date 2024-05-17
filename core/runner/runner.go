@@ -12,6 +12,7 @@ import (
 	"github.com/nyaruka/goflow/flows/triggers"
 	"github.com/nyaruka/librato"
 	"github.com/nyaruka/mailroom/core/goflow"
+	"github.com/nyaruka/mailroom/core/insights"
 	"github.com/nyaruka/mailroom/core/models"
 	"github.com/nyaruka/mailroom/core/queue"
 	"github.com/nyaruka/mailroom/runtime"
@@ -73,6 +74,20 @@ func ResumeFlow(ctx context.Context, rt *runtime.Runtime, oa *models.OrgAssets, 
 		// if this flow just isn't available anymore, log this error
 		if err == models.ErrNotFound {
 			logrus.WithField("contact_uuid", session.Contact().UUID()).WithField("session_id", session.ID()).WithField("flow_id", session.CurrentFlowID()).Error("unable to find flow in resume")
+
+			{ // insights integration
+				rc := rt.IRP.Get()
+				defer rc.Close()
+				runUUIDs, err := models.SelectRunUUIDsBySessionIDs(ctx, rt.DB, []models.SessionID{session.ID()})
+				if err != nil {
+					logrus.WithError(errors.Wrapf(err, "error selecting flow runs uuids"))
+				} else {
+					for _, ruuid := range runUUIDs {
+						insights.PushRun(rc, ruuid)
+					}
+				}
+			}
+
 			return nil, models.ExitSessions(ctx, rt.DB, []models.SessionID{session.ID()}, models.ExitFailed)
 		}
 		return nil, errors.Wrapf(err, "error loading session flow: %d", session.CurrentFlowID())
@@ -605,6 +620,25 @@ func StartFlowForContacts(
 		if err == nil {
 			logrus.WithField("elapsed", time.Since(commitStart)).WithField("count", len(sessions)).Debug("sessions committed")
 		}
+
+		if interrupt {
+			{ // insights integration
+				rc := rt.IRP.Get()
+				defer rc.Close()
+				cids := []models.ContactID{}
+				for _, cid := range contactIDs {
+					cids = append(cids, models.ContactID(cid))
+				}
+				runUUIDs, err := models.SelectRunUUIDsByContactsIDs(ctx, rt.DB, flow.FlowType(), cids)
+				if err != nil {
+					logrus.WithError(errors.Wrapf(err, "error selecting flow runs uuids"))
+				} else {
+					for _, ruuid := range runUUIDs {
+						insights.PushRun(rc, ruuid)
+					}
+				}
+			}
+		}
 	}
 
 	// retry committing our sessions one at a time
@@ -648,6 +682,22 @@ func StartFlowForContacts(
 				tx.Rollback()
 				log.WithField("contact_uuid", session.Contact().UUID()).WithError(err).Errorf("error comitting session to db")
 				continue
+			}
+
+			if interrupt {
+				// run atualizada como interrompida
+				{ // insights integration
+					rc := rt.IRP.Get()
+					defer rc.Close()
+					runUUIDs, err := models.SelectRunUUIDsByContactsIDs(ctx, rt.DB, flow.FlowType(), []models.ContactID{models.ContactID(session.Contact().ID())})
+					if err != nil {
+						logrus.WithError(errors.Wrapf(err, "error selecting flow runs uuids"))
+					} else {
+						for _, ruuid := range runUUIDs {
+							insights.PushRun(rc, ruuid)
+						}
+					}
+				}
 			}
 
 			dbSessions = append(dbSessions, dbSession[0])

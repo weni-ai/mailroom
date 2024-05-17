@@ -93,3 +93,61 @@ func TestRuns(t *testing.T) {
 	assert.NoError(t, err)
 	tx.Commit()
 }
+
+func TestSelectRunUUIDs(t *testing.T) {
+	ctx, _, db, _ := testsuite.Get()
+	defer testsuite.Reset(testsuite.ResetAll)
+	defer uuids.SetGenerator(uuids.DefaultGenerator)
+	uuids.SetGenerator(uuids.NewSeededGenerator(12345))
+
+	db.MustExec(`
+	INSERT INTO public.flows_flowsession 
+	(id, "uuid", session_type, status, responded, "output", created_on, ended_on, timeout_on, wait_started_on, connection_id, contact_id, current_flow_id, org_id, output_url) 
+	VALUES($1, $2, 'M', 'W', false, '', '2024-05-08 15:35:40', NULL, NULL, '2024-05-08 15:35:40', NULL, $3, $4, $5, '');
+	`,
+		999,
+		"63430eda-8319-4bf2-8da8-59c6f1713d88",
+		testdata.Cathy.ID,
+		testdata.SingleMessage.ID,
+		testdata.Org1.ID,
+	)
+
+	frUUID := "33365ae6-3145-425e-b7d7-5b6171383fab"
+
+	db.MustExec(`
+	INSERT INTO public.flows_flowrun 
+	(id, "uuid", status, created_on, modified_on, exited_on, expires_on, responded, 
+	parent_uuid, results, "path", events, current_node_uuid, delete_reason, is_active, 
+	exit_type, connection_id, contact_id, flow_id, org_id, 
+	parent_id, session_id, start_id, submitted_by_id) 
+	VALUES
+	($1, $2, $3, '2024-05-08 15:35:40', '2024-05-08 15:35:40', '2024-05-08 15:35:40', NULL, true, 
+	NULL, NULL, NULL, NULL, NULL, NULL, true, 
+	'C', NULL, $4, $5, $6, 
+	NULL, $7, NULL, NULL);`,
+		999,
+		frUUID,
+		models.RunStatusCompleted,
+		testdata.Cathy.ID,
+		testdata.SingleMessage.ID,
+		testdata.Org1.ID,
+		999,
+	)
+
+	frs, err := models.SelectRunUUIDsBySessionIDs(ctx, db, []models.SessionID{999})
+	assert.NoError(t, err)
+	assert.Equal(t, len(frs), 1)
+	assert.Equal(t, frs[0], frUUID)
+
+	frs, err = models.SelectRunUUIDsByContactsIDs(
+		ctx, db, models.FlowTypeMessaging, []models.ContactID{testdata.Cathy.ID})
+	assert.NoError(t, err)
+	assert.Equal(t, len(frs), 1)
+	assert.Equal(t, frs[0], frUUID)
+
+	frs, err = models.SelectRunUUIDsByIDs(
+		ctx, db, []models.FlowRunID{999})
+	assert.NoError(t, err)
+	assert.Equal(t, len(frs), 1)
+	assert.Equal(t, frs[0], frUUID)
+}

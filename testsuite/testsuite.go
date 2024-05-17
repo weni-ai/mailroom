@@ -69,6 +69,7 @@ func Get() (context.Context, *runtime.Runtime, *sqlx.DB, *redis.Pool) {
 		MediaStorage:   storage.NewFS(MediaStorageDir),
 		SessionStorage: storage.NewFS(SessionStorageDir),
 		Config:         runtime.NewDefaultConfig(),
+		IRP:            rp,
 	}
 
 	/*for name, expected := range tableHashes {

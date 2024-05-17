@@ -17,4 +17,5 @@ type Runtime struct {
 	MediaStorage   storage.Storage
 	SessionStorage storage.Storage
 	Config         *Config
+	IRP            *redis.Pool
 }
