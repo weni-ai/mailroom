@@ -1,3 +1,7 @@
+1.23.0-mailroom-7.1.22
+----------
+ * Add insights integration and send flowrun data to it on create or update
+
 1.22.0-mailroom-7.1.22
 ----------
  * Add WhatsApp token header on callWebhook actions
