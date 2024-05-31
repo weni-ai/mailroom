@@ -410,6 +410,7 @@ func NewOrgAssets(ctx context.Context, rt *runtime.Runtime, orgID OrgID, prev *O
 		context := oa.org.ConfigValue("description", "")
 		c := &OrgContext{}
 		c.c.OrgContext = context
+		c.c.ProjectUUID = oa.org.ProjectUUID()
 		oa.orgContexts = append(oa.orgContexts, c)
 		if err != nil {
 			return nil, errors.Wrapf(err, "error loading context for org %d", orgID)

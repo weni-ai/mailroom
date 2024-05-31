@@ -6,6 +6,7 @@ import (
 	"github.com/nyaruka/gocommon/urns"
 	"github.com/nyaruka/goflow/flows"
 	"github.com/nyaruka/goflow/flows/engine"
+	"github.com/nyaruka/goflow/services/brain"
 	"github.com/nyaruka/goflow/services/webhooks"
 	"github.com/nyaruka/goflow/services/wenigpt"
 	"github.com/nyaruka/mailroom/runtime"
@@ -73,6 +74,7 @@ func Engine(c *runtime.Config) flows.Engine {
 		eng = engine.NewBuilder().
 			WithWebhookServiceFactory(webhooks.NewServiceFactory(httpClient, httpRetries, httpAccess, webhookHeaders, c.WebhooksMaxBodyBytes)).
 			WithWeniGPTServiceFactory(wenigpt.NewServiceFactory(httpClient, httpRetries, httpAccess, webhookHeaders, c.WebhooksMaxBodyBytes, c.WenigptAuthToken, c.WenigptBaseURL)).
+			WithBrainServiceFactory(brain.NewServiceFactory(httpClient, httpRetries, httpAccess, webhookHeaders, c.WebhooksMaxBodyBytes, c.RouterAuthToken, c.RouterBaseURL)).
 			WithClassificationServiceFactory(classificationFactory(c)).
 			WithEmailServiceFactory(emailFactory(c)).
 			WithTicketServiceFactory(ticketFactory(c)).
