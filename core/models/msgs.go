@@ -135,6 +135,7 @@ type Msg struct {
 		URNAuth              null.String        `db:"urn_auth"        json:"urn_auth,omitempty"`
 		OrgID                OrgID              `db:"org_id"          json:"org_id"`
 		TopupID              TopupID            `db:"topup_id"        json:"-"`
+		Template             string             `db:"template"        json:"template"`
 
 		SessionID     SessionID     `json:"session_id,omitempty"`
 		SessionStatus SessionStatus `json:"session_status,omitempty"`
@@ -178,6 +179,7 @@ func (m *Msg) TopupID() TopupID                 { return m.m.TopupID }
 func (m *Msg) ContactID() ContactID             { return m.m.ContactID }
 func (m *Msg) ContactURNID() *URNID             { return m.m.ContactURNID }
 func (m *Msg) IsResend() bool                   { return m.m.IsResend }
+func (m *Msg) Template() string                 { return m.m.Template }
 
 func (m *Msg) SetTopup(topupID TopupID) { m.m.TopupID = topupID }
 
@@ -415,6 +417,7 @@ func newOutgoingMsg(rt *runtime.Runtime, org *Org, channel *Channel, contactID C
 		}
 		if out.Templating() != nil {
 			metadata["templating"] = out.Templating()
+			m.Template = out.Templating().Template().Name
 		}
 		if out.Topic() != flows.NilMsgTopic {
 			metadata["topic"] = string(out.Topic())
@@ -754,10 +757,10 @@ const insertMsgSQL = `
 INSERT INTO
 msgs_msg(uuid, text, high_priority, created_on, modified_on, queued_on, sent_on, direction, status, attachments, metadata,
 		 visibility, msg_type, msg_count, error_count, next_attempt, failed_reason, channel_id,
-		 contact_id, contact_urn_id, org_id, topup_id, broadcast_id)
+		 contact_id, contact_urn_id, org_id, topup_id, broadcast_id, template)
   VALUES(:uuid, :text, :high_priority, :created_on, now(), now(), :sent_on, :direction, :status, :attachments, :metadata,
 		 :visibility, :msg_type, :msg_count, :error_count, :next_attempt, :failed_reason, :channel_id,
-		 :contact_id, :contact_urn_id, :org_id, :topup_id, :broadcast_id)
+		 :contact_id, :contact_urn_id, :org_id, :topup_id, :broadcast_id, :template)
 RETURNING 
 	id as id, 
 	now() as modified_on,
