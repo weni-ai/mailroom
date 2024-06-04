@@ -336,6 +336,11 @@ func NewOutgoingFlowMsgCatalog(rt *runtime.Runtime, org *Org, channel *Channel, 
 	return newOutgoingMsgCatalog(rt, org, channel, session.ContactID(), out, createdOn, session, NilBroadcastID)
 }
 
+// NewOutgoingFlowMsgWpp creates an outgoing message for the passed in flow message
+func NewOutgoingFlowMsgWpp(rt *runtime.Runtime, org *Org, channel *Channel, session *Session, out *flows.MsgWppOut, createdOn time.Time) (*Msg, error) {
+	return newOutgoingMsgWpp(rt, org, channel, session.ContactID(), out, createdOn, session, NilBroadcastID)
+}
+
 // NewOutgoingBroadcastMsg creates an outgoing message which is part of a broadcast
 func NewOutgoingBroadcastMsg(rt *runtime.Runtime, org *Org, channel *Channel, contactID ContactID, out *flows.MsgOut, createdOn time.Time, broadcastID BroadcastID) (*Msg, error) {
 	return newOutgoingMsg(rt, org, channel, contactID, out, createdOn, nil, broadcastID)
@@ -513,6 +518,93 @@ func newOutgoingMsgCatalog(rt *runtime.Runtime, org *Org, channel *Channel, cont
 		m.MsgCount = gsm7.Segments(m.Text) + len(m.Attachments)
 	}
 
+	return msg, nil
+}
+
+func newOutgoingMsgWpp(rt *runtime.Runtime, org *Org, channel *Channel, contactID ContactID, msgWpp *flows.MsgWppOut, createdOn time.Time, session *Session, broadcastID BroadcastID) (*Msg, error) {
+	msg := &Msg{}
+	m := &msg.m
+	m.UUID = msgWpp.UUID()
+	m.Text = msgWpp.Text()
+	m.HighPriority = false
+	m.Direction = DirectionOut
+	m.Status = MsgStatusQueued
+	m.Visibility = VisibilityVisible
+	m.MsgType = MsgTypeFlow
+	m.MsgCount = 1
+	m.ContactID = contactID
+	m.BroadcastID = broadcastID
+	m.OrgID = org.ID()
+	m.TopupID = NilTopupID
+	m.CreatedOn = createdOn
+
+	msg.SetChannel(channel)
+	msg.SetURN(msgWpp.URN())
+
+	if org.Suspended() {
+		// we fail messages for suspended orgs right away
+		m.Status = MsgStatusFailed
+		m.FailedReason = MsgFailedSuspended
+	} else if msg.URN() == urns.NilURN || channel == nil {
+		// if msg is missing the URN or channel, we also fail it
+		m.Status = MsgStatusFailed
+		m.FailedReason = MsgFailedNoDestination
+	}
+
+	// if we have a session, set fields on the message from that
+	if session != nil {
+		m.ResponseToExternalID = session.IncomingMsgExternalID()
+		m.SessionID = session.ID()
+		m.SessionStatus = session.Status()
+
+		// if we're responding to an incoming message, send as high priority
+		if session.IncomingMsgID() != NilMsgID {
+			m.HighPriority = true
+		}
+	}
+
+	// if we have attachments, add them
+	if len(msgWpp.Attachments()) > 0 {
+		for _, a := range msgWpp.Attachments() {
+			m.Attachments = append(m.Attachments, string(NormalizeAttachment(rt.Config, a)))
+		}
+	}
+
+	if len(msgWpp.QuickReplies()) > 0 || len(msgWpp.ListMessage().ListItems) > 0 || msgWpp.Topic() != flows.NilMsgTopic || msgWpp.Text() != "" || msgWpp.Footer() != "" || msgWpp.HeaderType() != "" || msgWpp.InteractionType() != "" {
+		metadata := make(map[string]interface{})
+		if msgWpp.Topic() != flows.NilMsgTopic {
+			metadata["topic"] = string(msgWpp.Topic())
+		}
+		if msgWpp.HeaderText() != "" {
+			metadata["header_text"] = string(msgWpp.HeaderText())
+			metadata["header_type"] = string(msgWpp.HeaderType())
+		}
+		if msgWpp.Text() != "" {
+			metadata["text"] = string(msgWpp.Text())
+		}
+		if msgWpp.Footer() != "" {
+			metadata["footer"] = string(msgWpp.Footer())
+		}
+		if len(msgWpp.Attachments()) > 0 {
+			metadata["header_type"] = string(msgWpp.HeaderType())
+		}
+		if len(msgWpp.QuickReplies()) > 0 {
+			metadata["quick_replies"] = msgWpp.QuickReplies()
+			metadata["interaction_type"] = string(msgWpp.InteractionType())
+		}
+		if len(msgWpp.ListMessage().ListItems) > 0 {
+			metadata["list_message"] = msgWpp.ListMessage()
+			metadata["interaction_type"] = string(msgWpp.InteractionType())
+		}
+		if msgWpp.InteractionType() == "location" {
+			metadata["interaction_type"] = string(msgWpp.InteractionType())
+		}
+		if msgWpp.TextLanguage != "" {
+			metadata["text_language"] = msgWpp.TextLanguage
+		}
+
+		m.Metadata = null.NewMap(metadata)
+	}
 	return msg, nil
 }
 
