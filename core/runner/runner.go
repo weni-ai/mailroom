@@ -16,6 +16,7 @@ import (
 	"github.com/nyaruka/mailroom/core/models"
 	"github.com/nyaruka/mailroom/core/queue"
 	"github.com/nyaruka/mailroom/runtime"
+	"github.com/nyaruka/mailroom/runtime/metrics"
 	"github.com/nyaruka/mailroom/utils/locker"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
@@ -264,6 +265,9 @@ func StartFlowBatch(
 	librato.Gauge("mr.flow_batch_start_elapsed", float64(time.Since(start))/float64(time.Second))
 	librato.Gauge("mr.flow_batch_start_count", float64(len(sessions)))
 
+	metrics.ObserveFlowBatchStartElapsed(oa.OrgID(), float64(time.Since(start))/float64(time.Millisecond))
+	metrics.AddFlowBatchStartCount(oa.OrgID(), float64(len(sessions)))
+
 	return sessions, nil
 }
 
@@ -413,6 +417,9 @@ func FireCampaignEvents(
 	// log both our total and average
 	librato.Gauge("mr.campaign_event_elapsed", float64(time.Since(start))/float64(time.Second))
 	librato.Gauge("mr.campaign_event_count", float64(len(sessions)))
+
+	metrics.ObserveCampaignEventElapsed(orgID, float64(time.Since(start))/float64(time.Millisecond))
+	metrics.AddCampaignEventCount(orgID, float64(len(sessions)))
 
 	// build the list of contacts actually started
 	startedContacts := make([]models.ContactID, len(sessions))
@@ -577,6 +584,7 @@ func StartFlowForContacts(
 		}
 		log.WithField("elapsed", time.Since(start)).Info("flow engine start")
 		librato.Gauge("mr.flow_start_elapsed", float64(time.Since(start)))
+		metrics.ObserveFlowStartElapsed(oa.OrgID(), float64(time.Since(start))/float64(time.Millisecond))
 
 		sessions = append(sessions, session)
 		sprints = append(sprints, sprint)
