@@ -31,6 +31,7 @@ import (
 	"github.com/nyaruka/mailroom/core/queue"
 	"github.com/nyaruka/mailroom/core/runner"
 	"github.com/nyaruka/mailroom/runtime"
+	"github.com/nyaruka/mailroom/runtime/metrics"
 	"github.com/nyaruka/mailroom/utils/dbutil"
 	"github.com/nyaruka/mailroom/utils/locker"
 	"github.com/nyaruka/null"
@@ -169,9 +170,11 @@ func handleContactEvent(ctx context.Context, rt *runtime.Runtime, task *queue.Ta
 
 		// log our processing time to librato
 		librato.Gauge(fmt.Sprintf("mr.%s_elapsed", contactEvent.Type), float64(time.Since(start))/float64(time.Second))
+		metrics.ObserveContactEventElapsed(models.OrgID(task.OrgID), contactEvent.Type, float64(time.Since(start))/float64(time.Millisecond))
 
 		// and total latency for this task since it was queued
 		librato.Gauge(fmt.Sprintf("mr.%s_latency", contactEvent.Type), float64(time.Since(task.QueuedOn))/float64(time.Second))
+		metrics.ObserveContactEventLatency(models.OrgID(task.OrgID), contactEvent.Type, float64(time.Since(task.QueuedOn))/float64(time.Millisecond))
 
 		// if we get an error processing an event, requeue it for later and return our error
 		if err != nil {
