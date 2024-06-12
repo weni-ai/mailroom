@@ -121,6 +121,7 @@ func fireCampaignEvents(ctx context.Context, rt *runtime.Runtime) error {
 
 		if !captured {
 			log.WithField("elapsed", time.Since(start)).Info("checked event fire already queued in redis")
+			captured = true
 		}
 
 		// this has already been queued, move on
