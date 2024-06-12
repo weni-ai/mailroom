@@ -652,7 +652,7 @@ func handleMsgEvent(ctx context.Context, rt *runtime.Runtime, event *MsgEvent) e
 			}
 			err = json.Unmarshal(asJSON, &nfmReply)
 			if err != nil {
-				log.WithError(err).Error("unable to unmarshal orderJSON from metadata[\"nfm_reply\"]")
+				log.WithError(err).Error("unable to unmarshal nfmReplyJSON from metadata[\"nfm_reply\"]")
 			}
 			msgIn.SetNFMReply(nfmReply)
 		}
