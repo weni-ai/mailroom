@@ -79,6 +79,8 @@ type Config struct {
 	FlowStartBatchTimeout int `help:"timeout config for flow start batch"`
 	FlowStartBatchSize    int `help:"size of flow start batch"`
 
+	ExpiredEventsQuerySize int `help:"size of the query for expired events"`
+
 	ZeroshotAPIToken string `help:"secret token for zeroshot API authentication and authorization"`
 	ZeroshotAPIUrl   string `help:"zeroshot API base url"`
 
@@ -157,6 +159,8 @@ func NewDefaultConfig() *Config {
 
 		FlowStartBatchTimeout: 15,
 		FlowStartBatchSize:    100,
+
+		ExpiredEventsQuerySize: 25000,
 
 		ZeroshotAPIToken: "",
 		ZeroshotAPIUrl:   "http://engine-ai.dev.cloud.weni.ai",

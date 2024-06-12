@@ -51,7 +51,7 @@ func fireCampaignEvents(ctx context.Context, rt *runtime.Runtime) error {
 	ctx, cancel := context.WithTimeout(ctx, time.Minute*5)
 	defer cancel()
 
-	rows, err := rt.DB.QueryxContext(ctx, expiredEventsQuery)
+	rows, err := rt.DB.QueryxContext(ctx, expiredEventsQuery, rt.Config.ExpiredEventsQuerySize)
 	if err != nil {
 		return errors.Wrapf(err, "error loading expired campaign events")
 	}
@@ -187,5 +187,5 @@ ORDER BY
     DATE_TRUNC('minute', scheduled) ASC,
     ef.event_id ASC
 LIMIT
-    25000;
+    $1;
 `
