@@ -57,11 +57,15 @@ func fireCampaignEvents(ctx context.Context, rt *runtime.Runtime) error {
 	}
 	defer rows.Close()
 
+	log.WithField("elapsed", time.Since(start)).Info("loaded expired campaign events from db")
+
 	rc := rt.RP.Get()
 	defer rc.Close()
 
 	queued := 0
 	queueTask := func(orgID models.OrgID, task *FireCampaignEventTask) error {
+		start := time.Now()
+
 		if task.EventID == 0 {
 			return nil
 		}
@@ -91,6 +95,8 @@ func fireCampaignEvents(ctx context.Context, rt *runtime.Runtime) error {
 			queued += len(task.FireIDs)
 		}
 
+		log.WithField("elapsed", time.Since(start)).Info("queued event fire task to redis")
+
 		return nil
 	}
 
@@ -98,6 +104,7 @@ func fireCampaignEvents(ctx context.Context, rt *runtime.Runtime) error {
 	orgID := models.NilOrgID
 	task := &FireCampaignEventTask{}
 
+	captured := false
 	for rows.Next() {
 		row := &eventFireRow{}
 		err := rows.StructScan(row)
@@ -110,6 +117,10 @@ func fireCampaignEvents(ctx context.Context, rt *runtime.Runtime) error {
 		dupe, err := campaignsMarker.Contains(rc, taskID)
 		if err != nil {
 			return errors.Wrap(err, "error checking task lock")
+		}
+
+		if !captured {
+			log.WithField("elapsed", time.Since(start)).Info("checked event fire already queued in redis")
 		}
 
 		// this has already been queued, move on
