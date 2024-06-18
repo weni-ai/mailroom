@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"database/sql/driver"
+	"fmt"
 	"net/http"
 	"time"
 
@@ -143,9 +144,10 @@ func GetActiveCatalogFromChannel(ctx context.Context, db sqlx.DB, channelID Chan
 
 func loadCatalog(ctx context.Context, db *sqlx.DB, orgID OrgID) ([]assets.MsgCatalog, error) {
 	start := time.Now()
-
+	fmt.Println("ORG: ", orgID)
 	rows, err := db.Queryx(selectOrgCatalogSQL, orgID)
 	if err != nil && err != sql.ErrNoRows {
+		fmt.Println("Error: ", err)
 		return nil, errors.Wrapf(err, "error querying catalog for org: %d", orgID)
 	}
 	defer rows.Close()
@@ -155,14 +157,22 @@ func loadCatalog(ctx context.Context, db *sqlx.DB, orgID OrgID) ([]assets.MsgCat
 		msgCatalog := &MsgCatalog{}
 		err := dbutil.ReadJSONRow(rows, &msgCatalog.c)
 		if err != nil {
+			fmt.Println("Error: ", err)
 			return nil, errors.Wrapf(err, "error unmarshalling catalog")
 		}
+		fmt.Println("msgCatalog FacebookCatalogID: ", msgCatalog.FacebookCatalogID())
+		fmt.Println("msgCatalog ID: ", msgCatalog.ID())
+		fmt.Println("msgCatalog ChannelUUID: ", msgCatalog.ChannelUUID())
+		fmt.Println("msgCatalog ChannelID: ", msgCatalog.ChannelID())
 		channelUUID, err := ChannelUUIDForChannelID(ctx, db, msgCatalog.ChannelID())
+		fmt.Println("ChannelUUID: ", string(channelUUID))
 		if err != nil {
+			fmt.Println("Error: ", err)
 			return nil, err
 		}
 
 		if err == nil && channelUUID == assets.ChannelUUID("") {
+			fmt.Println("Error: ", err)
 			return nil, nil
 		}
 
