@@ -172,8 +172,7 @@ func loadCatalog(ctx context.Context, db *sqlx.DB, orgID OrgID) ([]assets.MsgCat
 		}
 
 		if err == nil && channelUUID == assets.ChannelUUID("") {
-			fmt.Println("Error: ", err)
-			return nil, nil
+			continue
 		}
 
 		msgCatalog.c.ChannelUUID = channelUUID
