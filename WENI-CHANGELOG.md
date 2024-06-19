@@ -1,3 +1,8 @@
+1.25.0-mailroom-7.1.22
+----------
+ * Add Metrics by org and globally to prometheus
+ * Fix Load Catalogs
+
 1.24.0-mailroom-7.1.22
 ----------
  * Implementations for whatsapp message sending card
