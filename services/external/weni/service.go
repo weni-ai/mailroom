@@ -203,6 +203,13 @@ func (s *service) Call(session flows.Session, params assets.MsgCatalogParam, log
 		}
 	}
 
+	newProductRetailerIDS, err := ProductsSearchMeta(finalResult.ProductRetailerIDS, fmt.Sprint(catalog.ID()), s.rtConfig.WhatsappSystemUserToken)
+	if err != nil {
+		return nil, err
+	}
+
+	finalResult.ProductRetailerIDS = newProductRetailerIDS
+
 	return finalResult, nil
 }
 
@@ -505,4 +512,106 @@ func CartSimulation(products []string, sellerID string, url string, postalCode s
 	}
 
 	return result, trace, nil
+}
+
+// Filter represents the structure of the filter for the API request
+type Filter struct {
+	Or []OrCondition `json:"or"`
+}
+
+// OrCondition represents an OR condition
+type OrCondition struct {
+	And []AndCondition `json:"and"`
+}
+
+// AndCondition represents an AND condition
+type AndCondition struct {
+	RetailerID   map[string]string `json:"retailer_id,omitempty"`
+	Availability map[string]string `json:"availability,omitempty"`
+}
+
+// createFilter creates the filter JSON based on the list of retailer IDs
+func createFilter(productEntryList []string) (string, error) {
+	var filter Filter
+
+	for _, id := range productEntryList {
+		andCondition := []AndCondition{
+			{
+				RetailerID: map[string]string{"i_contains": id},
+			},
+			{
+				Availability: map[string]string{"i_contains": "in stock"},
+			},
+		}
+		filter.Or = append(filter.Or, OrCondition{And: andCondition})
+
+	}
+
+	filterJSON, err := json.Marshal(filter)
+	if err != nil {
+		return "", err
+	}
+
+	return string(filterJSON), nil
+}
+
+// Response represents the structure of the API response
+type Response struct {
+	Data []struct {
+		RetailerID string `json:"retailer_id"`
+	} `json:"data"`
+}
+
+func fetchProducts(url string) (*Response, error) {
+	client := &http.Client{}
+
+	req, err := httpx.NewRequest("GET", url, nil, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	t, err := httpx.DoTrace(client, req, nil, nil, -1)
+	if err != nil {
+		return nil, err
+	}
+
+	if t.Response.StatusCode >= 400 {
+		return nil, fmt.Errorf("error when searching with seller: status code %d", t.Response.StatusCode)
+	}
+
+	var response Response
+	err = json.Unmarshal(t.ResponseBody, &response)
+	if err != nil {
+		return nil, err
+	}
+
+	return &response, err
+
+}
+
+func ProductsSearchMeta(productEntryList []flows.ProductEntry, catalog string, whatsappSystemUserToken string) ([]flows.ProductEntry, error) {
+
+	for i, productEntry := range productEntryList {
+		filter, err := createFilter(productEntry.ProductRetailerIDs)
+		if err != nil {
+			return nil, err
+		}
+		url := fmt.Sprintf("https://graph.facebook.com/v14.0/%s/products?fields=[\"category\",\"name\",\"retailer_id\",\"availability\"]&filter=%s&summary=true&access_token=%s", catalog, filter, whatsappSystemUserToken)
+
+		response, err := fetchProducts(url)
+		if err != nil {
+			return nil, err
+		}
+
+		var productRetailerIDs []string
+
+		// Process the data
+		for _, product := range response.Data {
+			productRetailerIDs = append(productRetailerIDs, product.RetailerID)
+		}
+		productEntryList[i].ProductRetailerIDs = productRetailerIDs
+	}
+
+	return nil, nil
+
 }

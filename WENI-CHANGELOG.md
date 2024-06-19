@@ -1,3 +1,7 @@
+1.24.0-mailroom-7.1.22
+----------
+ * Implementations for whatsapp message sending card
+   
 1.23.1-mailroom-7.1.22
 ----------
  * Update goflow version to v0.9.1-goflow-0.144.3 for custom webhooks timeouts
