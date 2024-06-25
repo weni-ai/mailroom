@@ -205,6 +205,7 @@ func (s *service) Call(session flows.Session, params assets.MsgCatalogParam, log
 
 	newProductRetailerIDS, err := ProductsSearchMeta(finalResult.ProductRetailerIDS, fmt.Sprint(catalog.ID()), s.rtConfig.WhatsappSystemUserToken)
 	if err != nil {
+		fmt.Println("Erro3: ", err)
 		return nil, err
 	}
 
@@ -594,12 +595,14 @@ func ProductsSearchMeta(productEntryList []flows.ProductEntry, catalog string, w
 	for i, productEntry := range productEntryList {
 		filter, err := createFilter(productEntry.ProductRetailerIDs)
 		if err != nil {
+			fmt.Println("Erro1: ", err)
 			return nil, err
 		}
 		url := fmt.Sprintf("https://graph.facebook.com/v14.0/%s/products?fields=[\"category\",\"name\",\"retailer_id\",\"availability\"]&filter=%s&summary=true&access_token=%s", catalog, filter, whatsappSystemUserToken)
 
 		response, err := fetchProducts(url)
 		if err != nil {
+			fmt.Println("Erro2: ", err)
 			return nil, err
 		}
 
@@ -612,6 +615,6 @@ func ProductsSearchMeta(productEntryList []flows.ProductEntry, catalog string, w
 		productEntryList[i].ProductRetailerIDs = productRetailerIDs
 	}
 
-	return nil, nil
+	return productEntryList, nil
 
 }
