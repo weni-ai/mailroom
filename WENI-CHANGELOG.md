@@ -1,3 +1,7 @@
+1.26.1-mailroom-7.1.22
+----------
+ * Update goflow version to v0.11.1-goflow-0.144.3 for correct brain webhook call
+
 1.26.0-mailroom-7.1.22
 ----------
  * Add action to brain card
