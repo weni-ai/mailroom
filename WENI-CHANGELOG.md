@@ -1,3 +1,7 @@
+1.26.0-mailroom-7.1.22
+----------
+ * Add action to brain card
+
 1.25.0-mailroom-7.1.22
 ----------
  * Add Metrics by org and globally to prometheus
