@@ -9,6 +9,7 @@ import (
 	"github.com/nyaruka/mailroom"
 	"github.com/nyaruka/mailroom/core/queue"
 	"github.com/nyaruka/mailroom/runtime"
+	"github.com/nyaruka/mailroom/runtime/metrics"
 	"github.com/nyaruka/mailroom/utils/cron"
 	"github.com/sirupsen/logrus"
 )
@@ -83,6 +84,14 @@ func reportAnalytics(ctx context.Context, rt *runtime.Runtime) error {
 	librato.Gauge("mr.db_idle", float64(dbStats.Idle))
 	librato.Gauge("mr.db_waiting", float64(dbStats.WaitCount-waitCount))
 	librato.Gauge("mr.db_wait_ms", float64((dbStats.WaitDuration-waitDuration)/time.Millisecond))
+
+	metrics.SetQueueSize("handler", handlerSize)
+	metrics.SetQueueSize("batch", batchSize)
+	metrics.SetQueueSize("flow_batch", flowBatchSize)
+	metrics.SetDBStats("busy", float64(dbStats.InUse))
+	metrics.SetDBStats("idle",  float64(dbStats.Idle))
+	metrics.SetDBStats("waiting",  float64(dbStats.WaitCount-waitCount))
+	metrics.SetDBStats("wait_ms", float64((dbStats.WaitDuration-waitDuration)/time.Millisecond))
 
 	waitCount = dbStats.WaitCount
 	waitDuration = dbStats.WaitDuration

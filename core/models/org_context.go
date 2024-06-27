@@ -5,6 +5,7 @@ import (
 	"net/http"
 
 	"github.com/nyaruka/gocommon/httpx"
+	"github.com/nyaruka/gocommon/uuids"
 	"github.com/nyaruka/goflow/assets"
 	"github.com/nyaruka/goflow/flows"
 	"github.com/nyaruka/goflow/flows/engine"
@@ -46,11 +47,13 @@ type OrgContext struct {
 	c struct {
 		OrgContext  string             `json:"context"`
 		ChannelUUID assets.ChannelUUID `json:"channel_uuid"`
+		ProjectUUID uuids.UUID         `json:"project_uuid"`
 	}
 }
 
 func (c *OrgContext) Context() string                 { return c.c.OrgContext }
 func (c *OrgContext) ChannelUUID() assets.ChannelUUID { return c.c.ChannelUUID }
+func (c *OrgContext) ProjectUUID() uuids.UUID         { return c.c.ProjectUUID }
 
 type OrgContextService interface {
 	flows.OrgContextService

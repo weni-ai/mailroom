@@ -12,6 +12,7 @@ import (
 	"github.com/nyaruka/mailroom/core/models"
 	"github.com/nyaruka/mailroom/core/queue"
 	"github.com/nyaruka/mailroom/runtime"
+	"github.com/nyaruka/mailroom/runtime/metrics"
 	"github.com/nyaruka/mailroom/utils/cron"
 	"github.com/nyaruka/redisx"
 
@@ -149,6 +150,10 @@ func fireCampaignEvents(ctx context.Context, rt *runtime.Runtime) error {
 
 	librato.Gauge("mr.campaign_event_cron_elapsed", float64(time.Since(start))/float64(time.Second))
 	librato.Gauge("mr.campaign_event_cron_count", float64(queued))
+
+	metrics.ObserveCampaignEventCronElapsed(orgID, float64(time.Since(start))/float64(time.Millisecond))
+	metrics.AddCampaignEventCronCount(orgID, float64(queued))
+
 	log.WithField("elapsed", time.Since(start)).WithField("queued", queued).Info("campaign event fire queuing complete")
 	return nil
 }

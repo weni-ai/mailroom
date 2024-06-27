@@ -1,3 +1,20 @@
+1.26.2-mailroom-7.1.22
+----------
+ * Update goflow version to v0.11.2-goflow-0.144.3 with correct release
+
+1.26.1-mailroom-7.1.22
+----------
+ * Update goflow version to v0.11.1-goflow-0.144.3 for correct brain webhook call
+
+1.26.0-mailroom-7.1.22
+----------
+ * Add action to brain card
+
+1.25.0-mailroom-7.1.22
+----------
+ * Add Metrics by org and globally to prometheus
+ * Fix Load Catalogs
+
 1.24.0-mailroom-7.1.22
 ----------
  * Implementations for whatsapp message sending card

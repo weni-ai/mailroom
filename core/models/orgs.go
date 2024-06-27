@@ -13,6 +13,7 @@ import (
 
 	"github.com/nyaruka/gocommon/httpx"
 	"github.com/nyaruka/gocommon/jsonx"
+	"github.com/nyaruka/gocommon/uuids"
 	"github.com/nyaruka/goflow/envs"
 	"github.com/nyaruka/goflow/flows"
 	"github.com/nyaruka/goflow/flows/engine"
@@ -69,11 +70,12 @@ const (
 // Org is mailroom's type for RapidPro orgs. It also implements the envs.Environment interface for GoFlow
 type Org struct {
 	o struct {
-		ID         OrgID    `json:"id"`
-		Suspended  bool     `json:"is_suspended"`
-		UsesTopups bool     `json:"uses_topups"`
-		Config     null.Map `json:"config"`
-		BrainOn    bool     `json:"brain_on"`
+		ID          OrgID      `json:"id"`
+		Suspended   bool       `json:"is_suspended"`
+		UsesTopups  bool       `json:"uses_topups"`
+		Config      null.Map   `json:"config"`
+		BrainOn     bool       `json:"brain_on"`
+		ProjectUUID uuids.UUID `json:"proj_uuid"`
 	}
 	env envs.Environment
 }
@@ -87,8 +89,11 @@ func (o *Org) Suspended() bool { return o.o.Suspended }
 // UsesTopups returns whether the org uses topups
 func (o *Org) UsesTopups() bool { return o.o.UsesTopups }
 
-// BrainOn returns whether the org uses topups
+// BrainOn returns whether the org uses brainOn
 func (o *Org) BrainOn() bool { return o.o.BrainOn }
+
+// ProjectUUID returns whether the org uses proj_uuid
+func (o *Org) ProjectUUID() uuids.UUID { return o.o.ProjectUUID }
 
 // DateFormat returns the date format for this org
 func (o *Org) DateFormat() envs.DateFormat { return o.env.DateFormat() }
@@ -259,6 +264,7 @@ SELECT ROW_TO_JSON(o) FROM (SELECT
 	is_suspended,
 	uses_topups,
 	brain_on,
+	proj_uuid,
 	COALESCE(o.config::json,'{}'::json) AS config,
 	(SELECT CASE date_format WHEN 'D' THEN 'DD-MM-YYYY' WHEN 'M' THEN 'MM-DD-YYYY' END) AS date_format, 
 	'tt:mm' AS time_format,
