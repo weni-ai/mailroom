@@ -612,6 +612,6 @@ func ProductsSearchMeta(productEntryList []flows.ProductEntry, catalog string, w
 		productEntryList[i].ProductRetailerIDs = productRetailerIDs
 	}
 
-	return nil, nil
+	return productEntryList, nil
 
 }
