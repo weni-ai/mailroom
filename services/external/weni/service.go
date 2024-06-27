@@ -206,11 +206,11 @@ func (s *service) Call(session flows.Session, params assets.MsgCatalogParam, log
 	}
 
 	newProductRetailerIDS, tracesMeta, err := ProductsSearchMeta(finalResult.ProductRetailerIDS, fmt.Sprint(catalog.ID()), s.rtConfig.WhatsappSystemUserToken)
+	finalResult.Traces = append(finalResult.Traces, tracesMeta...)
 	if err != nil {
 		fmt.Println("Error8: ", err)
 		return finalResult, err
 	}
-	finalResult.Traces = append(finalResult.Traces, tracesMeta...)
 	finalResult.ProductRetailerIDS = newProductRetailerIDS
 
 	return finalResult, nil
