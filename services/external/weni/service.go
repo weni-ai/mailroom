@@ -205,7 +205,7 @@ func (s *service) Call(session flows.Session, params assets.MsgCatalogParam, log
 		}
 	}
 
-	newProductRetailerIDS, tracesMeta, err := ProductsSearchMeta(finalResult.ProductRetailerIDS, fmt.Sprint(catalog.ID()), s.rtConfig.WhatsappSystemUserToken)
+	newProductRetailerIDS, tracesMeta, err := ProductsSearchMeta(finalResult.ProductRetailerIDS, fmt.Sprint(catalog.FacebookCatalogID()), s.rtConfig.WhatsappSystemUserToken)
 	finalResult.Traces = append(finalResult.Traces, tracesMeta...)
 	if err != nil {
 		fmt.Println("Error8: ", err)
