@@ -138,6 +138,7 @@ func (s *service) Call(session flows.Session, params assets.MsgCatalogParam, log
 			}
 		}
 		if err != nil {
+			fmt.Println("Error6: ", err)
 			return callResult, errors.Wrapf(err, "on iterate to search products")
 		}
 		for _, prod := range searchResult {
@@ -170,6 +171,7 @@ func (s *service) Call(session flows.Session, params assets.MsgCatalogParam, log
 		existingProductsIds, trace, err = CartSimulation(allProducts, sellerID, params.SearchUrl, postalCode_)
 		callResult.Traces = append(callResult.Traces, trace)
 		if err != nil {
+			fmt.Println("Error7: ", err)
 			return nil, err
 		}
 	}
@@ -205,6 +207,7 @@ func (s *service) Call(session flows.Session, params assets.MsgCatalogParam, log
 
 	newProductRetailerIDS, err := ProductsSearchMeta(finalResult.ProductRetailerIDS, fmt.Sprint(catalog.ID()), s.rtConfig.WhatsappSystemUserToken)
 	if err != nil {
+		fmt.Println("Error8: ", err)
 		return nil, err
 	}
 
@@ -321,6 +324,7 @@ func GetProductListFromVtex(productSearch string, searchUrl string, apiType stri
 	if apiType == "legacy" {
 		result, traces, err = VtexLegacySearch(searchUrl, productSearch)
 		if err != nil {
+			fmt.Println("Error5: ", err)
 			return nil, traces, err
 		}
 	} else if apiType == "intelligent" {
@@ -360,6 +364,7 @@ func VtexLegacySearch(searchUrl string, productSearch string) ([]string, []*http
 
 	req, err := httpx.NewRequest("GET", url, nil, nil)
 	if err != nil {
+		fmt.Println("Error1: ", err)
 		return nil, nil, err
 	}
 
@@ -367,6 +372,7 @@ func VtexLegacySearch(searchUrl string, productSearch string) ([]string, []*http
 	trace, err := httpx.DoTrace(client, req, nil, nil, -1)
 	traces = append(traces, trace)
 	if err != nil {
+		fmt.Println("Error2: ", err)
 		return nil, traces, err
 	}
 
@@ -376,6 +382,7 @@ func VtexLegacySearch(searchUrl string, productSearch string) ([]string, []*http
 
 	err = jsonx.Unmarshal(trace.ResponseBody, &response)
 	if err != nil {
+		fmt.Println("Error3: ", err)
 		return nil, traces, err
 	}
 
@@ -388,6 +395,7 @@ func VtexLegacySearch(searchUrl string, productSearch string) ([]string, []*http
 	}
 
 	if len(allItems) == 0 {
+		fmt.Println("Error4: ", err)
 		return nil, traces, nil
 	}
 
