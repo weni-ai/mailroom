@@ -205,12 +205,12 @@ func (s *service) Call(session flows.Session, params assets.MsgCatalogParam, log
 		}
 	}
 
-	newProductRetailerIDS, err := ProductsSearchMeta(finalResult.ProductRetailerIDS, fmt.Sprint(catalog.ID()), s.rtConfig.WhatsappSystemUserToken)
+	newProductRetailerIDS, tracesMeta, err := ProductsSearchMeta(finalResult.ProductRetailerIDS, fmt.Sprint(catalog.ID()), s.rtConfig.WhatsappSystemUserToken)
 	if err != nil {
 		fmt.Println("Error8: ", err)
-		return nil, err
+		return finalResult, err
 	}
-
+	finalResult.Traces = append(finalResult.Traces, tracesMeta...)
 	finalResult.ProductRetailerIDS = newProductRetailerIDS
 
 	return finalResult, nil
@@ -570,45 +570,47 @@ type Response struct {
 	} `json:"data"`
 }
 
-func fetchProducts(url string) (*Response, error) {
+func fetchProducts(url string) (*Response, *httpx.Trace, error) {
 	client := &http.Client{}
 
 	req, err := httpx.NewRequest("GET", url, nil, nil)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	t, err := httpx.DoTrace(client, req, nil, nil, -1)
 	if err != nil {
-		return nil, err
+		return nil, t, err
 	}
 
 	if t.Response.StatusCode >= 400 {
-		return nil, fmt.Errorf("error when searching with seller: status code %d", t.Response.StatusCode)
+		return nil, t, fmt.Errorf("error when searching with seller: status code %d", t.Response.StatusCode)
 	}
 
 	var response Response
 	err = json.Unmarshal(t.ResponseBody, &response)
 	if err != nil {
-		return nil, err
+		return nil, t, err
 	}
 
-	return &response, err
+	return &response, t, err
 
 }
 
-func ProductsSearchMeta(productEntryList []flows.ProductEntry, catalog string, whatsappSystemUserToken string) ([]flows.ProductEntry, error) {
-
+func ProductsSearchMeta(productEntryList []flows.ProductEntry, catalog string, whatsappSystemUserToken string) ([]flows.ProductEntry, []*httpx.Trace, error) {
+	traces := []*httpx.Trace{}
 	for i, productEntry := range productEntryList {
 		filter, err := createFilter(productEntry.ProductRetailerIDs)
 		if err != nil {
-			return nil, err
+			return nil, nil, err
 		}
+
 		url := fmt.Sprintf("https://graph.facebook.com/v14.0/%s/products?fields=[\"category\",\"name\",\"retailer_id\",\"availability\"]&filter=%s&summary=true&access_token=%s", catalog, filter, whatsappSystemUserToken)
 
-		response, err := fetchProducts(url)
+		response, trace, err := fetchProducts(url)
+		traces = append(traces, trace)
 		if err != nil {
-			return nil, err
+			return nil, traces, err
 		}
 
 		var productRetailerIDs []string
@@ -620,6 +622,6 @@ func ProductsSearchMeta(productEntryList []flows.ProductEntry, catalog string, w
 		productEntryList[i].ProductRetailerIDs = productRetailerIDs
 	}
 
-	return productEntryList, nil
+	return productEntryList, traces, nil
 
 }
