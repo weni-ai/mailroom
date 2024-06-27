@@ -605,11 +605,14 @@ func ProductsSearchMeta(productEntryList []flows.ProductEntry, catalog string, w
 			return nil, nil, err
 		}
 
-		url_ := fmt.Sprintf("https://graph.facebook.com/v14.0/%s/products?fields=[\"category\",\"name\",\"retailer_id\",\"availability\"]&summary=true&access_token=%s&filter=", catalog, whatsappSystemUserToken)
-		urlEncoded := url.QueryEscape(url_)
-		finalUrl := urlEncoded + filter
+		params := url.Values{}
+		params.Add("fields", "[\"category\",\"name\",\"retailer_id\",\"availability\"]")
+		params.Add("summary", "true")
+		params.Add("access_token", whatsappSystemUserToken)
+		params.Add("filter", filter)
+		url_ := fmt.Sprintf("https://graph.facebook.com/v14.0/%s/products?"+params.Encode(), catalog)
 
-		response, trace, err := fetchProducts(finalUrl)
+		response, trace, err := fetchProducts(url_)
 		traces = append(traces, trace)
 		if err != nil {
 			return nil, traces, err
