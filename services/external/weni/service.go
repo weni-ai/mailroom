@@ -589,7 +589,7 @@ func fetchProducts(url string) (*Response, *httpx.Trace, error) {
 	}
 
 	if t.Response.StatusCode >= 400 {
-		return nil, t, fmt.Errorf("error when searching with seller: status code %d", t.Response.StatusCode)
+		return nil, t, fmt.Errorf("error when searching in meta: status code %d", t.Response.StatusCode)
 	}
 
 	var response Response
