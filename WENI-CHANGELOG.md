@@ -1,3 +1,7 @@
+1.27.0-mailroom-7.1.22
+----------
+ * Add product search to Meta to target availability
+
 1.26.2-mailroom-7.1.22
 ----------
  * Update goflow version to v0.11.2-goflow-0.144.3 with correct release
