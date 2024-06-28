@@ -616,7 +616,7 @@ func ProductsSearchMeta(productEntryList []flows.ProductEntry, catalog string, w
 		params.Add("access_token", whatsappSystemUserToken)
 		params.Add("filter", filter)
 		params.Add("return_only_approved_products", "true")
-		url_ := fmt.Sprintf("https://graph.facebook.com/v14.0/%s/products?%s", catalog, params.Encode())
+		url_ := fmt.Sprintf("https://graph.facebook.com/v14.0/%s/product?%s", catalog, params.Encode())
 
 		response, trace, err := fetchProducts(url_)
 		traces = append(traces, trace)
