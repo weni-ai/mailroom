@@ -1,3 +1,7 @@
+1.27.2-mailroom-7.1.22
+----------
+ * Remove empty sessions
+
 1.27.1-mailroom-7.1.22
 ----------
  * Remove return_only_approved_products field
