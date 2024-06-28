@@ -1,3 +1,7 @@
+1.27.1-mailroom-7.1.22
+----------
+ * Remove return_only_approved_products field
+
 1.27.0-mailroom-7.1.22
 ----------
  * Add product search to Meta to target availability
