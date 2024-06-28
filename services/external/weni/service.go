@@ -631,7 +631,12 @@ func ProductsSearchMeta(productEntryList []flows.ProductEntry, catalog string, w
 		}
 		productEntryList[i].ProductRetailerIDs = productRetailerIDs
 	}
-
-	return productEntryList, traces, nil
+	newProductEntryList := []flows.ProductEntry{}
+	for _, productEntry := range productEntryList {
+		if len(productEntry.ProductRetailerIDs) > 0 {
+			newProductEntryList = append(newProductEntryList, productEntry)
+		}
+	}
+	return newProductEntryList, traces, nil
 
 }
