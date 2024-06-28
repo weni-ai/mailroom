@@ -203,8 +203,17 @@ func (s *service) Call(session flows.Session, params assets.MsgCatalogParam, log
 		}
 	}
 
-	newProductRetailerIDS, tracesMeta, err := ProductsSearchMeta(finalResult.ProductRetailerIDS, fmt.Sprint(catalog.FacebookCatalogID()), s.rtConfig.WhatsappSystemUserToken)
-	finalResult.Traces = append(finalResult.Traces, tracesMeta...)
+	retries := 2
+	var newProductRetailerIDS []flows.ProductEntry
+	var tracesMeta []*httpx.Trace
+	for i := 0; i < retries; i++ {
+		newProductRetailerIDS, tracesMeta, err = ProductsSearchMeta(finalResult.ProductRetailerIDS, fmt.Sprint(catalog.FacebookCatalogID()), s.rtConfig.WhatsappSystemUserToken)
+		finalResult.Traces = append(finalResult.Traces, tracesMeta...)
+		if err != nil {
+			continue
+		}
+		break
+	}
 	if err != nil {
 		return finalResult, err
 	}
