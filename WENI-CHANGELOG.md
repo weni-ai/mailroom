@@ -1,3 +1,7 @@
+1.28.0-mailroom-7.1.22
+----------
+ * Popular template column in msgs_msg table
+
 1.27.2-mailroom-7.1.22
 ----------
  * Remove empty sessions
