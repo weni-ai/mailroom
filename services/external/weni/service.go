@@ -337,6 +337,11 @@ func GetProductListFromVtex(productSearch string, searchUrl string, apiType stri
 		if err != nil {
 			return nil, traces, err
 		}
+	} else if apiType == "sponsored" {
+		result, traces, err = VtexSponsoredSearch(searchUrl, productSearch)
+		if err != nil {
+			return nil, traces, err
+		}
 	}
 
 	return result, traces, nil
@@ -450,6 +455,55 @@ func VtexIntelligentSearch(searchUrl string, productSearch string) ([]string, []
 	}
 
 	return allItems, traces, nil
+}
+
+func VtexSponsoredSearch(searchUrl string, productSearch string) ([]string, []*httpx.Trace, error) {
+	traces := []*httpx.Trace{}
+
+	query := url.Values{}
+	query.Add("query", productSearch)
+	query.Add("locale", "pt-BR")
+	query.Add("hideUnavailableItems", "true")
+
+	urlAfter := strings.TrimSuffix(searchUrl, "/")
+
+	url_ := fmt.Sprintf("%s?%s", urlAfter, query.Encode())
+
+	req, err := httpx.NewRequest("GET", url_, nil, nil)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	client := &http.Client{}
+	trace, err := httpx.DoTrace(client, req, nil, nil, -1)
+	traces = append(traces, trace)
+	if err != nil {
+		return nil, traces, err
+	}
+
+	response := &[]struct {
+		Items []VtexProduct `json:"items"`
+	}{}
+
+	err = jsonx.Unmarshal(trace.ResponseBody, &response)
+	if err != nil {
+		return nil, traces, err
+	}
+
+	allItems := []string{}
+
+	for _, items := range *response {
+		for _, item := range items.Items {
+			allItems = append(allItems, item.ItemId)
+		}
+	}
+
+	if len(allItems) == 0 {
+		return nil, traces, nil
+	}
+
+	return allItems, traces, nil
+
 }
 
 func CartSimulation(products []string, sellerID string, url string, postalCode string) ([]string, *httpx.Trace, error) {
