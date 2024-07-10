@@ -18,7 +18,6 @@ import (
 	"github.com/nyaruka/goflow/flows"
 	"github.com/nyaruka/goflow/flows/events"
 	"github.com/nyaruka/mailroom/core/goflow"
-	"github.com/nyaruka/mailroom/core/insights"
 	"github.com/nyaruka/mailroom/runtime"
 	"github.com/nyaruka/null"
 
@@ -694,16 +693,6 @@ func (s *Session) WriteUpdatedSession(ctx context.Context, rt *runtime.Runtime, 
 		return errors.Wrapf(err, "error writing runs")
 	}
 
-	{ // insights integration for new and updated runs
-		rc := rt.IRP.Get()
-		defer rc.Close()
-		for _, r := range s.Runs() {
-			if err := insights.PushRun(rc, string(r.UUID())); err != nil {
-				logrus.WithError(err).Error("error pushing data to insights integration")
-			}
-		}
-	}
-
 	if err := RecordFlowStatistics(ctx, rt, tx, []flows.Session{fs}, []flows.Sprint{sprint}); err != nil {
 		return errors.Wrapf(err, "error saving flow statistics")
 	}
@@ -875,18 +864,6 @@ func WriteSessions(ctx context.Context, rt *runtime.Runtime, tx *sqlx.Tx, org *O
 	err = BulkQuery(ctx, "insert runs", tx, insertRunSQL, runs)
 	if err != nil {
 		return nil, errors.Wrapf(err, "error writing runs")
-	}
-
-	{
-		rc := rt.IRP.Get()
-		defer rc.Close()
-		for _, s := range sessions {
-			for _, r := range s.runs {
-				if err := insights.PushRun(rc, string(r.UUID())); err != nil {
-					logrus.WithError(err).Error("error pushing data to insights integration")
-				}
-			}
-		}
 	}
 
 	if err := RecordFlowStatistics(ctx, rt, tx, ss, sprints); err != nil {

@@ -4,11 +4,9 @@ import (
 	"context"
 	"time"
 
-	"github.com/nyaruka/mailroom/core/insights"
 	"github.com/nyaruka/mailroom/core/models"
 	"github.com/nyaruka/mailroom/core/tasks"
 	"github.com/nyaruka/mailroom/runtime"
-	"github.com/sirupsen/logrus"
 
 	"github.com/lib/pq"
 	"github.com/pkg/errors"
@@ -124,19 +122,6 @@ func (t *InterruptSessionsTask) Perform(ctx context.Context, rt *runtime.Runtime
 	err := models.ExitSessions(ctx, db, uniqueSessionIDs, models.ExitInterrupted)
 	if err != nil {
 		return errors.Wrapf(err, "error interrupting sessions")
-	}
-
-	{ // insights integration
-		rc := rt.IRP.Get()
-		defer rc.Close()
-		runUUIDs, err := models.SelectRunUUIDsBySessionIDs(ctx, db, uniqueSessionIDs)
-		if err != nil {
-			logrus.WithError(errors.Wrapf(err, "error selecting flow runs uuids"))
-		} else {
-			for _, ruuid := range runUUIDs {
-				insights.PushRun(rc, ruuid)
-			}
-		}
 	}
 
 	return nil
