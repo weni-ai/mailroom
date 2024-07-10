@@ -94,13 +94,7 @@ type Config struct {
 	RouterBaseURL   string `help:"router base url"`
 	RouterAuthToken string `help:"router authorization token"`
 
-
-	InsightsRedis   string `help:"insights redis url"`
-	InsightsRunsKey string `help:"insights runs key"`
-	InsightsEnabled bool   `help:"insights enabled. true or false"`
-
 	WhatsappSystemUserToken string `help:"WhatsApp system user token"`
-
 }
 
 // NewDefaultConfig returns a new default configuration object
@@ -165,10 +159,6 @@ func NewDefaultConfig() *Config {
 		SentenxBaseURL:  "https://sentenx.weni.ai",
 		RouterBaseURL:   "https://nexus.stg.cloud.weni.ai",
 		RouterAuthToken: "",
-
-		InsightsRedis:   "redis://localhost:6379/15",
-		InsightsRunsKey: "flowruns:wait",
-		InsightsEnabled: false,
 
 		WhatsappSystemUserToken: "",
 	}
