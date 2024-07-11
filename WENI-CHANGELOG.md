@@ -1,3 +1,7 @@
+1.29.0-mailroom-7.1.22
+----------
+ * Add sponsored search in the send products card
+
 1.28.1-mailroom-7.1.22
 ----------
  * Remove weni insights integration
