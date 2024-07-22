@@ -602,6 +602,14 @@ func newOutgoingMsgWpp(rt *runtime.Runtime, org *Org, channel *Channel, contactI
 		if msgWpp.InteractionType() == "location" {
 			metadata["interaction_type"] = string(msgWpp.InteractionType())
 		}
+		if msgWpp.InteractionType() == "cta_url" {
+			metadata["interaction_type"] = msgWpp.InteractionType()
+			metadata["cta_message"] = msgWpp.CTAMessage()
+			metadata["cta_message"] = map[string]string{
+				"url":          msgWpp.CTAMessage().URL_,
+				"display_text": msgWpp.CTAMessage().DisplayText_,
+			}
+		}
 		if msgWpp.TextLanguage != "" {
 			metadata["text_language"] = msgWpp.TextLanguage
 		}

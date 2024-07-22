@@ -43,6 +43,7 @@ func TestMsgWppCreated(t *testing.T) {
 						"Menu",
 						nil,
 						"list",
+						"",
 						true,
 					),
 				},
@@ -54,11 +55,24 @@ func TestMsgWppCreated(t *testing.T) {
 						"Menu",
 						nil,
 						"list",
+						"",
+						true,
+					),
+				},
+				testdata.Cathy: []flows.Action{
+					actions.NewSendWppMsg(
+						handlers.NewActionUUID(),
+						"text", "Hi", "", "Hi there.", "footer",
+						[]flows.ListItems{},
+						"Link",
+						nil,
+						"cta_url",
+						"http://foo.bar",
 						true,
 					),
 				},
 				testdata.Bob: []flows.Action{
-					actions.NewSendWppMsg(handlers.NewActionUUID(), "", "", "", "Text", "footer", []flows.ListItems{}, "Menu", nil, "", false),
+					actions.NewSendWppMsg(handlers.NewActionUUID(), "", "", "", "Text", "footer", []flows.ListItems{}, "Menu", nil, "", "", false),
 				},
 			},
 			Msgs: handlers.ContactMsgMap{
