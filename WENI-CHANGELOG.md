@@ -1,3 +1,7 @@
+1.30.0-mailroom-7.1.22
+----------
+ * Support for CTA message for whatsapp cloud channels
+
 1.29.0-mailroom-7.1.22
 ----------
  * Add sponsored search in the send products card
