@@ -927,7 +927,7 @@ func requestToRouter(event *MsgEvent, rtConfig *runtime.Config, projectUUID uuid
 		Text        string             `json:"text"`
 		Attachments []utils.Attachment `json:"attachments"`
 		Metadata    json.RawMessage    `json:"metadata"`
-		MsgEvent		MsgEvent					 `json:"msg_event"`
+		MsgEvent    MsgEvent           `json:"msg_event"`
 	}{
 		ProjectUUID: projectUUID,
 		ContactURN:  event.URN,

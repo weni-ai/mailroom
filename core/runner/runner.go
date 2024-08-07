@@ -147,8 +147,8 @@ func ResumeFlow(ctx context.Context, rt *runtime.Runtime, oa *models.OrgAssets, 
 
 // The params that weni brain send when starting a flow
 type brainStartParams struct {
-	Message		string		`json:"message"`
-	MsgEvent	startMsgEvent	`json:"msg_event"`
+	Message   string        `json:"message"`
+	MsgEvent  startMsgEvent `json:"msg_event"`
 }
 
 // A MsgEvent that weni brain send as a param to start a flow, attachments and metadata are manually handled
@@ -189,9 +189,9 @@ type  startMetadata struct {
 }
 
 type startOrder struct {
-	CatalogID    	string        								`json:"catalog_id,omitempty"`
-	Text 					string        								`json:"text,omitempty"`
-	ProductItems 	map[string]flows.ProductItem 	`json:"product_items,omitempty"`
+	CatalogID     string                        `json:"catalog_id,omitempty"`
+	Text          string                        `json:"text,omitempty"`
+	ProductItems  map[string]flows.ProductItem  `json:"product_items,omitempty"`
 }
 
 func (x *startOrder) toOrder() *flows.Order {
