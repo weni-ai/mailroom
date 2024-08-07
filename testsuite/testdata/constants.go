@@ -45,6 +45,7 @@ var SurveyorFlow = &Flow{10005, "ed8cf8d4-a42c-4ce1-a7e3-44a2918e3cec"}
 var IncomingExtraFlow = &Flow{10006, "376d3de6-7f0e-408c-80d6-b1919738bc80"}
 var ParentTimeoutFlow = &Flow{10007, "81c0f323-7e06-4e0c-a960-19c20f17117c"}
 var CampaignFlow = &Flow{10009, "3a92a964-3a8d-420b-9206-2cd9d884ac30"}
+var InputOrderFlow = &Flow{30000, "3b36078c-aba7-4315-9681-bb584a855579"}
 
 var CreatedOnField = &Field{3, "53499958-0a0a-48a5-bb5f-8f9f4d8af77b"}
 var LastSeenOnField = &Field{5, "4307df2e-b00b-42b6-922b-4a1dcfc268d8"}

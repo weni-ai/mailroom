@@ -180,7 +180,6 @@ func (m *startMsgEvent) Valid() bool {
 		m.ChannelID != 0 &&
 		m.MsgID != 0 &&
 		m.MsgUUID != "" &&
-		m.MsgExternalID != "" &&
 		m.URN != "" &&
 		m.URNID != 0
 }
@@ -301,7 +300,7 @@ func StartFlowBatch(
 
 			if msgEvent.Valid() {
 				channel := oa.ChannelByID(msgEvent.ChannelID)
-				msgIn := flows.NewMsgIn(msgEvent.MsgUUID, msgEvent.URN, channel.ChannelReference(), msgEvent.Text, msgEvent.GetAttachments()) // TODO: handle attachments
+				msgIn := flows.NewMsgIn(msgEvent.MsgUUID, msgEvent.URN, channel.ChannelReference(), msgEvent.Text, msgEvent.GetAttachments())
 				msgIn.SetExternalID(string(msgEvent.MsgExternalID))
 				msgIn.SetID(msgEvent.MsgID)
 
