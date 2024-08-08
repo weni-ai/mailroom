@@ -260,12 +260,9 @@ func (s *service) Forward(ticket *models.Ticket, msgUUID flows.MsgUUID, text str
 
 func (s *service) Close(tickets []*models.Ticket, logHTTP flows.HTTPLogCallback) error {
 	for _, t := range tickets {
-		_, trace, err := s.restClient.CloseRoom(string(t.ExternalID()))
+		_, trace, _ := s.restClient.CloseRoom(string(t.ExternalID()))
 		if trace != nil {
 			logHTTP(flows.NewHTTPLog(trace, flows.HTTPStatusFromCode, s.redactor))
-		}
-		if err != nil {
-			return errors.Wrap(err, "error calling wenichats API")
 		}
 	}
 	return nil
