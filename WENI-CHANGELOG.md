@@ -1,3 +1,7 @@
+1.30.1-mailroom-7.1.22
+----------
+ * Ensure ticket close even if wenichats close room fails
+
 1.30.0-mailroom-7.1.22
 ----------
  * Support for CTA message for whatsapp cloud channels
