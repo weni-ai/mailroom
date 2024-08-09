@@ -1,3 +1,7 @@
+1.31.0-mailroom-7.1.22
+----------
+ * Update goflow for v0.13.0-goflow-0.144.3
+
 1.30.1-mailroom-7.1.22
 ----------
  * Ensure ticket close even if wenichats close room fails
