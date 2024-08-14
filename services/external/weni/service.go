@@ -204,10 +204,10 @@ func (s *service) Call(session flows.Session, params assets.MsgCatalogParam, log
 	}
 
 	retries := 2
-	var newProductRetailerIDS []flows.ProductEntry
+	var filteredProductRetailerIDS []string
 	var tracesMeta []*httpx.Trace
 	for i := 0; i < retries; i++ {
-		newProductRetailerIDS, tracesMeta, err = ProductsSearchMeta(finalResult.ProductRetailerIDS, fmt.Sprint(catalog.FacebookCatalogID()), s.rtConfig.WhatsappSystemUserToken)
+		filteredProductRetailerIDS, tracesMeta, err = ProductsSearchMeta(finalResult.ProductRetailerIDS, fmt.Sprint(catalog.FacebookCatalogID()), s.rtConfig.WhatsappSystemUserToken)
 		finalResult.Traces = append(finalResult.Traces, tracesMeta...)
 		if err != nil {
 			continue
@@ -217,9 +217,36 @@ func (s *service) Call(session flows.Session, params assets.MsgCatalogParam, log
 	if err != nil {
 		return finalResult, err
 	}
-	finalResult.ProductRetailerIDS = newProductRetailerIDS
+
+	var finalProducts []flows.ProductEntry
+	for _, productEntry := range finalResult.ProductRetailerIDS {
+		var availableRetailerIDs []string
+		for _, retailerID := range productEntry.ProductRetailerIDs {
+			if contains(filteredProductRetailerIDS, retailerID) {
+				availableRetailerIDs = append(availableRetailerIDs, retailerID)
+			}
+
+		}
+		if len(availableRetailerIDs) > 0 {
+			finalProducts = append(finalProducts, flows.ProductEntry{
+				Product:            productEntry.Product,
+				ProductRetailerIDs: availableRetailerIDs,
+			})
+		}
+	}
+
+	finalResult.ProductRetailerIDS = finalProducts
 
 	return finalResult, nil
+}
+
+func contains(list []string, item string) bool {
+	for _, v := range list {
+		if v == item {
+			return true
+		}
+	}
+	return false
 }
 
 func GetProductListFromWeniGPT(rtConfig *runtime.Config, content string) ([]string, *httpx.Trace, error) {
@@ -595,23 +622,25 @@ type AndCondition struct {
 }
 
 // createFilter creates the filter JSON based on the list of retailer IDs
-func createFilter(productEntryList []string) (string, error) {
+func createFilter(productEntryList []flows.ProductEntry) (string, error) {
 	var filter Filter
 
-	for _, id := range productEntryList {
-		andCondition := []AndCondition{
-			{
-				RetailerID: map[string]string{"i_contains": id},
-			},
-			{
-				Availability: map[string]string{"i_contains": "in stock"},
-			},
-			{
-				Visibility: map[string]string{"i_contains": "published"},
-			},
+	for _, ProductRetailerList := range productEntryList {
+		var andCondition []AndCondition
+		for _, id := range ProductRetailerList.ProductRetailerIDs {
+			andCondition = []AndCondition{
+				{
+					RetailerID: map[string]string{"i_contains": id},
+				},
+				{
+					Availability: map[string]string{"i_contains": "in stock"},
+				},
+				{
+					Visibility: map[string]string{"i_contains": "published"},
+				},
+			}
 		}
 		filter.Or = append(filter.Or, OrCondition{And: andCondition})
-
 	}
 
 	filterJSON, err := json.Marshal(filter)
@@ -656,41 +685,32 @@ func fetchProducts(url string) (*Response, *httpx.Trace, error) {
 
 }
 
-func ProductsSearchMeta(productEntryList []flows.ProductEntry, catalog string, whatsappSystemUserToken string) ([]flows.ProductEntry, []*httpx.Trace, error) {
+func ProductsSearchMeta(productEntryList []flows.ProductEntry, catalog string, whatsappSystemUserToken string) ([]string, []*httpx.Trace, error) {
 	traces := []*httpx.Trace{}
-	for i, productEntry := range productEntryList {
-		filter, err := createFilter(productEntry.ProductRetailerIDs)
-		if err != nil {
-			return nil, nil, err
-		}
-
-		params := url.Values{}
-		params.Add("fields", "[\"category\",\"name\",\"retailer_id\",\"availability\"]")
-		params.Add("summary", "true")
-		params.Add("access_token", whatsappSystemUserToken)
-		params.Add("filter", filter)
-		url_ := fmt.Sprintf("https://graph.facebook.com/v14.0/%s/products?%s", catalog, params.Encode())
-
-		response, trace, err := fetchProducts(url_)
-		traces = append(traces, trace)
-		if err != nil {
-			return nil, traces, err
-		}
-
-		var productRetailerIDs []string
-
-		// Process the data
-		for _, product := range response.Data {
-			productRetailerIDs = append(productRetailerIDs, product.RetailerID)
-		}
-		productEntryList[i].ProductRetailerIDs = productRetailerIDs
+	filter, err := createFilter(productEntryList)
+	if err != nil {
+		return nil, nil, err
 	}
-	newProductEntryList := []flows.ProductEntry{}
-	for _, productEntry := range productEntryList {
-		if len(productEntry.ProductRetailerIDs) > 0 {
-			newProductEntryList = append(newProductEntryList, productEntry)
-		}
-	}
-	return newProductEntryList, traces, nil
 
+	params := url.Values{}
+	params.Add("fields", "[\"category\",\"name\",\"retailer_id\",\"availability\"]")
+	params.Add("summary", "true")
+	params.Add("access_token", whatsappSystemUserToken)
+	params.Add("filter", filter)
+	url_ := fmt.Sprintf("https://graph.facebook.com/v14.0/%s/products?%s", catalog, params.Encode())
+
+	response, trace, err := fetchProducts(url_)
+	traces = append(traces, trace)
+	if err != nil {
+		return nil, traces, err
+	}
+
+	var productRetailerIDs []string
+
+	// Process the data
+	for _, product := range response.Data {
+		productRetailerIDs = append(productRetailerIDs, product.RetailerID)
+	}
+
+	return productRetailerIDs, traces, nil
 }
