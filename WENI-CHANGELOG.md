@@ -1,3 +1,7 @@
+1.32.0-mailroom-7.1.22
+----------
+ * Add ninth digit verification to allowed orgs
+
 1.31.1-mailroom-7.1.22
 ----------
  * Update goflow for v0.13.1-goflow-0.144.3
