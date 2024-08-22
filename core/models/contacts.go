@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"net/url"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/nyaruka/gocommon/dates"
@@ -560,7 +561,7 @@ func CreateContact(ctx context.Context, db QueryerWithTx, oa *OrgAssets, userID 
 	}
 
 	// find current owners of these URNs
-	owners, err := contactIDsFromURNs(ctx, db, oa.OrgID(), urnz)
+	owners, err := contactIDsFromURNs(ctx, db, oa.OrgID(), urnz, oa.Org().o.Config)
 	if err != nil {
 		return nil, nil, errors.Wrapf(err, "error looking up contacts for URNs")
 	}
@@ -610,7 +611,7 @@ func GetOrCreateContact(ctx context.Context, db QueryerWithTx, oa *OrgAssets, ur
 		urnz[i] = urn.Normalize(string(oa.Env().DefaultCountry()))
 	}
 
-	contactID, created, err := getOrCreateContact(ctx, db, oa.OrgID(), urnz, channelID)
+	contactID, created, err := getOrCreateContact(ctx, db, oa.OrgID(), urnz, channelID, oa.Org().o.Config)
 	if err != nil {
 		return nil, nil, false, err
 	}
@@ -647,7 +648,7 @@ func GetOrCreateContactIDsFromURNs(ctx context.Context, db QueryerWithTx, oa *Or
 	}
 
 	// find current owners of these URNs
-	owners, err := contactIDsFromURNs(ctx, db, oa.OrgID(), urnz)
+	owners, err := contactIDsFromURNs(ctx, db, oa.OrgID(), urnz, oa.Org().o.Config)
 	if err != nil {
 		return nil, errors.Wrapf(err, "error looking up contacts for URNs")
 	}
@@ -666,7 +667,7 @@ func GetOrCreateContactIDsFromURNs(ctx context.Context, db QueryerWithTx, oa *Or
 }
 
 // looks up the contacts who own the given urns (which should be normalized by the caller) and returns that information as a map
-func contactIDsFromURNs(ctx context.Context, db Queryer, orgID OrgID, urnz []urns.URN) (map[urns.URN]ContactID, error) {
+func contactIDsFromURNs(ctx context.Context, db Queryer, orgID OrgID, urnz []urns.URN, orgConfig null.Map) (map[urns.URN]ContactID, error) {
 	identityToOriginal := make(map[urns.URN]urns.URN, len(urnz))
 	identities := make([]urns.URN, len(urnz))
 	owners := make(map[urns.URN]ContactID, len(urnz))
@@ -693,12 +694,74 @@ func contactIDsFromURNs(ctx context.Context, db Queryer, orgID OrgID, urnz []urn
 		owners[identityToOriginal[urn]] = id
 	}
 
+	if (orgConfig.Get("verify_ninth_digit", false) == true) {
+		owners, err = checkNinthDigitContacts(ctx, owners, db, orgID)
+		if err != nil {
+			return nil, errors.Wrapf(err, "error while checking for ninth digit contacts")
+		}
+	}
+
 	return owners, nil
 }
 
-func getOrCreateContact(ctx context.Context, db QueryerWithTx, orgID OrgID, urnz []urns.URN, channelID ChannelID) (ContactID, bool, error) {
+func checkNinthDigitContacts(ctx context.Context, owners map[urns.URN]ContactID, db Queryer, orgID OrgID) (map[urns.URN]ContactID, error) {
+	identitiesToRecheck := make([]urns.URN, 0)
+	urnVariationsMap := make(map[urns.URN]urns.URN)
+	for urn, id := range owners {
+		if id == NilContactID {
+			urnVariation := generateWhatsAppURNVariation(urn)
+			if urnVariation != urn {
+				identitiesToRecheck = append(identitiesToRecheck, urnVariation.Identity())
+				urnVariationsMap[urnVariation] = urn
+			}
+		}
+	}
+
+	if len(identitiesToRecheck) > 0 {
+		rows, err := db.QueryxContext(ctx, `SELECT contact_id, identity FROM contacts_contacturn WHERE org_id = $1 AND identity = ANY($2)`, orgID, pq.Array(identitiesToRecheck))
+		if err != nil && err != sql.ErrNoRows {
+			return nil, errors.Wrapf(err, "error querying contact URNs")
+		}
+		defer rows.Close()
+
+		for rows.Next() {
+			var urn urns.URN
+			var id ContactID
+			if err := rows.Scan(&id, &urn); err != nil {
+				return nil, errors.Wrapf(err, "error scanning URN result")
+			}
+			owners[urnVariationsMap[urn]] = id
+		}
+	}
+
+	return owners, nil
+}
+
+func generateWhatsAppURNVariation(urn urns.URN) urns.URN {
+	// if it's a whatsapp URN we need to generate the variations
+	path := urn.Path()
+	pathVariation := ""
+	if urn.Scheme() == "whatsapp" && strings.HasPrefix(path, "55") {
+		if len(path) == 13 && string(path[4]) == "9" {
+			// Generate without digit 9
+			pathVariation = path[:4] + path[5:]
+		} else {
+			// Generate with digit 9
+			pathVariation = path[:4] + "9" + path[4:]
+		}
+	}
+
+	if pathVariation != "" {
+		urnVariation, _ := urns.NewURNFromParts(urn.Scheme(), pathVariation, "", "")
+		return urnVariation
+	}
+
+	return urn
+}
+
+func getOrCreateContact(ctx context.Context, db QueryerWithTx, orgID OrgID, urnz []urns.URN, channelID ChannelID, orgConfig null.Map) (ContactID, bool, error) {
 	// find current owners of these URNs
-	owners, err := contactIDsFromURNs(ctx, db, orgID, urnz)
+	owners, err := contactIDsFromURNs(ctx, db, orgID, urnz, orgConfig)
 	if err != nil {
 		return NilContactID, false, errors.Wrapf(err, "error looking up contacts for URNs")
 	}
@@ -718,7 +781,7 @@ func getOrCreateContact(ctx context.Context, db QueryerWithTx, orgID OrgID, urnz
 	if dbutil.IsUniqueViolation(err) {
 		// another thread must have created contacts with these URNs in the time between us looking them up and trying to
 		// create them ourselves, so let's try to fetch that contact
-		owners, err := contactIDsFromURNs(ctx, db, orgID, urnz)
+		owners, err := contactIDsFromURNs(ctx, db, orgID, urnz, orgConfig)
 		if err != nil {
 			return NilContactID, false, errors.Wrapf(err, "error looking up contacts for URNs")
 		}
