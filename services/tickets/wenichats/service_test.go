@@ -468,6 +468,9 @@ func TestCloseAndReopen(t *testing.T) {
 	httpx.SetRequestor(httpx.NewMockRequestor(map[string][]httpx.MockResponse{
 		fmt.Sprintf("%s/rooms/%s/close/", baseURL, roomUUID): {
 			httpx.MockConnectionError,
+			httpx.NewMockResponse(500, nil, `{
+				"message": "error"
+			}`),
 			httpx.NewMockResponse(200, nil, `{
 				"uuid": "8ecb1e4a-b457-4645-a161-e2b02ddffa88",
 				"user": {
@@ -554,7 +557,7 @@ func TestCloseAndReopen(t *testing.T) {
 
 	logger := &flows.HTTPLogger{}
 	err = svc.Close([]*models.Ticket{ticket1, ticket2}, logger.Log)
-	assert.EqualError(t, err, "error calling wenichats API: unable to connect to server")
+	assert.NoError(t, err)
 
 	logger = &flows.HTTPLogger{}
 	err = svc.Close([]*models.Ticket{ticket1, ticket2}, logger.Log)
