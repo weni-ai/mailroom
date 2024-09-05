@@ -108,6 +108,8 @@ func (s *service) Call(session flows.Session, params assets.MsgCatalogParam, log
 	var productEntries []flows.ProductEntry
 	var productEntry flows.ProductEntry
 	searchResult := []string{}
+	var searchResultSponsored string
+	var allProductsSponsored []flows.ProductEntry
 	var trace *httpx.Trace
 	var traces []*httpx.Trace
 	var sellerID string
@@ -130,7 +132,7 @@ func (s *service) Call(session flows.Session, params assets.MsgCatalogParam, log
 			searchResult, trace, err = GetProductListFromSentenX(product, catalog.FacebookCatalogID(), searchThreshold, s.rtConfig)
 			callResult.Traces = append(callResult.Traces, trace)
 		} else if params.SearchType == "vtex" {
-			searchResult, traces, err = GetProductListFromVtex(product, params.SearchUrl, params.ApiType)
+			searchResult, searchResultSponsored, traces, err = GetProductListFromVtex(product, params.SearchUrl, params.ApiType, catalog.FacebookCatalogID(), s.rtConfig)
 			callResult.Traces = append(callResult.Traces, traces...)
 			allProducts = append(allProducts, searchResult...)
 			if searchResult == nil {
@@ -158,6 +160,8 @@ func (s *service) Call(session flows.Session, params assets.MsgCatalogParam, log
 			productRetailerIDS = nil
 		}
 		productRetailerIDMap = make(map[string]struct{})
+
+		allProductsSponsored = append(allProductsSponsored, flows.ProductEntry{Product: product, ProductRetailerIDs: []string{searchResultSponsored}})
 	}
 
 	callResult.ProductRetailerIDS = productEntries
@@ -178,7 +182,7 @@ func (s *service) Call(session flows.Session, params assets.MsgCatalogParam, log
 	finalResult.Traces = callResult.Traces
 	finalResult.ResponseJSON = callResult.ResponseJSON
 
-	for _, productEntry := range callResult.ProductRetailerIDS {
+	for i, productEntry := range callResult.ProductRetailerIDS {
 		newEntry := productEntry
 		newEntry.ProductRetailerIDs = []string{}
 
@@ -186,14 +190,21 @@ func (s *service) Call(session flows.Session, params assets.MsgCatalogParam, log
 			if hasSimulation {
 				for _, existingProductId := range existingProductsIds {
 					if productRetailerID == existingProductId {
-						if len(newEntry.ProductRetailerIDs) < 5 {
+						if len(newEntry.ProductRetailerIDs) < 4 {
 							newEntry.ProductRetailerIDs = append(newEntry.ProductRetailerIDs, productRetailerID+"#"+sellerID)
+							if allProductsSponsored[i].Product == newEntry.Product && len(allProductsSponsored[i].ProductRetailerIDs) > 0 {
+								newEntry.ProductRetailerIDs = append(newEntry.ProductRetailerIDs, allProductsSponsored[i].ProductRetailerIDs[0]+"#"+sellerID)
+							}
 						}
 					}
 				}
 			} else {
-				if len(newEntry.ProductRetailerIDs) < 5 {
+				if len(newEntry.ProductRetailerIDs) < 4 {
 					newEntry.ProductRetailerIDs = append(newEntry.ProductRetailerIDs, productRetailerID+"#"+sellerID)
+					if allProductsSponsored[i].Product == newEntry.Product && len(allProductsSponsored[i].ProductRetailerIDs) > 0 {
+						newEntry.ProductRetailerIDs = append(newEntry.ProductRetailerIDs, allProductsSponsored[i].ProductRetailerIDs[0]+"#"+sellerID)
+					}
+
 				}
 			}
 		}
@@ -322,29 +333,65 @@ func GetProductListFromChatGPT(ctx context.Context, rtConfig *runtime.Config, co
 	return products["products"], trace, nil
 }
 
-func GetProductListFromVtex(productSearch string, searchUrl string, apiType string) ([]string, []*httpx.Trace, error) {
+func GetProductListFromVtex(productSearch string, searchUrl string, apiType string, catalog string, rt *runtime.Config) ([]string, string, []*httpx.Trace, error) {
 	var result []string
 	var traces []*httpx.Trace
 	var err error
+	var productSponsored string
 
 	if apiType == "legacy" {
 		result, traces, err = VtexLegacySearch(searchUrl, productSearch)
 		if err != nil {
-			return nil, traces, err
+			return nil, productSponsored, traces, err
 		}
 	} else if apiType == "intelligent" {
 		result, traces, err = VtexIntelligentSearch(searchUrl, productSearch)
 		if err != nil {
-			return nil, traces, err
-		}
-	} else if apiType == "sponsored" {
-		result, traces, err = VtexSponsoredSearch(searchUrl, productSearch)
-		if err != nil {
-			return nil, traces, err
+			return nil, productSponsored, traces, err
 		}
 	}
 
-	return result, traces, nil
+	resultSponsored, traces, err := VtexSponsoredSearch(searchUrl, productSearch)
+	if err != nil {
+		return nil, productSponsored, traces, err
+	}
+
+	productRetailerIDS := []string{}
+	productRetailerIDMap := make(map[string]struct{})
+	var productEntries []flows.ProductEntry
+	var productEntry flows.ProductEntry
+
+	for _, productRetailerID := range resultSponsored {
+		productRetailerIDS = append(productRetailerIDS, productRetailerID)
+		productRetailerIDMap[productRetailerID] = struct{}{}
+	}
+
+	if len(productRetailerIDS) > 0 {
+		productEntry = flows.ProductEntry{
+			Product:            searchUrl,
+			ProductRetailerIDs: productRetailerIDS,
+		}
+		productEntries = append(productEntries, productEntry)
+		productRetailerIDS = nil
+	}
+
+	retries := 2
+	var newProductRetailerIDS []flows.ProductEntry
+	var tracesMeta []*httpx.Trace
+	for i := 0; i < retries; i++ {
+		newProductRetailerIDS, tracesMeta, err = ProductsSearchMeta(productEntries, fmt.Sprint(catalog), rt.WhatsappSystemUserToken)
+		traces = append(traces, tracesMeta...)
+		if err != nil {
+			continue
+		}
+		break
+	}
+
+	if len(newProductRetailerIDS[0].ProductRetailerIDs) > 0 {
+		productSponsored = newProductRetailerIDS[0].ProductRetailerIDs[0]
+	}
+
+	return result, productSponsored, traces, nil
 }
 
 type SearchSeller struct {
