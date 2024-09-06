@@ -55,6 +55,7 @@ type OrgContext struct {
 func (c *OrgContext) Context() string                 { return c.c.OrgContext }
 func (c *OrgContext) ChannelUUID() assets.ChannelUUID { return c.c.ChannelUUID }
 func (c *OrgContext) ProjectUUID() uuids.UUID         { return c.c.ProjectUUID }
+func (c *OrgContext) HasVtex() bool                   { return c.c.HasVtex }
 
 type OrgContextService interface {
 	flows.OrgContextService
