@@ -408,9 +408,11 @@ func NewOrgAssets(ctx context.Context, rt *runtime.Runtime, orgID OrgID, prev *O
 
 	if prev == nil || refresh&RefreshContext > 0 {
 		context := oa.org.ConfigValue("description", "")
+		hasVtex := oa.org.o.Config.Get("has_vtex", false)
 		c := &OrgContext{}
 		c.c.OrgContext = context
 		c.c.ProjectUUID = oa.org.ProjectUUID()
+		c.c.HasVtex = hasVtex.(bool)
 		oa.orgContexts = append(oa.orgContexts, c)
 		if err != nil {
 			return nil, errors.Wrapf(err, "error loading context for org %d", orgID)

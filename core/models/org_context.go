@@ -48,6 +48,7 @@ type OrgContext struct {
 		OrgContext  string             `json:"context"`
 		ChannelUUID assets.ChannelUUID `json:"channel_uuid"`
 		ProjectUUID uuids.UUID         `json:"project_uuid"`
+		HasVtex     bool               `json:"has_vtex"`
 	}
 }
 
