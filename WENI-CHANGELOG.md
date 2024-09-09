@@ -1,3 +1,7 @@
+1.34.1-mailroom-7.1.22
+----------
+ * Handle invalid vtex api search type
+
 1.34.0-mailroom-7.1.22
 ----------
  * Handle brain flowstart msg event with order
