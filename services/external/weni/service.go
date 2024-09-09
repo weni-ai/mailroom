@@ -131,6 +131,9 @@ func (s *service) Call(session flows.Session, params assets.MsgCatalogParam, log
 			callResult.Traces = append(callResult.Traces, trace)
 		} else if params.SearchType == "vtex" {
 			searchResult, traces, err = GetProductListFromVtex(product, params.SearchUrl, params.ApiType)
+			if err != nil {
+				return callResult, errors.Wrapf(err, "on vtex search products")
+			}
 			callResult.Traces = append(callResult.Traces, traces...)
 			allProducts = append(allProducts, searchResult...)
 			if searchResult == nil {
@@ -342,6 +345,8 @@ func GetProductListFromVtex(productSearch string, searchUrl string, apiType stri
 		if err != nil {
 			return nil, traces, err
 		}
+	} else {
+		return nil, nil, errors.New(fmt.Sprintf("invalid api type for url %s", searchUrl))
 	}
 
 	return result, traces, nil
