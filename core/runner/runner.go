@@ -2,14 +2,17 @@ package runner
 
 import (
 	"context"
+	"encoding/json"
 	"time"
 
 	"github.com/gomodule/redigo/redis"
 	"github.com/jmoiron/sqlx"
+	"github.com/nyaruka/gocommon/urns"
 	"github.com/nyaruka/goflow/assets"
 	"github.com/nyaruka/goflow/excellent/types"
 	"github.com/nyaruka/goflow/flows"
 	"github.com/nyaruka/goflow/flows/triggers"
+	"github.com/nyaruka/goflow/utils"
 	"github.com/nyaruka/librato"
 	"github.com/nyaruka/mailroom/core/goflow"
 	"github.com/nyaruka/mailroom/core/models"
@@ -17,6 +20,7 @@ import (
 	"github.com/nyaruka/mailroom/runtime"
 	"github.com/nyaruka/mailroom/runtime/metrics"
 	"github.com/nyaruka/mailroom/utils/locker"
+	"github.com/nyaruka/null"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 )
@@ -141,6 +145,70 @@ func ResumeFlow(ctx context.Context, rt *runtime.Runtime, oa *models.OrgAssets, 
 	return session, nil
 }
 
+// The params that weni brain send when starting a flow
+type brainStartParams struct {
+	Message   string        `json:"message"`
+	MsgEvent  startMsgEvent `json:"msg_event"`
+}
+
+// A MsgEvent that weni brain send as a param to start a flow, attachments and metadata are manually handled
+type startMsgEvent struct {
+	ContactID     models.ContactID   `json:"contact_id,omitempty"`
+	OrgID         models.OrgID       `json:"org_id,omitempty"`
+	ChannelID     models.ChannelID   `json:"channel_id,omitempty"`
+	MsgID         flows.MsgID        `json:"msg_id,omitempty"`
+	MsgUUID       flows.MsgUUID      `json:"msg_uuid,omitempty"`
+	MsgExternalID null.String        `json:"msg_external_id,omitempty"`
+	URN           urns.URN           `json:"urn,omitempty"`
+	URNID         models.URNID       `json:"urn_id,omitempty"`
+	Text          string             `json:"text,omitempty"`
+	Attachments   map[string]string  `json:"attachments,omitempty"`
+	Metadata      *startMetadata     `json:"metadata,omitempty"`
+}
+
+func (m *startMsgEvent) GetAttachments() []utils.Attachment {
+	attachments := make([]utils.Attachment, 0, len(m.Attachments))
+	for _, v := range m.Attachments {
+		attachments = append(attachments, utils.Attachment(v))
+	}
+	return attachments
+}
+
+func (m *startMsgEvent) Valid() bool {
+	return m.ContactID != 0 &&
+		m.OrgID != 0 &&
+		m.ChannelID != 0 &&
+		m.MsgID != 0 &&
+		m.MsgUUID != "" &&
+		m.URN != "" &&
+		m.URNID != 0
+}
+
+type  startMetadata struct {
+	Order *startOrder `json:"order,omitempty"`
+}
+
+type startOrder struct {
+	CatalogID     string                        `json:"catalog_id,omitempty"`
+	Text          string                        `json:"text,omitempty"`
+	ProductItems  map[string]flows.ProductItem  `json:"product_items,omitempty"`
+}
+
+func (x *startOrder) toOrder() *flows.Order {
+	order := &flows.Order{}
+	order.CatalogID = x.CatalogID
+	order.Text = x.Text
+	
+	if x.ProductItems != nil {
+		order.ProductItems = make([]flows.ProductItem, 0, len(x.ProductItems))
+		for _, v := range x.ProductItems {
+			order.ProductItems = append(order.ProductItems, v)
+		}
+	}
+
+	return order
+}
+
 // StartFlowBatch starts the flow for the passed in org, contacts and flow
 func StartFlowBatch(
 	ctx context.Context, rt *runtime.Runtime,
@@ -191,6 +259,20 @@ func StartFlowBatch(
 		}
 	}
 
+	var brainStartMsgEvent *brainStartParams
+	if params != nil {
+		xMsgEvent, err := params.MarshalJSON()
+		if err != nil {
+			return nil, errors.Wrap(err, "unable to marshal JSON from flow start params")
+		}
+
+		brainStartMsgEvent = &brainStartParams{}
+		err = json.Unmarshal(xMsgEvent, brainStartMsgEvent)
+		if err != nil {
+			return nil, errors.Wrap(err, "unable to unmarshal JSON from flow start start")
+		}
+	}
+
 	var history *flows.SessionHistory
 	if len(batch.SessionHistory()) > 0 {
 		history, err = models.ReadSessionHistory(batch.SessionHistory())
@@ -212,6 +294,33 @@ func StartFlowBatch(
 			return tb.Build()
 		}
 
+		// if we have a message event sent from weni brain, we need to build a trigger for that
+		if brainStartMsgEvent != nil {
+			msgEvent := brainStartMsgEvent.MsgEvent
+
+			if msgEvent.Valid() {
+				channel := oa.ChannelByID(msgEvent.ChannelID)
+				msgIn := flows.NewMsgIn(msgEvent.MsgUUID, msgEvent.URN, channel.ChannelReference(), msgEvent.Text, msgEvent.GetAttachments())
+				msgIn.SetExternalID(string(msgEvent.MsgExternalID))
+				msgIn.SetID(msgEvent.MsgID)
+
+				if (msgEvent.Metadata != nil) {
+					if (msgEvent.Metadata.Order != nil) {
+						msgIn.SetOrder(msgEvent.Metadata.Order.toOrder())				
+					}
+				}
+
+				// create a trigger that contains the incoming message from weni brain
+				tb := triggers.NewBuilder(oa.Env(), flow.FlowReference(), contact).Msg(msgIn)
+				
+				if batch.Extra() != nil {
+					tb = tb.WithParams(params)
+				}
+
+				return tb.Build()
+			}
+		}
+				
 		tb := triggers.NewBuilder(oa.Env(), flow.FlowReference(), contact).Manual()
 		if batch.Extra() != nil {
 			tb = tb.WithParams(params)
