@@ -170,7 +170,7 @@ func (s *service) Call(session flows.Session, params assets.MsgCatalogParam, log
 		existingProductsIds, trace, err = CartSimulation(allProducts, sellerID, params.SearchUrl, postalCode_)
 		callResult.Traces = append(callResult.Traces, trace)
 		if err != nil {
-			return nil, err
+			return callResult, err
 		}
 	}
 
