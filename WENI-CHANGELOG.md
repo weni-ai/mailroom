@@ -1,3 +1,7 @@
+1.34.2-mailroom-7.1.22
+----------
+ * Update goflow for v0.14.1-goflow-0.144.3
+
 1.34.1-mailroom-7.1.22
 ----------
  * Handle invalid vtex api search type
