@@ -1,3 +1,8 @@
+1.34.3-mailroom-7.1.22
+----------
+ * Allow locale query param on vtex intelligent search
+ * Update goflow for v0.14.2-goflow-0.144.3
+
 1.34.2-mailroom-7.1.22
 ----------
  * Update goflow for v0.14.1-goflow-0.144.3
