@@ -417,10 +417,28 @@ func VtexIntelligentSearch(searchUrl string, productSearch string) ([]string, []
 
 	traces := []*httpx.Trace{}
 
+	searchUrlParts := strings.Split(searchUrl, "?")
+	queryParams := map[string][]string{}
+	var err error
+	if len(searchUrlParts) > 1 {
+		queryParams, err = url.ParseQuery(searchUrlParts[1])
+		if err != nil {
+			return nil, nil, err
+		}
+	}
+
 	query := url.Values{}
 	query.Add("query", productSearch)
-	query.Add("locale", "pt-BR")
 	query.Add("hideUnavailableItems", "true")
+
+	for key, value := range queryParams {
+		query.Add(key, value[0])
+	}
+
+	// add default pt-BR locale
+	if _, ok := queryParams["locale"]; !ok {
+		query.Add("locale", "pt-BR")
+	}
 
 	urlAfter := strings.TrimSuffix(searchUrl, "/")
 
