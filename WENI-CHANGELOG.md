@@ -1,3 +1,7 @@
+1.34.4-mailroom-7.1.22
+----------
+ * Fix vtex intelligent search url
+
 1.34.3-mailroom-7.1.22
 ----------
  * Allow locale query param on vtex intelligent search
