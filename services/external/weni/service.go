@@ -418,6 +418,7 @@ func VtexIntelligentSearch(searchUrl string, productSearch string) ([]string, []
 	traces := []*httpx.Trace{}
 
 	searchUrlParts := strings.Split(searchUrl, "?")
+	searchUrl = searchUrlParts[0]
 	queryParams := map[string][]string{}
 	var err error
 	if len(searchUrlParts) > 1 {
