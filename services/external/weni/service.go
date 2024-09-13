@@ -110,7 +110,6 @@ func (s *service) Call(session flows.Session, params assets.MsgCatalogParam, log
 	var productEntry flows.ProductEntry
 	searchResult := []string{}
 	var searchResultSponsored string
-	var allProductsSponsored []flows.ProductEntry
 	var trace *httpx.Trace
 	var traces []*httpx.Trace
 	var sellerID string
@@ -127,6 +126,13 @@ func (s *service) Call(session flows.Session, params assets.MsgCatalogParam, log
 	sellerID = strings.TrimSpace(params.SellerId)
 	if sellerID == "" {
 		sellerID = "1"
+	}
+
+	allProductsSponsored := []flows.ProductEntry{
+		{
+			Product:            languages[params.Language],
+			ProductRetailerIDs: []string{},
+		},
 	}
 
 	for _, product := range productList {
@@ -163,7 +169,7 @@ func (s *service) Call(session flows.Session, params assets.MsgCatalogParam, log
 		}
 		productRetailerIDMap = make(map[string]struct{})
 
-		allProductsSponsored = append(allProductsSponsored, flows.ProductEntry{Product: product, ProductRetailerIDs: []string{searchResultSponsored}})
+		allProductsSponsored[0].ProductRetailerIDs = append(allProductsSponsored[0].ProductRetailerIDs, searchResultSponsored)
 	}
 
 	callResult.ProductRetailerIDS = productEntries
@@ -183,7 +189,7 @@ func (s *service) Call(session flows.Session, params assets.MsgCatalogParam, log
 	finalResult := &flows.MsgCatalogCall{}
 	finalResult.Traces = callResult.Traces
 	finalResult.ResponseJSON = callResult.ResponseJSON
-
+	finalResult.ProductRetailerIDS = allProductsSponsored
 	for i, productEntry := range callResult.ProductRetailerIDS {
 		newEntry := productEntry
 		newEntry.ProductRetailerIDs = []string{}
@@ -739,4 +745,10 @@ func ProductsSearchMeta(productEntryList []flows.ProductEntry, catalog string, w
 	}
 	return newProductEntryList, traces, nil
 
+}
+
+var languages = map[string]string{
+	"eng": "You may also like:",
+	"por": "Você também pode gostar:",
+	"spa": "También te puede interesar:",
 }
