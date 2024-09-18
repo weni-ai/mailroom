@@ -1,6 +1,10 @@
+1.34.6-mailroom-7.1.22
+----------
+ * Fix brain to only send attachments when entry is "@input.text"
+
 1.34.5-mailroom-7.1.22
 ----------
- * Fix open wenichats on open ticket to handle properly for contact without preferred urn 
+ * Fix open wenichats on open ticket to handle properly for contact without preferred urn
 
 1.34.4-mailroom-7.1.22
 ----------
