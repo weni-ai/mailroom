@@ -377,23 +377,23 @@ func GetProductListFromVtex(productSearch string, searchUrl string, apiType stri
 			}
 			productEntries = append(productEntries, productEntry)
 			productRetailerIDS = nil
-		}
 
-		retries := 2
-		var newProductRetailerIDS []flows.ProductEntry
-		var tracesMeta []*httpx.Trace
-		for i := 0; i < retries; i++ {
-			newProductRetailerIDS, tracesMeta, err = ProductsSearchMeta(productEntries, fmt.Sprint(catalog), rt.WhatsappSystemUserToken)
-			if err != nil {
-				continue
+			retries := 2
+			var newProductRetailerIDS []flows.ProductEntry
+			var tracesMeta []*httpx.Trace
+			for i := 0; i < retries; i++ {
+				newProductRetailerIDS, tracesMeta, err = ProductsSearchMeta(productEntries, fmt.Sprint(catalog), rt.WhatsappSystemUserToken)
+				if err != nil {
+					continue
+				}
+				break
 			}
-			break
+			if len(newProductRetailerIDS) > 0 {
+				productSponsored = newProductRetailerIDS[0].ProductRetailerIDs[0]
+				traces = append(traces, tracesMeta...)
+			}
 		}
 
-		if len(newProductRetailerIDS) > 0 {
-			productSponsored = newProductRetailerIDS[0].ProductRetailerIDs[0]
-			traces = append(traces, tracesMeta...)
-		}
 	}
 
 	return result, productSponsored, traces, nil
