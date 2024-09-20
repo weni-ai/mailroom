@@ -517,9 +517,14 @@ func VtexSponsoredSearch(searchUrl string, productSearch string) ([]string, []*h
 	query.Add("locale", "pt-BR")
 	query.Add("hideUnavailableItems", "true")
 
-	urlAfter := strings.TrimSuffix(searchUrl, "/")
+	parsedURL, err := url.Parse(searchUrl)
+	if err != nil {
+		fmt.Println("Erro ao fazer parse da URL:", err)
+		return nil, nil, err
+	}
+	domain := parsedURL.Host
 
-	url_ := fmt.Sprintf("%s?%s", urlAfter, query.Encode())
+	url_ := fmt.Sprintf("http://%s/api/io/_v/api/intelligent-search/sponsored_products?%s", domain, query.Encode())
 
 	req, err := httpx.NewRequest("GET", url_, nil, nil)
 	if err != nil {
