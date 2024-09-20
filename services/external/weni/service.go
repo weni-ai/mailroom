@@ -390,7 +390,7 @@ func GetProductListFromVtex(productSearch string, searchUrl string, apiType stri
 			break
 		}
 
-		if len(newProductRetailerIDS[0].ProductRetailerIDs) > 0 {
+		if len(newProductRetailerIDS) > 0 {
 			productSponsored = newProductRetailerIDS[0].ProductRetailerIDs[0]
 			traces = append(traces, tracesMeta...)
 		}
