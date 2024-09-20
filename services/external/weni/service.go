@@ -355,7 +355,8 @@ func GetProductListFromVtex(productSearch string, searchUrl string, apiType stri
 		}
 	}
 	if hasVtex {
-		resultSponsored, traces, err := VtexSponsoredSearch(searchUrl, productSearch)
+		resultSponsored, tracesAds, err := VtexSponsoredSearch(searchUrl, productSearch)
+		traces = append(traces, tracesAds...)
 		if err != nil {
 			return nil, productSponsored, traces, err
 		}
@@ -384,7 +385,6 @@ func GetProductListFromVtex(productSearch string, searchUrl string, apiType stri
 		var tracesMeta []*httpx.Trace
 		for i := 0; i < retries; i++ {
 			newProductRetailerIDS, tracesMeta, err = ProductsSearchMeta(productEntries, fmt.Sprint(catalog), rt.WhatsappSystemUserToken)
-			traces = append(traces, tracesMeta...)
 			if err != nil {
 				continue
 			}
@@ -393,6 +393,7 @@ func GetProductListFromVtex(productSearch string, searchUrl string, apiType stri
 
 		if len(newProductRetailerIDS[0].ProductRetailerIDs) > 0 {
 			productSponsored = newProductRetailerIDS[0].ProductRetailerIDs[0]
+			traces = append(traces, tracesMeta...)
 		}
 	}
 
