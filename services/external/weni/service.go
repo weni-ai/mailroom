@@ -169,7 +169,7 @@ func (s *service) Call(session flows.Session, params assets.MsgCatalogParam, log
 		}
 		productRetailerIDMap = make(map[string]struct{})
 
-		allProductsSponsored[0].ProductRetailerIDs = append(allProductsSponsored[0].ProductRetailerIDs, searchResultSponsored)
+		allProductsSponsored[0].ProductRetailerIDs = append(allProductsSponsored[0].ProductRetailerIDs, searchResultSponsored+"#"+sellerID)
 	}
 
 	callResult.ProductRetailerIDS = productEntries
@@ -189,14 +189,13 @@ func (s *service) Call(session flows.Session, params assets.MsgCatalogParam, log
 	finalResult := &flows.MsgCatalogCall{}
 	finalResult.Traces = callResult.Traces
 	finalResult.ResponseJSON = callResult.ResponseJSON
-	finalResult.ProductRetailerIDS = allProductsSponsored
-	for i, productEntry := range callResult.ProductRetailerIDS {
+	if len(allProductsSponsored) > 0 {
+		finalResult.ProductRetailerIDS = allProductsSponsored
+	}
+
+	for _, productEntry := range callResult.ProductRetailerIDS {
 		newEntry := productEntry
 		newEntry.ProductRetailerIDs = []string{}
-		if allProductsSponsored[i].Product == newEntry.Product && len(allProductsSponsored[i].ProductRetailerIDs) > 0 && hasVtex {
-			newEntry.ProductRetailerIDs = append(newEntry.ProductRetailerIDs, allProductsSponsored[i].ProductRetailerIDs[0]+"#"+sellerID)
-			qttProducts = 4
-		}
 		for _, productRetailerID := range productEntry.ProductRetailerIDs {
 			if hasSimulation {
 				for _, existingProductId := range existingProductsIds {
