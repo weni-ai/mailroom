@@ -135,6 +135,8 @@ func (s *service) Call(session flows.Session, params assets.MsgCatalogParam, log
 		},
 	}
 
+	hasSponsored := false
+
 	for _, product := range productList {
 		if params.SearchType == "default" {
 			searchResult, trace, err = GetProductListFromSentenX(product, catalog.FacebookCatalogID(), searchThreshold, s.rtConfig)
@@ -170,6 +172,7 @@ func (s *service) Call(session flows.Session, params assets.MsgCatalogParam, log
 		productRetailerIDMap = make(map[string]struct{})
 
 		if len(searchResultSponsored) > 0 {
+			hasSponsored = true
 			allProductsSponsored[0].ProductRetailerIDs = append(allProductsSponsored[0].ProductRetailerIDs, searchResultSponsored+"#"+sellerID)
 		}
 
@@ -192,7 +195,7 @@ func (s *service) Call(session flows.Session, params assets.MsgCatalogParam, log
 	finalResult := &flows.MsgCatalogCall{}
 	finalResult.Traces = callResult.Traces
 	finalResult.ResponseJSON = callResult.ResponseJSON
-	if len(allProductsSponsored) > 0 {
+	if hasSponsored {
 		finalResult.ProductRetailerIDS = allProductsSponsored
 	}
 
