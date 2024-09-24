@@ -333,6 +333,10 @@ github.com/weni-ai/goflow v0.13.1-goflow-0.144.3 h1:KrP/XDHg3z9NXwtsyAWu6DO5XM2z
 github.com/weni-ai/goflow v0.13.1-goflow-0.144.3/go.mod h1:o0xaVWP9qNcauBSlcNLa79Fm2oCPV+BDpheFRa/D40c=
 github.com/weni-ai/goflow v0.14.0-goflow-0.144.3-4-develop h1:2UxL4lBRcO2BRlWS+Gb+D2LyX0EGk5PTKvO30fjNg5Y=
 github.com/weni-ai/goflow v0.14.0-goflow-0.144.3-4-develop/go.mod h1:o0xaVWP9qNcauBSlcNLa79Fm2oCPV+BDpheFRa/D40c=
+github.com/weni-ai/goflow v0.15.0-goflow-0.144.3-3-develop h1:gZitrDsAvKDOBuskDtmZBxDuI5ZmcnX2YOWtLHs1K7I=
+github.com/weni-ai/goflow v0.15.0-goflow-0.144.3-3-develop/go.mod h1:o0xaVWP9qNcauBSlcNLa79Fm2oCPV+BDpheFRa/D40c=
+github.com/weni-ai/goflow v0.15.0-goflow-0.144.3-4-develop h1:ZZGIdlZ2nXoVODNDG7jCwDsD6NhNgI3XP9ZBMMxAKhY=
+github.com/weni-ai/goflow v0.15.0-goflow-0.144.3-4-develop/go.mod h1:o0xaVWP9qNcauBSlcNLa79Fm2oCPV+BDpheFRa/D40c=
 github.com/yuin/goldmark v1.1.25/go.mod h1:3hX8gzYuyVAZsxl0MRgGTJEmQBFcNTphYh9decYSb74=
 github.com/yuin/goldmark v1.1.27/go.mod h1:3hX8gzYuyVAZsxl0MRgGTJEmQBFcNTphYh9decYSb74=
 github.com/yuin/goldmark v1.1.32/go.mod h1:3hX8gzYuyVAZsxl0MRgGTJEmQBFcNTphYh9decYSb74=

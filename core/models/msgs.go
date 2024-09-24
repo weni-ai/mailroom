@@ -618,6 +618,7 @@ func newOutgoingMsgWpp(rt *runtime.Runtime, org *Org, channel *Channel, contactI
 				"flow_screen": msgWpp.FlowMessage().FlowScreen,
 				"flow_data":   msgWpp.FlowMessage().FlowData,
 				"flow_cta":    msgWpp.FlowMessage().FlowCTA,
+				"flow_mode":   msgWpp.FlowMessage().FlowMode,
 			}
 		}
 		if msgWpp.TextLanguage != "" {

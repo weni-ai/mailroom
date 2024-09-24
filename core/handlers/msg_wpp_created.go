@@ -106,6 +106,20 @@ func handleMsgWppCreated(ctx context.Context, rt *runtime.Runtime, tx *sqlx.Tx, 
 		}
 	}
 
+	// get our whatsapp flow status
+	if channel.Type() == "WAC" {
+		if event.Msg.InteractionType() == "flow_msg" && event.Msg.FlowMessage().FlowID != "" {
+			whatsAppFlow, err := models.GetActiveWhatsAppFlowFromFacebookIDAndChannel(ctx, tx, channel.ID(), event.Msg.FlowMessage().FlowID)
+			if err != nil {
+				return errors.Wrapf(err, "unable to load whatsapp flow with id: %s, for channel %d", event.Msg.FlowMessage().FlowID, channel.ID())
+			}
+
+			if whatsAppFlow != nil {
+				event.Msg.FlowMessage_.FlowMode = whatsAppFlow.Status()
+			}
+		}
+	}
+
 	msg, err := models.NewOutgoingFlowMsgWpp(rt, oa.Org(), channel, scene.Session(), event.Msg, event.CreatedOn())
 	if err != nil {
 		return errors.Wrapf(err, "error creating outgoing message to %s", event.Msg.URN())
