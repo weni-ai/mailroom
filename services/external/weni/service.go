@@ -169,7 +169,10 @@ func (s *service) Call(session flows.Session, params assets.MsgCatalogParam, log
 		}
 		productRetailerIDMap = make(map[string]struct{})
 
-		allProductsSponsored[0].ProductRetailerIDs = append(allProductsSponsored[0].ProductRetailerIDs, searchResultSponsored+"#"+sellerID)
+		if len(searchResultSponsored) > 0 {
+			allProductsSponsored[0].ProductRetailerIDs = append(allProductsSponsored[0].ProductRetailerIDs, searchResultSponsored+"#"+sellerID)
+		}
+
 	}
 
 	callResult.ProductRetailerIDS = productEntries
