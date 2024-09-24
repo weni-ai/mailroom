@@ -107,7 +107,7 @@ func handleMsgWppCreated(ctx context.Context, rt *runtime.Runtime, tx *sqlx.Tx, 
 	}
 
 	// get our whatsapp flow status
-	if channel.Type() == "WAC" {
+	if channel != nil && channel.Type() == "WAC" {
 		if event.Msg.InteractionType() == "flow_msg" && event.Msg.FlowMessage().FlowID != "" {
 			whatsAppFlow, err := models.GetActiveWhatsAppFlowFromFacebookIDAndChannel(ctx, tx, channel.ID(), event.Msg.FlowMessage().FlowID)
 			if err != nil {
