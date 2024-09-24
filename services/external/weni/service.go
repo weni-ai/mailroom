@@ -103,7 +103,7 @@ func (s *service) Call(session flows.Session, params assets.MsgCatalogParam, log
 		return callResult, err
 	}
 
-	hasVtex := params.HasVtex
+	hasVtexAds := params.HasVtexAds
 	productRetailerIDS := []string{}
 	productRetailerIDMap := make(map[string]struct{})
 	var productEntries []flows.ProductEntry
@@ -142,7 +142,7 @@ func (s *service) Call(session flows.Session, params assets.MsgCatalogParam, log
 			searchResult, trace, err = GetProductListFromSentenX(product, catalog.FacebookCatalogID(), searchThreshold, s.rtConfig)
 			callResult.Traces = append(callResult.Traces, trace)
 		} else if params.SearchType == "vtex" {
-			searchResult, searchResultSponsored, traces, err = GetProductListFromVtex(product, params.SearchUrl, params.ApiType, catalog.FacebookCatalogID(), s.rtConfig, hasVtex)
+			searchResult, searchResultSponsored, traces, err = GetProductListFromVtex(product, params.SearchUrl, params.ApiType, catalog.FacebookCatalogID(), s.rtConfig, hasVtexAds)
 			callResult.Traces = append(callResult.Traces, traces...)
 			allProducts = append(allProducts, searchResult...)
 			if searchResult == nil {
@@ -342,7 +342,7 @@ func GetProductListFromChatGPT(ctx context.Context, rtConfig *runtime.Config, co
 	return products["products"], trace, nil
 }
 
-func GetProductListFromVtex(productSearch string, searchUrl string, apiType string, catalog string, rt *runtime.Config, hasVtex bool) ([]string, string, []*httpx.Trace, error) {
+func GetProductListFromVtex(productSearch string, searchUrl string, apiType string, catalog string, rt *runtime.Config, hasVtexAds bool) ([]string, string, []*httpx.Trace, error) {
 	var result []string
 	var traces []*httpx.Trace
 	var err error
@@ -359,7 +359,7 @@ func GetProductListFromVtex(productSearch string, searchUrl string, apiType stri
 			return nil, productSponsored, traces, err
 		}
 	}
-	if hasVtex {
+	if hasVtexAds {
 		resultSponsored, tracesAds, err := VtexSponsoredSearch(searchUrl, productSearch)
 		traces = append(traces, tracesAds...)
 		if err != nil {

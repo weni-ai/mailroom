@@ -48,14 +48,14 @@ type OrgContext struct {
 		OrgContext  string             `json:"context"`
 		ChannelUUID assets.ChannelUUID `json:"channel_uuid"`
 		ProjectUUID uuids.UUID         `json:"project_uuid"`
-		HasVtex     bool               `json:"has_vtex"`
+		HasVtexAds  bool               `json:"vtex_ads"`
 	}
 }
 
 func (c *OrgContext) Context() string                 { return c.c.OrgContext }
 func (c *OrgContext) ChannelUUID() assets.ChannelUUID { return c.c.ChannelUUID }
 func (c *OrgContext) ProjectUUID() uuids.UUID         { return c.c.ProjectUUID }
-func (c *OrgContext) HasVtex() bool                   { return c.c.HasVtex }
+func (c *OrgContext) HasVtexAds() bool                { return c.c.HasVtexAds }
 
 type OrgContextService interface {
 	flows.OrgContextService
