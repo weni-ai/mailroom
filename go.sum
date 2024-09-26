@@ -331,6 +331,8 @@ github.com/tj/go-kinesis v0.0.0-20171128231115-08b17f58cb1b/go.mod h1:/yhzCV0xPf
 github.com/tj/go-spin v1.1.0/go.mod h1:Mg1mzmePZm4dva8Qz60H2lHwmJ2loum4VIrLgVnKwh4=
 github.com/weni-ai/goflow v1.0.0 h1:19Zm8owCQWoFb+fWUxiKpWyB+KysxwJzk7ZwNolSjlo=
 github.com/weni-ai/goflow v1.0.0/go.mod h1:o0xaVWP9qNcauBSlcNLa79Fm2oCPV+BDpheFRa/D40c=
+github.com/weni-ai/goflow v1.1.0 h1:/UC432ghh6fkhb05Z6c/JxGWf8ej5CNVF67t9gZcIVU=
+github.com/weni-ai/goflow v1.1.0/go.mod h1:o0xaVWP9qNcauBSlcNLa79Fm2oCPV+BDpheFRa/D40c=
 github.com/yuin/goldmark v1.1.25/go.mod h1:3hX8gzYuyVAZsxl0MRgGTJEmQBFcNTphYh9decYSb74=
 github.com/yuin/goldmark v1.1.27/go.mod h1:3hX8gzYuyVAZsxl0MRgGTJEmQBFcNTphYh9decYSb74=
 github.com/yuin/goldmark v1.1.32/go.mod h1:3hX8gzYuyVAZsxl0MRgGTJEmQBFcNTphYh9decYSb74=
