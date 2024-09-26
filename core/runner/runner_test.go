@@ -3,6 +3,7 @@ package runner_test
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"testing"
 	"time"
 
@@ -157,6 +158,115 @@ func TestBatchStart(t *testing.T) {
 		testsuite.AssertQuery(t, db,
 			`SELECT count(*) FROM flows_flowrun WHERE contact_id = ANY($1) and flow_id = $2
 			AND is_active = FALSE AND responded = FALSE AND org_id = 1 AND exit_type = 'C' AND status = 'C'
+			AND results IS NOT NULL AND path IS NOT NULL AND events IS NOT NULL
+			AND session_id IS NOT NULL`, pq.Array(contactIDs), tc.Flow).
+			Returns(tc.TotalCount, "%d: unexpected number of runs", i)
+
+		testsuite.AssertQuery(t, db,
+			`SELECT count(*) FROM msgs_msg WHERE contact_id = ANY($1) AND text = $2 AND org_id = 1 AND status = 'Q' 
+			AND queued_on IS NOT NULL AND direction = 'O' AND msg_type = 'F' AND channel_id = $3`,
+			pq.Array(contactIDs), tc.Msg, testdata.TwilioChannel.ID).
+			Returns(tc.TotalCount, "%d: unexpected number of messages", i)
+
+		last = time.Now()
+	}
+}
+
+func TestBatchStartWithOrderInExtra(t *testing.T) {
+	ctx, rt, db, _ := testsuite.Get()
+
+	defer testsuite.Reset(testsuite.ResetAll)
+
+	// create a start object
+	testdata.InsertFlowStart(db, testdata.Org1, testdata.SingleMessage, nil)
+
+	// create our incoming message
+	msg := testdata.InsertIncomingMsg(db, testdata.Org1, testdata.TwilioChannel, testdata.Cathy, "Here's my order", models.MsgStatusHandled)
+
+	// and our batch object
+	contactIDs := []models.ContactID{testdata.Cathy.ID}
+
+	tcs := []struct {
+		Flow          models.FlowID
+		Restart       models.RestartParticipants
+		IncludeActive models.IncludeActive
+		Extra         json.RawMessage
+		Msg           string
+		Count         int
+		TotalCount    int
+	}{
+		{
+			Flow:          testdata.InputOrderFlow.ID,
+			Restart:       true,
+			IncludeActive: false,
+			Extra:         json.RawMessage([]byte(fmt.Sprintf(`{
+				"message": "Here's my order",
+				"msg_event": {
+						"contact_urn": "%s",
+						"contact_id": %d,
+						"org_id": %d,
+						"channel_id": %d,
+						"msg_id": %d,
+						"msg_uuid": "%s",
+						"msg_external_id": "%s",
+						"urn": "%s",
+						"urn_id": %d,
+						"text": "%s",
+						"attachments": {
+							"0": "image:https://link.to/image.jpg"
+						},
+						"metadata": {
+								"order": {
+										"catalog_id": "1",
+										"text": "Here's my order",
+										"product_items": {
+												"0": {
+														"currency": "BRL",
+														"item_price": 10.99,
+														"product_retailer_id": "retailer_id_1",
+														"quantity": 2
+												}
+										}
+								}
+						}
+				}
+		}`, testdata.Cathy.URN,
+				testdata.Cathy.ID,
+				models.OrgID(1),
+				testdata.TwilioChannel.ID,
+				msg.ID(),
+				msg.UUID(),
+				msg.ExternalID(),
+				testdata.Cathy.URN,
+				testdata.Cathy.URNID,
+				msg.Text(),
+			))),
+			Msg:           "Your order costs: 2 * 10.99 BRL",
+			Count:         1,
+			TotalCount:    1,
+		},
+	}
+
+	last := time.Now()
+
+	for i, tc := range tcs {
+		start := models.NewFlowStart(models.OrgID(1), models.StartTypeManual, models.FlowTypeMessaging, tc.Flow, tc.Restart, tc.IncludeActive).
+			WithContactIDs(contactIDs).
+			WithExtra(tc.Extra)
+		batch := start.CreateBatch(contactIDs, true, len(contactIDs))
+
+		sessions, err := runner.StartFlowBatch(ctx, rt, batch)
+		require.NoError(t, err)
+		assert.Equal(t, tc.Count, len(sessions), "%d: unexpected number of sessions created", i)
+
+		testsuite.AssertQuery(t, db,
+			`SELECT count(*) FROM flows_flowsession WHERE contact_id = ANY($1) 
+			AND status = 'C' AND responded = FALSE AND org_id = 1 AND connection_id IS NULL AND output IS NOT NULL AND created_on > $2`, pq.Array(contactIDs), last).
+			Returns(tc.Count, "%d: unexpected number of sessions", i)
+
+		testsuite.AssertQuery(t, db,
+			`SELECT count(*) FROM flows_flowrun WHERE contact_id = ANY($1) and flow_id = $2
+			AND is_active = FALSE AND responded = TRUE AND org_id = 1 AND exit_type = 'C' AND status = 'C'
 			AND results IS NOT NULL AND path IS NOT NULL AND events IS NOT NULL
 			AND session_id IS NOT NULL`, pq.Array(contactIDs), tc.Flow).
 			Returns(tc.TotalCount, "%d: unexpected number of runs", i)

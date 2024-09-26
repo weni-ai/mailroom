@@ -112,7 +112,16 @@ func (s *service) Open(session flows.Session, topic *flows.Topic, body string, a
 
 	roomData.SectorUUID = s.sectorUUID
 	roomData.QueueUUID = string(topic.UUID())
-	roomData.Contact.URN = session.Contact().PreferredURN().URN().String()
+	preferredURN := session.Contact().PreferredURN()
+	if preferredURN != nil {
+		roomData.Contact.URN = preferredURN.URN().String()
+	} else {
+		urns := session.Contact().URNs()
+		if len(urns) == 0 {
+			return nil, errors.New("failed to open ticket, no urn found for contact")
+		}
+		roomData.Contact.URN = urns[0].String()
+	}
 	roomData.FlowUUID = session.Runs()[0].Flow().UUID()
 	roomData.Contact.Groups = groups
 

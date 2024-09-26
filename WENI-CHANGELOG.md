@@ -1,3 +1,40 @@
+1.34.6-mailroom-7.1.22
+----------
+ * Fix brain to only send attachments when entry is "@input.text"
+
+1.34.5-mailroom-7.1.22
+----------
+ * Fix open wenichats on open ticket to handle properly for contact without preferred urn
+
+1.34.4-mailroom-7.1.22
+----------
+ * Fix vtex intelligent search url
+
+1.34.3-mailroom-7.1.22
+----------
+ * Allow locale query param on vtex intelligent search
+ * Update goflow for v0.14.2-goflow-0.144.3
+
+1.34.2-mailroom-7.1.22
+----------
+ * Update goflow for v0.14.1-goflow-0.144.3
+
+1.34.1-mailroom-7.1.22
+----------
+ * Handle invalid vtex api search type
+
+1.34.0-mailroom-7.1.22
+----------
+ * Handle brain flowstart msg event with order
+
+1.33.1-mailroom-7.1.22
+----------
+ * Return call result if cart simulation fails
+
+1.33.0-mailroom-7.1.22
+----------
+ * Update goflow to v0.14.0-goflow-0.144.3
+
 1.32.0-mailroom-7.1.22
 ----------
  * Add ninth digit verification to allowed orgs
