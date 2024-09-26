@@ -1,3 +1,8 @@
+1.35.0
+----------
+ * Refactor vtex ads
+ * Feat: Add support to WhatsApp Flows
+
 1.34.6-mailroom-7.1.22
 ----------
  * Fix brain to only send attachments when entry is "@input.text"
