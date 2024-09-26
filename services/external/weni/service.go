@@ -188,7 +188,7 @@ func (s *service) Call(session flows.Session, params assets.MsgCatalogParam, log
 		existingProductsIds, trace, err = CartSimulation(allProducts, sellerID, params.SearchUrl, postalCode_)
 		callResult.Traces = append(callResult.Traces, trace)
 		if err != nil {
-			return nil, err
+			return callResult, err
 		}
 	}
 
@@ -470,10 +470,29 @@ func VtexIntelligentSearch(searchUrl string, productSearch string) ([]string, []
 
 	traces := []*httpx.Trace{}
 
+	searchUrlParts := strings.Split(searchUrl, "?")
+	searchUrl = searchUrlParts[0]
+	queryParams := map[string][]string{}
+	var err error
+	if len(searchUrlParts) > 1 {
+		queryParams, err = url.ParseQuery(searchUrlParts[1])
+		if err != nil {
+			return nil, nil, err
+		}
+	}
+
 	query := url.Values{}
 	query.Add("query", productSearch)
-	query.Add("locale", "pt-BR")
 	query.Add("hideUnavailableItems", "true")
+
+	for key, value := range queryParams {
+		query.Add(key, value[0])
+	}
+
+	// add default pt-BR locale
+	if _, ok := queryParams["locale"]; !ok {
+		query.Add("locale", "pt-BR")
+	}
 
 	urlAfter := strings.TrimSuffix(searchUrl, "/")
 

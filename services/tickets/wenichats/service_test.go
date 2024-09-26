@@ -453,6 +453,11 @@ func TestOpenAndForward(t *testing.T) {
 	assert.Equal(t, "9688d21d-95aa-4bed-afc7-f31b35731a3d", ticket.ExternalID())
 	assert.Equal(t, 2, len(logger3.Logs))
 	test.AssertSnapshot(t, "open_ticket_empty_body", logger3.Logs[0].Request)
+
+	session.Contact().ClearURNs()
+	_, err = svc.Open(session, defaultTopic, "{\"history_after\":\"2019-10-07 15:21:30\"}", nil, logger3.Log)
+
+	assert.Equal(t, "failed to open ticket, no urn found for contact", err.Error())
 }
 
 func TestCloseAndReopen(t *testing.T) {
