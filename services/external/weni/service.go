@@ -103,15 +103,18 @@ func (s *service) Call(session flows.Session, params assets.MsgCatalogParam, log
 		return callResult, err
 	}
 
+	hasVtexAds := params.HasVtexAds
 	productRetailerIDS := []string{}
 	productRetailerIDMap := make(map[string]struct{})
 	var productEntries []flows.ProductEntry
 	var productEntry flows.ProductEntry
 	searchResult := []string{}
+	var searchResultSponsored string
 	var trace *httpx.Trace
 	var traces []*httpx.Trace
 	var sellerID string
 	var allProducts []string
+	qttProducts := 5
 
 	postalCode_ := strings.TrimSpace(params.PostalCode)
 	if params.PostalCode != "" {
@@ -125,15 +128,21 @@ func (s *service) Call(session flows.Session, params assets.MsgCatalogParam, log
 		sellerID = "1"
 	}
 
+	allProductsSponsored := []flows.ProductEntry{
+		{
+			Product:            languages[params.Language],
+			ProductRetailerIDs: []string{},
+		},
+	}
+
+	hasSponsored := false
+
 	for _, product := range productList {
 		if params.SearchType == "default" {
 			searchResult, trace, err = GetProductListFromSentenX(product, catalog.FacebookCatalogID(), searchThreshold, s.rtConfig)
 			callResult.Traces = append(callResult.Traces, trace)
 		} else if params.SearchType == "vtex" {
-			searchResult, traces, err = GetProductListFromVtex(product, params.SearchUrl, params.ApiType)
-			if err != nil {
-				return callResult, errors.Wrapf(err, "on vtex search products")
-			}
+			searchResult, searchResultSponsored, traces, err = GetProductListFromVtex(product, params.SearchUrl, params.ApiType, catalog.FacebookCatalogID(), s.rtConfig, hasVtexAds)
 			callResult.Traces = append(callResult.Traces, traces...)
 			allProducts = append(allProducts, searchResult...)
 			if searchResult == nil {
@@ -161,6 +170,12 @@ func (s *service) Call(session flows.Session, params assets.MsgCatalogParam, log
 			productRetailerIDS = nil
 		}
 		productRetailerIDMap = make(map[string]struct{})
+
+		if len(searchResultSponsored) > 0 {
+			hasSponsored = true
+			allProductsSponsored[0].ProductRetailerIDs = append(allProductsSponsored[0].ProductRetailerIDs, searchResultSponsored+"#"+sellerID)
+		}
+
 	}
 
 	callResult.ProductRetailerIDS = productEntries
@@ -180,22 +195,24 @@ func (s *service) Call(session flows.Session, params assets.MsgCatalogParam, log
 	finalResult := &flows.MsgCatalogCall{}
 	finalResult.Traces = callResult.Traces
 	finalResult.ResponseJSON = callResult.ResponseJSON
+	if hasSponsored {
+		finalResult.ProductRetailerIDS = allProductsSponsored
+	}
 
 	for _, productEntry := range callResult.ProductRetailerIDS {
 		newEntry := productEntry
 		newEntry.ProductRetailerIDs = []string{}
-
 		for _, productRetailerID := range productEntry.ProductRetailerIDs {
 			if hasSimulation {
 				for _, existingProductId := range existingProductsIds {
 					if productRetailerID == existingProductId {
-						if len(newEntry.ProductRetailerIDs) < 5 {
+						if len(newEntry.ProductRetailerIDs) < qttProducts {
 							newEntry.ProductRetailerIDs = append(newEntry.ProductRetailerIDs, productRetailerID+"#"+sellerID)
 						}
 					}
 				}
 			} else {
-				if len(newEntry.ProductRetailerIDs) < 5 {
+				if len(newEntry.ProductRetailerIDs) < qttProducts {
 					newEntry.ProductRetailerIDs = append(newEntry.ProductRetailerIDs, productRetailerID+"#"+sellerID)
 				}
 			}
@@ -325,31 +342,67 @@ func GetProductListFromChatGPT(ctx context.Context, rtConfig *runtime.Config, co
 	return products["products"], trace, nil
 }
 
-func GetProductListFromVtex(productSearch string, searchUrl string, apiType string) ([]string, []*httpx.Trace, error) {
+func GetProductListFromVtex(productSearch string, searchUrl string, apiType string, catalog string, rt *runtime.Config, hasVtexAds bool) ([]string, string, []*httpx.Trace, error) {
 	var result []string
 	var traces []*httpx.Trace
 	var err error
+	var productSponsored string
 
 	if apiType == "legacy" {
 		result, traces, err = VtexLegacySearch(searchUrl, productSearch)
 		if err != nil {
-			return nil, traces, err
+			return nil, productSponsored, traces, err
 		}
 	} else if apiType == "intelligent" {
 		result, traces, err = VtexIntelligentSearch(searchUrl, productSearch)
 		if err != nil {
-			return nil, traces, err
+			return nil, productSponsored, traces, err
 		}
-	} else if apiType == "sponsored" {
-		result, traces, err = VtexSponsoredSearch(searchUrl, productSearch)
+	}
+	if hasVtexAds {
+		resultSponsored, tracesAds, err := VtexSponsoredSearch(searchUrl, productSearch)
+		traces = append(traces, tracesAds...)
 		if err != nil {
-			return nil, traces, err
+			return nil, productSponsored, traces, err
 		}
-	} else {
-		return nil, nil, errors.New(fmt.Sprintf("invalid api type for url %s", searchUrl))
+
+		productRetailerIDS := []string{}
+		productRetailerIDMap := make(map[string]struct{})
+		var productEntries []flows.ProductEntry
+		var productEntry flows.ProductEntry
+
+		for _, productRetailerID := range resultSponsored {
+			productRetailerIDS = append(productRetailerIDS, productRetailerID)
+			productRetailerIDMap[productRetailerID] = struct{}{}
+		}
+
+		if len(productRetailerIDS) > 0 {
+			productEntry = flows.ProductEntry{
+				Product:            searchUrl,
+				ProductRetailerIDs: productRetailerIDS,
+			}
+			productEntries = append(productEntries, productEntry)
+			productRetailerIDS = nil
+
+			retries := 2
+			var newProductRetailerIDS []flows.ProductEntry
+			var tracesMeta []*httpx.Trace
+			for i := 0; i < retries; i++ {
+				newProductRetailerIDS, tracesMeta, err = ProductsSearchMeta(productEntries, fmt.Sprint(catalog), rt.WhatsappSystemUserToken)
+				if err != nil {
+					continue
+				}
+				break
+			}
+			if len(newProductRetailerIDS) > 0 {
+				productSponsored = newProductRetailerIDS[0].ProductRetailerIDs[0]
+				traces = append(traces, tracesMeta...)
+			}
+		}
+
 	}
 
-	return result, traces, nil
+	return result, productSponsored, traces, nil
 }
 
 type SearchSeller struct {
@@ -489,9 +542,14 @@ func VtexSponsoredSearch(searchUrl string, productSearch string) ([]string, []*h
 	query.Add("locale", "pt-BR")
 	query.Add("hideUnavailableItems", "true")
 
-	urlAfter := strings.TrimSuffix(searchUrl, "/")
+	parsedURL, err := url.Parse(searchUrl)
+	if err != nil {
+		fmt.Println("Erro ao fazer parse da URL:", err)
+		return nil, nil, err
+	}
+	domain := parsedURL.Host
 
-	url_ := fmt.Sprintf("%s?%s", urlAfter, query.Encode())
+	url_ := fmt.Sprintf("http://%s/api/io/_v/api/intelligent-search/sponsored_products?%s", domain, query.Encode())
 
 	req, err := httpx.NewRequest("GET", url_, nil, nil)
 	if err != nil {
@@ -717,4 +775,10 @@ func ProductsSearchMeta(productEntryList []flows.ProductEntry, catalog string, w
 	}
 	return newProductEntryList, traces, nil
 
+}
+
+var languages = map[string]string{
+	"eng": "You may also like:",
+	"por": "Você também pode gostar:",
+	"spa": "También te puede interesar:",
 }
