@@ -84,7 +84,7 @@ jobs:
           push: true
           tags: "${{env.IMAGE_TAG}}"
           no-cache: true
-          outputs: type=image,name=${{ secrets.ECR }}/mailroom,push-by-digest=true,name-canonical=true,push=true
+          outputs: type=image,name=${{ secrets.ECR_SHARED }}/mailroom,push-by-digest=true,name-canonical=true,push=true
 
       - name: Export digest
         run: |
@@ -125,7 +125,7 @@ jobs:
             VERSION="${TAG}"
             echo "VERSION=${VERSION}" | tee -a "${GITHUB_ENV}"
             echo "COMMIT_SHA=$GITHUB_SHA" | tee -a "${GITHUB_ENV}"
-            echo "IMAGE_TAG=${{ secrets.ECR }}/mailroom:$TAG" | tee -a "${GITHUB_ENV}"
+            echo "IMAGE_TAG=${{ secrets.ECR_SHARED }}/mailroom:$TAG" | tee -a "${GITHUB_ENV}"
       - name: Download digests
         uses: actions/download-artifact@v4
         with:
@@ -148,7 +148,7 @@ jobs:
         working-directory: /tmp/digests
         run: |
           docker buildx imagetools create -t "${{ env.IMAGE_TAG }}" \
-            $(printf '${{ secrets.ECR }}/mailrom@sha256:%s ' *)        
+            $(printf '${{ secrets.ECR_SHARED }}/mailrom@sha256:%s ' *)        
 
       - name: Check out Kubernetes Manifests
         uses: actions/checkout@master
