@@ -1,3 +1,7 @@
+1.36.0
+----------
+ * update goflow to v1.2.0-a1
+
 1.35.0
 ----------
  * Refactor vtex ads
