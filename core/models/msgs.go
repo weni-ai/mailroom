@@ -621,6 +621,10 @@ func newOutgoingMsgWpp(rt *runtime.Runtime, org *Org, channel *Channel, contactI
 				"flow_mode":   msgWpp.FlowMessage().FlowMode,
 			}
 		}
+		if msgWpp.InteractionType() == "order_details" {
+			metadata["interaction_type"] = msgWpp.InteractionType()
+			metadata["order_details_message"] = msgWpp.OrderDetailsMessage()
+		}
 		if msgWpp.TextLanguage != "" {
 			metadata["text_language"] = msgWpp.TextLanguage
 		}
