@@ -121,13 +121,13 @@ func TestMsgWppCreated(t *testing.T) {
 						"",
 						&flows.OrderDetails{
 							ReferenceID: "5278474598478",
-							Items:       "[{\"retaler_id\":\"12345\",\"name\":\"item1\",\"amount\":\"1025\",\"quantity\":\"10\",\"sale_amount\":\"859\"}]",
+							Items:       "[{\"retailer_id\":\"123\",\"name\":\"item 1\",\"quantity\":1,\"amount\":{\"value\":2000,\"offset\":100},\"sale_amount\":{\"value\":1000,\"offset\":100}}]",
 							Tax: &flows.OrderAmountWithDescription{
 								Value:       "10.00",
 								Description: "Tax",
 							},
 							Shipping: &flows.OrderAmountWithDescription{
-								Value:       "5.00",
+								Value:       "5,00",
 								Description: "Shipping",
 							},
 							Discount: &flows.OrderDiscount{
