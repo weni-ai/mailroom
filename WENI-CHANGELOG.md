@@ -1,3 +1,7 @@
+1.39.0
+----------
+ * Feat: WhatsApp Order Details
+
 1.38.0
 ----------
  * update goflow to v1.3.0
