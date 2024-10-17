@@ -930,11 +930,11 @@ func requestToRouter(event *MsgEvent, rtConfig *runtime.Config, projectUUID uuid
 		MsgEvent    MsgEvent           `json:"msg_event"`
 	}{
 		ProjectUUID: projectUUID,
-		ContactURN:  event.URN,
+		ContactURN:  event.URN.Identity(),
 		Text:        event.Text,
 		Attachments: event.Attachments,
 		Metadata:    event.Metadata,
-		MsgEvent: 	 *event,
+		MsgEvent:    *event,
 	}
 
 	var b io.Reader
