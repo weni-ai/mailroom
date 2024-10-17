@@ -7,6 +7,7 @@ import (
 	"github.com/nyaruka/goflow/flows"
 	"github.com/nyaruka/goflow/flows/engine"
 	"github.com/nyaruka/goflow/services/brain"
+	"github.com/nyaruka/goflow/services/meta"
 	"github.com/nyaruka/goflow/services/webhooks"
 	"github.com/nyaruka/goflow/services/wenigpt"
 	"github.com/nyaruka/mailroom/runtime"
@@ -75,6 +76,7 @@ func Engine(c *runtime.Config) flows.Engine {
 			WithWebhookServiceFactory(webhooks.NewServiceFactory(httpClient, httpRetries, httpAccess, webhookHeaders, c.WebhooksMaxBodyBytes)).
 			WithWeniGPTServiceFactory(wenigpt.NewServiceFactory(httpClient, httpRetries, httpAccess, webhookHeaders, c.WebhooksMaxBodyBytes, c.WenigptAuthToken, c.WenigptBaseURL)).
 			WithBrainServiceFactory(brain.NewServiceFactory(httpClient, httpRetries, httpAccess, webhookHeaders, c.WebhooksMaxBodyBytes, c.RouterAuthToken, c.RouterBaseURL)).
+			WithMetaServiceFactory(meta.NewServiceFactory(httpClient, httpRetries, httpAccess, webhookHeaders, c.WebhooksMaxBodyBytes, c.WhatsappSystemUserToken, c.MetaWebhookURL)).
 			WithClassificationServiceFactory(classificationFactory(c)).
 			WithEmailServiceFactory(emailFactory(c)).
 			WithTicketServiceFactory(ticketFactory(c)).
@@ -104,6 +106,7 @@ func Simulator(c *runtime.Config) flows.Engine {
 			WithWebhookServiceFactory(webhooks.NewServiceFactory(httpClient, nil, httpAccess, webhookHeaders, c.WebhooksMaxBodyBytes)).
 			WithWeniGPTServiceFactory(wenigpt.NewServiceFactory(httpClient, nil, httpAccess, webhookHeaders, c.WebhooksMaxBodyBytes, c.WenigptAuthToken, c.WenigptBaseURL)).
 			WithBrainServiceFactory(brain.NewServiceFactory(httpClient, httpRetries, httpAccess, webhookHeaders, c.WebhooksMaxBodyBytes, c.RouterAuthToken, c.RouterBaseURL)).
+			WithMetaServiceFactory(meta.NewServiceFactory(httpClient, httpRetries, httpAccess, webhookHeaders, c.WebhooksMaxBodyBytes, c.WhatsappSystemUserToken, c.MetaWebhookURL)).
 			WithClassificationServiceFactory(classificationFactory(c)).     // simulated sessions do real classification
 			WithExternalServiceServiceFactory(externalServiceFactory((c))). // and real external services
 			WithMsgCatalogServiceFactory(msgCatalogFactory((c))).           // msg catalog
