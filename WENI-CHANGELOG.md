@@ -1,3 +1,9 @@
+1.39.2
+----------
+ * Update wenichats service try close room on fail in any step to open ticket
+ * Fix URN Brain
+ * Update goflow to v1.4.2
+
 1.39.1
 ----------
  * Update goflow to v1.4.1
