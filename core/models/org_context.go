@@ -45,10 +45,11 @@ func orgContextServiceFactory(c *runtime.Config) engine.OrgContextServiceFactory
 
 type OrgContext struct {
 	c struct {
-		OrgContext  string             `json:"context"`
-		ChannelUUID assets.ChannelUUID `json:"channel_uuid"`
-		ProjectUUID uuids.UUID         `json:"project_uuid"`
-		HasVtexAds  bool               `json:"vtex_ads"`
+		OrgContext      string             `json:"context"`
+		ChannelUUID     assets.ChannelUUID `json:"channel_uuid"`
+		ProjectUUID     uuids.UUID         `json:"project_uuid"`
+		HasVtexAds      bool               `json:"vtex_ads"`
+		HideUnavaliable bool               `json:"hide_unavailable"`
 	}
 }
 
@@ -56,6 +57,7 @@ func (c *OrgContext) Context() string                 { return c.c.OrgContext }
 func (c *OrgContext) ChannelUUID() assets.ChannelUUID { return c.c.ChannelUUID }
 func (c *OrgContext) ProjectUUID() uuids.UUID         { return c.c.ProjectUUID }
 func (c *OrgContext) HasVtexAds() bool                { return c.c.HasVtexAds }
+func (c *OrgContext) HideUnavaliable() bool           { return c.c.HideUnavaliable }
 
 type OrgContextService interface {
 	flows.OrgContextService
