@@ -361,7 +361,7 @@ func GetProductListFromVtex(productSearch string, searchUrl string, apiType stri
 		}
 	}
 	if hasVtexAds {
-		resultSponsored, tracesAds, err := VtexSponsoredSearch(searchUrl, productSearch)
+		resultSponsored, tracesAds, err := VtexSponsoredSearch(searchUrl, productSearch, hideUnavailableItems)
 		traces = append(traces, tracesAds...)
 		if err != nil {
 			return nil, productSponsored, traces, err
@@ -541,13 +541,19 @@ func VtexIntelligentSearch(searchUrl string, productSearch string, hideUnavailab
 	return allItems, traces, nil
 }
 
-func VtexSponsoredSearch(searchUrl string, productSearch string) ([]string, []*httpx.Trace, error) {
+func VtexSponsoredSearch(searchUrl string, productSearch string, hideUnavailableItems bool) ([]string, []*httpx.Trace, error) {
 	traces := []*httpx.Trace{}
 
 	query := url.Values{}
 	query.Add("query", productSearch)
 	query.Add("locale", "pt-BR")
-	query.Add("hideUnavailableItems", "true")
+
+	hideUnavailable := "true"
+	if !hideUnavailableItems {
+		hideUnavailable = "false"
+	}
+
+	query.Add("hideUnavailableItems", hideUnavailable)
 
 	parsedURL, err := url.Parse(searchUrl)
 	if err != nil {
