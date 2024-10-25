@@ -49,7 +49,7 @@ type OrgContext struct {
 		ChannelUUID     assets.ChannelUUID `json:"channel_uuid"`
 		ProjectUUID     uuids.UUID         `json:"project_uuid"`
 		HasVtexAds      bool               `json:"vtex_ads"`
-		HideUnavaliable bool               `json:"hide_unavailable"`
+		HideUnavailable bool               `json:"hide_unavailable"`
 	}
 }
 
@@ -57,7 +57,7 @@ func (c *OrgContext) Context() string                 { return c.c.OrgContext }
 func (c *OrgContext) ChannelUUID() assets.ChannelUUID { return c.c.ChannelUUID }
 func (c *OrgContext) ProjectUUID() uuids.UUID         { return c.c.ProjectUUID }
 func (c *OrgContext) HasVtexAds() bool                { return c.c.HasVtexAds }
-func (c *OrgContext) HideUnavaliable() bool           { return c.c.HideUnavaliable }
+func (c *OrgContext) HideUnavailable() bool           { return c.c.HideUnavailable }
 
 type OrgContextService interface {
 	flows.OrgContextService

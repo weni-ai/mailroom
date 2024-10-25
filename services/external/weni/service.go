@@ -104,7 +104,7 @@ func (s *service) Call(session flows.Session, params assets.MsgCatalogParam, log
 	}
 
 	hasVtexAds := params.HasVtexAds
-	hideUnavailableItems := params.HideUnavaliable
+	hideUnavailableItems := params.HideUnavailable
 	productRetailerIDS := []string{}
 	productRetailerIDMap := make(map[string]struct{})
 	var productEntries []flows.ProductEntry
