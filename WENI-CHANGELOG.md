@@ -1,3 +1,7 @@
+1.40.0
+----------
+ * Use hideUnavailable for product search
+
 1.39.2
 ----------
  * Update wenichats service try close room on fail in any step to open ticket
