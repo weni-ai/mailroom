@@ -112,7 +112,7 @@ func (s *service) Open(session flows.Session, topic *flows.Topic, body string, a
 	}
 
 	roomData.SectorUUID = s.sectorUUID
-	roomData.QueueUUID = string(topic.UUID())
+	roomData.QueueUUID = string(topic.QueueUUID())
 	preferredURN := session.Contact().PreferredURN()
 	if preferredURN != nil {
 		roomData.Contact.URN = preferredURN.URN().String()
