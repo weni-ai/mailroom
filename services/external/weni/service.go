@@ -104,6 +104,7 @@ func (s *service) Call(session flows.Session, params assets.MsgCatalogParam, log
 	}
 
 	hasVtexAds := params.HasVtexAds
+	hideUnavailableItems := params.HideUnavailable
 	productRetailerIDS := []string{}
 	productRetailerIDMap := make(map[string]struct{})
 	var productEntries []flows.ProductEntry
@@ -142,7 +143,7 @@ func (s *service) Call(session flows.Session, params assets.MsgCatalogParam, log
 			searchResult, trace, err = GetProductListFromSentenX(product, catalog.FacebookCatalogID(), searchThreshold, s.rtConfig)
 			callResult.Traces = append(callResult.Traces, trace)
 		} else if params.SearchType == "vtex" {
-			searchResult, searchResultSponsored, traces, err = GetProductListFromVtex(product, params.SearchUrl, params.ApiType, catalog.FacebookCatalogID(), s.rtConfig, hasVtexAds)
+			searchResult, searchResultSponsored, traces, err = GetProductListFromVtex(product, params.SearchUrl, params.ApiType, catalog.FacebookCatalogID(), s.rtConfig, hasVtexAds, hideUnavailableItems)
 			callResult.Traces = append(callResult.Traces, traces...)
 			allProducts = append(allProducts, searchResult...)
 			if searchResult == nil {
@@ -341,7 +342,7 @@ func GetProductListFromChatGPT(ctx context.Context, rtConfig *runtime.Config, co
 	return products["products"], trace, nil
 }
 
-func GetProductListFromVtex(productSearch string, searchUrl string, apiType string, catalog string, rt *runtime.Config, hasVtexAds bool) ([]string, string, []*httpx.Trace, error) {
+func GetProductListFromVtex(productSearch string, searchUrl string, apiType string, catalog string, rt *runtime.Config, hasVtexAds bool, hideUnavailableItems bool) ([]string, string, []*httpx.Trace, error) {
 	var result []string
 	var traces []*httpx.Trace
 	var err error
@@ -353,13 +354,13 @@ func GetProductListFromVtex(productSearch string, searchUrl string, apiType stri
 			return nil, productSponsored, traces, err
 		}
 	} else if apiType == "intelligent" {
-		result, traces, err = VtexIntelligentSearch(searchUrl, productSearch)
+		result, traces, err = VtexIntelligentSearch(searchUrl, productSearch, hideUnavailableItems)
 		if err != nil {
 			return nil, productSponsored, traces, err
 		}
 	}
 	if hasVtexAds {
-		resultSponsored, tracesAds, err := VtexSponsoredSearch(searchUrl, productSearch)
+		resultSponsored, tracesAds, err := VtexSponsoredSearch(searchUrl, productSearch, hideUnavailableItems)
 		traces = append(traces, tracesAds...)
 		if err != nil {
 			return nil, productSponsored, traces, err
@@ -465,7 +466,7 @@ func VtexLegacySearch(searchUrl string, productSearch string) ([]string, []*http
 	return allItems, traces, nil
 }
 
-func VtexIntelligentSearch(searchUrl string, productSearch string) ([]string, []*httpx.Trace, error) {
+func VtexIntelligentSearch(searchUrl string, productSearch string, hideUnavailableItems bool) ([]string, []*httpx.Trace, error) {
 
 	traces := []*httpx.Trace{}
 
@@ -482,7 +483,13 @@ func VtexIntelligentSearch(searchUrl string, productSearch string) ([]string, []
 
 	query := url.Values{}
 	query.Add("query", productSearch)
-	query.Add("hideUnavailableItems", "true")
+
+	hideUnavailable := "true"
+	if !hideUnavailableItems {
+		hideUnavailable = "false"
+	}
+
+	query.Add("hideUnavailableItems", hideUnavailable)
 
 	for key, value := range queryParams {
 		query.Add(key, value[0])
@@ -533,13 +540,19 @@ func VtexIntelligentSearch(searchUrl string, productSearch string) ([]string, []
 	return allItems, traces, nil
 }
 
-func VtexSponsoredSearch(searchUrl string, productSearch string) ([]string, []*httpx.Trace, error) {
+func VtexSponsoredSearch(searchUrl string, productSearch string, hideUnavailableItems bool) ([]string, []*httpx.Trace, error) {
 	traces := []*httpx.Trace{}
 
 	query := url.Values{}
 	query.Add("query", productSearch)
 	query.Add("locale", "pt-BR")
-	query.Add("hideUnavailableItems", "true")
+
+	hideUnavailable := "true"
+	if !hideUnavailableItems {
+		hideUnavailable = "false"
+	}
+
+	query.Add("hideUnavailableItems", hideUnavailable)
 
 	parsedURL, err := url.Parse(searchUrl)
 	if err != nil {

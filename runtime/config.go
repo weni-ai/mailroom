@@ -95,6 +95,7 @@ type Config struct {
 	RouterAuthToken string `help:"router authorization token"`
 
 	WhatsappSystemUserToken string `help:"WhatsApp system user token"`
+	MetaWebhookURL          string `help:"Meta webhook URL"`
 }
 
 // NewDefaultConfig returns a new default configuration object
@@ -161,6 +162,7 @@ func NewDefaultConfig() *Config {
 		RouterAuthToken: "",
 
 		WhatsappSystemUserToken: "",
+		MetaWebhookURL:          "https://graph.facebook.com/v21.0",
 	}
 }
 

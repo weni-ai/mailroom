@@ -610,6 +610,21 @@ func newOutgoingMsgWpp(rt *runtime.Runtime, org *Org, channel *Channel, contactI
 				"display_text": msgWpp.CTAMessage().DisplayText_,
 			}
 		}
+		if msgWpp.InteractionType() == "flow_msg" {
+			metadata["interaction_type"] = msgWpp.InteractionType()
+			metadata["flow_message"] = msgWpp.FlowMessage()
+			metadata["flow_message"] = map[string]interface{}{
+				"flow_id":     msgWpp.FlowMessage().FlowID,
+				"flow_screen": msgWpp.FlowMessage().FlowScreen,
+				"flow_data":   msgWpp.FlowMessage().FlowData,
+				"flow_cta":    msgWpp.FlowMessage().FlowCTA,
+				"flow_mode":   msgWpp.FlowMessage().FlowMode,
+			}
+		}
+		if msgWpp.InteractionType() == "order_details" {
+			metadata["interaction_type"] = msgWpp.InteractionType()
+			metadata["order_details_message"] = msgWpp.OrderDetailsMessage()
+		}
 		if msgWpp.TextLanguage != "" {
 			metadata["text_language"] = msgWpp.TextLanguage
 		}

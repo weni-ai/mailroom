@@ -1,3 +1,38 @@
+1.40.0
+----------
+ * Use hideUnavailable for product search
+
+1.39.2
+----------
+ * Update wenichats service try close room on fail in any step to open ticket
+ * Fix URN Brain
+ * Update goflow to v1.4.2
+
+1.39.1
+----------
+ * Update goflow to v1.4.1
+
+1.39.0
+----------
+ * Feat: WhatsApp Order Details
+
+1.38.0
+----------
+ * update goflow to v1.3.0
+
+1.37.0
+----------
+ * update goflow to v1.2.1
+
+1.36.0
+----------
+ * update goflow to v1.2.0-a1
+
+1.35.0
+----------
+ * Refactor vtex ads
+ * Feat: Add support to WhatsApp Flows
+
 1.34.6-mailroom-7.1.22
 ----------
  * Fix brain to only send attachments when entry is "@input.text"
