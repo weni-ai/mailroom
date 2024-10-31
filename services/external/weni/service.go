@@ -804,7 +804,7 @@ var languages = map[string]string{
 func truncateURL(u *url.URL) *url.URL {
 	if len(u.String()) > 2048 {
 		if len(u.RawQuery) > 2048 {
-			u.RawQuery = u.RawQuery[:2048]
+			u.RawQuery = u.RawQuery[:2047]
 		}
 	}
 	return u
