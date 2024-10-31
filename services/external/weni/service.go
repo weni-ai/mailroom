@@ -732,9 +732,7 @@ func fetchProducts(url string) (*Response, *httpx.Trace, error) {
 	}
 
 	t, err := httpx.DoTrace(client, req, nil, nil, -1)
-	fmt.Println("SIZE1: ", t.Request.URL)
 	t.Request.URL = truncateURL(t.Request.URL)
-	fmt.Println("SIZE2: ", t.Request.URL)
 	if err != nil {
 		return nil, t, err
 	}
@@ -804,9 +802,13 @@ var languages = map[string]string{
 }
 
 func truncateURL(u *url.URL) *url.URL {
-	if len(u.String()) > 2048 {
-		if len(u.RawQuery) > 2048 {
-			u.RawQuery = u.RawQuery[:2047]
+	const maxLength = 2048
+	if len(u.String()) > maxLength {
+		excessLength := len(u.String()) - maxLength
+		if excessLength < len(u.RawQuery) {
+			u.RawQuery = u.RawQuery[:len(u.RawQuery)-excessLength]
+		} else {
+			u.RawQuery = ""
 		}
 	}
 	return u
