@@ -732,7 +732,9 @@ func fetchProducts(url string) (*Response, *httpx.Trace, error) {
 	}
 
 	t, err := httpx.DoTrace(client, req, nil, nil, -1)
+	fmt.Println("SIZE1: ", t.Request.URL)
 	t.Request.URL = truncateURL(t.Request.URL)
+	fmt.Println("SIZE2: ", t.Request.URL)
 	if err != nil {
 		return nil, t, err
 	}
