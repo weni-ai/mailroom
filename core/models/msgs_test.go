@@ -556,7 +556,7 @@ func TestNonPersistentBroadcasts(t *testing.T) {
 	oa, err := models.GetOrgAssets(ctx, rt, testdata.Org1.ID)
 	require.NoError(t, err)
 
-	msgs, err := models.CreateBroadcastMessages(ctx, rt, oa, batch)
+	msgs, err := models.CreateBroadcastMessages(ctx, rt, oa, batch, nil)
 	require.NoError(t, err)
 
 	assert.Equal(t, 2, len(msgs))

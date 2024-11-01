@@ -127,7 +127,7 @@ func TestSendReply(t *testing.T) {
 	ticket := testdata.InsertOpenTicket(db, testdata.Org1, testdata.Cathy, testdata.Mailgun, testdata.DefaultTopic, "Have you seen my cookies?", "", nil)
 	modelTicket := ticket.Load(db)
 
-	msg, err := tickets.SendReply(ctx, rt, modelTicket, "I'll get back to you", []*tickets.File{image})
+	msg, err := tickets.SendReply(ctx, rt, modelTicket, "I'll get back to you", []*tickets.File{image}, nil)
 	require.NoError(t, err)
 
 	assert.Equal(t, "I'll get back to you", msg.Text())
@@ -136,7 +136,7 @@ func TestSendReply(t *testing.T) {
 	assert.FileExists(t, "_test_media_storage/media/1/e718/7099/e7187099-7d38-4f60-955c-325957214c42.jpg")
 
 	// try with file that can't be read (i.e. same file again which is already closed)
-	_, err = tickets.SendReply(ctx, rt, modelTicket, "I'll get back to you", []*tickets.File{image})
+	_, err = tickets.SendReply(ctx, rt, modelTicket, "I'll get back to you", []*tickets.File{image}, nil)
 	assert.EqualError(t, err, "error storing attachment http://coolfiles.com/a.jpg for ticket reply: unable to read attachment content: read ../../core/models/testdata/test.jpg: file already closed")
 }
 
