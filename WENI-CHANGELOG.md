@@ -1,3 +1,7 @@
+1.40.1
+----------
+ * Refactor meta search
+
 1.40.0
 ----------
  * Use hideUnavailable for product search
