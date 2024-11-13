@@ -3,6 +3,7 @@ package models_test
 import (
 	"testing"
 
+	"github.com/nyaruka/goflow/assets"
 	"github.com/nyaruka/mailroom/core/models"
 	"github.com/nyaruka/mailroom/testsuite"
 	"github.com/nyaruka/mailroom/testsuite/testdata"
@@ -22,6 +23,7 @@ func TestTopics(t *testing.T) {
 
 	assert.Equal(t, 3, len(topics))
 	assert.Equal(t, testdata.DefaultTopic.UUID, topics[0].UUID())
+	assert.Equal(t, assets.QueueUUID("5c85fdf7-d54a-49dd-97ed-7e10077a1f6a"), topics[0].QueueUUID())
 	assert.Equal(t, "General", topics[0].Name())
 	assert.Equal(t, testdata.SalesTopic.UUID, topics[1].UUID())
 	assert.Equal(t, "Sales", topics[1].Name())

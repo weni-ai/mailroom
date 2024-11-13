@@ -1,3 +1,7 @@
+1.40.2
+----------
+ * Add topic queue uuid 
+
 1.40.1
 ----------
  * Refactor meta search

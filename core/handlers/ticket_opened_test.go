@@ -69,7 +69,7 @@ func TestTicketOpened(t *testing.T) {
 					actions.NewOpenTicket(
 						handlers.NewActionUUID(),
 						assets.NewTicketerReference(testdata.Mailgun.UUID, "Mailgun (IT Support)"),
-						assets.NewTopicReference(testdata.SupportTopic.UUID, "Support"),
+						assets.NewTopicReference(testdata.SupportTopic.UUID, "Support", ""),
 						"Where are my cookies?",
 						assets.NewUserReference(testdata.Admin.Email, "Admin"),
 						"Email Ticket",
