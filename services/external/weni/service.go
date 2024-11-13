@@ -5,7 +5,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"io"
 	"net/http"
 	"net/url"
 	"strconv"
@@ -185,9 +184,10 @@ func (s *service) Call(session flows.Session, params assets.MsgCatalogParam, log
 
 	hasSimulation := false
 	if postalCode_ != "" && sellerID != "1" {
+		var tracesSimulation []*httpx.Trace
 		hasSimulation = true
-		existingProductsIds, trace, err = CartSimulation(allProducts, sellerID, params.SearchUrl, postalCode_)
-		callResult.Traces = append(callResult.Traces, trace)
+		existingProductsIds, tracesSimulation, err = CartSimulation(allProducts, sellerID, params.SearchUrl, postalCode_)
+		callResult.Traces = append(callResult.Traces, tracesSimulation...)
 		if err != nil {
 			return callResult, err
 		}
@@ -406,14 +406,16 @@ func GetProductListFromVtex(productSearch string, searchUrl string, apiType stri
 }
 
 type SearchSeller struct {
-	Items []struct {
-		ID           string `json:"id"`
-		Quantity     int    `json:"quantity"`
-		Seller       string `json:"seller"`
-		Availability string `json:"availability,omitempty"`
-	} `json:"items"`
+	Items      []Item `json:"items"`
 	PostalCode string `json:"postalCode"`
 	Country    string `json:"country"`
+}
+
+type Item struct {
+	ID           string `json:"id"`
+	Quantity     int    `json:"quantity"`
+	Seller       string `json:"seller"`
+	Availability string `json:"availability,omitempty"`
 }
 
 type VtexProduct struct {
@@ -600,75 +602,78 @@ func VtexSponsoredSearch(searchUrl string, productSearch string, hideUnavailable
 
 }
 
-func CartSimulation(products []string, sellerID string, url string, postalCode string) ([]string, *httpx.Trace, error) {
-	var trace *httpx.Trace
-	var body SearchSeller
-	result := []string{}
+func CartSimulation(products []string, sellerID string, url string, postalCode string) ([]string, []*httpx.Trace, error) {
+	var traces []*httpx.Trace
+	var searchSeller SearchSeller
+	batchSize := 300
+	availableProducts := []string{}
+
+	if postalCode != "" {
+		searchSeller.PostalCode = postalCode
+		searchSeller.Country = "BRA"
+	}
+
+	urlSplit := strings.Split(url, "api")
+	urlSimulation := urlSplit[0] + "api/checkout/pub/orderForms/simulation"
 
 	for _, product := range products {
 		product_retailer_id := product
+		searchSeller.Items = append(searchSeller.Items, Item{ID: product_retailer_id, Quantity: 1, Seller: sellerID})
 
-		body.Items = append(body.Items, struct {
-			ID           string "json:\"id\""
-			Quantity     int    "json:\"quantity\""
-			Seller       string "json:\"seller\""
-			Availability string "json:\"availability,omitempty\""
-		}{ID: product_retailer_id, Quantity: 1, Seller: sellerID})
-	}
-
-	if len(body.Items) > 0 {
-
-		if postalCode != "" {
-			body.PostalCode = postalCode
-			body.Country = "BRA"
-		}
-
-		urlSplit := strings.Split(url, "api")
-
-		urlSimulation := urlSplit[0] + "api/checkout/pub/orderForms/simulation"
-
-		headers := map[string]string{
-			"Accept": "application/json",
-		}
-		var b io.Reader
-		data, err := jsonx.Marshal(body)
-		if err != nil {
-			return nil, trace, err
-		}
-		b = bytes.NewReader(data)
-		headers["Content-Type"] = "application/json"
-		req, err := httpx.NewRequest("POST", urlSimulation, b, headers)
-		if err != nil {
-			return nil, trace, err
-		}
-
-		client := &http.Client{}
-		trace, err := httpx.DoTrace(client, req, nil, nil, -1)
-		if err != nil {
-			return nil, trace, err
-		}
-
-		if trace.Response.StatusCode >= 400 {
-			return nil, trace, fmt.Errorf("error when searching with seller: status code %d", trace.Response.StatusCode)
-		}
-
-		response := &SearchSeller{}
-
-		err = json.Unmarshal(trace.ResponseBody, response)
-		if err != nil {
-			return nil, trace, err
-		}
-
-		availableProducts := []string{}
-		for _, item := range response.Items {
-			if item.Availability == "available" {
-				availableProducts = append(availableProducts, item.ID)
+		if len(searchSeller.Items) == batchSize {
+			batchAvailableProducts, trace, err := sendBatchRequest(searchSeller, urlSimulation)
+			traces = append(traces, trace)
+			if err != nil {
+				return nil, traces, err
 			}
+			availableProducts = append(availableProducts, batchAvailableProducts...)
+			searchSeller.Items = []Item{}
 		}
-		return availableProducts, trace, nil
 	}
 
-	return result, trace, nil
+	return availableProducts, traces, nil
+}
+
+func sendBatchRequest(body SearchSeller, url string) ([]string, *httpx.Trace, error) {
+	client := &http.Client{}
+
+	headers := map[string]string{
+		"Accept": "application/json",
+	}
+
+	data, err := jsonx.Marshal(body)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	req, err := httpx.NewRequest("POST", url, bytes.NewReader(data), headers)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	trace, err := httpx.DoTrace(client, req, nil, nil, -1)
+	if err != nil {
+		return nil, trace, err
+	}
+
+	if trace.Response.StatusCode >= 400 {
+		return nil, trace, fmt.Errorf("error when searching with seller: status code %d", trace.Response.StatusCode)
+	}
+
+	response := &SearchSeller{}
+	err = json.Unmarshal(trace.ResponseBody, response)
+	if err != nil {
+		return nil, trace, err
+	}
+
+	availableProducts := []string{}
+	for _, item := range response.Items {
+		if item.Availability == "available" {
+			availableProducts = append(availableProducts, item.ID)
+		}
+	}
+
+	return availableProducts, trace, nil
 }
 
 // Filter represents the structure of the filter for the API request
