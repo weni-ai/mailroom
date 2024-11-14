@@ -300,7 +300,7 @@ func GetProductListFromChatGPT(ctx context.Context, rtConfig *runtime.Config, co
 
 	prompt1 := chatgpt.ChatCompletionMessage{
 		Role:    chatgpt.ChatMessageRoleSystem,
-		Content: "<|begin_of_text|><|system|>Your task is to generate an unformatted JSON list containing strings with the full name of each product taken from the user's input, preserving any multiple-word product names. CRITERIA: ",
+		Content: "Your task is to generate an unformatted JSON list containing strings with the full name of each product taken from the user's input, preserving any multiple-word product names.",
 	}
 	prompt2 := chatgpt.ChatCompletionMessage{
 		Role:    chatgpt.ChatMessageRoleSystem,
@@ -324,7 +324,7 @@ func GetProductListFromChatGPT(ctx context.Context, rtConfig *runtime.Config, co
 	}
 	prompt7 := chatgpt.ChatCompletionMessage{
 		Role:    chatgpt.ChatMessageRoleSystem,
-		Content: "DO NOT RETURN ANYTHING BEYOND THAT</|system|><|end_of_text|>",
+		Content: "DO NOT RETURN ANYTHING BEYOND THAT",
 	}
 	question := chatgpt.ChatCompletionMessage{
 		Role:    chatgpt.ChatMessageRoleUser,
