@@ -301,7 +301,7 @@ func GetProductListFromChatGPT(ctx context.Context, rtConfig *runtime.Config, co
 
 	prompt1 := chatgpt.ChatCompletionMessage{
 		Role:    chatgpt.ChatMessageRoleSystem,
-		Content: "Your task is to generate an unformatted JSON list containing strings with the full name of each product taken from the user's input, preserving any multiple-word product names.",
+		Content: "Your task is to generate an unformatted JSON list containing strings with the full name of each product taken from the user's input, preserving any multiple-word product measurements.",
 	}
 	prompt2 := chatgpt.ChatCompletionMessage{
 		Role:    chatgpt.ChatMessageRoleSystem,
@@ -309,11 +309,11 @@ func GetProductListFromChatGPT(ctx context.Context, rtConfig *runtime.Config, co
 	}
 	prompt3 := chatgpt.ChatCompletionMessage{
 		Role:    chatgpt.ChatMessageRoleSystem,
-		Content: "Always use this pattern: {\"products\": []}",
+		Content: "Each product should be in singular form with specific measurements (e.g., \"1 kg,\" \"500 ml\") that are part of the product's description.",
 	}
 	prompt4 := chatgpt.ChatCompletionMessage{
 		Role:    chatgpt.ChatMessageRoleSystem,
-		Content: "Each product should be in singular form without any numbers or quantities, except for specific measurements (e.g., \"1 kg,\" \"500 ml\") that are part of the product's description.",
+		Content: "Always use this pattern: {\"products\": [\"product + product measurements\"]}",
 	}
 	prompt5 := chatgpt.ChatCompletionMessage{
 		Role:    chatgpt.ChatMessageRoleSystem,
