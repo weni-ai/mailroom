@@ -324,7 +324,7 @@ func GetProductListFromChatGPT(ctx context.Context, rtConfig *runtime.Config, co
 	}
 	prompt7 := chatgpt.ChatCompletionMessage{
 		Role:    chatgpt.ChatMessageRoleSystem,
-		Content: "DO NOT RETURN ANYTHING BEYOND THAT</|system|>",
+		Content: "DO NOT RETURN ANYTHING BEYOND THAT</|system|><|end_of_text|>",
 	}
 	question := chatgpt.ChatCompletionMessage{
 		Role:    chatgpt.ChatMessageRoleUser,
