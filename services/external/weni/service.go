@@ -299,34 +299,44 @@ func GetProductListFromChatGPT(ctx context.Context, rtConfig *runtime.Config, co
 	chatGPTClient := chatgpt.NewClient(httpClient, httpRetries, rtConfig.ChatgptBaseURL, rtConfig.ChatgptKey)
 
 	prompt1 := chatgpt.ChatCompletionMessage{
-		Role:    chatgpt.ChatMessageRoleSystem,
-		Content: "Give me an unformatted JSON list containing strings with the full name of each product taken from the user prompt, preserving any multiple-word product names.",
+		Role: chatgpt.ChatMessageRoleSystem,
+		Content: `<|begin_of_text|><|system|>
+					Your task is to generate an unformatted JSON list containing strings with the full name of each product taken from the user's input, preserving any multiple-word product names.
+
+					CRITERIA:
+					- ENSURE that no product names are repeated.
+					- Always use this pattern: {\"products\": []}.
+					- Each product should be in singular form without any numbers or quantities, except for specific measurements (e.g., "1 kg," "500 ml") that are part of the product's description.
+					- Preserve the order of products as they appear in the user's input.
+					- If the user provides no list of products or provides invalid input, return {"products": []}.
+					DO NOT RETURN ANYTHING BEYOND THAT</|system|>
+					<|user|>{USER_INPUT}</|user|><|end_of_text|>`,
 	}
-	prompt2 := chatgpt.ChatCompletionMessage{
-		Role:    chatgpt.ChatMessageRoleSystem,
-		Content: "Never repeat the same product, and each product should be singular.",
-	}
-	prompt3 := chatgpt.ChatCompletionMessage{
-		Role:    chatgpt.ChatMessageRoleSystem,
-		Content: "Always use this pattern: {\"products\": []}",
-	}
-	prompt4 := chatgpt.ChatCompletionMessage{
-		Role:    chatgpt.ChatMessageRoleSystem,
-		Content: "Ensure that no product names are repeated, and preserve the weight and volume specifications (e.g., 1 kg, 500 ml) that are part of the product description. Remove any quantities or unit counts (e.g., \"2 cookies\"), but keep the weight, volume, or other specification words like 'kg', 'L', and 'ml'",
-	}
-	prompt5 := chatgpt.ChatCompletionMessage{
-		Role:    chatgpt.ChatMessageRoleSystem,
-		Content: "Preserve the order of products as they appear in the user prompt.",
-	}
-	prompt6 := chatgpt.ChatCompletionMessage{
-		Role:    chatgpt.ChatMessageRoleSystem,
-		Content: "If the user does not provide a list of products or provides an invalid input, return an empty list of products.",
-	}
+	// prompt2 := chatgpt.ChatCompletionMessage{
+	// 	Role:    chatgpt.ChatMessageRoleSystem,
+	// 	Content: "Never repeat the same product, and each product should be singular.",
+	// }
+	// prompt3 := chatgpt.ChatCompletionMessage{
+	// 	Role:    chatgpt.ChatMessageRoleSystem,
+	// 	Content: "Always use this pattern: {\"products\": []}",
+	// }
+	// prompt4 := chatgpt.ChatCompletionMessage{
+	// 	Role:    chatgpt.ChatMessageRoleSystem,
+	// 	Content: "Ensure that no product names are repeated, and preserve the weight and volume specifications (e.g., 1 kg, 500 ml) that are part of the product description. Remove any quantities or unit counts (e.g., \"2 cookies\"), but keep the weight, volume, or other specification words like 'kg', 'L', and 'ml'",
+	// }
+	// prompt5 := chatgpt.ChatCompletionMessage{
+	// 	Role:    chatgpt.ChatMessageRoleSystem,
+	// 	Content: "Preserve the order of products as they appear in the user prompt.",
+	// }
+	// prompt6 := chatgpt.ChatCompletionMessage{
+	// 	Role:    chatgpt.ChatMessageRoleSystem,
+	// 	Content: "If the user does not provide a list of products or provides an invalid input, return an empty list of products.",
+	// }
 	question := chatgpt.ChatCompletionMessage{
 		Role:    chatgpt.ChatMessageRoleUser,
 		Content: content,
 	}
-	completionRequest := chatgpt.NewChatCompletionRequest([]chatgpt.ChatCompletionMessage{prompt1, prompt2, prompt3, prompt4, prompt5, prompt6, question})
+	completionRequest := chatgpt.NewChatCompletionRequest([]chatgpt.ChatCompletionMessage{prompt1, question}) //prompt2, prompt3, prompt4, prompt5, prompt6,
 	response, trace, err := chatGPTClient.CreateChatCompletion(completionRequest)
 	if err != nil {
 		return nil, trace, errors.Wrapf(err, "error on chatgpt call for list products")
