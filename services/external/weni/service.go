@@ -304,7 +304,7 @@ func GetProductListFromChatGPT(ctx context.Context, rtConfig *runtime.Config, co
 	}
 	prompt2 := chatgpt.ChatCompletionMessage{
 		Role:    chatgpt.ChatMessageRoleSystem,
-		Content: "Never repeat the same product.",
+		Content: "Never repeat the same product, and each product should be singular.",
 	}
 	prompt3 := chatgpt.ChatCompletionMessage{
 		Role:    chatgpt.ChatMessageRoleSystem,
@@ -312,7 +312,7 @@ func GetProductListFromChatGPT(ctx context.Context, rtConfig *runtime.Config, co
 	}
 	prompt4 := chatgpt.ChatCompletionMessage{
 		Role:    chatgpt.ChatMessageRoleSystem,
-		Content: "Ensure that no product names are repeated, and each product should be in singular form without any numbers or quantities.",
+		Content: "Ensure that no product names are repeated, and preserve the weight and volume specifications (e.g., 1 kg, 500 ml) that are part of the product description. Remove any quantities or unit counts (e.g., \"2 cookies\"), but keep the weight, volume, or other specification words like 'kg', 'L', and 'ml'",
 	}
 	prompt5 := chatgpt.ChatCompletionMessage{
 		Role:    chatgpt.ChatMessageRoleSystem,
