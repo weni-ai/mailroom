@@ -193,21 +193,6 @@ func (s *service) Call(session flows.Session, params assets.MsgCatalogParam, log
 		}
 	}
 
-	retries := 2
-	var productSections []flows.ProductEntry
-	var tracesMeta []*httpx.Trace
-	for i := 0; i < retries; i++ {
-		productSections, tracesMeta, err = ProductsSearchMeta(callResult.ProductRetailerIDS, fmt.Sprint(catalog.FacebookCatalogID()), s.rtConfig.WhatsappSystemUserToken)
-		callResult.Traces = append(callResult.Traces, tracesMeta...)
-		if err != nil {
-			continue
-		}
-		break
-	}
-	if err != nil {
-		return callResult, err
-	}
-
 	finalResult := &flows.MsgCatalogCall{}
 	finalResult.Traces = callResult.Traces
 	finalResult.ResponseJSON = callResult.ResponseJSON
@@ -215,7 +200,7 @@ func (s *service) Call(session flows.Session, params assets.MsgCatalogParam, log
 		finalResult.ProductRetailerIDS = allProductsSponsored
 	}
 
-	for _, productEntry := range productSections {
+	for _, productEntry := range callResult.ProductRetailerIDS {
 		newEntry := productEntry
 		newEntry.ProductRetailerIDs = []string{}
 		for _, productRetailerID := range productEntry.ProductRetailerIDs {
@@ -238,6 +223,22 @@ func (s *service) Call(session flows.Session, params assets.MsgCatalogParam, log
 			finalResult.ProductRetailerIDS = append(finalResult.ProductRetailerIDS, newEntry)
 		}
 	}
+
+	retries := 2
+	var newProductRetailerIDS []flows.ProductEntry
+	var tracesMeta []*httpx.Trace
+	for i := 0; i < retries; i++ {
+		newProductRetailerIDS, tracesMeta, err = ProductsSearchMeta(finalResult.ProductRetailerIDS, fmt.Sprint(catalog.FacebookCatalogID()), s.rtConfig.WhatsappSystemUserToken)
+		finalResult.Traces = append(finalResult.Traces, tracesMeta...)
+		if err != nil {
+			continue
+		}
+		break
+	}
+	if err != nil {
+		return finalResult, err
+	}
+	finalResult.ProductRetailerIDS = newProductRetailerIDS
 
 	return finalResult, nil
 }
@@ -737,7 +738,6 @@ func fetchProducts(url string) (*Response, *httpx.Trace, error) {
 	}
 
 	t, err := httpx.DoTrace(client, req, nil, nil, -1)
-	t.Request.URL = truncateURL(t.Request.URL)
 	if err != nil {
 		return nil, t, err
 	}
@@ -758,44 +758,39 @@ func fetchProducts(url string) (*Response, *httpx.Trace, error) {
 
 func ProductsSearchMeta(productEntryList []flows.ProductEntry, catalog string, whatsappSystemUserToken string) ([]flows.ProductEntry, []*httpx.Trace, error) {
 	traces := []*httpx.Trace{}
-	allIds := []string{}
-	for _, productEntry := range productEntryList {
-		allIds = append(allIds, productEntry.ProductRetailerIDs...)
+	for i, productEntry := range productEntryList {
+		filter, err := createFilter(productEntry.ProductRetailerIDs)
+		if err != nil {
+			return nil, nil, err
+		}
+
+		params := url.Values{}
+		params.Add("fields", "[\"category\",\"name\",\"retailer_id\",\"availability\"]")
+		params.Add("summary", "true")
+		params.Add("access_token", whatsappSystemUserToken)
+		params.Add("filter", filter)
+		url_ := fmt.Sprintf("https://graph.facebook.com/v14.0/%s/products?%s", catalog, params.Encode())
+
+		response, trace, err := fetchProducts(url_)
+		traces = append(traces, trace)
+		if err != nil {
+			return nil, traces, err
+		}
+
+		var productRetailerIDs []string
+
+		// Process the data
+		for _, product := range response.Data {
+			productRetailerIDs = append(productRetailerIDs, product.RetailerID)
+		}
+		productEntryList[i].ProductRetailerIDs = productRetailerIDs
 	}
-
-	filter, err := createFilter(allIds)
-	if err != nil {
-		return nil, nil, err
-	}
-
-	params := url.Values{}
-	params.Add("fields", "[\"category\",\"name\",\"retailer_id\",\"availability\"]")
-	params.Add("summary", "true")
-	params.Add("access_token", whatsappSystemUserToken)
-	params.Add("filter", filter)
-	url_ := fmt.Sprintf("https://graph.facebook.com/v14.0/%s/products?%s", catalog, params.Encode())
-
-	response, trace, err := fetchProducts(url_)
-	traces = append(traces, trace)
-	if err != nil {
-		return nil, traces, err
-	}
-
 	newProductEntryList := []flows.ProductEntry{}
 	for _, productEntry := range productEntryList {
-		validProductIds := []string{}
-		for _, retailerId := range productEntry.ProductRetailerIDs {
-			for _, id := range response.Data {
-				if retailerId == id.RetailerID {
-					validProductIds = append(validProductIds, id.RetailerID)
-				}
-			}
-		}
-		if len(validProductIds) > 0 {
-			newProductEntryList = append(newProductEntryList, flows.ProductEntry{Product: productEntry.Product, ProductRetailerIDs: validProductIds})
+		if len(productEntry.ProductRetailerIDs) > 0 {
+			newProductEntryList = append(newProductEntryList, productEntry)
 		}
 	}
-
 	return newProductEntryList, traces, nil
 
 }
@@ -804,17 +799,4 @@ var languages = map[string]string{
 	"eng": "You may also like:",
 	"por": "Você também pode gostar:",
 	"spa": "También te puede interesar:",
-}
-
-func truncateURL(u *url.URL) *url.URL {
-	const maxLength = 2048
-	if len(u.String()) > maxLength {
-		excessLength := len(u.String()) - maxLength
-		if excessLength < len(u.RawQuery) {
-			u.RawQuery = u.RawQuery[:len(u.RawQuery)-excessLength]
-		} else {
-			u.RawQuery = ""
-		}
-	}
-	return u
 }
