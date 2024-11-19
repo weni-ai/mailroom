@@ -114,6 +114,7 @@ func (s *service) Call(session flows.Session, params assets.MsgCatalogParam, log
 	var traces []*httpx.Trace
 	var sellerID string
 	var allProducts []string
+	existingProductsIds := []string{}
 	qttProducts := 5
 
 	postalCode_ := strings.TrimSpace(params.PostalCode)
@@ -142,7 +143,7 @@ func (s *service) Call(session flows.Session, params assets.MsgCatalogParam, log
 			searchResult, trace, err = GetProductListFromSentenX(product, catalog.FacebookCatalogID(), searchThreshold, s.rtConfig)
 			callResult.Traces = append(callResult.Traces, trace)
 		} else if params.SearchType == "vtex" {
-			searchResult, searchResultSponsored, traces, err = GetProductListFromVtex(product, params.SearchUrl, params.ApiType, catalog.FacebookCatalogID(), s.rtConfig, hasVtexAds, hideUnavailableItems)
+			searchResult, searchResultSponsored, traces, err = GetProductListFromVtex(product, params.SearchUrl, params.ApiType, catalog.FacebookCatalogID(), s.rtConfig, hasVtexAds, hideUnavailableItems, sellerID)
 			callResult.Traces = append(callResult.Traces, traces...)
 			allProducts = append(allProducts, searchResult...)
 			if searchResult == nil {
@@ -173,15 +174,13 @@ func (s *service) Call(session flows.Session, params assets.MsgCatalogParam, log
 
 		if len(searchResultSponsored) > 0 {
 			hasSponsored = true
-			allProductsSponsored[0].ProductRetailerIDs = append(allProductsSponsored[0].ProductRetailerIDs, searchResultSponsored+"#"+sellerID)
+			allProductsSponsored[0].ProductRetailerIDs = append(allProductsSponsored[0].ProductRetailerIDs, searchResultSponsored)
 		}
-
 	}
 
 	callResult.ProductRetailerIDS = productEntries
 
-	existingProductsIds := []string{}
-
+	// simulates cart in VTEX with all products
 	hasSimulation := false
 	if postalCode_ != "" && sellerID != "1" {
 		var tracesSimulation []*httpx.Trace
@@ -193,6 +192,29 @@ func (s *service) Call(session flows.Session, params assets.MsgCatalogParam, log
 		}
 	}
 
+	// adds '#sellerID' formatting to the end of all retailer IDs
+	for _, productEntry := range callResult.ProductRetailerIDS {
+		for i, retailerID := range productEntry.ProductRetailerIDs {
+			productEntry.ProductRetailerIDs[i] = retailerID + "#" + sellerID
+		}
+	}
+
+	// search for products in Meta
+	retries := 2
+	var productSections []flows.ProductEntry
+	var tracesMeta []*httpx.Trace
+	for i := 0; i < retries; i++ {
+		productSections, tracesMeta, err = ProductsSearchMeta(callResult.ProductRetailerIDS, fmt.Sprint(catalog.FacebookCatalogID()), s.rtConfig.WhatsappSystemUserToken)
+		callResult.Traces = append(callResult.Traces, tracesMeta...)
+		if err != nil {
+			continue
+		}
+		break
+	}
+	if err != nil {
+		return callResult, err
+	}
+
 	finalResult := &flows.MsgCatalogCall{}
 	finalResult.Traces = callResult.Traces
 	finalResult.ResponseJSON = callResult.ResponseJSON
@@ -200,7 +222,8 @@ func (s *service) Call(session flows.Session, params assets.MsgCatalogParam, log
 		finalResult.ProductRetailerIDS = allProductsSponsored
 	}
 
-	for _, productEntry := range callResult.ProductRetailerIDS {
+	// checks available products and limits to 5 per section
+	for _, productEntry := range productSections {
 		newEntry := productEntry
 		newEntry.ProductRetailerIDs = []string{}
 		for _, productRetailerID := range productEntry.ProductRetailerIDs {
@@ -208,13 +231,13 @@ func (s *service) Call(session flows.Session, params assets.MsgCatalogParam, log
 				for _, existingProductId := range existingProductsIds {
 					if productRetailerID == existingProductId {
 						if len(newEntry.ProductRetailerIDs) < qttProducts {
-							newEntry.ProductRetailerIDs = append(newEntry.ProductRetailerIDs, productRetailerID+"#"+sellerID)
+							newEntry.ProductRetailerIDs = append(newEntry.ProductRetailerIDs, productRetailerID)
 						}
 					}
 				}
 			} else {
 				if len(newEntry.ProductRetailerIDs) < qttProducts {
-					newEntry.ProductRetailerIDs = append(newEntry.ProductRetailerIDs, productRetailerID+"#"+sellerID)
+					newEntry.ProductRetailerIDs = append(newEntry.ProductRetailerIDs, productRetailerID)
 				}
 			}
 		}
@@ -223,22 +246,6 @@ func (s *service) Call(session flows.Session, params assets.MsgCatalogParam, log
 			finalResult.ProductRetailerIDS = append(finalResult.ProductRetailerIDS, newEntry)
 		}
 	}
-
-	retries := 2
-	var newProductRetailerIDS []flows.ProductEntry
-	var tracesMeta []*httpx.Trace
-	for i := 0; i < retries; i++ {
-		newProductRetailerIDS, tracesMeta, err = ProductsSearchMeta(finalResult.ProductRetailerIDS, fmt.Sprint(catalog.FacebookCatalogID()), s.rtConfig.WhatsappSystemUserToken)
-		finalResult.Traces = append(finalResult.Traces, tracesMeta...)
-		if err != nil {
-			continue
-		}
-		break
-	}
-	if err != nil {
-		return finalResult, err
-	}
-	finalResult.ProductRetailerIDS = newProductRetailerIDS
 
 	return finalResult, nil
 }
@@ -343,7 +350,7 @@ func GetProductListFromChatGPT(ctx context.Context, rtConfig *runtime.Config, co
 	return products["products"], trace, nil
 }
 
-func GetProductListFromVtex(productSearch string, searchUrl string, apiType string, catalog string, rt *runtime.Config, hasVtexAds bool, hideUnavailableItems bool) ([]string, string, []*httpx.Trace, error) {
+func GetProductListFromVtex(productSearch string, searchUrl string, apiType string, catalog string, rt *runtime.Config, hasVtexAds bool, hideUnavailableItems bool, sellerID string) ([]string, string, []*httpx.Trace, error) {
 	var result []string
 	var traces []*httpx.Trace
 	var err error
@@ -368,13 +375,11 @@ func GetProductListFromVtex(productSearch string, searchUrl string, apiType stri
 		}
 
 		productRetailerIDS := []string{}
-		productRetailerIDMap := make(map[string]struct{})
 		var productEntries []flows.ProductEntry
 		var productEntry flows.ProductEntry
 
 		for _, productRetailerID := range resultSponsored {
-			productRetailerIDS = append(productRetailerIDS, productRetailerID)
-			productRetailerIDMap[productRetailerID] = struct{}{}
+			productRetailerIDS = append(productRetailerIDS, productRetailerID+"#"+sellerID)
 		}
 
 		if len(productRetailerIDS) > 0 {
@@ -383,7 +388,6 @@ func GetProductListFromVtex(productSearch string, searchUrl string, apiType stri
 				ProductRetailerIDs: productRetailerIDS,
 			}
 			productEntries = append(productEntries, productEntry)
-			productRetailerIDS = nil
 
 			retries := 2
 			var newProductRetailerIDS []flows.ProductEntry
@@ -757,9 +761,23 @@ func fetchProducts(url string) (*Response, *httpx.Trace, error) {
 }
 
 func ProductsSearchMeta(productEntryList []flows.ProductEntry, catalog string, whatsappSystemUserToken string) ([]flows.ProductEntry, []*httpx.Trace, error) {
+	const batchSize = 15
 	traces := []*httpx.Trace{}
-	for i, productEntry := range productEntryList {
-		filter, err := createFilter(productEntry.ProductRetailerIDs)
+	allIds := []string{}
+	for _, productEntry := range productEntryList {
+		allIds = append(allIds, productEntry.ProductRetailerIDs...)
+	}
+
+	newProductEntryList := []flows.ProductEntry{}
+
+	for i := 0; i < len(allIds); i += batchSize {
+		end := i + batchSize
+		if end > len(allIds) {
+			end = len(allIds)
+		}
+
+		batchIds := allIds[i:end]
+		filter, err := createFilter(batchIds)
 		if err != nil {
 			return nil, nil, err
 		}
@@ -769,6 +787,7 @@ func ProductsSearchMeta(productEntryList []flows.ProductEntry, catalog string, w
 		params.Add("summary", "true")
 		params.Add("access_token", whatsappSystemUserToken)
 		params.Add("filter", filter)
+
 		url_ := fmt.Sprintf("https://graph.facebook.com/v14.0/%s/products?%s", catalog, params.Encode())
 
 		response, trace, err := fetchProducts(url_)
@@ -777,22 +796,22 @@ func ProductsSearchMeta(productEntryList []flows.ProductEntry, catalog string, w
 			return nil, traces, err
 		}
 
-		var productRetailerIDs []string
+		for _, productEntry := range productEntryList {
+			validProductIds := []string{}
+			for _, retailerId := range productEntry.ProductRetailerIDs {
+				for _, id := range response.Data {
+					if retailerId == id.RetailerID {
+						validProductIds = append(validProductIds, id.RetailerID)
+					}
+				}
+			}
+			if len(validProductIds) > 0 {
+				newProductEntryList = append(newProductEntryList, flows.ProductEntry{Product: productEntry.Product, ProductRetailerIDs: validProductIds})
+			}
+		}
+	}
 
-		// Process the data
-		for _, product := range response.Data {
-			productRetailerIDs = append(productRetailerIDs, product.RetailerID)
-		}
-		productEntryList[i].ProductRetailerIDs = productRetailerIDs
-	}
-	newProductEntryList := []flows.ProductEntry{}
-	for _, productEntry := range productEntryList {
-		if len(productEntry.ProductRetailerIDs) > 0 {
-			newProductEntryList = append(newProductEntryList, productEntry)
-		}
-	}
 	return newProductEntryList, traces, nil
-
 }
 
 var languages = map[string]string{
