@@ -1,3 +1,7 @@
+1.40.4
+----------
+ * Update goflow to v1.5.2
+
 1.40.3
 ----------
  * Undo refactoring for Meta search
