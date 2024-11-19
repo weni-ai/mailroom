@@ -52,6 +52,17 @@ func TestChannels(t *testing.T) {
 			nil,
 		},
 		{
+			testdata.WhatsAppCloudChannel.ID,
+			testdata.WhatsAppCloudChannel.UUID,
+			"WhatsApp Cloud",
+			"+559999999999",
+			[]string{"whatsapp"},
+			[]assets.ChannelRole{"send", "receive"},
+			nil,
+			false,
+			nil,
+		},
+		{
 			testdata.VonageChannel.ID,
 			testdata.VonageChannel.UUID,
 			"Vonage",
