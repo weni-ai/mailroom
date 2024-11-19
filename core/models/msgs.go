@@ -1606,12 +1606,14 @@ func CreateWppBroadcastMessages(ctx context.Context, rt *runtime.Runtime, oa *Or
 		// evaluate our message fields
 		text := bcast.Msg().Text
 		attachments := bcast.Msg().Attachments
-		quickReplies := bcast.Msg().QuickReplies
+		quickReplies := make([]string, len(bcast.Msg().QuickReplies))
+		copy(quickReplies, bcast.Msg().QuickReplies)
 		headerType := bcast.Msg().Header.Type
 		headerText := bcast.Msg().Header.Text
 		footerText := bcast.Msg().Footer
 		var templating *flows.MsgTemplating = nil
-		templateVariables := bcast.Msg().Template.Variables
+		templateVariables := make([]string, len(bcast.Msg().Template.Variables))
+		copy(templateVariables, bcast.Msg().Template.Variables)
 
 		ctaMessage := bcast.Msg().CTAMessage
 		listMessage := bcast.Msg().ListMessage
@@ -1674,6 +1676,8 @@ func CreateWppBroadcastMessages(ctx context.Context, rt *runtime.Runtime, oa *Or
 				text = translation.Substitute(evaluatedVariables)
 				var templateReference = assets.NewTemplateReference(bcast.Msg().Template.UUID, bcast.Msg().Template.Name)
 				templating = flows.NewMsgTemplating(templateReference, translation.Language(), translation.Country(), evaluatedVariables, translation.Namespace())
+			} else {
+				return nil, errors.Errorf("translation not found for template: %s, in channel: %s", bcast.Msg().Template.UUID, channel.UUID())
 			}
 		}
 
