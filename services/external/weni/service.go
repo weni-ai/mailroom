@@ -180,6 +180,8 @@ func (s *service) Call(session flows.Session, params assets.MsgCatalogParam, log
 
 	callResult.ProductRetailerIDS = productEntries
 
+	fmt.Println("SIZE ProductRetailerIDS:", len(callResult.ProductRetailerIDS))
+
 	// simulates cart in VTEX with all products
 	hasSimulation := false
 	if postalCode_ != "" && sellerID != "1" {
@@ -763,11 +765,14 @@ func fetchProducts(url string) (*Response, *httpx.Trace, error) {
 
 func ProductsSearchMeta(productEntryList []flows.ProductEntry, catalog string, whatsappSystemUserToken string) ([]flows.ProductEntry, []*httpx.Trace, error) {
 	const batchSize = 15
+	validProductIds := []string{}
 	traces := []*httpx.Trace{}
 	allIds := []string{}
 	for _, productEntry := range productEntryList {
 		allIds = append(allIds, productEntry.ProductRetailerIDs...)
 	}
+
+	fmt.Println("SIZE ALLIDS: ", len(allIds))
 
 	newProductEntryList := []flows.ProductEntry{}
 
@@ -797,17 +802,19 @@ func ProductsSearchMeta(productEntryList []flows.ProductEntry, catalog string, w
 			return nil, traces, err
 		}
 
-		for _, productEntry := range productEntryList {
-			validProductIds := []string{}
-			for _, retailerId := range productEntry.ProductRetailerIDs {
-				for _, id := range response.Data {
-					if retailerId == id.RetailerID {
-						validProductIds = append(validProductIds, id.RetailerID)
-					}
+		for _, id := range response.Data {
+			validProductIds = append(validProductIds, id.RetailerID)
+		}
+	}
+
+	for i, productEntry := range productEntryList {
+		newProductEntryList[i].Product = productEntry.Product
+		for _, retailerId := range productEntry.ProductRetailerIDs {
+			for _, id := range validProductIds {
+				if retailerId == id {
+					newProductEntryList[i].ProductRetailerIDs = append(newProductEntryList[i].ProductRetailerIDs, id)
+					break
 				}
-			}
-			if len(validProductIds) > 0 {
-				newProductEntryList = append(newProductEntryList, flows.ProductEntry{Product: productEntry.Product, ProductRetailerIDs: validProductIds})
 			}
 		}
 	}
