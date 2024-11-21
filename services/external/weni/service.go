@@ -638,6 +638,15 @@ func CartSimulation(products []string, sellerID string, url string, postalCode s
 		}
 	}
 
+	if len(searchSeller.Items) > 0 {
+		batchAvailableProducts, trace, err := sendBatchRequest(searchSeller, urlSimulation)
+		traces = append(traces, trace)
+		if err != nil {
+			return nil, traces, err
+		}
+		availableProducts = append(availableProducts, batchAvailableProducts...)
+	}
+
 	return availableProducts, traces, nil
 }
 
