@@ -1,3 +1,7 @@
+1.41.0
+----------
+ * Feat: WhatsApp Broadcasts
+
 1.40.4
 ----------
  * Update goflow to v1.5.2
