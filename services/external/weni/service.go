@@ -610,40 +610,35 @@ func VtexSponsoredSearch(searchUrl string, productSearch string, hideUnavailable
 }
 
 func CartSimulation(products []string, sellerID string, url string, postalCode string) ([]string, []*httpx.Trace, error) {
+	const batchSize = 300
 	var traces []*httpx.Trace
-	var searchSeller SearchSeller
-	batchSize := 300
-	availableProducts := []string{}
-
-	if postalCode != "" {
-		searchSeller.PostalCode = postalCode
-		searchSeller.Country = "BRA"
-	}
+	var availableProducts []string
 
 	urlSplit := strings.Split(url, "api")
 	urlSimulation := urlSplit[0] + "api/checkout/pub/orderForms/simulation"
 
-	for _, product := range products {
-		product_retailer_id := product
-		searchSeller.Items = append(searchSeller.Items, Item{ID: product_retailer_id, Quantity: 1, Seller: sellerID})
-
-		if len(searchSeller.Items) == batchSize {
-			batchAvailableProducts, trace, err := sendBatchRequest(searchSeller, urlSimulation)
-			traces = append(traces, trace)
-			if err != nil {
-				return nil, traces, err
-			}
-			availableProducts = append(availableProducts, batchAvailableProducts...)
-			searchSeller.Items = []Item{}
+	for i := 0; i < len(products); i += batchSize {
+		end := i + batchSize
+		if end > len(products) {
+			end = len(products)
 		}
-	}
+		batchProducts := products[i:end]
 
-	if len(searchSeller.Items) > 0 {
+		var searchSeller SearchSeller
+		if postalCode != "" {
+			searchSeller.PostalCode = postalCode
+			searchSeller.Country = "BRA"
+		}
+		for _, product := range batchProducts {
+			searchSeller.Items = append(searchSeller.Items, Item{ID: product, Quantity: 1, Seller: sellerID})
+		}
+
 		batchAvailableProducts, trace, err := sendBatchRequest(searchSeller, urlSimulation)
 		traces = append(traces, trace)
 		if err != nil {
 			return nil, traces, err
 		}
+
 		availableProducts = append(availableProducts, batchAvailableProducts...)
 	}
 
