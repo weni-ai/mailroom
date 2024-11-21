@@ -808,7 +808,7 @@ func ProductsSearchMeta(productEntryList []flows.ProductEntry, catalog string, w
 	}
 
 	for i, productEntry := range productEntryList {
-		newProductEntryList[i].Product = productEntry.Product
+		newProductEntryList = append(newProductEntryList, flows.ProductEntry{Product: productEntry.Product, ProductRetailerIDs: []string{}})
 		for _, retailerId := range productEntry.ProductRetailerIDs {
 			for _, id := range validProductIds {
 				if retailerId == id {
