@@ -231,7 +231,7 @@ func (s *service) Call(session flows.Session, params assets.MsgCatalogParam, log
 		for _, productRetailerID := range productEntry.ProductRetailerIDs {
 			if hasSimulation {
 				for _, existingProductId := range existingProductsIds {
-					if productRetailerID == existingProductId {
+					if productRetailerID == existingProductId+"#"+sellerID {
 						if len(newEntry.ProductRetailerIDs) < qttProducts {
 							newEntry.ProductRetailerIDs = append(newEntry.ProductRetailerIDs, productRetailerID)
 						}
