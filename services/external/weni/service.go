@@ -113,7 +113,6 @@ func (s *service) Call(session flows.Session, params assets.MsgCatalogParam, log
 	var trace *httpx.Trace
 	var traces []*httpx.Trace
 	var sellerID string
-	var allProducts []string
 	existingProductsIds := []string{}
 	qttProducts := 5
 
