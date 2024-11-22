@@ -14,6 +14,7 @@ import (
 	"github.com/nyaruka/goflow/assets"
 	"github.com/nyaruka/goflow/envs"
 	"github.com/nyaruka/goflow/flows"
+	"github.com/nyaruka/goflow/flows/events"
 	"github.com/nyaruka/goflow/utils"
 	"github.com/nyaruka/mailroom/core/models"
 	"github.com/nyaruka/mailroom/core/msgio"
@@ -101,7 +102,7 @@ func SendReply(ctx context.Context, rt *runtime.Runtime, ticket *models.Ticket, 
 	translations := map[envs.Language]*models.BroadcastTranslation{envs.Language("base"): base}
 
 	// we'll use a broadcast to send this message
-	bcast := models.NewBroadcast(oa.OrgID(), models.NilBroadcastID, translations, models.TemplateStateEvaluated, envs.Language("base"), nil, nil, nil, ticket.ID())
+	bcast := models.NewBroadcast(oa.OrgID(), models.NilBroadcastID, translations, models.TemplateStateEvaluated, envs.Language("base"), nil, nil, nil, ticket.ID(), events.BroadcastTypeDefault)
 	batch := bcast.CreateBatch([]models.ContactID{ticket.ContactID()})
 	msgs, err := models.CreateBroadcastMessages(ctx, rt, oa, batch)
 	if err != nil {

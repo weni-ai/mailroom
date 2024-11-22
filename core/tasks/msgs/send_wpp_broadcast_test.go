@@ -7,6 +7,7 @@ import (
 
 	"github.com/nyaruka/gocommon/urns"
 	"github.com/nyaruka/goflow/flows"
+	"github.com/nyaruka/goflow/flows/events"
 	"github.com/nyaruka/goflow/utils"
 	_ "github.com/nyaruka/mailroom/core/handlers"
 	"github.com/nyaruka/mailroom/core/models"
@@ -32,7 +33,7 @@ func TestWppBroadcastTask(t *testing.T) {
 	assert.NoError(t, err)
 
 	// insert a broadcast so we can check it is being set to sent
-	existingID := testdata.InsertBroadcast(db, testdata.Org1, "base", nil, models.NilScheduleID, nil, nil)
+	existingID := testdata.InsertBroadcast(db, testdata.Org1, "base", nil, models.NilScheduleID, nil, nil, events.BroadcastTypeDefault)
 
 	doctorsOnly := []models.GroupID{testdata.DoctorsGroup.ID}
 	cathyOnly := []models.ContactID{testdata.Cathy.ID}

@@ -989,6 +989,7 @@ type Broadcast struct {
 		OrgID         OrgID                                   `json:"org_id"                 db:"org_id"`
 		ParentID      BroadcastID                             `json:"parent_id,omitempty"    db:"parent_id"`
 		TicketID      TicketID                                `json:"ticket_id,omitempty"    db:"ticket_id"`
+		BroadcastType events.BroadcastType                    `json:"broadcast_type"         db:"broadcast_type"`
 	}
 }
 
@@ -1001,6 +1002,7 @@ func (b *Broadcast) BaseLanguage() envs.Language                           { ret
 func (b *Broadcast) Translations() map[envs.Language]*BroadcastTranslation { return b.b.Translations }
 func (b *Broadcast) TemplateState() TemplateState                          { return b.b.TemplateState }
 func (b *Broadcast) TicketID() TicketID                                    { return b.b.TicketID }
+func (b *Broadcast) BroadcastType() events.BroadcastType                   { return b.b.BroadcastType }
 
 func (b *Broadcast) MarshalJSON() ([]byte, error)    { return json.Marshal(b.b) }
 func (b *Broadcast) UnmarshalJSON(data []byte) error { return json.Unmarshal(data, &b.b) }
@@ -1008,7 +1010,7 @@ func (b *Broadcast) UnmarshalJSON(data []byte) error { return json.Unmarshal(dat
 // NewBroadcast creates a new broadcast with the passed in parameters
 func NewBroadcast(
 	orgID OrgID, id BroadcastID, translations map[envs.Language]*BroadcastTranslation,
-	state TemplateState, baseLanguage envs.Language, urns []urns.URN, contactIDs []ContactID, groupIDs []GroupID, ticketID TicketID) *Broadcast {
+	state TemplateState, baseLanguage envs.Language, urns []urns.URN, contactIDs []ContactID, groupIDs []GroupID, ticketID TicketID, broadcastType events.BroadcastType) *Broadcast {
 
 	bcast := &Broadcast{}
 	bcast.b.OrgID = orgID
@@ -1020,6 +1022,7 @@ func NewBroadcast(
 	bcast.b.ContactIDs = contactIDs
 	bcast.b.GroupIDs = groupIDs
 	bcast.b.TicketID = ticketID
+	bcast.b.BroadcastType = broadcastType
 
 	return bcast
 }
@@ -1036,6 +1039,7 @@ func InsertChildBroadcast(ctx context.Context, db Queryer, parent *Broadcast) (*
 		parent.b.ContactIDs,
 		parent.b.GroupIDs,
 		parent.b.TicketID,
+		parent.b.BroadcastType,
 	)
 	// populate our parent id
 	child.b.ParentID = parent.ID()
@@ -1124,8 +1128,8 @@ type broadcastGroup struct {
 
 const insertBroadcastSQL = `
 INSERT INTO
-	msgs_broadcast( org_id,  parent_id,  ticket_id, created_on, modified_on, status,  text,  base_language, send_all)
-			VALUES(:org_id, :parent_id, :ticket_id, NOW()     , NOW(),       'Q',    :text, :base_language, FALSE)
+	msgs_broadcast( org_id,  parent_id,  ticket_id, created_on, modified_on, status,  text,  base_language, send_all, broadcast_type)
+			VALUES(:org_id, :parent_id, :ticket_id, NOW()     , NOW(),       'Q',    :text, :base_language, FALSE, :broadcast_type)
 RETURNING
 	id
 `
@@ -1175,7 +1179,7 @@ func NewBroadcastFromEvent(ctx context.Context, tx Queryer, org *OrgAssets, even
 		}
 	}
 
-	return NewBroadcast(org.OrgID(), NilBroadcastID, translations, TemplateStateEvaluated, event.BaseLanguage, event.URNs, contactIDs, groupIDs, NilTicketID), nil
+	return NewBroadcast(org.OrgID(), NilBroadcastID, translations, TemplateStateEvaluated, event.BaseLanguage, event.URNs, contactIDs, groupIDs, NilTicketID, event.BroadcastType), nil
 }
 
 func (b *Broadcast) CreateBatch(contactIDs []ContactID) *BroadcastBatch {

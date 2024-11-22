@@ -13,6 +13,7 @@ import (
 	"github.com/nyaruka/goflow/assets"
 	"github.com/nyaruka/goflow/envs"
 	"github.com/nyaruka/goflow/flows"
+	"github.com/nyaruka/goflow/flows/events"
 	"github.com/nyaruka/goflow/test"
 	"github.com/nyaruka/goflow/utils"
 	"github.com/nyaruka/mailroom/core/models"
@@ -531,6 +532,7 @@ func TestNonPersistentBroadcasts(t *testing.T) {
 		[]models.ContactID{testdata.Alexandria.ID, testdata.Bob.ID, testdata.Cathy.ID},
 		[]models.GroupID{testdata.DoctorsGroup.ID},
 		ticket.ID,
+		events.BroadcastTypeDefault,
 	)
 
 	assert.Equal(t, models.NilBroadcastID, bcast.ID())
