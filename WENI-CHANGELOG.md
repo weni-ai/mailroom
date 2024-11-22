@@ -1,3 +1,8 @@
+1.42.0
+----------
+ * Fix: handle new broadcast_type field
+ * Refactor product search
+
 1.41.0
 ----------
  * Feat: WhatsApp Broadcasts
