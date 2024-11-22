@@ -620,6 +620,12 @@ func CartSimulation(ProductRetailerIDS []flows.ProductEntry, sellerID string, ur
 		products = append(products, p.ProductRetailerIDs...)
 	}
 
+	var searchSeller SearchSeller
+	if postalCode != "" {
+		searchSeller.PostalCode = postalCode
+		searchSeller.Country = "BRA"
+	}
+
 	for i := 0; i < len(products); i += batchSize {
 		end := i + batchSize
 		if end > len(products) {
@@ -627,11 +633,6 @@ func CartSimulation(ProductRetailerIDS []flows.ProductEntry, sellerID string, ur
 		}
 		batchProducts := products[i:end]
 
-		var searchSeller SearchSeller
-		if postalCode != "" {
-			searchSeller.PostalCode = postalCode
-			searchSeller.Country = "BRA"
-		}
 		for _, product := range batchProducts {
 			searchSeller.Items = append(searchSeller.Items, Item{ID: product, Quantity: 1, Seller: sellerID})
 		}
@@ -643,6 +644,7 @@ func CartSimulation(ProductRetailerIDS []flows.ProductEntry, sellerID string, ur
 		}
 
 		availableProducts = append(availableProducts, batchAvailableProducts...)
+		searchSeller.Items = []Item{}
 	}
 
 	return availableProducts, traces, nil
