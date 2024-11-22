@@ -230,8 +230,12 @@ func (s *service) Call(session flows.Session, params assets.MsgCatalogParam, log
 			if hasSimulation {
 				for _, existingProductId := range existingProductsIds {
 					if productRetailerID == existingProductId+"#"+sellerID {
-						if len(newEntry.ProductRetailerIDs) < qttProducts {
-							newEntry.ProductRetailerIDs = append(newEntry.ProductRetailerIDs, productRetailerID)
+						_, exists := productRetailerIDMap[productRetailerID]
+						if !exists {
+							if len(newEntry.ProductRetailerIDs) < qttProducts {
+								newEntry.ProductRetailerIDs = append(newEntry.ProductRetailerIDs, productRetailerID)
+							}
+							productRetailerIDMap[productRetailerID] = struct{}{}
 						}
 					}
 				}
