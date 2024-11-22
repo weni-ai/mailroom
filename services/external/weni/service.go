@@ -178,8 +178,6 @@ func (s *service) Call(session flows.Session, params assets.MsgCatalogParam, log
 
 	callResult.ProductRetailerIDS = productEntries
 
-	fmt.Println("SIZE ProductRetailerIDS:", len(callResult.ProductRetailerIDS))
-
 	// simulates cart in VTEX with all products
 	hasSimulation := false
 	if postalCode_ != "" && sellerID != "1" {
@@ -785,8 +783,6 @@ func ProductsSearchMeta(productEntryList []flows.ProductEntry, catalog string, w
 	for _, productEntry := range productEntryList {
 		allIds = append(allIds, productEntry.ProductRetailerIDs...)
 	}
-
-	fmt.Println("SIZE ALLIDS: ", len(allIds))
 
 	newProductEntryList := []flows.ProductEntry{}
 
