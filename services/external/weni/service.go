@@ -145,7 +145,6 @@ func (s *service) Call(session flows.Session, params assets.MsgCatalogParam, log
 		} else if params.SearchType == "vtex" {
 			searchResult, searchResultSponsored, traces, err = GetProductListFromVtex(product, params.SearchUrl, params.ApiType, catalog.FacebookCatalogID(), s.rtConfig, hasVtexAds, hideUnavailableItems, sellerID)
 			callResult.Traces = append(callResult.Traces, traces...)
-			allProducts = append(allProducts, searchResult...)
 			if searchResult == nil {
 				continue
 			}
@@ -187,7 +186,7 @@ func (s *service) Call(session flows.Session, params assets.MsgCatalogParam, log
 	if postalCode_ != "" && sellerID != "1" {
 		var tracesSimulation []*httpx.Trace
 		hasSimulation = true
-		existingProductsIds, tracesSimulation, err = CartSimulation(allProducts, sellerID, params.SearchUrl, postalCode_)
+		existingProductsIds, tracesSimulation, err = CartSimulation(callResult.ProductRetailerIDS, sellerID, params.SearchUrl, postalCode_)
 		callResult.Traces = append(callResult.Traces, tracesSimulation...)
 		if err != nil {
 			return callResult, err
@@ -609,13 +608,18 @@ func VtexSponsoredSearch(searchUrl string, productSearch string, hideUnavailable
 
 }
 
-func CartSimulation(products []string, sellerID string, url string, postalCode string) ([]string, []*httpx.Trace, error) {
+func CartSimulation(ProductRetailerIDS []flows.ProductEntry, sellerID string, url string, postalCode string) ([]string, []*httpx.Trace, error) {
 	const batchSize = 300
 	var traces []*httpx.Trace
 	var availableProducts []string
+	var products []string
 
 	urlSplit := strings.Split(url, "api")
 	urlSimulation := urlSplit[0] + "api/checkout/pub/orderForms/simulation"
+
+	for _, p := range ProductRetailerIDS {
+		products = append(products, p.ProductRetailerIDs...)
+	}
 
 	for i := 0; i < len(products); i += batchSize {
 		end := i + batchSize
