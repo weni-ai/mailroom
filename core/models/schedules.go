@@ -212,6 +212,7 @@ SELECT ROW_TO_JSON(s) FROM (SELECT
 			(SELECT JSON_OBJECT_AGG(ts.key, ts.value) FROM (SELECT key, JSON_BUILD_OBJECT('text', t.value) as value FROM each(b.text) t) ts) as translations,
 			'unevaluated' as template_state,
 			b.base_language as base_language,
+			b.broadcast_type as broadcast_type,
 			s.org_id as org_id,
 			(SELECT ARRAY_AGG(bc.contact_id) FROM (
 				SELECT
