@@ -205,6 +205,8 @@ func (mr *Mailroom) Stop() error {
 	close(mr.quit)
 	mr.cancel()
 
+	time.Sleep(time.Second * time.Duration(mr.rt.Config.ShutdownToleranceTime))
+
 	// stop our web server
 	mr.webserver.Stop()
 
