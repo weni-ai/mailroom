@@ -12,6 +12,7 @@ import (
 	"github.com/buger/jsonparser"
 	"github.com/jmoiron/sqlx"
 	"github.com/pkg/errors"
+	"github.com/sirupsen/logrus"
 
 	"github.com/nyaruka/gocommon/httpx"
 	"github.com/nyaruka/gocommon/jsonx"
@@ -111,7 +112,7 @@ func (s *service) Open(session flows.Session, topic *flows.Topic, body string, a
 	}
 
 	roomData.SectorUUID = s.sectorUUID
-	roomData.QueueUUID = string(topic.UUID())
+	roomData.QueueUUID = string(topic.QueueUUID())
 	preferredURN := session.Contact().PreferredURN()
 	if preferredURN != nil {
 		roomData.Contact.URN = preferredURN.URN().String()
@@ -145,6 +146,7 @@ func (s *service) Open(session flows.Session, topic *flows.Topic, body string, a
 		logHTTP(flows.NewHTTPLog(trace, flows.HTTPStatusFromCode, s.redactor))
 	}
 	if err != nil {
+		logrus.Error(errors.Wrap(err, fmt.Sprintf("failed to create wenichats room for: %+v", roomData)))
 		return nil, errors.Wrap(err, "failed to create wenichats room")
 	}
 
@@ -163,6 +165,7 @@ func (s *service) Open(session flows.Session, topic *flows.Topic, body string, a
 		logHTTP(flows.NewHTTPLog(trace, flows.HTTPStatusFromCode, s.redactor))
 	}
 	if err != nil {
+		logrus.Error(errors.Wrap(err, fmt.Sprintf("Error updating wenichats room for: %+v", newRoom)))
 		return nil, errors.Wrap(err, "failed to create wenichats room webhook")
 	}
 
@@ -174,6 +177,13 @@ func (s *service) Open(session flows.Session, topic *flows.Topic, body string, a
 		after1, err1 := time.Parse("2006-01-02 15:04:05", historyAfter)
 		after2, err2 := time.Parse("2006-01-02T15:04:05Z", historyAfter)
 		if err1 != nil && err2 != nil {
+			_, _, err = s.restClient.CloseRoom(newRoom.UUID)
+			if err != nil {
+				closeErr := errors.Wrap(err, "error closing wenichats room after failing to parse history messages")
+				logrus.Error(closeErr)
+				return nil, closeErr
+			}
+			logrus.Error(errors.Wrap(err, fmt.Sprintf("Error open ticket for: %+v", newRoom)))
 			return nil, errors.Wrap(err, fmt.Sprintf("failed to parse history_after from value from format DateTime or RFC3339. Expected format \"2006-01-02 15:04:05\" or \"2006-01-02T15:04:05Z\", current value is \"%s\"", historyAfter))
 		}
 		if err1 != nil {
@@ -188,9 +198,15 @@ func (s *service) Open(session flows.Session, topic *flows.Topic, body string, a
 	}
 	cx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 	defer cancel()
-	msgs, err := models.SelectContactMessages(cx, db, int(contact.ID()), after)
-	if err != nil {
-		return nil, errors.Wrap(err, "failed to get history messages")
+	msgs, selectErr := models.SelectContactMessages(cx, db, int(contact.ID()), after)
+	if selectErr != nil {
+		_, _, err = s.restClient.CloseRoom(newRoom.UUID)
+		if err != nil {
+			closeErr := errors.Wrap(err, "error closing wenichats room after failing to select history messages")
+			logrus.Error(closeErr)
+			return nil, closeErr
+		}
+		return nil, errors.Wrap(selectErr, "failed to get history messages")
 	}
 
 	//send history
@@ -215,7 +231,9 @@ func (s *service) Open(session flows.Session, topic *flows.Topic, body string, a
 		if err != nil {
 			_, _, err = s.restClient.CloseRoom(newRoom.UUID)
 			if err != nil {
-				return nil, errors.Wrap(err, "error closing ticket after failing to send history messages to wenichats")
+				closeErr := errors.Wrap(err, "error closing wenichats room after failing to send history messages")
+				logrus.Error(closeErr)
+				return nil, closeErr
 			}
 			return nil, errors.Wrap(err, "error calling wenichats to create a history message, closing newly opened ticket")
 		}

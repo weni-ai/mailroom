@@ -1,0 +1,2 @@
+-- insert the SQL to be merged into the database using dump_merger.sh
+-- this file should always be empty, and only be used locally to update the test database

@@ -59,9 +59,9 @@ func (c *baseClient) request(method, url string, params *url.Values, payload, re
 
 	if trace.Response.StatusCode >= 400 {
 		response := &errorResponse{}
-		err = jsonx.Unmarshal(trace.ResponseBody, response)
+		err := jsonx.Unmarshal(trace.ResponseBody, response)
 		if err != nil {
-			return trace, errors.Wrap(err, "couldn't parse error response")
+			return trace, errors.Wrap(err, fmt.Sprintf("couldn't parse error response: %v", string(trace.ResponseBody)))
 		}
 		return trace, errors.New(response.Detail)
 	}

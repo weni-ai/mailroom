@@ -328,6 +328,16 @@ func GetMsgRepetitions(rp *redis.Pool, contactID ContactID, msg *flows.MsgOut) (
 	return redis.Int(msgRepetitionsScript.Do(rc, key, contactID, msg.Text()))
 }
 
+// GetWppMsgRepetitions gets the number of repetitions of this msg text for the given contact in the current 5 minute window
+func GetWppMsgRepetitions(rp *redis.Pool, contactID ContactID, msg *flows.MsgWppOut) (int, error) {
+	rc := rp.Get()
+	defer rc.Close()
+
+	keyTime := dates.Now().UTC().Round(time.Minute * 5)
+	key := fmt.Sprintf("msg_repetitions:%s", keyTime.Format("2006-01-02T15:04"))
+	return redis.Int(msgRepetitionsScript.Do(rc, key, contactID, msg.Text()))
+}
+
 // NewOutgoingFlowMsg creates an outgoing message for the passed in flow message
 func NewOutgoingFlowMsg(rt *runtime.Runtime, org *Org, channel *Channel, session *Session, out *flows.MsgOut, createdOn time.Time) (*Msg, error) {
 	return newOutgoingMsg(rt, org, channel, session.ContactID(), out, createdOn, session, NilBroadcastID)
@@ -346,6 +356,10 @@ func NewOutgoingFlowMsgWpp(rt *runtime.Runtime, org *Org, channel *Channel, sess
 // NewOutgoingBroadcastMsg creates an outgoing message which is part of a broadcast
 func NewOutgoingBroadcastMsg(rt *runtime.Runtime, org *Org, channel *Channel, contactID ContactID, out *flows.MsgOut, createdOn time.Time, broadcastID BroadcastID) (*Msg, error) {
 	return newOutgoingMsg(rt, org, channel, contactID, out, createdOn, nil, broadcastID)
+}
+
+func NewOutgoingWppBroadcastMsg(rt *runtime.Runtime, org *Org, channel *Channel, contactID ContactID, out *flows.MsgWppOut, createdOn time.Time, broadcastID BroadcastID) (*Msg, error) {
+	return newOutgoingMsgWpp(rt, org, channel, contactID, out, createdOn, nil, broadcastID)
 }
 
 // NewOutgoingMsg creates an outgoing message that does not belong to any flow or broadcast, it's used to the a direct message to the contact
@@ -552,6 +566,18 @@ func newOutgoingMsgWpp(rt *runtime.Runtime, org *Org, channel *Channel, contactI
 		// if msg is missing the URN or channel, we also fail it
 		m.Status = MsgStatusFailed
 		m.FailedReason = MsgFailedNoDestination
+	} else {
+		// also fail right away if this looks like a loop
+		repetitions, err := GetWppMsgRepetitions(rt.RP, contactID, msgWpp)
+		if err != nil {
+			return nil, errors.Wrap(err, "error looking up msg repetitions")
+		}
+		if repetitions >= 20 {
+			m.Status = MsgStatusFailed
+			m.FailedReason = MsgFailedLooping
+
+			logrus.WithFields(logrus.Fields{"contact_id": contactID, "text": msgWpp.Text(), "repetitions": repetitions}).Error("too many repetitions, failing message")
+		}
 	}
 
 	// if we have a session, set fields on the message from that
@@ -573,7 +599,7 @@ func newOutgoingMsgWpp(rt *runtime.Runtime, org *Org, channel *Channel, contactI
 		}
 	}
 
-	if len(msgWpp.QuickReplies()) > 0 || len(msgWpp.ListMessage().ListItems) > 0 || msgWpp.Topic() != flows.NilMsgTopic || msgWpp.Text() != "" || msgWpp.Footer() != "" || msgWpp.HeaderType() != "" || msgWpp.InteractionType() != "" {
+	if len(msgWpp.QuickReplies()) > 0 || len(msgWpp.ListMessage().ListItems) > 0 || msgWpp.Topic() != flows.NilMsgTopic || msgWpp.Text() != "" || msgWpp.Footer() != "" || msgWpp.HeaderType() != "" || msgWpp.InteractionType() != "" || msgWpp.Templating() != nil {
 		metadata := make(map[string]interface{})
 		if msgWpp.Topic() != flows.NilMsgTopic {
 			metadata["topic"] = string(msgWpp.Topic())
@@ -625,8 +651,15 @@ func newOutgoingMsgWpp(rt *runtime.Runtime, org *Org, channel *Channel, contactI
 			metadata["interaction_type"] = msgWpp.InteractionType()
 			metadata["order_details_message"] = msgWpp.OrderDetailsMessage()
 		}
+		if len(msgWpp.Buttons()) > 0 {
+			metadata["buttons"] = msgWpp.Buttons()
+		}
 		if msgWpp.TextLanguage != "" {
 			metadata["text_language"] = msgWpp.TextLanguage
+		}
+		if msgWpp.Templating() != nil {
+			metadata["templating"] = msgWpp.Templating()
+			m.Template = msgWpp.Templating().Template().Name
 		}
 
 		m.Metadata = null.NewMap(metadata)
@@ -959,6 +992,7 @@ type Broadcast struct {
 		OrgID         OrgID                                   `json:"org_id"                 db:"org_id"`
 		ParentID      BroadcastID                             `json:"parent_id,omitempty"    db:"parent_id"`
 		TicketID      TicketID                                `json:"ticket_id,omitempty"    db:"ticket_id"`
+		BroadcastType events.BroadcastType                    `json:"broadcast_type"         db:"broadcast_type"`
 	}
 }
 
@@ -971,6 +1005,7 @@ func (b *Broadcast) BaseLanguage() envs.Language                           { ret
 func (b *Broadcast) Translations() map[envs.Language]*BroadcastTranslation { return b.b.Translations }
 func (b *Broadcast) TemplateState() TemplateState                          { return b.b.TemplateState }
 func (b *Broadcast) TicketID() TicketID                                    { return b.b.TicketID }
+func (b *Broadcast) BroadcastType() events.BroadcastType                   { return b.b.BroadcastType }
 
 func (b *Broadcast) MarshalJSON() ([]byte, error)    { return json.Marshal(b.b) }
 func (b *Broadcast) UnmarshalJSON(data []byte) error { return json.Unmarshal(data, &b.b) }
@@ -978,7 +1013,7 @@ func (b *Broadcast) UnmarshalJSON(data []byte) error { return json.Unmarshal(dat
 // NewBroadcast creates a new broadcast with the passed in parameters
 func NewBroadcast(
 	orgID OrgID, id BroadcastID, translations map[envs.Language]*BroadcastTranslation,
-	state TemplateState, baseLanguage envs.Language, urns []urns.URN, contactIDs []ContactID, groupIDs []GroupID, ticketID TicketID) *Broadcast {
+	state TemplateState, baseLanguage envs.Language, urns []urns.URN, contactIDs []ContactID, groupIDs []GroupID, ticketID TicketID, broadcastType events.BroadcastType) *Broadcast {
 
 	bcast := &Broadcast{}
 	bcast.b.OrgID = orgID
@@ -990,6 +1025,7 @@ func NewBroadcast(
 	bcast.b.ContactIDs = contactIDs
 	bcast.b.GroupIDs = groupIDs
 	bcast.b.TicketID = ticketID
+	bcast.b.BroadcastType = broadcastType
 
 	return bcast
 }
@@ -1006,6 +1042,7 @@ func InsertChildBroadcast(ctx context.Context, db Queryer, parent *Broadcast) (*
 		parent.b.ContactIDs,
 		parent.b.GroupIDs,
 		parent.b.TicketID,
+		parent.b.BroadcastType,
 	)
 	// populate our parent id
 	child.b.ParentID = parent.ID()
@@ -1094,8 +1131,8 @@ type broadcastGroup struct {
 
 const insertBroadcastSQL = `
 INSERT INTO
-	msgs_broadcast( org_id,  parent_id,  ticket_id, created_on, modified_on, status,  text,  base_language, send_all)
-			VALUES(:org_id, :parent_id, :ticket_id, NOW()     , NOW(),       'Q',    :text, :base_language, FALSE)
+	msgs_broadcast( org_id,  parent_id,  ticket_id, created_on, modified_on, status,  text,  base_language, send_all, broadcast_type)
+			VALUES(:org_id, :parent_id, :ticket_id, NOW()     , NOW(),       'Q',    :text, :base_language, FALSE, :broadcast_type)
 RETURNING
 	id
 `
@@ -1145,7 +1182,7 @@ func NewBroadcastFromEvent(ctx context.Context, tx Queryer, org *OrgAssets, even
 		}
 	}
 
-	return NewBroadcast(org.OrgID(), NilBroadcastID, translations, TemplateStateEvaluated, event.BaseLanguage, event.URNs, contactIDs, groupIDs, NilTicketID), nil
+	return NewBroadcast(org.OrgID(), NilBroadcastID, translations, TemplateStateEvaluated, event.BaseLanguage, event.URNs, contactIDs, groupIDs, NilTicketID, event.BroadcastType), nil
 }
 
 func (b *Broadcast) CreateBatch(contactIDs []ContactID) *BroadcastBatch {
@@ -1397,6 +1434,345 @@ func CreateBroadcastMessages(ctx context.Context, rt *runtime.Runtime, oa *OrgAs
 		if err != nil {
 			return nil, errors.Wrapf(err, "error updating broadcast ticket")
 		}
+	}
+
+	return msgs, nil
+}
+
+type WppBroadcastTemplate struct {
+	UUID      assets.TemplateUUID `json:"uuid" validate:"required,uuid"`
+	Name      string              `json:"name" validate:"required"`
+	Variables []string            `json:"variables,omitempty"`
+}
+
+type WppBroadcastMessageHeader struct {
+	Type string `json:"type,omitempty"`
+	Text string `json:"text,omitempty"`
+}
+
+type WppBroadcastMessage struct {
+	Text            string                    `json:"text,omitempty"`
+	Header          WppBroadcastMessageHeader `json:"header,omitempty"`
+	Footer          string                    `json:"footer,omitempty"`
+	Attachments     []utils.Attachment        `json:"attachments,omitempty"`
+	QuickReplies    []string                  `json:"quick_replies,omitempty"`
+	Template        WppBroadcastTemplate      `json:"template,omitempty"`
+	InteractionType string                    `json:"interaction_type,omitempty"`
+	OrderDetails    flows.OrderDetailsMessage `json:"order_details,omitempty"`
+	FlowMessage     flows.FlowMessage         `json:"flow_message,omitempty"`
+	ListMessage     flows.ListMessage         `json:"list_message,omitempty"`
+	CTAMessage      flows.CTAMessage          `json:"cta_message,omitempty"`
+	Buttons         []flows.ButtonComponent   `json:"buttons,omitempty"`
+}
+
+type WppBroadcast struct {
+	b struct {
+		BroadcastID BroadcastID         `json:"broadcast_id,omitempty" db:"id"`
+		URNs        []urns.URN          `json:"urns,omitempty"`
+		ContactIDs  []ContactID         `json:"contact_ids,omitempty"`
+		GroupIDs    []GroupID           `json:"group_ids,omitempty"`
+		OrgID       OrgID               `json:"org_id"                 db:"org_id"`
+		ParentID    BroadcastID         `json:"parent_id,omitempty"    db:"parent_id"`
+		Msg         WppBroadcastMessage `json:"msg"`
+		ChannelID   ChannelID           `json:"channel_id,omitempty"`
+	}
+}
+
+func (b *WppBroadcast) ID() BroadcastID          { return b.b.BroadcastID }
+func (b *WppBroadcast) OrgID() OrgID             { return b.b.OrgID }
+func (b *WppBroadcast) ContactIDs() []ContactID  { return b.b.ContactIDs }
+func (b *WppBroadcast) GroupIDs() []GroupID      { return b.b.GroupIDs }
+func (b *WppBroadcast) URNs() []urns.URN         { return b.b.URNs }
+func (b *WppBroadcast) Msg() WppBroadcastMessage { return b.b.Msg }
+func (b *WppBroadcast) ChannelID() ChannelID     { return b.b.ChannelID }
+
+func (b *WppBroadcast) MarshalJSON() ([]byte, error)    { return json.Marshal(b.b) }
+func (b *WppBroadcast) UnmarshalJSON(data []byte) error { return json.Unmarshal(data, &b.b) }
+
+func NewWppBroadcast(orgID OrgID, id BroadcastID, msg WppBroadcastMessage, urns []urns.URN, contactIDs []ContactID, groupIDs []GroupID, channelID ChannelID) *WppBroadcast {
+	bcast := &WppBroadcast{}
+	bcast.b.OrgID = orgID
+	bcast.b.BroadcastID = id
+	bcast.b.Msg = msg
+	bcast.b.URNs = urns
+	bcast.b.ContactIDs = contactIDs
+	bcast.b.GroupIDs = groupIDs
+	bcast.b.ChannelID = channelID
+
+	return bcast
+}
+
+func (b *WppBroadcast) CreateBatch(contactIDs []ContactID) *WppBroadcastBatch {
+	batch := &WppBroadcastBatch{}
+	batch.b.BroadcastID = b.b.BroadcastID
+	batch.b.Msg = b.b.Msg
+	batch.b.OrgID = b.b.OrgID
+	batch.b.ChannelID = b.b.ChannelID
+	batch.b.ContactIDs = contactIDs
+	return batch
+}
+
+type WppBroadcastBatch struct {
+	b struct {
+		BroadcastID BroadcastID            `json:"broadcast_id,omitempty"`
+		Msg         WppBroadcastMessage    `json:"msg"`
+		URNs        map[ContactID]urns.URN `json:"urns,omitempty"`
+		ContactIDs  []ContactID            `json:"contact_ids,omitempty"`
+		IsLast      bool                   `json:"is_last"`
+		OrgID       OrgID                  `json:"org_id"`
+		ChannelID   ChannelID              `json:"channel_id,omitempty"`
+	}
+}
+
+func (b *WppBroadcastBatch) BroadcastID() BroadcastID            { return b.b.BroadcastID }
+func (b *WppBroadcastBatch) ContactIDs() []ContactID             { return b.b.ContactIDs }
+func (b *WppBroadcastBatch) URNs() map[ContactID]urns.URN        { return b.b.URNs }
+func (b *WppBroadcastBatch) SetURNs(urns map[ContactID]urns.URN) { b.b.URNs = urns }
+func (b *WppBroadcastBatch) OrgID() OrgID                        { return b.b.OrgID }
+func (b *WppBroadcastBatch) Msg() WppBroadcastMessage            { return b.b.Msg }
+func (b *WppBroadcastBatch) ChannelID() ChannelID                { return b.b.ChannelID }
+
+func (b *WppBroadcastBatch) IsLast() bool        { return b.b.IsLast }
+func (b *WppBroadcastBatch) SetIsLast(last bool) { b.b.IsLast = last }
+
+func (b *WppBroadcastBatch) MarshalJSON() ([]byte, error)    { return json.Marshal(b.b) }
+func (b *WppBroadcastBatch) UnmarshalJSON(data []byte) error { return json.Unmarshal(data, &b.b) }
+
+func CreateWppBroadcastMessages(ctx context.Context, rt *runtime.Runtime, oa *OrgAssets, bcast *WppBroadcastBatch) ([]*Msg, error) {
+	repeatedContacts := make(map[ContactID]bool)
+	broadcastURNs := bcast.URNs()
+
+	// build our list of contact ids
+	contactIDs := bcast.ContactIDs()
+
+	// build a map of the contacts that are present both in our URN list and our contact id list
+	if broadcastURNs != nil {
+		for _, id := range contactIDs {
+			_, found := broadcastURNs[id]
+			if found {
+				repeatedContacts[id] = true
+			}
+		}
+
+		// if we have URN we need to send to, add those contacts as well if not already repeated
+		for id := range broadcastURNs {
+			if !repeatedContacts[id] {
+				contactIDs = append(contactIDs, id)
+			}
+		}
+	}
+
+	// load all our contacts
+	contacts, err := LoadContacts(ctx, rt.DB, oa, contactIDs)
+	if err != nil {
+		return nil, errors.Wrapf(err, "error loading contacts for broadcast")
+	}
+
+	channels := oa.SessionAssets().Channels()
+
+	// for each contact, build our message
+	msgs := make([]*Msg, 0, len(contacts))
+
+	// utility method to build up our message
+	buildMessage := func(c *Contact, forceURN urns.URN) (*Msg, error) {
+		if c.Status() != ContactStatusActive {
+			return nil, nil
+		}
+
+		contact, err := c.FlowContact(oa)
+		if err != nil {
+			return nil, errors.Wrapf(err, "error creating flow contact")
+		}
+
+		urn := urns.NilURN
+		var channel *Channel
+
+		// we are forcing to send to a non-preferred URN, find the channel
+		if forceURN != urns.NilURN {
+			for _, u := range contact.URNs() {
+				if u.URN().Identity() == forceURN.Identity() {
+					c := channels.GetForURN(u, assets.ChannelRoleSend)
+					if c == nil {
+						return nil, nil
+					}
+					urn = u.URN()
+					channel = oa.ChannelByUUID(c.UUID())
+					break
+				}
+			}
+		} else {
+			// no forced URN, find the first URN we can send to
+			for _, u := range contact.URNs() {
+				c := channels.GetForURN(u, assets.ChannelRoleSend)
+				if c != nil {
+					urn = u.URN()
+					channel = oa.ChannelByUUID(c.UUID())
+					break
+				}
+			}
+		}
+
+		if bcast.ChannelID() != NilChannelID {
+			channel = oa.ChannelByID(bcast.ChannelID())
+		}
+
+		// no urn and channel? move on
+		if channel == nil {
+			return nil, nil
+		}
+
+		// evaluate our message fields
+		text := bcast.Msg().Text
+		attachments := bcast.Msg().Attachments
+		quickReplies := make([]string, len(bcast.Msg().QuickReplies))
+		copy(quickReplies, bcast.Msg().QuickReplies)
+		headerType := bcast.Msg().Header.Type
+		headerText := bcast.Msg().Header.Text
+		footerText := bcast.Msg().Footer
+		var templating *flows.MsgTemplating = nil
+		templateVariables := make([]string, len(bcast.Msg().Template.Variables))
+		copy(templateVariables, bcast.Msg().Template.Variables)
+
+		ctaMessage := bcast.Msg().CTAMessage
+		listMessage := bcast.Msg().ListMessage
+		flowMessage := bcast.Msg().FlowMessage
+		orderDetails := bcast.Msg().OrderDetails
+
+		// build up the minimum viable context for evaluation
+		evaluationCtx := types.NewXObject(map[string]types.XValue{
+			"contact": flows.Context(oa.Env(), contact),
+			"fields":  flows.Context(oa.Env(), contact.Fields()),
+			"globals": flows.Context(oa.Env(), oa.SessionAssets().Globals()),
+			"urns":    flows.ContextFunc(oa.Env(), contact.URNs().MapContext),
+		})
+
+		// evaluate our text
+		text, _ = excellent.EvaluateTemplate(oa.Env(), evaluationCtx, text, nil)
+
+		// evaluate our header text
+		headerText, _ = excellent.EvaluateTemplate(oa.Env(), evaluationCtx, headerText, nil)
+
+		// evaluate our footer text
+		footerText, _ = excellent.EvaluateTemplate(oa.Env(), evaluationCtx, footerText, nil)
+
+		// evaluate our quick replies
+		for i, qr := range quickReplies {
+			quickReplies[i], _ = excellent.EvaluateTemplate(oa.Env(), evaluationCtx, qr, nil)
+		}
+
+		// evaluate our template
+		if bcast.Msg().Template.UUID != "" {
+			// load our template
+			var templateMatch assets.Template = nil
+			for _, t := range oa.templates {
+				if t.UUID() == bcast.Msg().Template.UUID {
+					templateMatch = t
+					break
+				}
+			}
+			if templateMatch == nil {
+				return nil, errors.Errorf("template not found: %s", bcast.Msg().Template.UUID)
+			}
+
+			// looks for a translation in these locales
+			locales := []envs.Locale{
+				contact.Locale(oa.Env()),
+				oa.Env().DefaultLocale(),
+			}
+			translation := oa.SessionAssets().Templates().FindTranslation(bcast.Msg().Template.UUID, channel.ChannelReference(), locales)
+			if translation != nil {
+				// evaluate our variables
+				evaluatedVariables := make([]string, len(templateVariables))
+				for i, variable := range templateVariables {
+					sub, err := excellent.EvaluateTemplate(oa.Env(), evaluationCtx, variable, nil)
+					if err != nil {
+						return nil, errors.Wrapf(err, "failed to evaluate template variable")
+					}
+					evaluatedVariables[i] = sub
+				}
+
+				text = translation.Substitute(evaluatedVariables)
+				var templateReference = assets.NewTemplateReference(bcast.Msg().Template.UUID, bcast.Msg().Template.Name)
+				templating = flows.NewMsgTemplating(templateReference, translation.Language(), translation.Country(), evaluatedVariables, translation.Namespace())
+			} else {
+				return nil, errors.Errorf("translation not found for template: %s, in channel: %s", bcast.Msg().Template.UUID, channel.UUID())
+			}
+		}
+
+		// evaluate our buttons
+		buttons := make([]flows.ButtonComponent, 0)
+		for _, button := range bcast.Msg().Buttons {
+			var newButton flows.ButtonComponent
+			newButton.SubType, _ = excellent.EvaluateTemplate(oa.Env(), evaluationCtx, button.SubType, nil)
+
+			for _, param := range button.Parameters {
+				var newParam flows.ButtonParam
+				newParam.Type, _ = excellent.EvaluateTemplate(oa.Env(), evaluationCtx, param.Type, nil)
+				newParam.Text, _ = excellent.EvaluateTemplate(oa.Env(), evaluationCtx, param.Text, nil)
+				newButton.Parameters = append(newButton.Parameters, newParam)
+			}
+
+			buttons = append(buttons, newButton)
+		}
+
+		// don't do anything if we have no text or attachments
+		if text == "" && len(attachments) == 0 {
+			return nil, nil
+		}
+
+		// create our outgoing message
+		out := flows.NewMsgWppOut(urn, channel.ChannelReference(), bcast.Msg().InteractionType, headerType, headerText, text, footerText, ctaMessage, listMessage, flowMessage, orderDetails, attachments, quickReplies, buttons, templating, flows.NilMsgTopic)
+		msg, err := NewOutgoingWppBroadcastMsg(rt, oa.Org(), channel, c.ID(), out, time.Now(), bcast.BroadcastID())
+		if err != nil {
+			return nil, errors.Wrapf(err, "error creating outgoing message")
+		}
+
+		return msg, nil
+	}
+
+	// run through all our contacts to create our messages
+	for _, c := range contacts {
+		// use the preferred URN if present
+		urn := broadcastURNs[c.ID()]
+		msg, err := buildMessage(c, urn)
+		if err != nil {
+			return nil, errors.Wrapf(err, "error creating broadcast message")
+		}
+		if msg != nil {
+			msgs = append(msgs, msg)
+		}
+
+		// if this is a contact that will receive two messages, calculate that one as well
+		if repeatedContacts[c.ID()] {
+			m2, err := buildMessage(c, urns.NilURN)
+			if err != nil {
+				return nil, errors.Wrapf(err, "error creating broadcast message")
+			}
+
+			// add this message if it isn't a duplicate
+			if m2 != nil && m2.URN() != msg.URN() {
+				msgs = append(msgs, m2)
+			}
+		}
+	}
+
+	// allocate a topup for these message if org uses topups
+	topup, err := AllocateTopups(ctx, rt.DB, rt.RP, oa.Org(), len(msgs))
+	if err != nil {
+		return nil, errors.Wrapf(err, "error allocating topup for broadcast messages")
+	}
+
+	// if we have an active topup, assign it to our messages
+	if topup != NilTopupID {
+		for _, m := range msgs {
+			m.SetTopup(topup)
+		}
+	}
+
+	// insert them in a single request
+	err = InsertMessages(ctx, rt.DB, msgs)
+	if err != nil {
+		return nil, errors.Wrapf(err, "error inserting broadcast messages")
 	}
 
 	return msgs, nil

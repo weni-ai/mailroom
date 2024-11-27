@@ -6,6 +6,7 @@ import (
 
 	"github.com/nyaruka/gocommon/urns"
 	"github.com/nyaruka/goflow/envs"
+	"github.com/nyaruka/goflow/flows/events"
 	"github.com/nyaruka/mailroom/core/models"
 	"github.com/nyaruka/mailroom/testsuite"
 	"github.com/nyaruka/mailroom/testsuite/testdata"
@@ -27,7 +28,7 @@ func TestGetExpired(t *testing.T) {
 	assert.NoError(t, err)
 
 	b1 := testdata.InsertBroadcast(db, testdata.Org1, "eng", map[envs.Language]string{"eng": "Test message", "fra": "Un Message"}, s1,
-		[]*testdata.Contact{testdata.Cathy, testdata.George}, []*testdata.Group{testdata.DoctorsGroup},
+		[]*testdata.Contact{testdata.Cathy, testdata.George}, []*testdata.Group{testdata.DoctorsGroup}, events.BroadcastTypeDefault,
 	)
 
 	// add a URN
