@@ -41,7 +41,7 @@ func TestWppBroadcastTask(t *testing.T) {
 	// add an extra URN for cathy
 	testdata.InsertContactURN(db, testdata.Org1, testdata.Cathy, urns.URN("tel:+12065551212"), 1001)
 
-	// change alexandrias URN to a twitter URN and set her language to eng so that a template gets used for her
+	// change alexandrias URN to a whatsapp URN and set her language to eng so that a template gets used for her
 	db.MustExec(`UPDATE contacts_contacturn SET identity = 'whatsapp:559899999999', path='559899999999', scheme='whatsapp' WHERE contact_id = $1`, testdata.Alexandria.ID)
 	db.MustExec(`UPDATE contacts_contact SET language='eng' WHERE id = $1`, testdata.Alexandria.ID)
 
@@ -164,6 +164,7 @@ func TestWppBroadcastTask(t *testing.T) {
 		MsgCount    int
 		Msg         models.WppBroadcastMessage
 		MsgText     string
+		ChannelID   models.ChannelID
 	}{
 		{
 			models.NilBroadcastID,
@@ -175,6 +176,7 @@ func TestWppBroadcastTask(t *testing.T) {
 			121,
 			baseMsg,
 			"hello world",
+			models.NilChannelID,
 		},
 		{
 			existingID,
@@ -186,6 +188,7 @@ func TestWppBroadcastTask(t *testing.T) {
 			1,
 			evaluationMsg,
 			"hello Cathy",
+			models.NilChannelID,
 		},
 		{
 			models.NilBroadcastID,
@@ -197,6 +200,19 @@ func TestWppBroadcastTask(t *testing.T) {
 			1,
 			evaluationMsg,
 			"hello Cathy",
+			testdata.WhatsAppCloudChannel.ID,
+		},
+		{
+			models.NilBroadcastID,
+			nil,
+			cathyOnly,
+			nil,
+			queue.HandlerQueue,
+			1,
+			1,
+			evaluationMsg,
+			"hello Cathy",
+			models.NilChannelID,
 		},
 		{
 			models.NilBroadcastID,
@@ -208,6 +224,7 @@ func TestWppBroadcastTask(t *testing.T) {
 			1,
 			replyMsg,
 			"hello Cathy, how are you doing today?",
+			models.NilChannelID,
 		},
 		{
 			models.NilBroadcastID,
@@ -219,6 +236,7 @@ func TestWppBroadcastTask(t *testing.T) {
 			1,
 			listMsg,
 			"hello Cathy",
+			models.NilChannelID,
 		},
 		{
 			models.NilBroadcastID,
@@ -230,6 +248,7 @@ func TestWppBroadcastTask(t *testing.T) {
 			1,
 			ctaMsg,
 			"hello Cathy",
+			models.NilChannelID,
 		},
 		{
 			models.NilBroadcastID,
@@ -241,6 +260,7 @@ func TestWppBroadcastTask(t *testing.T) {
 			1,
 			flowMsg,
 			"hello Cathy",
+			models.NilChannelID,
 		},
 		{
 			models.NilBroadcastID,
@@ -252,6 +272,7 @@ func TestWppBroadcastTask(t *testing.T) {
 			1,
 			orderDetailsMsg,
 			"hello Cathy",
+			models.NilChannelID,
 		},
 		{
 			models.NilBroadcastID,
@@ -265,6 +286,7 @@ func TestWppBroadcastTask(t *testing.T) {
 			1,
 			templateMsg,
 			"Welcome Alexandia!",
+			models.NilChannelID,
 		},
 		{
 			models.NilBroadcastID,
@@ -284,7 +306,7 @@ func TestWppBroadcastTask(t *testing.T) {
 
 	for i, tc := range tcs {
 		// handle our start task
-		bcast := models.NewWppBroadcast(oa.OrgID(), tc.BroadcastID, tc.Msg, tc.URNs, tc.ContactIDs, tc.GroupIDs)
+		bcast := models.NewWppBroadcast(oa.OrgID(), tc.BroadcastID, tc.Msg, tc.URNs, tc.ContactIDs, tc.GroupIDs, tc.ChannelID)
 		err = msgs.CreateWppBroadcastBatches(ctx, rt, bcast)
 		assert.NoError(t, err)
 
@@ -376,6 +398,12 @@ func TestWppBroadcastTask(t *testing.T) {
 				tc.MsgText,
 				`{"templating":{"template":{"uuid":"17f52732-9655-4230-8225-6bd0800351e1","name":"welcome"},"language":"eng","country":"US","variables":["Alexandia"],"namespace":"7300ee93-b610-4ea5-98f0-f49d66dba123"},"text":"Welcome Alexandia!"}`,
 			).Returns(1, "%d: unexpected template count", i)
+		}
+
+		// assert our channel is being set
+		if tc.ChannelID != models.NilChannelID {
+			testsuite.AssertQuery(t, db, `SELECT count(*) FROM msgs_msg WHERE org_id = 1 AND created_on > $1 AND text = $2 AND channel_id = $3`, lastNow, tc.MsgText, tc.ChannelID).
+				Returns(1, "%d: unexpected channel count", i)
 		}
 
 		// make sure our broadcast is marked as sent
