@@ -96,6 +96,8 @@ type Config struct {
 
 	WhatsappSystemUserToken string `help:"WhatsApp system user token"`
 	MetaWebhookURL          string `help:"Meta webhook URL"`
+
+	ShutdownToleranceTime int `help:"Shutdown tolerance time(in seconds)"`
 }
 
 // NewDefaultConfig returns a new default configuration object
@@ -163,6 +165,8 @@ func NewDefaultConfig() *Config {
 
 		WhatsappSystemUserToken: "",
 		MetaWebhookURL:          "https://graph.facebook.com/v21.0",
+
+		ShutdownToleranceTime: 10,
 	}
 }
 
