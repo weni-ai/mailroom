@@ -1474,6 +1474,7 @@ type WppBroadcast struct {
 		OrgID       OrgID               `json:"org_id"                 db:"org_id"`
 		ParentID    BroadcastID         `json:"parent_id,omitempty"    db:"parent_id"`
 		Msg         WppBroadcastMessage `json:"msg"`
+		ChannelID   ChannelID           `json:"channel_id,omitempty"`
 	}
 }
 
@@ -1483,11 +1484,12 @@ func (b *WppBroadcast) ContactIDs() []ContactID  { return b.b.ContactIDs }
 func (b *WppBroadcast) GroupIDs() []GroupID      { return b.b.GroupIDs }
 func (b *WppBroadcast) URNs() []urns.URN         { return b.b.URNs }
 func (b *WppBroadcast) Msg() WppBroadcastMessage { return b.b.Msg }
+func (b *WppBroadcast) ChannelID() ChannelID     { return b.b.ChannelID }
 
 func (b *WppBroadcast) MarshalJSON() ([]byte, error)    { return json.Marshal(b.b) }
 func (b *WppBroadcast) UnmarshalJSON(data []byte) error { return json.Unmarshal(data, &b.b) }
 
-func NewWppBroadcast(orgID OrgID, id BroadcastID, msg WppBroadcastMessage, urns []urns.URN, contactIDs []ContactID, groupIDs []GroupID) *WppBroadcast {
+func NewWppBroadcast(orgID OrgID, id BroadcastID, msg WppBroadcastMessage, urns []urns.URN, contactIDs []ContactID, groupIDs []GroupID, channelID ChannelID) *WppBroadcast {
 	bcast := &WppBroadcast{}
 	bcast.b.OrgID = orgID
 	bcast.b.BroadcastID = id
@@ -1495,6 +1497,7 @@ func NewWppBroadcast(orgID OrgID, id BroadcastID, msg WppBroadcastMessage, urns 
 	bcast.b.URNs = urns
 	bcast.b.ContactIDs = contactIDs
 	bcast.b.GroupIDs = groupIDs
+	bcast.b.ChannelID = channelID
 
 	return bcast
 }
@@ -1504,6 +1507,7 @@ func (b *WppBroadcast) CreateBatch(contactIDs []ContactID) *WppBroadcastBatch {
 	batch.b.BroadcastID = b.b.BroadcastID
 	batch.b.Msg = b.b.Msg
 	batch.b.OrgID = b.b.OrgID
+	batch.b.ChannelID = b.b.ChannelID
 	batch.b.ContactIDs = contactIDs
 	return batch
 }
@@ -1516,6 +1520,7 @@ type WppBroadcastBatch struct {
 		ContactIDs  []ContactID            `json:"contact_ids,omitempty"`
 		IsLast      bool                   `json:"is_last"`
 		OrgID       OrgID                  `json:"org_id"`
+		ChannelID   ChannelID              `json:"channel_id,omitempty"`
 	}
 }
 
@@ -1525,6 +1530,7 @@ func (b *WppBroadcastBatch) URNs() map[ContactID]urns.URN        { return b.b.UR
 func (b *WppBroadcastBatch) SetURNs(urns map[ContactID]urns.URN) { b.b.URNs = urns }
 func (b *WppBroadcastBatch) OrgID() OrgID                        { return b.b.OrgID }
 func (b *WppBroadcastBatch) Msg() WppBroadcastMessage            { return b.b.Msg }
+func (b *WppBroadcastBatch) ChannelID() ChannelID                { return b.b.ChannelID }
 
 func (b *WppBroadcastBatch) IsLast() bool        { return b.b.IsLast }
 func (b *WppBroadcastBatch) SetIsLast(last bool) { b.b.IsLast = last }
@@ -1604,6 +1610,10 @@ func CreateWppBroadcastMessages(ctx context.Context, rt *runtime.Runtime, oa *Or
 					break
 				}
 			}
+		}
+
+		if bcast.ChannelID() != NilChannelID {
+			channel = oa.ChannelByID(bcast.ChannelID())
 		}
 
 		// no urn and channel? move on
