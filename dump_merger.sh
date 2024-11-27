@@ -5,28 +5,13 @@
 
 sleep 1
 
-echo "add remote nyaruka"
-git remote add nyaruka https://github.com/nyaruka/mailroom.git
-
-if [ -z $MAILROOM_TAG ]
-then 
-  echo "checkout mailroom_test.dump from nyaruka main"
-  git checkout nyaruka/main -- mailroom_test.dump
-else 
-  echo "fetch nyaruka remote"
-  git fetch nyaruka
-  echo "checkout mailroom_test.dump from tag $MAILROOM_TAG"
-  sleep 3
-  git checkout tags/${MAILROOM_TAG} -- mailroom_test.dump
-fi
-
 echo "creating postgres/postgis container"
 docker run --name dbdump -d -e POSTGRES_PASSWORD=temba -e PGPASSWORD=temba -p 5432:5432 'postgis/postgis:13-3.1'
 sleep 4
 echo "setup pg user and db"
 docker exec -i dbdump bash -c "PGPASSWORD=temba psql -U postgres --no-password -c \"CREATE USER mailroom_test PASSWORD 'temba';\""
 docker exec -i dbdump bash -c "PGPASSWORD=temba psql -U postgres --no-password -c \"ALTER ROLE mailroom_test WITH SUPERUSER;\""
-sleep 1
+sleep 5
 docker exec -i dbdump bash -c "PGPASSWORD=temba psql -U postgres --no-password -c \"CREATE DATABASE mailroom_test;\""
 sleep 2
 echo "restore dump"

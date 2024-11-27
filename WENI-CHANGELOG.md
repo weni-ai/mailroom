@@ -1,3 +1,42 @@
+1.42.0
+----------
+ * Fix: handle new broadcast_type field
+ * Refactor product search
+
+1.41.0
+----------
+ * Feat: WhatsApp Broadcasts
+
+1.40.4
+----------
+ * Update goflow to v1.5.2
+
+1.40.3
+----------
+ * Undo refactoring for Meta search
+
+1.40.2
+----------
+ * Add topic queue uuid 
+
+1.40.1
+----------
+ * Refactor meta search
+
+1.40.0
+----------
+ * Use hideUnavailable for product search
+
+1.39.2
+----------
+ * Update wenichats service try close room on fail in any step to open ticket
+ * Fix URN Brain
+ * Update goflow to v1.4.2
+
+1.39.1
+----------
+ * Update goflow to v1.4.1
+
 1.39.0
 ----------
  * Feat: WhatsApp Order Details

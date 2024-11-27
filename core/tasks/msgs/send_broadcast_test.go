@@ -56,24 +56,25 @@ func TestBroadcastEvents(t *testing.T) {
 	georgeOnly := []*flows.ContactReference{george}
 
 	tcs := []struct {
-		Translations map[envs.Language]*events.BroadcastTranslation
-		BaseLanguage envs.Language
-		Groups       []*assets.GroupReference
-		Contacts     []*flows.ContactReference
-		URNs         []urns.URN
-		Queue        string
-		BatchCount   int
-		MsgCount     int
-		MsgText      string
+		Translations  map[envs.Language]*events.BroadcastTranslation
+		BaseLanguage  envs.Language
+		Groups        []*assets.GroupReference
+		Contacts      []*flows.ContactReference
+		URNs          []urns.URN
+		Queue         string
+		BatchCount    int
+		MsgCount      int
+		MsgText       string
+		BroadcastType events.BroadcastType
 	}{
-		{basic, eng, doctorsOnly, nil, nil, queue.BatchQueue, 2, 121, "hello world"},
-		{basic, eng, doctorsOnly, georgeOnly, nil, queue.BatchQueue, 2, 121, "hello world"},
-		{basic, eng, nil, georgeOnly, nil, queue.HandlerQueue, 1, 0, "hello world"},
-		{basic, eng, doctorsOnly, cathyOnly, nil, queue.BatchQueue, 2, 121, "hello world"},
-		{basic, eng, nil, cathyOnly, nil, queue.HandlerQueue, 1, 1, "hello world"},
-		{basic, eng, nil, cathyOnly, []urns.URN{urns.URN("tel:+12065551212")}, queue.HandlerQueue, 1, 1, "hello world"},
-		{basic, eng, nil, cathyOnly, []urns.URN{urns.URN("tel:+250700000001")}, queue.HandlerQueue, 1, 2, "hello world"},
-		{basic, eng, nil, nil, []urns.URN{urns.URN("tel:+250700000001")}, queue.HandlerQueue, 1, 1, "hello world"},
+		{basic, eng, doctorsOnly, nil, nil, queue.BatchQueue, 2, 121, "hello world", events.BroadcastTypeDefault},
+		{basic, eng, doctorsOnly, georgeOnly, nil, queue.BatchQueue, 2, 121, "hello world", events.BroadcastTypeDefault},
+		{basic, eng, nil, georgeOnly, nil, queue.HandlerQueue, 1, 0, "hello world", events.BroadcastTypeDefault},
+		{basic, eng, doctorsOnly, cathyOnly, nil, queue.BatchQueue, 2, 121, "hello world", events.BroadcastTypeDefault},
+		{basic, eng, nil, cathyOnly, nil, queue.HandlerQueue, 1, 1, "hello world", events.BroadcastTypeDefault},
+		{basic, eng, nil, cathyOnly, []urns.URN{urns.URN("tel:+12065551212")}, queue.HandlerQueue, 1, 1, "hello world", events.BroadcastTypeDefault},
+		{basic, eng, nil, cathyOnly, []urns.URN{urns.URN("tel:+250700000001")}, queue.HandlerQueue, 1, 2, "hello world", events.BroadcastTypeDefault},
+		{basic, eng, nil, nil, []urns.URN{urns.URN("tel:+250700000001")}, queue.HandlerQueue, 1, 1, "hello world", events.BroadcastTypeDefault},
 	}
 
 	lastNow := time.Now()
@@ -81,7 +82,7 @@ func TestBroadcastEvents(t *testing.T) {
 
 	for i, tc := range tcs {
 		// handle our start task
-		event := events.NewBroadcastCreated(tc.Translations, tc.BaseLanguage, tc.Groups, tc.Contacts, tc.URNs)
+		event := events.NewBroadcastCreated(tc.Translations, tc.BaseLanguage, tc.Groups, tc.Contacts, tc.URNs, tc.BroadcastType)
 		bcast, err := models.NewBroadcastFromEvent(ctx, db, oa, event)
 		assert.NoError(t, err)
 
@@ -132,7 +133,7 @@ func TestBroadcastTask(t *testing.T) {
 	eng := envs.Language("eng")
 
 	// insert a broadcast so we can check it is being set to sent
-	legacyID := testdata.InsertBroadcast(db, testdata.Org1, "base", map[envs.Language]string{"base": "hi @(PROPER(contact.name)) legacy"}, models.NilScheduleID, nil, nil)
+	legacyID := testdata.InsertBroadcast(db, testdata.Org1, "base", map[envs.Language]string{"base": "hi @(PROPER(contact.name)) legacy"}, models.NilScheduleID, nil, nil, events.BroadcastTypeDefault)
 
 	ticket := testdata.InsertOpenTicket(db, testdata.Org1, testdata.Cathy, testdata.Mailgun, testdata.DefaultTopic, "", "", nil)
 	modelTicket := ticket.Load(db)
@@ -180,6 +181,7 @@ func TestBroadcastTask(t *testing.T) {
 		BatchCount    int
 		MsgCount      int
 		MsgText       string
+		BroadcastType events.BroadcastType
 	}{
 		{
 			models.NilBroadcastID,
@@ -194,6 +196,7 @@ func TestBroadcastTask(t *testing.T) {
 			2,
 			121,
 			"hello world",
+			events.BroadcastTypeDefault,
 		},
 		{
 			legacyID,
@@ -208,6 +211,7 @@ func TestBroadcastTask(t *testing.T) {
 			1,
 			1,
 			"hi Cathy legacy URN: +12065551212 Gender: F",
+			events.BroadcastTypeDefault,
 		},
 		{
 			models.NilBroadcastID,
@@ -222,6 +226,7 @@ func TestBroadcastTask(t *testing.T) {
 			1,
 			1,
 			"hi Cathy from Nyaruka goflow URN: tel:+12065551212 Gender: F",
+			events.BroadcastTypeDefault,
 		},
 	}
 
@@ -230,7 +235,7 @@ func TestBroadcastTask(t *testing.T) {
 
 	for i, tc := range tcs {
 		// handle our start task
-		bcast := models.NewBroadcast(oa.OrgID(), tc.BroadcastID, tc.Translations, tc.TemplateState, tc.BaseLanguage, tc.URNs, tc.ContactIDs, tc.GroupIDs, tc.TicketID)
+		bcast := models.NewBroadcast(oa.OrgID(), tc.BroadcastID, tc.Translations, tc.TemplateState, tc.BaseLanguage, tc.URNs, tc.ContactIDs, tc.GroupIDs, tc.TicketID, tc.BroadcastType)
 		err = msgs.CreateBroadcastBatches(ctx, rt, bcast)
 		assert.NoError(t, err)
 

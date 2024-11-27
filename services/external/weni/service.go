@@ -5,7 +5,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"io"
 	"net/http"
 	"net/url"
 	"strconv"
@@ -104,6 +103,7 @@ func (s *service) Call(session flows.Session, params assets.MsgCatalogParam, log
 	}
 
 	hasVtexAds := params.HasVtexAds
+	hideUnavailableItems := params.HideUnavailable
 	productRetailerIDS := []string{}
 	productRetailerIDMap := make(map[string]struct{})
 	var productEntries []flows.ProductEntry
@@ -113,7 +113,7 @@ func (s *service) Call(session flows.Session, params assets.MsgCatalogParam, log
 	var trace *httpx.Trace
 	var traces []*httpx.Trace
 	var sellerID string
-	var allProducts []string
+	existingProductsIds := []string{}
 	qttProducts := 5
 
 	postalCode_ := strings.TrimSpace(params.PostalCode)
@@ -142,9 +142,8 @@ func (s *service) Call(session flows.Session, params assets.MsgCatalogParam, log
 			searchResult, trace, err = GetProductListFromSentenX(product, catalog.FacebookCatalogID(), searchThreshold, s.rtConfig)
 			callResult.Traces = append(callResult.Traces, trace)
 		} else if params.SearchType == "vtex" {
-			searchResult, searchResultSponsored, traces, err = GetProductListFromVtex(product, params.SearchUrl, params.ApiType, catalog.FacebookCatalogID(), s.rtConfig, hasVtexAds)
+			searchResult, searchResultSponsored, traces, err = GetProductListFromVtex(product, params.SearchUrl, params.ApiType, catalog.FacebookCatalogID(), s.rtConfig, hasVtexAds, hideUnavailableItems, sellerID)
 			callResult.Traces = append(callResult.Traces, traces...)
-			allProducts = append(allProducts, searchResult...)
 			if searchResult == nil {
 				continue
 			}
@@ -173,25 +172,32 @@ func (s *service) Call(session flows.Session, params assets.MsgCatalogParam, log
 
 		if len(searchResultSponsored) > 0 {
 			hasSponsored = true
-			allProductsSponsored[0].ProductRetailerIDs = append(allProductsSponsored[0].ProductRetailerIDs, searchResultSponsored+"#"+sellerID)
+			allProductsSponsored[0].ProductRetailerIDs = append(allProductsSponsored[0].ProductRetailerIDs, searchResultSponsored)
 		}
-
 	}
 
 	callResult.ProductRetailerIDS = productEntries
 
-	existingProductsIds := []string{}
-
+	// simulates cart in VTEX with all products
 	hasSimulation := false
 	if postalCode_ != "" && sellerID != "1" {
+		var tracesSimulation []*httpx.Trace
 		hasSimulation = true
-		existingProductsIds, trace, err = CartSimulation(allProducts, sellerID, params.SearchUrl, postalCode_)
-		callResult.Traces = append(callResult.Traces, trace)
+		existingProductsIds, tracesSimulation, err = CartSimulation(callResult.ProductRetailerIDS, sellerID, params.SearchUrl, postalCode_)
+		callResult.Traces = append(callResult.Traces, tracesSimulation...)
 		if err != nil {
 			return callResult, err
 		}
 	}
 
+	// adds '#sellerID' formatting to the end of all retailer IDs
+	for _, productEntry := range callResult.ProductRetailerIDS {
+		for i, retailerID := range productEntry.ProductRetailerIDs {
+			productEntry.ProductRetailerIDs[i] = retailerID + "#" + sellerID
+		}
+	}
+
+	// search for products in Meta
 	retries := 2
 	var productSections []flows.ProductEntry
 	var tracesMeta []*httpx.Trace
@@ -214,21 +220,26 @@ func (s *service) Call(session flows.Session, params assets.MsgCatalogParam, log
 		finalResult.ProductRetailerIDS = allProductsSponsored
 	}
 
+	// checks available products and limits to 5 per section
 	for _, productEntry := range productSections {
 		newEntry := productEntry
 		newEntry.ProductRetailerIDs = []string{}
 		for _, productRetailerID := range productEntry.ProductRetailerIDs {
 			if hasSimulation {
 				for _, existingProductId := range existingProductsIds {
-					if productRetailerID == existingProductId {
-						if len(newEntry.ProductRetailerIDs) < qttProducts {
-							newEntry.ProductRetailerIDs = append(newEntry.ProductRetailerIDs, productRetailerID+"#"+sellerID)
+					if productRetailerID == existingProductId+"#"+sellerID {
+						_, exists := productRetailerIDMap[productRetailerID]
+						if !exists {
+							if len(newEntry.ProductRetailerIDs) < qttProducts {
+								newEntry.ProductRetailerIDs = append(newEntry.ProductRetailerIDs, productRetailerID)
+							}
+							productRetailerIDMap[productRetailerID] = struct{}{}
 						}
 					}
 				}
 			} else {
 				if len(newEntry.ProductRetailerIDs) < qttProducts {
-					newEntry.ProductRetailerIDs = append(newEntry.ProductRetailerIDs, productRetailerID+"#"+sellerID)
+					newEntry.ProductRetailerIDs = append(newEntry.ProductRetailerIDs, productRetailerID)
 				}
 			}
 		}
@@ -341,7 +352,7 @@ func GetProductListFromChatGPT(ctx context.Context, rtConfig *runtime.Config, co
 	return products["products"], trace, nil
 }
 
-func GetProductListFromVtex(productSearch string, searchUrl string, apiType string, catalog string, rt *runtime.Config, hasVtexAds bool) ([]string, string, []*httpx.Trace, error) {
+func GetProductListFromVtex(productSearch string, searchUrl string, apiType string, catalog string, rt *runtime.Config, hasVtexAds bool, hideUnavailableItems bool, sellerID string) ([]string, string, []*httpx.Trace, error) {
 	var result []string
 	var traces []*httpx.Trace
 	var err error
@@ -353,26 +364,24 @@ func GetProductListFromVtex(productSearch string, searchUrl string, apiType stri
 			return nil, productSponsored, traces, err
 		}
 	} else if apiType == "intelligent" {
-		result, traces, err = VtexIntelligentSearch(searchUrl, productSearch)
+		result, traces, err = VtexIntelligentSearch(searchUrl, productSearch, hideUnavailableItems)
 		if err != nil {
 			return nil, productSponsored, traces, err
 		}
 	}
 	if hasVtexAds {
-		resultSponsored, tracesAds, err := VtexSponsoredSearch(searchUrl, productSearch)
+		resultSponsored, tracesAds, err := VtexSponsoredSearch(searchUrl, productSearch, hideUnavailableItems)
 		traces = append(traces, tracesAds...)
 		if err != nil {
 			return nil, productSponsored, traces, err
 		}
 
 		productRetailerIDS := []string{}
-		productRetailerIDMap := make(map[string]struct{})
 		var productEntries []flows.ProductEntry
 		var productEntry flows.ProductEntry
 
 		for _, productRetailerID := range resultSponsored {
-			productRetailerIDS = append(productRetailerIDS, productRetailerID)
-			productRetailerIDMap[productRetailerID] = struct{}{}
+			productRetailerIDS = append(productRetailerIDS, productRetailerID+"#"+sellerID)
 		}
 
 		if len(productRetailerIDS) > 0 {
@@ -381,7 +390,6 @@ func GetProductListFromVtex(productSearch string, searchUrl string, apiType stri
 				ProductRetailerIDs: productRetailerIDS,
 			}
 			productEntries = append(productEntries, productEntry)
-			productRetailerIDS = nil
 
 			retries := 2
 			var newProductRetailerIDS []flows.ProductEntry
@@ -405,14 +413,16 @@ func GetProductListFromVtex(productSearch string, searchUrl string, apiType stri
 }
 
 type SearchSeller struct {
-	Items []struct {
-		ID           string `json:"id"`
-		Quantity     int    `json:"quantity"`
-		Seller       string `json:"seller"`
-		Availability string `json:"availability,omitempty"`
-	} `json:"items"`
+	Items      []Item `json:"items"`
 	PostalCode string `json:"postalCode"`
 	Country    string `json:"country"`
+}
+
+type Item struct {
+	ID           string `json:"id"`
+	Quantity     int    `json:"quantity"`
+	Seller       string `json:"seller"`
+	Availability string `json:"availability,omitempty"`
 }
 
 type VtexProduct struct {
@@ -465,7 +475,7 @@ func VtexLegacySearch(searchUrl string, productSearch string) ([]string, []*http
 	return allItems, traces, nil
 }
 
-func VtexIntelligentSearch(searchUrl string, productSearch string) ([]string, []*httpx.Trace, error) {
+func VtexIntelligentSearch(searchUrl string, productSearch string, hideUnavailableItems bool) ([]string, []*httpx.Trace, error) {
 
 	traces := []*httpx.Trace{}
 
@@ -482,7 +492,13 @@ func VtexIntelligentSearch(searchUrl string, productSearch string) ([]string, []
 
 	query := url.Values{}
 	query.Add("query", productSearch)
-	query.Add("hideUnavailableItems", "true")
+
+	hideUnavailable := "true"
+	if !hideUnavailableItems {
+		hideUnavailable = "false"
+	}
+
+	query.Add("hideUnavailableItems", hideUnavailable)
 
 	for key, value := range queryParams {
 		query.Add(key, value[0])
@@ -533,13 +549,19 @@ func VtexIntelligentSearch(searchUrl string, productSearch string) ([]string, []
 	return allItems, traces, nil
 }
 
-func VtexSponsoredSearch(searchUrl string, productSearch string) ([]string, []*httpx.Trace, error) {
+func VtexSponsoredSearch(searchUrl string, productSearch string, hideUnavailableItems bool) ([]string, []*httpx.Trace, error) {
 	traces := []*httpx.Trace{}
 
 	query := url.Values{}
 	query.Add("query", productSearch)
 	query.Add("locale", "pt-BR")
-	query.Add("hideUnavailableItems", "true")
+
+	hideUnavailable := "true"
+	if !hideUnavailableItems {
+		hideUnavailable = "false"
+	}
+
+	query.Add("hideUnavailableItems", hideUnavailable)
 
 	parsedURL, err := url.Parse(searchUrl)
 	if err != nil {
@@ -587,75 +609,90 @@ func VtexSponsoredSearch(searchUrl string, productSearch string) ([]string, []*h
 
 }
 
-func CartSimulation(products []string, sellerID string, url string, postalCode string) ([]string, *httpx.Trace, error) {
-	var trace *httpx.Trace
-	var body SearchSeller
-	result := []string{}
+func CartSimulation(ProductRetailerIDS []flows.ProductEntry, sellerID string, url string, postalCode string) ([]string, []*httpx.Trace, error) {
+	const batchSize = 300
+	var traces []*httpx.Trace
+	var availableProducts []string
+	var products []string
 
-	for _, product := range products {
-		product_retailer_id := product
+	urlSplit := strings.Split(url, "api")
+	urlSimulation := urlSplit[0] + "api/checkout/pub/orderForms/simulation"
 
-		body.Items = append(body.Items, struct {
-			ID           string "json:\"id\""
-			Quantity     int    "json:\"quantity\""
-			Seller       string "json:\"seller\""
-			Availability string "json:\"availability,omitempty\""
-		}{ID: product_retailer_id, Quantity: 1, Seller: sellerID})
+	for _, p := range ProductRetailerIDS {
+		products = append(products, p.ProductRetailerIDs...)
 	}
 
-	if len(body.Items) > 0 {
+	for i := 0; i < len(products); i += batchSize {
+		end := i + batchSize
+		if end > len(products) {
+			end = len(products)
+		}
+		batchProducts := products[i:end]
 
+		searchSeller := SearchSeller{
+			Items: []Item{},
+		}
 		if postalCode != "" {
-			body.PostalCode = postalCode
-			body.Country = "BRA"
+			searchSeller.PostalCode = postalCode
+			searchSeller.Country = "BRA"
 		}
 
-		urlSplit := strings.Split(url, "api")
-
-		urlSimulation := urlSplit[0] + "api/checkout/pub/orderForms/simulation"
-
-		headers := map[string]string{
-			"Accept": "application/json",
+		for _, product := range batchProducts {
+			searchSeller.Items = append(searchSeller.Items, Item{ID: product, Quantity: 1, Seller: sellerID})
 		}
-		var b io.Reader
-		data, err := jsonx.Marshal(body)
+
+		batchAvailableProducts, trace, err := sendBatchRequest(searchSeller, urlSimulation)
+		traces = append(traces, trace)
 		if err != nil {
-			return nil, trace, err
-		}
-		b = bytes.NewReader(data)
-		headers["Content-Type"] = "application/json"
-		req, err := httpx.NewRequest("POST", urlSimulation, b, headers)
-		if err != nil {
-			return nil, trace, err
+			return nil, traces, err
 		}
 
-		client := &http.Client{}
-		trace, err := httpx.DoTrace(client, req, nil, nil, -1)
-		if err != nil {
-			return nil, trace, err
-		}
-
-		if trace.Response.StatusCode >= 400 {
-			return nil, trace, fmt.Errorf("error when searching with seller: status code %d", trace.Response.StatusCode)
-		}
-
-		response := &SearchSeller{}
-
-		err = json.Unmarshal(trace.ResponseBody, response)
-		if err != nil {
-			return nil, trace, err
-		}
-
-		availableProducts := []string{}
-		for _, item := range response.Items {
-			if item.Availability == "available" {
-				availableProducts = append(availableProducts, item.ID)
-			}
-		}
-		return availableProducts, trace, nil
+		availableProducts = append(availableProducts, batchAvailableProducts...)
 	}
 
-	return result, trace, nil
+	return availableProducts, traces, nil
+}
+
+func sendBatchRequest(body SearchSeller, url string) ([]string, *httpx.Trace, error) {
+	client := &http.Client{}
+
+	headers := map[string]string{
+		"Accept": "application/json",
+	}
+
+	data, err := jsonx.Marshal(body)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	req, err := httpx.NewRequest("POST", url, bytes.NewReader(data), headers)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	trace, err := httpx.DoTrace(client, req, nil, nil, -1)
+	if err != nil {
+		return nil, trace, err
+	}
+
+	if trace.Response.StatusCode >= 400 {
+		return nil, trace, fmt.Errorf("error when searching with seller: status code %d", trace.Response.StatusCode)
+	}
+
+	response := &SearchSeller{}
+	err = json.Unmarshal(trace.ResponseBody, response)
+	if err != nil {
+		return nil, trace, err
+	}
+
+	availableProducts := []string{}
+	for _, item := range response.Items {
+		if item.Availability == "available" {
+			availableProducts = append(availableProducts, item.ID)
+		}
+	}
+
+	return availableProducts, trace, nil
 }
 
 // Filter represents the structure of the filter for the API request
@@ -719,6 +756,7 @@ func fetchProducts(url string) (*Response, *httpx.Trace, error) {
 	}
 
 	t, err := httpx.DoTrace(client, req, nil, nil, -1)
+	t.Request.URL = truncateURL(t.Request.URL)
 	if err != nil {
 		return nil, t, err
 	}
@@ -738,51 +776,77 @@ func fetchProducts(url string) (*Response, *httpx.Trace, error) {
 }
 
 func ProductsSearchMeta(productEntryList []flows.ProductEntry, catalog string, whatsappSystemUserToken string) ([]flows.ProductEntry, []*httpx.Trace, error) {
+	const batchSize = 15
+	validProductIds := []string{}
 	traces := []*httpx.Trace{}
 	allIds := []string{}
 	for _, productEntry := range productEntryList {
 		allIds = append(allIds, productEntry.ProductRetailerIDs...)
 	}
 
-	filter, err := createFilter(allIds)
-	if err != nil {
-		return nil, nil, err
-	}
-
-	params := url.Values{}
-	params.Add("fields", "[\"category\",\"name\",\"retailer_id\",\"availability\"]")
-	params.Add("summary", "true")
-	params.Add("access_token", whatsappSystemUserToken)
-	params.Add("filter", filter)
-	url_ := fmt.Sprintf("https://graph.facebook.com/v14.0/%s/products?%s", catalog, params.Encode())
-
-	response, trace, err := fetchProducts(url_)
-	traces = append(traces, trace)
-	if err != nil {
-		return nil, traces, err
-	}
-
 	newProductEntryList := []flows.ProductEntry{}
-	for _, productEntry := range productEntryList {
-		validProductIds := []string{}
+
+	for i := 0; i < len(allIds); i += batchSize {
+		end := i + batchSize
+		if end > len(allIds) {
+			end = len(allIds)
+		}
+
+		batchIds := allIds[i:end]
+		filter, err := createFilter(batchIds)
+		if err != nil {
+			return nil, nil, err
+		}
+
+		params := url.Values{}
+		params.Add("fields", "[\"category\",\"name\",\"retailer_id\",\"availability\"]")
+		params.Add("summary", "true")
+		params.Add("access_token", whatsappSystemUserToken)
+		params.Add("filter", filter)
+
+		url_ := fmt.Sprintf("https://graph.facebook.com/v14.0/%s/products?%s", catalog, params.Encode())
+
+		response, trace, err := fetchProducts(url_)
+		traces = append(traces, trace)
+		if err != nil {
+			return nil, traces, err
+		}
+
+		for _, id := range response.Data {
+			validProductIds = append(validProductIds, id.RetailerID)
+		}
+	}
+
+	for i, productEntry := range productEntryList {
+		newProductEntryList = append(newProductEntryList, flows.ProductEntry{Product: productEntry.Product, ProductRetailerIDs: []string{}})
 		for _, retailerId := range productEntry.ProductRetailerIDs {
-			for _, id := range response.Data {
-				if retailerId == id.RetailerID {
-					validProductIds = append(validProductIds, id.RetailerID)
+			for _, id := range validProductIds {
+				if retailerId == id {
+					newProductEntryList[i].ProductRetailerIDs = append(newProductEntryList[i].ProductRetailerIDs, id)
+					break
 				}
 			}
-		}
-		if len(validProductIds) > 0 {
-			newProductEntryList = append(newProductEntryList, flows.ProductEntry{Product: productEntry.Product, ProductRetailerIDs: validProductIds})
 		}
 	}
 
 	return newProductEntryList, traces, nil
-
 }
 
 var languages = map[string]string{
 	"eng": "You may also like:",
 	"por": "Você também pode gostar:",
 	"spa": "También te puede interesar:",
+}
+
+func truncateURL(u *url.URL) *url.URL {
+	const maxLength = 2048
+	if len(u.String()) > maxLength {
+		excessLength := len(u.String()) - maxLength
+		if excessLength < len(u.RawQuery) {
+			u.RawQuery = u.RawQuery[:len(u.RawQuery)-excessLength]
+		} else {
+			u.RawQuery = ""
+		}
+	}
+	return u
 }

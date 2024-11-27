@@ -694,7 +694,7 @@ func contactIDsFromURNs(ctx context.Context, db Queryer, orgID OrgID, urnz []urn
 		owners[identityToOriginal[urn]] = id
 	}
 
-	if (orgConfig.Get("verify_ninth_digit", false) == true) {
+	if orgConfig.Get("verify_ninth_digit", false) == true {
 		owners, err = checkNinthDigitContacts(ctx, owners, db, orgID)
 		if err != nil {
 			return nil, errors.Wrapf(err, "error while checking for ninth digit contacts")

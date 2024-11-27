@@ -26,6 +26,7 @@ type Topic struct {
 		OrgID     OrgID            `json:"org_id"`
 		Name      string           `json:"name"`
 		IsDefault bool             `json:"is_default"`
+		QueueUUID assets.QueueUUID `json:"queue_uuid"`
 	}
 }
 
@@ -44,13 +45,16 @@ func (t *Topic) Name() string { return t.t.Name }
 // Type returns the type
 func (t *Topic) IsDefault() bool { return t.t.IsDefault }
 
+func (t *Topic) QueueUUID() assets.QueueUUID { return t.t.QueueUUID }
+
 const selectOrgTopicsSQL = `
 SELECT ROW_TO_JSON(r) FROM (SELECT
 	t.id as id,
 	t.uuid as uuid,
 	t.org_id as org_id,
 	t.name as name,
-	t.is_default as is_default
+	t.is_default as is_default,
+	t.queue_uuid as queue_uuid
 FROM
 	tickets_topic t
 WHERE

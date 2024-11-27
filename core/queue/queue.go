@@ -50,6 +50,12 @@ const (
 	// SendBroadcastBatch is our type for sending a broadcast batch
 	SendBroadcastBatch = "send_broadcast_batch"
 
+	// SendTemplateBroadcast is our type for sending a template broadcast
+	SendWppBroadcast = "send_whatsapp_broadcast"
+
+	// SendTemplateBroadcastBatch is our type for sending a template broadcast batch
+	SendWppBroadcastBatch = "send_whatsapp_broadcast_batch"
+
 	// HandleContactEvent is our task for event handling
 	HandleContactEvent = "handle_contact_event"
 

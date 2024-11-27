@@ -460,6 +460,182 @@ func TestOpenAndForward(t *testing.T) {
 	assert.Equal(t, "failed to open ticket, no urn found for contact", err.Error())
 }
 
+func TestOpenFails(t *testing.T) {
+	ctx, rt, _, _ := testsuite.Get()
+	testsuite.Reset(testsuite.ResetData | testsuite.ResetStorage)
+
+	defer dates.SetNowSource(dates.DefaultNowSource)
+	dates.SetNowSource(dates.NewSequentialNowSource(time.Date(2019, 10, 7, 15, 21, 30, 0, time.UTC)))
+
+	session, _, err := test.CreateTestSession("", envs.RedactionPolicyNone)
+	require.NoError(t, err)
+
+	defer uuids.SetGenerator(uuids.DefaultGenerator)
+	defer httpx.SetRequestor(httpx.DefaultRequestor)
+
+	uuids.SetGenerator(uuids.NewSeededGenerator(12345))
+
+	httpx.SetRequestor(httpx.NewMockRequestor(map[string][]httpx.MockResponse{
+		fmt.Sprintf("%s/rooms/", baseURL): {
+			httpx.NewMockResponse(502, nil, `502 Bad Gateway`),
+			httpx.NewMockResponse(201, nil, `{
+				"uuid": "8ecb1e4a-b457-4645-a161-e2b02ddffa88",
+				"user": {
+					"first_name": "John",
+					"last_name": "Doe",
+					"email": "john.doe@chats.weni.ai"
+				},
+				"contact": {
+					"external_id": "095be615-a8ad-4c33-8e9c-c7612fbf6c9f",
+					"name": "Foo Bar",
+					"email": "FooBar@weni.ai",
+					"status": "string",
+					"phone": "+250788123123",
+					"custom_fields": {},
+					"created_on": "2019-08-24T14:15:22Z"
+				},
+				"queue": {
+					"uuid": "449f48d9-4905-4d6f-8abf-f1ff6afb803e",
+					"created_on": "2019-08-24T14:15:22Z",
+					"modified_on": "2019-08-24T14:15:22Z",
+					"name": "CHATS",
+					"sector": "f3d496ff-c154-4a96-a678-6a8879583ddb"
+				},
+				"created_on": "2019-08-24T14:15:22Z",
+				"modified_on": "2019-08-24T14:15:22Z",
+				"is_active": true,
+				"custom_fields": {
+					"country": "brazil",
+					"mood": "angry",
+					"age": 23,
+					"join_date": "2017-12-02",
+					"gender": "male"
+				},
+				"callback_url": "http://example.com"
+			}`),
+			httpx.NewMockResponse(201, nil, `{
+				"uuid": "8ecb1e4a-b457-4645-a161-e2b02ddffa88",
+				"user": {
+					"first_name": "John",
+					"last_name": "Doe",
+					"email": "john.doe@chats.weni.ai"
+				},
+				"contact": {
+					"external_id": "095be615-a8ad-4c33-8e9c-c7612fbf6c9f",
+					"name": "Foo Bar",
+					"email": "FooBar@weni.ai",
+					"status": "string",
+					"phone": "+250788123123",
+					"custom_fields": {},
+					"created_on": "2019-08-24T14:15:22Z"
+				},
+				"queue": {
+					"uuid": "449f48d9-4905-4d6f-8abf-f1ff6afb803e",
+					"created_on": "2019-08-24T14:15:22Z",
+					"modified_on": "2019-08-24T14:15:22Z",
+					"name": "CHATS",
+					"sector": "f3d496ff-c154-4a96-a678-6a8879583ddb"
+				},
+				"created_on": "2019-08-24T14:15:22Z",
+				"modified_on": "2019-08-24T14:15:22Z",
+				"is_active": true,
+				"custom_fields": {
+					"country": "brazil",
+					"mood": "angry",
+					"age": 23,
+					"join_date": "2017-12-02",
+					"gender": "male"
+				},
+				"callback_url": "http://example.com"
+			}`),
+		},
+		fmt.Sprintf("%s/rooms/8ecb1e4a-b457-4645-a161-e2b02ddffa88/", baseURL): {
+			httpx.NewMockResponse(502, nil, `502 Bad Gateway`),
+			httpx.NewMockResponse(200, nil, `{
+				"uuid": "8ecb1e4a-b457-4645-a161-e2b02ddffa88",
+				"user": {
+					"first_name": "John",
+					"last_name": "Doe",
+					"email": "john.doe@chats.weni.ai"
+				},
+				"contact": {
+					"external_id": "095be615-a8ad-4c33-8e9c-c7612fbf6c9f",
+					"name": "Foo Bar",
+					"email": "FooBar@weni.ai",
+					"status": "string",
+					"phone": "+250788123123",
+					"custom_fields": {},
+					"created_on": "2019-08-24T14:15:22Z"
+				},
+				"queue": {
+					"uuid": "449f48d9-4905-4d6f-8abf-f1ff6afb803e",
+					"created_on": "2019-08-24T14:15:22Z",
+					"modified_on": "2019-08-24T14:15:22Z",
+					"name": "CHATS",
+					"sector": "f3d496ff-c154-4a96-a678-6a8879583ddb"
+				},
+				"created_on": "2019-08-24T14:15:22Z",
+				"modified_on": "2019-08-24T14:15:22Z",
+				"is_active": true,
+				"custom_fields": {
+					"country": "brazil",
+					"mood": "angry"
+				},
+				"callback_url": "http://example.com"
+			}`),
+		},
+		fmt.Sprintf("%s/rooms/8ecb1e4a-b457-4645-a161-e2b02ddffa88/close/", baseURL): {
+			httpx.NewMockResponse(200, nil, `{}`),
+		},
+	}))
+
+	ticketer := flows.NewTicketer(static.NewTicketer(assets.TicketerUUID(uuids.New()), "Support", "wenichats"))
+
+	svc, err := wenichats.NewService(
+		rt.Config,
+		http.DefaultClient,
+		nil,
+		ticketer,
+		map[string]string{
+			"project_auth": authToken,
+			"sector_uuid":  "1a4bae05-993c-4f3b-91b5-80f4e09951f2",
+		},
+	)
+	assert.NoError(t, err)
+
+	oa, err := models.GetOrgAssets(ctx, rt, testdata.Org1.ID)
+	require.NoError(t, err)
+	defaultTopic := oa.SessionAssets().Topics().FindByName("General")
+
+	// Error on Create Room
+	logger := &flows.HTTPLogger{}
+	ticket, err := svc.Open(session, defaultTopic, `{"custom_fields":{"country": "brazil","mood": "angry"}}`, nil, logger.Log)
+
+	assert.Nil(t, ticket)
+	assert.Error(t, err)
+
+	// Error on update room to set callbackURL
+	logger = &flows.HTTPLogger{}
+	ticket, err = svc.Open(session, defaultTopic, `{"custom_fields":{"country": "brazil","mood": "angry"}}`, nil, logger.Log)
+
+	assert.Nil(t, ticket)
+	assert.Error(t, err)
+
+	// Error on SelectHistory like a timeout
+	mockDB, _, _ := sqlmock.New()
+	defer mockDB.Close()
+	sqlxDB := sqlx.NewDb(mockDB, "sqlmock")
+
+	wenichats.SetDB(sqlxDB)
+
+	logger = &flows.HTTPLogger{}
+	ticket, err = svc.Open(session, defaultTopic, `{"custom_fields":{"country": "brazil","mood": "angry"}}`, nil, logger.Log)
+
+	assert.Nil(t, ticket)
+	assert.Error(t, err)
+
+}
+
 func TestCloseAndReopen(t *testing.T) {
 	_, rt, _, _ := testsuite.Get()
 

@@ -11,6 +11,7 @@ import (
 	"github.com/nyaruka/goflow/assets"
 	"github.com/nyaruka/goflow/envs"
 	"github.com/nyaruka/goflow/flows"
+	"github.com/nyaruka/goflow/flows/events"
 	"github.com/nyaruka/goflow/utils"
 	"github.com/nyaruka/mailroom/core/models"
 
@@ -72,7 +73,7 @@ func insertOutgoingMsg(db *sqlx.DB, org *Org, channel *Channel, contact *Contact
 	return msg
 }
 
-func InsertBroadcast(db *sqlx.DB, org *Org, baseLanguage envs.Language, text map[envs.Language]string, schedID models.ScheduleID, contacts []*Contact, groups []*Group) models.BroadcastID {
+func InsertBroadcast(db *sqlx.DB, org *Org, baseLanguage envs.Language, text map[envs.Language]string, schedID models.ScheduleID, contacts []*Contact, groups []*Group, broadcastType events.BroadcastType) models.BroadcastID {
 	textMap := make(map[string]sql.NullString, len(text))
 	for lang, t := range text {
 		textMap[string(lang)] = sql.NullString{String: t, Valid: true}
@@ -80,8 +81,8 @@ func InsertBroadcast(db *sqlx.DB, org *Org, baseLanguage envs.Language, text map
 
 	var id models.BroadcastID
 	must(db.Get(&id,
-		`INSERT INTO msgs_broadcast(org_id, base_language, text, schedule_id, status, send_all, created_on, modified_on, created_by_id, modified_by_id)
-		VALUES($1, $2, $3, $4, 'P', TRUE, NOW(), NOW(), 1, 1) RETURNING id`, org.ID, baseLanguage, hstore.Hstore{Map: textMap}, schedID,
+		`INSERT INTO msgs_broadcast(org_id, base_language, text, schedule_id, broadcast_type, status, send_all, created_on, modified_on, created_by_id, modified_by_id)
+		VALUES($1, $2, $3, $4, $5, 'P', TRUE, NOW(), NOW(), 1, 1) RETURNING id`, org.ID, baseLanguage, hstore.Hstore{Map: textMap}, schedID, broadcastType,
 	))
 
 	for _, contact := range contacts {
