@@ -1,3 +1,8 @@
+1.43.0
+----------
+ * feat: add buttons support to wpp broadcasts
+ * feat: add channel option to whatsapp broadcasts
+
 1.42.0
 ----------
  * Fix: handle new broadcast_type field
