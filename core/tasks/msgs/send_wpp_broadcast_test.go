@@ -139,6 +139,21 @@ func TestWppBroadcastTask(t *testing.T) {
 		},
 	}
 
+	buttonsMsg := models.WppBroadcastMessage{
+		Text: "hello @contact.name",
+		Buttons: []flows.ButtonComponent{
+			{
+				SubType: "url",
+				Parameters: []flows.ButtonParam{
+					{
+						Type: "text",
+						Text: "button param text",
+					},
+				},
+			},
+		},
+	}
+
 	tcs := []struct {
 		BroadcastID models.BroadcastID
 		URNs        []urns.URN
@@ -273,6 +288,18 @@ func TestWppBroadcastTask(t *testing.T) {
 			"Welcome Alexandia!",
 			models.NilChannelID,
 		},
+		{
+			models.NilBroadcastID,
+			nil,
+			cathyOnly,
+			nil,
+			queue.HandlerQueue,
+			1,
+			1,
+			buttonsMsg,
+			"hello Cathy",
+			models.NilChannelID,
+		},
 	}
 
 	lastNow := time.Now()
@@ -357,6 +384,12 @@ func TestWppBroadcastTask(t *testing.T) {
 		if tc.Msg.InteractionType == "order_details" {
 			testsuite.AssertQuery(t, db, `SELECT count(*) FROM msgs_msg WHERE org_id = 1 AND created_on > $1 AND text = $2 AND metadata LIKE '%' || 'order_details' || '%'`, lastNow, tc.MsgText).
 				Returns(1, "%d: unexpected order details message count", i)
+		}
+
+		// assert our buttons are being sent
+		if len(tc.Msg.Buttons) > 0 {
+			testsuite.AssertQuery(t, db, `SELECT count(*) FROM msgs_msg WHERE org_id = 1 AND created_on > $1 AND text = $2 AND metadata LIKE '%' || 'buttons' || '%'`, lastNow, tc.MsgText).
+				Returns(1, "%d: unexpected buttons count", i)
 		}
 
 		// assert our template is being sent
