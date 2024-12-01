@@ -72,6 +72,11 @@ func handleEventCallback(ctx context.Context, rt *runtime.Runtime, r *http.Reque
 		return err, http.StatusBadRequest, nil
 	}
 
+	extraMetadata := map[string]interface{}{
+		"ticketer_id":   ticket.TicketerID(),
+		"ticketer_type": "wenichats",
+	}
+
 	switch eventType {
 	case "msg.create":
 		eMsg := &eventCallbackRequest{}
@@ -100,7 +105,7 @@ func handleEventCallback(ctx context.Context, rt *runtime.Runtime, r *http.Reque
 					return errors.Wrapf(err, "unable to send media type %s because response body exceeds %d bytes limit", file.ContentType, maxBodyBytes), http.StatusBadRequest, nil
 				}
 				file.Body = io.NopCloser(bytes.NewReader(bodyBytes))
-				_, err = tickets.SendReply(ctx, rt, ticket, "", []*tickets.File{file})
+				_, err = tickets.SendReply(ctx, rt, ticket, "", []*tickets.File{file}, extraMetadata)
 				if err != nil {
 					return errors.Wrapf(err, "error on send ticket reply with media '%s'", m.URL), http.StatusInternalServerError, nil
 				}
@@ -109,7 +114,7 @@ func handleEventCallback(ctx context.Context, rt *runtime.Runtime, r *http.Reque
 
 		txtMsg := eMsg.Content.Text
 		if strings.TrimSpace(txtMsg) != "" {
-			_, err = tickets.SendReply(ctx, rt, ticket, txtMsg, nil)
+			_, err = tickets.SendReply(ctx, rt, ticket, txtMsg, nil, extraMetadata)
 			if err != nil {
 				return errors.Wrapf(err, "error on send ticket reply"), http.StatusBadRequest, nil
 			}

@@ -79,7 +79,7 @@ func FromTicketerUUID(ctx context.Context, rt *runtime.Runtime, uuid assets.Tick
 }
 
 // SendReply sends a message reply from the ticket system user to the contact
-func SendReply(ctx context.Context, rt *runtime.Runtime, ticket *models.Ticket, text string, files []*File) (*models.Msg, error) {
+func SendReply(ctx context.Context, rt *runtime.Runtime, ticket *models.Ticket, text string, files []*File, extraMetadata map[string]interface{}) (*models.Msg, error) {
 	// look up our assets
 	oa, err := models.GetOrgAssets(ctx, rt, ticket.OrgID())
 	if err != nil {
@@ -104,7 +104,7 @@ func SendReply(ctx context.Context, rt *runtime.Runtime, ticket *models.Ticket, 
 	// we'll use a broadcast to send this message
 	bcast := models.NewBroadcast(oa.OrgID(), models.NilBroadcastID, translations, models.TemplateStateEvaluated, envs.Language("base"), nil, nil, nil, ticket.ID(), events.BroadcastTypeDefault)
 	batch := bcast.CreateBatch([]models.ContactID{ticket.ContactID()})
-	msgs, err := models.CreateBroadcastMessages(ctx, rt, oa, batch)
+	msgs, err := models.CreateBroadcastMessages(ctx, rt, oa, batch, extraMetadata)
 	if err != nil {
 		return nil, errors.Wrapf(err, "error creating message batch")
 	}
