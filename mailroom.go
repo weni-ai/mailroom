@@ -201,12 +201,12 @@ func (mr *Mailroom) Stop() error {
 	mr.batchForeman.Stop()
 	mr.handlerForeman.Stop()
 	mr.flowBatchForeman.Stop()
-	librato.Stop()
 	close(mr.quit)
 	mr.cancel()
 
 	time.Sleep(time.Second * time.Duration(mr.rt.Config.ShutdownToleranceTime))
 
+	librato.Stop()
 	// stop our web server
 	mr.webserver.Stop()
 
