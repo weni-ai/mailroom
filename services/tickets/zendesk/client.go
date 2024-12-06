@@ -316,13 +316,15 @@ type User struct {
 	Organization struct {
 		Name string `json:"name"`
 	} `json:"organization,omitempty"`
-	ExternalID string `json:"external_id,omitempty"`
-	Identities []struct {
-		Type  string `json:"type"`
-		Value string `json:"value"`
-	} `json:"identities,omitempty"`
-	Verified bool   `json:"verified,omitempty"`
-	Role     string `json:"role,omitempty"`
+	ExternalID string     `json:"external_id,omitempty"`
+	Identities []Identity `json:"identities,omitempty"`
+	Verified   bool       `json:"verified,omitempty"`
+	Role       string     `json:"role,omitempty"`
+}
+
+type Identity struct {
+	Type  string `json:"type"`
+	Value string `json:"value"`
 }
 
 // CreateUser creates a new user in zendesk
@@ -349,7 +351,7 @@ type SearchUserResponse struct {
 
 // SearchUser returns the user with the given external ID or nil if it doesn't exist
 func (c *RESTClient) SearchUser(externalID string) (*User, *httpx.Trace, error) {
-	endpoint := fmt.Sprintf("users/search.json?external_id=%s", externalID)
+	endpoint := fmt.Sprintf("users/search.json?query=%s", externalID)
 	var response SearchUserResponse
 	trace, err := c.get(endpoint, nil, &response)
 	if err != nil {
@@ -359,4 +361,23 @@ func (c *RESTClient) SearchUser(externalID string) (*User, *httpx.Trace, error) 
 		return nil, trace, nil
 	}
 	return &response.Users[0], trace, nil
+}
+
+// MergeUser merge two users
+func (c *RESTClient) MergeUser(userID int64, unmergedUserID int64) (*User, *httpx.Trace, error) {
+	endpoint := fmt.Sprintf("users/%s/merge", unmergedUserID)
+
+	payload := struct {
+		User *User `json:"user"`
+	}{User: &User{ID: userID}}
+
+	response := &struct {
+		User *User `json:"user"`
+	}{}
+
+	trace, err := c.post(endpoint, payload, &response)
+	if err != nil {
+		return nil, trace, err
+	}
+	return response.User, trace, nil
 }
