@@ -83,6 +83,12 @@ func (s *service) Open(session flows.Session, topic *flows.Topic, body string, a
 	contactDisplay := session.Contact().Format(session.Environment())
 	contactUUID := string(session.Contact().UUID())
 
+	var phoneNumber string
+	urn := session.Contact().PreferredURN().URN()
+	if urn.Scheme() == "whatsapp" {
+		phoneNumber = string(session.Contact().PreferredURN().URN().Path())
+	}
+
 	user, trace, err := s.restClient.SearchUser(contactUUID)
 	if trace != nil {
 		logHTTP(flows.NewHTTPLog(trace, flows.HTTPStatusFromCode, s.redactor))
@@ -96,13 +102,13 @@ func (s *service) Open(session flows.Session, topic *flows.Topic, body string, a
 			ExternalID: contactUUID,
 			Verified:   true,
 			Role:       "end-user",
-			Identities: []Identity{
-				{
-					Type:  "phone_number",
-					Value: string(session.Contact().PreferredURN().URN().Path()),
-				},
-			},
+			Identities: []Identity{},
 		}
+
+		if len(phoneNumber) > 0 {
+			newUser.Identities = append(newUser.Identities, Identity{Type: "phone_number", Value: phoneNumber})
+		}
+
 		user, trace, err = s.restClient.CreateUser(newUser)
 		if trace != nil {
 			logHTTP(flows.NewHTTPLog(trace, flows.HTTPStatusFromCode, s.redactor))
