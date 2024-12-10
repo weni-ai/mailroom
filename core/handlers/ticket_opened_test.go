@@ -32,8 +32,14 @@ func TestTicketOpened(t *testing.T) {
 				"message": "Queued. Thank you."
 			}`),
 		},
-		"https://nyaruka.zendesk.com/api/v2/users/search.json?external_id=b699a406-7e44-49be-9f01-1a82893e8a10": {
+		"https://nyaruka.zendesk.com/api/v2/users/search.json?query=b699a406-7e44-49be-9f01-1a82893e8a10": {
 			httpx.NewMockResponse(200, nil, `{"users": []}`),
+		},
+		"https://nyaruka.zendesk.com/api/v2/users/search.json?query=type:user details:\"b699a406-7e44-49be-9f01-1a82893e8a10\"": {
+			httpx.NewMockResponse(200, nil, `{"users": [{"id": 35241, "name": "Dummy User"}], "count": 1, "next_page": "https://nyaruka.zendesk.com/api/v2/users.json?page=2"}`),
+		},
+		"https://nyaruka.zendesk.com/api/v2/users/35241/merge": {
+			httpx.NewMockResponse(200, nil, `{"users": [{"id": 35241, "name": "Dummy User"}], "count": 1, "next_page": "https://nyaruka.zendesk.com/api/v2/users.json?page=2"}`),
 		},
 		"https://nyaruka.zendesk.com/api/v2/users.json": {
 			httpx.NewMockResponse(201, nil, `{
@@ -110,7 +116,7 @@ func TestTicketOpened(t *testing.T) {
 				{ // and there's an HTTP log for that
 					SQL:   "select count(*) from request_logs_httplog where ticketer_id = $1",
 					Args:  []interface{}{testdata.Zendesk.ID},
-					Count: 3,
+					Count: 5,
 				},
 				{ // which doesn't include our API token
 					SQL:   "select count(*) from request_logs_httplog where ticketer_id = $1 AND request like '%523562%'",
