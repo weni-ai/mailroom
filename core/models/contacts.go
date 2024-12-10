@@ -730,7 +730,7 @@ func checkNinthDigitContacts(ctx context.Context, owners map[urns.URN]ContactID,
 			if err := rows.Scan(&id, &urn); err != nil {
 				return nil, errors.Wrapf(err, "error scanning URN result")
 			}
-			owners[urnVariationsMap[urn]] = id
+			owners[urn] = id
 		}
 	}
 
