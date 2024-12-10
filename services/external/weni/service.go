@@ -124,8 +124,8 @@ func (s *service) Call(session flows.Session, params assets.MsgCatalogParam, log
 	}
 
 	sellerID = strings.TrimSpace(params.SellerId)
-	if sellerID == "" {
-		sellerID = "1"
+	if len(sellerID) > 0 {
+		sellerID = "#" + sellerID
 	}
 
 	allProductsSponsored := []flows.ProductEntry{
@@ -180,7 +180,7 @@ func (s *service) Call(session flows.Session, params assets.MsgCatalogParam, log
 
 	// simulates cart in VTEX with all products
 	hasSimulation := false
-	if postalCode_ != "" && sellerID != "1" {
+	if postalCode_ != "" && sellerID != "1" && len(sellerID) > 0 {
 		var tracesSimulation []*httpx.Trace
 		hasSimulation = true
 		existingProductsIds, tracesSimulation, err = CartSimulation(callResult.ProductRetailerIDS, sellerID, params.SearchUrl, postalCode_)
