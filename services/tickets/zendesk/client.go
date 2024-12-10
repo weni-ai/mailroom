@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"strconv"
 	"strings"
 	"time"
 
@@ -365,7 +366,7 @@ func (c *RESTClient) SearchUser(externalID string) (*User, *httpx.Trace, error) 
 
 // MergeUser merge two users
 func (c *RESTClient) MergeUser(userID int64, unmergedUserID int64) (*User, *httpx.Trace, error) {
-	endpoint := fmt.Sprintf("users/%s/merge", unmergedUserID)
+	endpoint := fmt.Sprintf("users/%s/merge", strconv.FormatInt(unmergedUserID, 10))
 
 	payload := struct {
 		User *User `json:"user"`
