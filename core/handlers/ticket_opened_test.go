@@ -32,7 +32,7 @@ func TestTicketOpened(t *testing.T) {
 				"message": "Queued. Thank you."
 			}`),
 		},
-		"https://nyaruka.zendesk.com/api/v2/users/search.json?external_id=b699a406-7e44-49be-9f01-1a82893e8a10": {
+		"https://nyaruka.zendesk.com/api/v2/users/search.json?query=b699a406-7e44-49be-9f01-1a82893e8a10": {
 			httpx.NewMockResponse(200, nil, `{"users": []}`),
 		},
 		"https://nyaruka.zendesk.com/api/v2/users.json": {
