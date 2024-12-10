@@ -1,3 +1,7 @@
+1.44.0
+----------
+ * Merge users zendesk
+
 1.43.0
 ----------
  * feat: add buttons support to wpp broadcasts
