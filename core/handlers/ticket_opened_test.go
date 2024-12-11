@@ -33,6 +33,8 @@ func TestTicketOpened(t *testing.T) {
 			}`),
 		},
 		"https://nyaruka.zendesk.com/api/v2/users/search.json?query=b699a406-7e44-49be-9f01-1a82893e8a10": {
+			httpx.NewMockResponse(200, nil, `{"users": []}`), //now with retry the search repeats in these cases
+			httpx.NewMockResponse(200, nil, `{"users": []}`),
 			httpx.NewMockResponse(200, nil, `{"users": []}`),
 		},
 		"https://nyaruka.zendesk.com/api/v2/users/search.json?query=type:user details:\"b699a406-7e44-49be-9f01-1a82893e8a10\"": {
