@@ -1,3 +1,7 @@
+1.45.0
+----------
+ * Search for Zendesk user with identities and add retry
+
 1.44.0
 ----------
  * Merge users zendesk
