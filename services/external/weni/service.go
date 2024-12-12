@@ -124,8 +124,9 @@ func (s *service) Call(session flows.Session, params assets.MsgCatalogParam, log
 	}
 
 	sellerID = strings.TrimSpace(params.SellerId)
-	if sellerID == "" {
-		sellerID = "1"
+	if sellerID != "" { // tem a possibilidade de ser vazio
+
+		sellerID = "#" + sellerID
 	}
 
 	allProductsSponsored := []flows.ProductEntry{
@@ -193,7 +194,7 @@ func (s *service) Call(session flows.Session, params assets.MsgCatalogParam, log
 	// adds '#sellerID' formatting to the end of all retailer IDs
 	for _, productEntry := range callResult.ProductRetailerIDS {
 		for i, retailerID := range productEntry.ProductRetailerIDs {
-			productEntry.ProductRetailerIDs[i] = retailerID + "#" + sellerID
+			productEntry.ProductRetailerIDs[i] = retailerID + sellerID
 		}
 	}
 
@@ -227,7 +228,7 @@ func (s *service) Call(session flows.Session, params assets.MsgCatalogParam, log
 		for _, productRetailerID := range productEntry.ProductRetailerIDs {
 			if hasSimulation {
 				for _, existingProductId := range existingProductsIds {
-					if productRetailerID == existingProductId+"#"+sellerID {
+					if productRetailerID == existingProductId+sellerID {
 						_, exists := productRetailerIDMap[productRetailerID]
 						if !exists {
 							if len(newEntry.ProductRetailerIDs) < qttProducts {
@@ -364,7 +365,11 @@ func GetProductListFromVtex(productSearch string, searchUrl string, apiType stri
 			return nil, productSponsored, traces, err
 		}
 	} else if apiType == "intelligent" {
-		result, traces, err = VtexIntelligentSearch(searchUrl, productSearch, hideUnavailableItems)
+		hasSellerID := false
+		if sellerID != "" {
+			hasSellerID = true
+		}
+		result, traces, err = VtexIntelligentSearch(searchUrl, productSearch, hideUnavailableItems, hasSellerID)
 		if err != nil {
 			return nil, productSponsored, traces, err
 		}
@@ -381,7 +386,7 @@ func GetProductListFromVtex(productSearch string, searchUrl string, apiType stri
 		var productEntry flows.ProductEntry
 
 		for _, productRetailerID := range resultSponsored {
-			productRetailerIDS = append(productRetailerIDS, productRetailerID+"#"+sellerID)
+			productRetailerIDS = append(productRetailerIDS, productRetailerID+sellerID)
 		}
 
 		if len(productRetailerIDS) > 0 {
@@ -426,7 +431,12 @@ type Item struct {
 }
 
 type VtexProduct struct {
-	ItemId string `json:"itemId"`
+	ItemId  string   `json:"itemId"`
+	Sellers []Seller `json:"sellers"`
+}
+
+type Seller struct {
+	SellerID string `json:"sellerId"`
 }
 
 type VtexIntelligentProduct struct {
@@ -475,7 +485,7 @@ func VtexLegacySearch(searchUrl string, productSearch string) ([]string, []*http
 	return allItems, traces, nil
 }
 
-func VtexIntelligentSearch(searchUrl string, productSearch string, hideUnavailableItems bool) ([]string, []*httpx.Trace, error) {
+func VtexIntelligentSearch(searchUrl string, productSearch string, hideUnavailableItems bool, hasSellerID bool) ([]string, []*httpx.Trace, error) {
 
 	traces := []*httpx.Trace{}
 
