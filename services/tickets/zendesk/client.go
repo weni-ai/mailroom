@@ -350,18 +350,31 @@ type SearchUserResponse struct {
 	Users []User `json:"users"`
 }
 
-// SearchUser returns the user with the given external ID or nil if it doesn't exist
-func (c *RESTClient) SearchUser(externalID string) (*User, *httpx.Trace, error) {
-	endpoint := fmt.Sprintf("users/search.json?query=%s", externalID)
-	var response SearchUserResponse
-	trace, err := c.get(endpoint, nil, &response)
-	if err != nil {
-		return nil, trace, err
+// SearchUser returns the user or null if it does not exist, with retry logic for consistency delays.
+func (c *RESTClient) SearchUser(query string) (*User, *httpx.Trace, error) {
+	endpoint := fmt.Sprintf("users/search.json?query=%s", query)
+	maxRetries := 3
+	delay := 2 * time.Second
+	var (
+		response SearchUserResponse
+		trace    *httpx.Trace
+		err      error
+	)
+
+	for i := 0; i < maxRetries; i++ {
+		trace, err = c.get(endpoint, nil, &response)
+		if err != nil {
+			return nil, trace, err
+		}
+
+		if len(response.Users) > 0 {
+			return &response.Users[0], trace, nil
+		}
+
+		time.Sleep(delay)
 	}
-	if len(response.Users) == 0 {
-		return nil, trace, nil
-	}
-	return &response.Users[0], trace, nil
+
+	return nil, trace, nil
 }
 
 // MergeUser merge two users
