@@ -124,8 +124,7 @@ func (s *service) Call(session flows.Session, params assets.MsgCatalogParam, log
 	}
 
 	sellerID = strings.TrimSpace(params.SellerId)
-	if sellerID != "" { // tem a possibilidade de ser vazio
-
+	if sellerID != "" {
 		sellerID = "#" + sellerID
 	}
 
@@ -192,9 +191,11 @@ func (s *service) Call(session flows.Session, params assets.MsgCatalogParam, log
 	}
 
 	// adds '#sellerID' formatting to the end of all retailer IDs
-	for _, productEntry := range callResult.ProductRetailerIDS {
-		for i, retailerID := range productEntry.ProductRetailerIDs {
-			productEntry.ProductRetailerIDs[i] = retailerID + sellerID
+	if sellerID != "" {
+		for _, productEntry := range callResult.ProductRetailerIDS {
+			for i, retailerID := range productEntry.ProductRetailerIDs {
+				productEntry.ProductRetailerIDs[i] = retailerID + sellerID
+			}
 		}
 	}
 
@@ -436,7 +437,11 @@ type VtexProduct struct {
 }
 
 type Seller struct {
-	SellerID string `json:"sellerId"`
+	SellerID        string `json:"sellerId"`
+	SellerDefault   bool   `json:"sellerDefault"`
+	CommertialOffer struct {
+		AvailableQuantity int `json:"AvailableQuantity"`
+	} `json:"commertialOffer"`
 }
 
 type VtexIntelligentProduct struct {
@@ -548,7 +553,17 @@ func VtexIntelligentSearch(searchUrl string, productSearch string, hideUnavailab
 
 	for _, items := range response.Products {
 		for _, item := range items.Items {
-			allItems = append(allItems, item.ItemId)
+			if !hasSellerID {
+				for _, seller := range item.Sellers {
+					if seller.SellerDefault == true || seller.CommertialOffer.AvailableQuantity > 0 {
+						allItems = append(allItems, item.ItemId+"#"+seller.SellerID)
+					} else {
+						allItems = append(allItems, item.ItemId+"#1")
+					}
+				}
+			} else {
+				allItems = append(allItems, item.ItemId)
+			}
 		}
 	}
 
