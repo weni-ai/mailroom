@@ -1,3 +1,7 @@
+1.45.1
+----------
+ * Fix: Ninth digit generated owner urn map for broadcasts
+
 1.45.0
 ----------
  * Search for Zendesk user with identities and add retry
