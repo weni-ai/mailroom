@@ -1,3 +1,7 @@
+1.46.1
+----------
+ * Remove seller 1
+
 1.46.0
 ----------
  * Use sellerId returned in search in specific cases
