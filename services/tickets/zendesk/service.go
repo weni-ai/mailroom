@@ -83,12 +83,6 @@ func (s *service) Open(session flows.Session, topic *flows.Topic, body string, a
 	contactDisplay := session.Contact().Format(session.Environment())
 	contactUUID := string(session.Contact().UUID())
 
-	var phoneNumber string
-	urn := session.Contact().PreferredURN().URN()
-	if urn.Scheme() == "whatsapp" {
-		phoneNumber = string(session.Contact().PreferredURN().URN().Path())
-	}
-
 	user, trace, err := s.restClient.SearchUser(contactUUID)
 	if trace != nil {
 		logHTTP(flows.NewHTTPLog(trace, flows.HTTPStatusFromCode, s.redactor))
@@ -97,19 +91,13 @@ func (s *service) Open(session flows.Session, topic *flows.Topic, body string, a
 		return nil, err
 	}
 	if trace.Response.StatusCode == http.StatusNotFound || user == nil {
-		newUser := &User{
+		user := &User{
 			Name:       contactDisplay,
 			ExternalID: contactUUID,
 			Verified:   true,
 			Role:       "end-user",
-			Identities: []Identity{},
 		}
-
-		if len(phoneNumber) > 0 {
-			newUser.Identities = append(newUser.Identities, Identity{Type: "phone_number", Value: phoneNumber})
-		}
-
-		user, trace, err = s.restClient.CreateUser(newUser)
+		_, trace, err = s.restClient.CreateUser(user)
 		if trace != nil {
 			logHTTP(flows.NewHTTPLog(trace, flows.HTTPStatusFromCode, s.redactor))
 		}
@@ -125,12 +113,6 @@ func (s *service) Open(session flows.Session, topic *flows.Topic, body string, a
 		Author: Author{
 			ExternalID: contactUUID,
 			Name:       contactDisplay,
-			Fields: []FieldValue{
-				{
-					ID:    "details",
-					Value: contactUUID,
-				},
-			},
 		},
 		AllowChannelback: true,
 	}
@@ -192,23 +174,6 @@ func (s *service) Open(session flows.Session, topic *flows.Topic, body string, a
 	if err := s.push(msg, logHTTP); err != nil {
 		return nil, err
 	}
-
-	unmergedUser, trace, err := s.restClient.SearchUser("type:user details:\"" + contactUUID + "\"")
-	if trace != nil {
-		logHTTP(flows.NewHTTPLog(trace, flows.HTTPStatusFromCode, s.redactor))
-	}
-	if err != nil && trace.Response.StatusCode != http.StatusNotFound {
-		return nil, err
-	}
-
-	_, trace, err = s.restClient.MergeUser(user.ID, unmergedUser.ID)
-	if trace != nil {
-		logHTTP(flows.NewHTTPLog(trace, flows.HTTPStatusFromCode, s.redactor))
-	}
-	if err != nil && trace.Response.StatusCode != http.StatusNotFound {
-		return nil, err
-	}
-
 	return ticket, nil
 }
 
