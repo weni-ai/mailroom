@@ -316,8 +316,6 @@ func TestSearchUser(t *testing.T) {
 		fmt.Sprintf("https://mocked_subdomain.zendesk.com/api/v2/users/search.json?query=%s", userUUID): {
 			httpx.MockConnectionError,
 			httpx.NewMockResponse(400, nil, `{"description": "Something went wrong", "error": "Unknown"}`),
-			httpx.NewMockResponse(200, nil, `{"users": []}`), //now with retry the search repeats in these cases
-			httpx.NewMockResponse(200, nil, `{"users": []}`),
 			httpx.NewMockResponse(200, nil, `{"users": []}`),
 			httpx.NewMockResponse(200, nil, `{"users": [{"id": 35436,"name": "Dummy User"}]}`),
 		},

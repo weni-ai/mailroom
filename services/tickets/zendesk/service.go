@@ -80,27 +80,23 @@ func NewService(rtCfg *runtime.Config, httpClient *http.Client, httpRetries *htt
 // Open opens a ticket which for mailgun means just sending an initial email
 func (s *service) Open(session flows.Session, topic *flows.Topic, body string, assignee *flows.User, logHTTP flows.HTTPLogCallback) (*flows.Ticket, error) {
 	ticket := flows.OpenTicket(s.ticketer, topic, body, assignee)
-
-	contact := session.Contact()
-	if contact == nil {
-		return nil, fmt.Errorf("session contact is nil")
-	}
-
 	contactDisplay := session.Contact().Format(session.Environment())
 	contactUUID := string(session.Contact().UUID())
 
-	var trace *httpx.Trace
 	var phoneNumber string
-	preferredURN := contact.PreferredURN()
-	if preferredURN != nil && preferredURN.URN().Scheme() == "whatsapp" {
-		phoneNumber = string(preferredURN.URN().Path())
+	urn := session.Contact().PreferredURN().URN()
+	if urn.Scheme() == "whatsapp" {
+		phoneNumber = string(session.Contact().PreferredURN().URN().Path())
 	}
 
-	user, err := s.searchUserWithIdentities(contactUUID, phoneNumber, logHTTP)
-	if err != nil && user == nil {
+	user, trace, err := s.restClient.SearchUser(contactUUID)
+	if trace != nil {
+		logHTTP(flows.NewHTTPLog(trace, flows.HTTPStatusFromCode, s.redactor))
+	}
+	if err != nil && trace.Response.StatusCode != http.StatusNotFound {
 		return nil, err
 	}
-	if user == nil {
+	if trace.Response.StatusCode == http.StatusNotFound || user == nil {
 		newUser := &User{
 			Name:       contactDisplay,
 			ExternalID: contactUUID,
@@ -201,18 +197,16 @@ func (s *service) Open(session flows.Session, topic *flows.Topic, body string, a
 	if trace != nil {
 		logHTTP(flows.NewHTTPLog(trace, flows.HTTPStatusFromCode, s.redactor))
 	}
-	if err != nil {
+	if err != nil && trace.Response.StatusCode != http.StatusNotFound {
 		return nil, err
 	}
 
-	if unmergedUser != nil {
-		_, trace, err = s.restClient.MergeUser(user.ID, unmergedUser.ID)
-		if trace != nil {
-			logHTTP(flows.NewHTTPLog(trace, flows.HTTPStatusFromCode, s.redactor))
-		}
-		if err != nil {
-			return nil, err
-		}
+	_, trace, err = s.restClient.MergeUser(user.ID, unmergedUser.ID)
+	if trace != nil {
+		logHTTP(flows.NewHTTPLog(trace, flows.HTTPStatusFromCode, s.redactor))
+	}
+	if err != nil && trace.Response.StatusCode != http.StatusNotFound {
+		return nil, err
 	}
 
 	return ticket, nil
@@ -407,50 +401,4 @@ func (s *service) convertAttachments(attachments []utils.Attachment) ([]string, 
 		fileURLs[i] = "https://" + domain + "/api/v2/file/" + path
 	}
 	return fileURLs, nil
-}
-
-func (s *service) searchUserWithIdentities(contactUUID string, phoneNumber string, logHTTP flows.HTTPLogCallback) (*User, error) {
-	fetchUser := func(identifier string) (*User, error) {
-		if identifier == "" {
-			return nil, nil
-		}
-		user, trace, err := s.restClient.SearchUser(identifier)
-		if trace != nil {
-			logHTTP(flows.NewHTTPLog(trace, flows.HTTPStatusFromCode, s.redactor))
-		}
-		if err != nil && trace.Response.StatusCode != http.StatusNotFound {
-			return nil, err
-		}
-		return user, nil
-	}
-
-	userContactUUID, err := fetchUser(contactUUID)
-	if err != nil {
-		return nil, err
-	}
-
-	userPhoneNumber, err := fetchUser(phoneNumber)
-	if err != nil {
-		return nil, err
-	}
-
-	switch {
-	case userContactUUID == nil && userPhoneNumber == nil:
-		return nil, nil
-	case userContactUUID != nil && userPhoneNumber == nil:
-		return userContactUUID, nil
-	case userPhoneNumber != nil && userContactUUID == nil:
-		return userPhoneNumber, nil
-	case userContactUUID.ID == userPhoneNumber.ID:
-		return userContactUUID, nil
-	default:
-		mergedUser, trace, err := s.restClient.MergeUser(userContactUUID.ID, userPhoneNumber.ID)
-		if trace != nil {
-			logHTTP(flows.NewHTTPLog(trace, flows.HTTPStatusFromCode, s.redactor))
-		}
-		if err != nil && trace.Response.StatusCode != http.StatusNotFound {
-			return nil, err
-		}
-		return mergedUser, nil
-	}
 }
