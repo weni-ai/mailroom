@@ -562,7 +562,7 @@ func VtexIntelligentSearch(searchUrl string, productSearch string, hideUnavailab
 					}
 				}
 			} else {
-				allItems = append(allItems, item.ItemId+"#1")
+				allItems = append(allItems, item.ItemId)
 			}
 		}
 	}
