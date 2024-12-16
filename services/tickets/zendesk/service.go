@@ -96,10 +96,7 @@ func (s *service) Open(session flows.Session, topic *flows.Topic, body string, a
 		phoneNumber = string(preferredURN.URN().Path())
 	}
 
-	user, err := s.searchUserWithIdentities(contactUUID, phoneNumber, logHTTP)
-	if err != nil && user == nil {
-		return nil, err
-	}
+	user, _ := s.searchUserWithIdentities(contactUUID, phoneNumber, logHTTP)
 	if user == nil {
 		newUser := &User{
 			Name:       contactDisplay,
@@ -113,12 +110,9 @@ func (s *service) Open(session flows.Session, topic *flows.Topic, body string, a
 			newUser.Identities = append(newUser.Identities, Identity{Type: "phone_number", Value: phoneNumber})
 		}
 
-		user, trace, err = s.restClient.CreateUser(newUser)
+		user, trace, _ = s.restClient.CreateUser(newUser)
 		if trace != nil {
 			logHTTP(flows.NewHTTPLog(trace, flows.HTTPStatusFromCode, s.redactor))
-		}
-		if err != nil {
-			return nil, err
 		}
 	}
 
@@ -197,21 +191,15 @@ func (s *service) Open(session flows.Session, topic *flows.Topic, body string, a
 		return nil, err
 	}
 
-	unmergedUser, trace, err := s.restClient.SearchUser("type:user details:\"" + contactUUID + "\"")
+	unmergedUser, trace, _ := s.restClient.SearchUser("type:user details:\"" + contactUUID + "\"")
 	if trace != nil {
 		logHTTP(flows.NewHTTPLog(trace, flows.HTTPStatusFromCode, s.redactor))
 	}
-	if err != nil {
-		return nil, err
-	}
 
-	if unmergedUser != nil {
-		_, trace, err = s.restClient.MergeUser(user.ID, unmergedUser.ID)
+	if unmergedUser != nil && user != nil {
+		_, trace, _ = s.restClient.MergeUser(user.ID, unmergedUser.ID)
 		if trace != nil {
 			logHTTP(flows.NewHTTPLog(trace, flows.HTTPStatusFromCode, s.redactor))
-		}
-		if err != nil {
-			return nil, err
 		}
 	}
 

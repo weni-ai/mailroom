@@ -315,7 +315,7 @@ type User struct {
 	ID           int64  `json:"id,omitempty"`
 	Name         string `json:"name,omitempty"`
 	Organization struct {
-		Name string `json:"name"`
+		Name string `json:"name,omitempty"`
 	} `json:"organization,omitempty"`
 	ExternalID string     `json:"external_id,omitempty"`
 	Identities []Identity `json:"identities,omitempty"`
@@ -389,7 +389,7 @@ func (c *RESTClient) MergeUser(userID int64, unmergedUserID int64) (*User, *http
 		User *User `json:"user"`
 	}{}
 
-	trace, err := c.post(endpoint, payload, &response)
+	trace, err := c.put(endpoint, payload, &response)
 	if err != nil {
 		return nil, trace, err
 	}
