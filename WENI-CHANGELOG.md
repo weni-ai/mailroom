@@ -1,3 +1,7 @@
+1.46.0
+----------
+ * Use sellerId returned in search in specific cases
+
 1.45.1
 ----------
  * Fix: Ninth digit generated owner urn map for broadcasts
