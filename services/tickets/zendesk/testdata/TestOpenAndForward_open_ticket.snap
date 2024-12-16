@@ -1,4 +1,4 @@
-GET /api/v2/users/search.json?query=5d76d86b-3bb9-4d5a-b822-c9d86f5d8e4f HTTP/1.1
+GET /api/v2/users/search.json?external_id=5d76d86b-3bb9-4d5a-b822-c9d86f5d8e4f HTTP/1.1
 Host: nyaruka.zendesk.com
 User-Agent: Go-http-client/1.1
 Authorization: Bearer ****************
