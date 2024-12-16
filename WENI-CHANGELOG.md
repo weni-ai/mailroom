@@ -1,3 +1,8 @@
+1.47.0
+----------
+ * Revert "Merge users zendesk"
+ * Revert "Search for Zendesk user with identities and add retry"
+
 1.46.1
 ----------
  * Remove seller 1
