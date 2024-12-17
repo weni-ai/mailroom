@@ -640,6 +640,8 @@ func CartSimulation(ProductRetailerIDS []flows.ProductEntry, sellerID string, ur
 	var availableProducts []string
 	var products []string
 
+	sellerID = strings.TrimLeft(sellerID, "#")
+
 	urlSplit := strings.Split(url, "api")
 	urlSimulation := urlSplit[0] + "api/checkout/pub/orderForms/simulation"
 
