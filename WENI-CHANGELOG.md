@@ -1,3 +1,7 @@
+1.47.1
+----------
+ * Remove # at the beginning of sellerID
+
 1.47.0
 ----------
  * Revert "Merge users zendesk"
