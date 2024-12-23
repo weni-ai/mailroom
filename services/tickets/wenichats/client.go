@@ -147,6 +147,7 @@ func (c *Client) GetQueues(params *url.Values) (*QueuesResponse, *httpx.Trace, e
 }
 
 type RoomRequest struct {
+	TicketUUID   string                 `json:"ticket_uuid,omitempty"`
 	QueueUUID    string                 `json:"queue_uuid,omitempty"`
 	UserEmail    string                 `json:"user_email,omitempty"`
 	SectorUUID   string                 `json:"sector_uuid,omitempty"`
