@@ -78,7 +78,7 @@ func CreateWppBroadcastBatches(ctx context.Context, rt *runtime.Runtime, bcast *
 	for u, id := range urnMap {
 		if contactIDs[id] {
 			repeatedContacts[id] = u
-			delete(contactIDs, id)
+			delete(contactIDs, id) // if more than one contact contact with different urns, may cause fail if urn no exists, so this have to be handled previously
 		}
 		urnContacts[id] = u
 	}
