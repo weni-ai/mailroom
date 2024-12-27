@@ -554,13 +554,18 @@ func VtexIntelligentSearch(searchUrl string, productSearch string, hideUnavailab
 	for _, items := range response.Products {
 		for _, item := range items.Items {
 			if !hasSellerID {
-				for _, seller := range item.Sellers {
-					if seller.SellerDefault == true || seller.CommertialOffer.AvailableQuantity > 0 {
-						allItems = append(allItems, item.ItemId+"#"+seller.SellerID)
-					} else {
-						allItems = append(allItems, item.ItemId+"#1")
+				if item.Sellers != nil {
+					for _, seller := range item.Sellers {
+						if seller.SellerDefault == true || seller.CommertialOffer.AvailableQuantity > 0 {
+							allItems = append(allItems, item.ItemId+"#"+seller.SellerID)
+						} else {
+							allItems = append(allItems, item.ItemId+"#1")
+						}
 					}
+				} else {
+					allItems = append(allItems, item.ItemId)
 				}
+
 			} else {
 				allItems = append(allItems, item.ItemId)
 			}
