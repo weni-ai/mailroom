@@ -1,3 +1,7 @@
+1.47.3
+----------
+ * Fix session ended_on null cases
+
 1.47.2
 ----------
  * Fix send_wpp_broadcast for msgs with failed reason D
