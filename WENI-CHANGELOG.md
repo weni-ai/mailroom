@@ -1,6 +1,8 @@
 1.47.3
 ----------
  * Fix session ended_on null cases
+ * Add readme for mailroom services
+ * Increase test coverage for product research and bug fixes
 
 1.47.2
 ----------
