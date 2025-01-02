@@ -1,3 +1,7 @@
+1.47.4
+----------
+ * Sending the ticket uuid when opening wenichats rooms #211
+
 1.47.3
 ----------
  * Fix session ended_on null cases
