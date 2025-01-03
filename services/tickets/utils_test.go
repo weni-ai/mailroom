@@ -190,3 +190,22 @@ func TestCloseTicket(t *testing.T) {
 	testsuite.AssertContactTasks(t, 1, testdata.Cathy.ID,
 		[]string{`{"type":"ticket_closed","org_id":1,"task":{"id":1,"org_id":1,"contact_id":10000,"ticket_id":1,"event_type":"C","created_on":"2021-06-08T16:40:32Z"},"queued_on":"2021-06-08T16:40:35Z"}`})
 }
+
+func TestSendReplyCSAT(t *testing.T) {
+	ctx, rt, db, _ := testsuite.Get()
+
+	defer testsuite.Reset(testsuite.ResetAll)
+
+	defer uuids.SetGenerator(uuids.DefaultGenerator)
+	uuids.SetGenerator(uuids.NewSeededGenerator(12345))
+
+	// create a ticket
+	ticket := testdata.InsertOpenTicket(db, testdata.Org1, testdata.Cathy, testdata.Mailgun, testdata.DefaultTopic, "Have you seen my cookies?", "", nil)
+	modelTicket := ticket.Load(db)
+
+	msg, err := tickets.SendReplyCSAT(ctx, rt, modelTicket, "74729f45-7f29-4868-9dc4-90e491e3c7d8", "Satisfaction Survey", "https://csat.zen/e88512d8-acea-46d0-80a0-c7ae19d12cec")
+	require.NoError(t, err)
+
+	assert.Equal(t, "Satisfaction Survey", msg.Text())
+	assert.Equal(t, testdata.Cathy.ID, msg.ContactID())
+}
