@@ -1,0 +1,34 @@
+[
+    {
+        "label": "error response if missing required field",
+        "method": "POST",
+        "path": "/mr/tickets/types/zendesk/csat",
+        "body": {},
+        "status": 400,
+        "response": {
+            "error": "error looking up ticket "
+        }
+    },
+    {
+        "label": "create csat message and send to contact if everything correct",
+        "method": "POST",
+        "path": "/mr/tickets/types/zendesk/csat",
+        "body": {
+            "message": "Satisfaction Survey",
+            "thread_id": "$cathy_ticket_uuid$",
+            "channel_uuid": "74729f45-7f29-4868-9dc4-90e491e3c7d8",
+            "csat_url": "https://csat.zen/e88512d8-acea-46d0-80a0-c7ae19d12cec"
+        },
+        "status": 200,
+        "response": {
+            "external_id": "1",
+            "allow_channelback": true
+        },
+        "db_assertions": [
+            {
+                "query": "select count(*) from msgs_msg where direction = 'O' and text = 'We can help'",
+                "count": 1
+            }
+        ]
+    }
+]

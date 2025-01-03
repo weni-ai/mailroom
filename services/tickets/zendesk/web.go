@@ -27,6 +27,7 @@ func init() {
 	web.RegisterJSONRoute(http.MethodPost, base+"/channelback", handleChannelback)
 	web.RegisterJSONRoute(http.MethodPost, base+"/event_callback", web.WithHTTPLogs(handleEventCallback))
 	web.RegisterJSONRoute(http.MethodPost, base+`/webhook/{ticketer:[a-f0-9\-]+}`, web.WithHTTPLogs(handleTicketerWebhook))
+	web.RegisterJSONRoute(http.MethodPost, base+`/csat`, web.WithHTTPLogs(handleCSAT))
 }
 
 type integrationMetadata struct {
@@ -41,6 +42,13 @@ type channelbackRequest struct {
 	ThreadID    string   `form:"thread_id"    validate:"required"`
 	RecipientID string   `form:"recipient_id" validate:"required"`
 	Metadata    string   `form:"metadata"     validate:"required"`
+}
+
+type CSATRequest struct {
+	Message     string `json:"message"`
+	URL         string `json:"csat_url"`
+	ThreadID    string `json:"thread_id"`
+	ChannelUUID string `json:"channel_uuid"`
 }
 
 type channelbackResponse struct {
@@ -300,4 +308,25 @@ func handleTicketerWebhook(ctx context.Context, rt *runtime.Runtime, r *http.Req
 	}
 
 	return map[string]string{"status": "handled"}, http.StatusOK, nil
+}
+
+func handleCSAT(ctx context.Context, rt *runtime.Runtime, r *http.Request, l *models.HTTPLogger) (interface{}, int, error) {
+	request := &CSATRequest{}
+	if err := utils.UnmarshalAndValidateWithLimit(r.Body, request, web.MaxRequestBytes); err != nil {
+		return err, http.StatusBadRequest, nil
+	}
+
+	// lookup the ticket and ticketer
+	ticket, _, _, err := tickets.FromTicketUUID(ctx, rt, flows.TicketUUID(request.ThreadID), typeZendesk)
+	if err != nil {
+		fmt.Println(err)
+		return err, http.StatusBadRequest, nil
+	}
+
+	msg, err := tickets.SendReplyCSAT(ctx, rt, ticket, request.ChannelUUID, request.Message, request.URL)
+	if err != nil {
+		return err, http.StatusBadRequest, nil
+	}
+
+	return &channelbackResponse{ExternalID: fmt.Sprintf("%d", msg.ID()), AllowChannelback: true}, http.StatusOK, nil
 }
