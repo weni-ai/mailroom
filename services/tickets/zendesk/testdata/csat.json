@@ -26,7 +26,7 @@
         },
         "db_assertions": [
             {
-                "query": "select count(*) from msgs_msg where direction = 'O' and text = 'We can help'",
+                "query": "select count(*) from msgs_msg where direction = 'O' and text = 'Satisfaction Survey'",
                 "count": 1
             }
         ]
