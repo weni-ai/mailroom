@@ -129,7 +129,7 @@ func SendReplyCSAT(ctx context.Context, rt *runtime.Runtime, ticket *models.Tick
 		Text:            text,
 		InteractionType: "cta_url",
 		CTAMessage: flows.CTAMessage{
-			DisplayText_: "Pesquisa de Satisfação",
+			DisplayText_: "Link da Pesquisa",
 			URL_:         url,
 		},
 	}
