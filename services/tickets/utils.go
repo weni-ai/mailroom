@@ -126,7 +126,8 @@ func SendReplyCSAT(ctx context.Context, rt *runtime.Runtime, ticket *models.Tick
 	channel := oa.ChannelByUUID(assets.ChannelUUID(channelUUID))
 
 	msg := models.WppBroadcastMessage{
-		Text: text,
+		Text:            text,
+		InteractionType: "cta_url",
 		CTAMessage: flows.CTAMessage{
 			DisplayText_: "Pesquisa de Satisfação",
 			URL_:         url,

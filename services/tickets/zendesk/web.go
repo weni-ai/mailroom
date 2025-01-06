@@ -319,7 +319,6 @@ func handleCSAT(ctx context.Context, rt *runtime.Runtime, r *http.Request, l *mo
 	// lookup the ticket and ticketer
 	ticket, _, _, err := tickets.FromTicketUUID(ctx, rt, flows.TicketUUID(request.ThreadID), typeZendesk)
 	if err != nil {
-		fmt.Println(err)
 		return err, http.StatusBadRequest, nil
 	}
 
