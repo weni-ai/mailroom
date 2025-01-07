@@ -333,7 +333,7 @@ func handleCSAT(ctx context.Context, rt *runtime.Runtime, r *http.Request, l *mo
 		return map[string]string{"status": "ignored"}, http.StatusOK, nil
 	}
 
-	msg, err := tickets.SendReplyCSAT(ctx, rt, ticket, request.ChannelUUID, request.Message, request.URL, request.ButtonText)
+	msg, err := tickets.SendReplyCSAT(ctx, rt, ticket, request.ChannelUUID, request.Message, request.ButtonText, request.URL)
 	if err != nil {
 		return err, http.StatusBadRequest, nil
 	}
