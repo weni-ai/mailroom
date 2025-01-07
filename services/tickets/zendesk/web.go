@@ -45,10 +45,12 @@ type channelbackRequest struct {
 }
 
 type CSATRequest struct {
-	Message     string `json:"message"`
-	URL         string `json:"csat_url"`
-	ThreadID    string `json:"thread_id"`
-	ChannelUUID string `json:"channel_uuid"`
+	Message      string `json:"message"`
+	URL          string `json:"csat_url"`
+	TicketerUUID string `json:"ticketer_uuid"`
+	TicketID     string `json:"ticket_id"`
+	ChannelUUID  string `json:"channel_uuid"`
+	ButtonText   string `json:"button_text"`
 }
 
 type channelbackResponse struct {
@@ -316,13 +318,22 @@ func handleCSAT(ctx context.Context, rt *runtime.Runtime, r *http.Request, l *mo
 		return err, http.StatusBadRequest, nil
 	}
 
-	// lookup the ticket and ticketer
-	ticket, _, _, err := tickets.FromTicketUUID(ctx, rt, flows.TicketUUID(request.ThreadID), typeZendesk)
-	if err != nil {
-		return err, http.StatusBadRequest, nil
+	ticketerUUID := assets.TicketerUUID(request.TicketerUUID)
+
+	// look up our ticketer
+	ticketer, _, err := tickets.FromTicketerUUID(ctx, rt, ticketerUUID, typeZendesk)
+	if err != nil || ticketer == nil {
+		return errors.Errorf("no such ticketer %s", ticketerUUID), http.StatusNotFound, nil
 	}
 
-	msg, err := tickets.SendReplyCSAT(ctx, rt, ticket, request.ChannelUUID, request.Message, request.URL)
+	// lookup ticket
+	ticket, err := models.LookupTicketByExternalID(ctx, rt.DB, ticketer.ID(), request.TicketID)
+	if err != nil || ticket == nil {
+		// we don't return an error here, because ticket might just belong to a different ticketer
+		return map[string]string{"status": "ignored"}, http.StatusOK, nil
+	}
+
+	msg, err := tickets.SendReplyCSAT(ctx, rt, ticket, request.ChannelUUID, request.Message, request.URL, request.ButtonText)
 	if err != nil {
 		return err, http.StatusBadRequest, nil
 	}
