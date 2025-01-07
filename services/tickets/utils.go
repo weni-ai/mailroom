@@ -116,7 +116,7 @@ func SendReply(ctx context.Context, rt *runtime.Runtime, ticket *models.Ticket, 
 	return nil, nil
 }
 
-func SendReplyCSAT(ctx context.Context, rt *runtime.Runtime, ticket *models.Ticket, channelUUID string, text string, url string) (*models.Msg, error) {
+func SendReplyCSAT(ctx context.Context, rt *runtime.Runtime, ticket *models.Ticket, channelUUID string, msgText string, buttonText string, url string) (*models.Msg, error) {
 	// look up our assets
 	oa, err := models.GetOrgAssets(ctx, rt, ticket.OrgID())
 	if err != nil {
@@ -126,10 +126,10 @@ func SendReplyCSAT(ctx context.Context, rt *runtime.Runtime, ticket *models.Tick
 	channel := oa.ChannelByUUID(assets.ChannelUUID(channelUUID))
 
 	msg := models.WppBroadcastMessage{
-		Text:            text,
+		Text:            msgText,
 		InteractionType: "cta_url",
 		CTAMessage: flows.CTAMessage{
-			DisplayText_: "Link da Pesquisa",
+			DisplayText_: buttonText,
 			URL_:         url,
 		},
 	}
