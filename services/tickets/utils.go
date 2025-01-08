@@ -124,6 +124,9 @@ func SendReplyCSAT(ctx context.Context, rt *runtime.Runtime, ticket *models.Tick
 	}
 
 	channel := oa.ChannelByUUID(assets.ChannelUUID(channelUUID))
+	if channel == nil {
+		return nil, errors.Errorf("unable to load channel with uuid: %s", channelUUID)
+	}
 
 	msg := models.WppBroadcastMessage{
 		Text:            msgText,
