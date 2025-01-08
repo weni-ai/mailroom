@@ -1,3 +1,7 @@
+1.47.5
+----------
+ * Add tolerance time to wait before shutdown mr webserver to avoid 502 and 503 errors
+
 1.47.4
 ----------
  * Sending the ticket uuid when opening wenichats rooms #211
