@@ -203,7 +203,7 @@ func TestSendReplyCSAT(t *testing.T) {
 	ticket := testdata.InsertOpenTicket(db, testdata.Org1, testdata.Cathy, testdata.Mailgun, testdata.DefaultTopic, "Have you seen my cookies?", "", nil)
 	modelTicket := ticket.Load(db)
 
-	msg, err := tickets.SendReplyCSAT(ctx, rt, modelTicket, "74729f45-7f29-4868-9dc4-90e491e3c7d8", "Satisfaction Survey", "https://csat.zen/e88512d8-acea-46d0-80a0-c7ae19d12cec")
+	msg, err := tickets.SendReplyCSAT(ctx, rt, modelTicket, "74729f45-7f29-4868-9dc4-90e491e3c7d8", "Satisfaction Survey", "Survey Link", "https://csat.zen/e88512d8-acea-46d0-80a0-c7ae19d12cec")
 	require.NoError(t, err)
 
 	assert.Equal(t, "Satisfaction Survey", msg.Text())
