@@ -70,6 +70,32 @@
     ]
   },
   {
+    "label": "create message with extraMetadata chats_msg_uuid",
+    "method": "POST",
+    "path": "/mr/tickets/types/wenichats/event_callback/006d224e-107f-4e18-afb2-f41fe302abdc/$cathy_ticket_uuid$",
+    "body": {
+      "type": "msg.create",
+      "content": {
+        "uuid": "ba84ab60-8b18-4054-8a97-22edc5fb1d2f",
+        "text": "1234"
+      }
+    },
+    "status": 200,
+    "response": {
+      "status": "handled"
+    },
+    "db_assertions": [
+      {
+        "query": "select count(*) from msgs_msg where metadata ilike '%ba84ab60-8b18-4054-8a97-22edc5fb1d2f%'",
+        "count": 1
+      },
+      {
+        "query": "select count(*) from tickets_ticket where status = 'O'",
+        "count": 1
+      }
+    ]
+  },
+  {
     "label": "create message with attachments if everything is correct",
     "method": "POST",
     "path": "/mr/tickets/types/wenichats/event_callback/006d224e-107f-4e18-afb2-f41fe302abdc/$cathy_ticket_uuid$",
@@ -99,7 +125,7 @@
     },
     "db_assertions": [
       {
-        "query": "select count(*) from msgs_msg where direction = 'O' and attachments = '{text/plain:https:///_test_media_storage/media/1/6929/26ea/692926ea-09d6-4942-bd38-d266ec8d3716.jpg}'",
+        "query": "select count(*) from msgs_msg where direction = 'O' and attachments = '{text/plain:https:///_test_media_storage/media/1/8720/f157/8720f157-ca1c-432f-9c0b-2014ddc77094.jpg}'",
         "count": 1
       }
     ]
