@@ -1,0 +1,53 @@
+[
+    {
+        "label": "error response if missing required field",
+        "method": "POST",
+        "path": "/mr/tickets/types/zendesk/csat",
+        "body": {},
+        "status": 404,
+        "response": {
+            "error": "no such ticketer "
+        }
+    },
+    {
+        "label": "create csat message and send to contact if everything correct",
+        "method": "POST",
+        "path": "/mr/tickets/types/zendesk/csat",
+        "body": {
+            "message": "Satisfaction Survey",
+            "ticketer_uuid": "4ee6d4f3-f92b-439b-9718-8da90c05490b",
+            "ticket_id": "1234",
+            "channel_uuid": "74729f45-7f29-4868-9dc4-90e491e3c7d8",
+            "csat_url": "https://csat.zen/e88512d8-acea-46d0-80a0-c7ae19d12cec",
+            "button_text": "Survey Link"
+        },
+        "status": 200,
+        "response": {
+            "external_id": "1",
+            "allow_channelback": true
+        },
+        "db_assertions": [
+            {
+                "query": "select count(*) from msgs_msg where direction = 'O' and text = 'Satisfaction Survey'",
+                "count": 1
+            }
+        ]
+    },
+    {
+        "label": "error response if unable to load channel",
+        "method": "POST",
+        "path": "/mr/tickets/types/zendesk/csat",
+        "body": {
+            "message": "Satisfaction Survey",
+            "ticketer_uuid": "4ee6d4f3-f92b-439b-9718-8da90c05490b",
+            "ticket_id": "1234",
+            "channel_uuid": "1a2b3c",
+            "csat_url": "https://csat.zen/e88512d8-acea-46d0-80a0-c7ae19d12cec",
+            "button_text": "Survey Link"
+        },
+        "status": 400,
+        "response": {
+            "error": "unable to load channel with uuid: 1a2b3c"
+        }
+    }
+]

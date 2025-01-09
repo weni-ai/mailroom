@@ -116,6 +116,42 @@ func SendReply(ctx context.Context, rt *runtime.Runtime, ticket *models.Ticket, 
 	return nil, nil
 }
 
+func SendReplyCSAT(ctx context.Context, rt *runtime.Runtime, ticket *models.Ticket, channelUUID string, msgText string, buttonText string, url string) (*models.Msg, error) {
+	// look up our assets
+	oa, err := models.GetOrgAssets(ctx, rt, ticket.OrgID())
+	if err != nil {
+		return nil, errors.Wrapf(err, "error looking up org #%d", ticket.OrgID())
+	}
+
+	channel := oa.ChannelByUUID(assets.ChannelUUID(channelUUID))
+	if channel == nil {
+		return nil, errors.Errorf("unable to load channel with uuid: %s", channelUUID)
+	}
+
+	msg := models.WppBroadcastMessage{
+		Text:            msgText,
+		InteractionType: "cta_url",
+		CTAMessage: flows.CTAMessage{
+			DisplayText_: buttonText,
+			URL_:         url,
+		},
+	}
+
+	// we'll use a broadcast to send this message
+	bcast := models.NewWppBroadcast(oa.OrgID(), models.NilBroadcastID, msg, nil, []models.ContactID{ticket.ContactID()}, nil, channel.ID())
+	batch := bcast.CreateBatch([]models.ContactID{ticket.ContactID()})
+	msgs, err := models.CreateWppBroadcastMessages(ctx, rt, oa, batch)
+	if err != nil {
+		return nil, errors.Wrapf(err, "error creating message batch")
+	}
+
+	msgio.SendMessages(ctx, rt, rt.DB, nil, msgs)
+	if len(msgs) > 0 {
+		return msgs[0], nil
+	}
+	return nil, nil
+}
+
 var retries = httpx.NewFixedRetries(time.Second*5, time.Second*10)
 
 // File represents a file sent to us from a ticketing service
