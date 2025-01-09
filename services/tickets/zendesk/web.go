@@ -93,7 +93,7 @@ func handleChannelback(ctx context.Context, rt *runtime.Runtime, r *http.Request
 		}
 	}
 
-	msg, err := tickets.SendReply(ctx, rt, ticket, request.Message, files)
+	msg, err := tickets.SendReply(ctx, rt, ticket, request.Message, files, nil)
 	if err != nil {
 		return err, http.StatusBadRequest, nil
 	}

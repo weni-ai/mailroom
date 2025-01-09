@@ -104,3 +104,23 @@ func chunkSessionIDs(ids []SessionID, size int) [][]SessionID {
 	}
 	return chunks
 }
+
+func MergeMaps(maps ...map[string]interface{}) map[string]interface{} {
+	result := make(map[string]interface{})
+
+	for _, m := range maps {
+		for k, v := range m {
+			if resValue, ok := result[k]; ok {
+				if resMap, ok := resValue.(map[string]interface{}); ok {
+					result[k] = MergeMaps(resMap, v.(map[string]interface{}))
+				} else {
+					result[k] = v
+				}
+			} else {
+				result[k] = v
+			}
+		}
+	}
+
+	return result
+}
