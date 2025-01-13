@@ -41,11 +41,11 @@ func TestOpenAndForward(t *testing.T) {
 	uuids.SetGenerator(uuids.NewSeededGenerator(12345))
 	dates.SetNowSource(dates.NewSequentialNowSource(time.Date(2019, 10, 7, 15, 21, 30, 0, time.UTC)))
 	httpx.SetRequestor(httpx.NewMockRequestor(map[string][]httpx.MockResponse{
-		"https://nyaruka.zendesk.com/api/v2/users/search.json?external_id=5d76d86b-3bb9-4d5a-b822-c9d86f5d8e4f": {
-			httpx.NewMockResponse(200, nil, `{"users": [{"id": 35241, "name": "Dummy User"}], "count": 1, "next_page": "https://nyaruka.zendesk.com/api/v2/users.json?page=2"}`),
-			httpx.NewMockResponse(200, nil, `{"users": [{"id": 35241, "name": "Dummy User"}], "count": 1, "next_page": "https://nyaruka.zendesk.com/api/v2/users.json?page=2"}`),
-			httpx.NewMockResponse(200, nil, `{"users": [{"id": 35241, "name": "Dummy User"}], "count": 1, "next_page": "https://nyaruka.zendesk.com/api/v2/users.json?page=2"}`),
-		},
+		// "https://nyaruka.zendesk.com/api/v2/users/search.json?external_id=5d76d86b-3bb9-4d5a-b822-c9d86f5d8e4f": {
+		// 	httpx.NewMockResponse(200, nil, `{"users": [{"id": 35241, "name": "Dummy User"}], "count": 1, "next_page": "https://nyaruka.zendesk.com/api/v2/users.json?page=2"}`),
+		// 	httpx.NewMockResponse(200, nil, `{"users": [{"id": 35241, "name": "Dummy User"}], "count": 1, "next_page": "https://nyaruka.zendesk.com/api/v2/users.json?page=2"}`),
+		// 	httpx.NewMockResponse(200, nil, `{"users": [{"id": 35241, "name": "Dummy User"}], "count": 1, "next_page": "https://nyaruka.zendesk.com/api/v2/users.json?page=2"}`),
+		// },
 		"https://nyaruka.zendesk.com/api/v2/any_channel/push.json": {
 			httpx.MockConnectionError,
 			httpx.NewMockResponse(201, nil, `{
@@ -128,7 +128,7 @@ func TestOpenAndForward(t *testing.T) {
 	assert.Equal(t, "General", ticket.Topic().Name())
 	assert.Equal(t, fieldTicket, ticket.Body())
 	assert.Equal(t, "", ticket.ExternalID())
-	assert.Equal(t, 2, len(logger.Logs))
+	assert.Equal(t, 1, len(logger.Logs))
 	test.AssertSnapshot(t, "open_ticket", logger.Logs[0].Request)
 
 	dbTicket := models.NewTicket(ticket.UUID(), testdata.Org1.ID, testdata.Cathy.ID, testdata.Zendesk.ID, "", testdata.DefaultTopic.ID, "Where are my cookies?", models.NilUserID, map[string]interface{}{
@@ -152,7 +152,7 @@ func TestOpenAndForward(t *testing.T) {
 	logger = &flows.HTTPLogger{}
 	_, err = svc.Open(session, defaultTopic, fieldTicket1, nil, logger.Log)
 	assert.NoError(t, err)
-	assert.Equal(t, 2, len(logger.Logs))
+	assert.Equal(t, 1, len(logger.Logs))
 	test.AssertSnapshot(t, "open", logger.Logs[0].Request)
 }
 

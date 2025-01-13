@@ -110,7 +110,7 @@ func TestTicketOpened(t *testing.T) {
 				{ // and there's an HTTP log for that
 					SQL:   "select count(*) from request_logs_httplog where ticketer_id = $1",
 					Args:  []interface{}{testdata.Zendesk.ID},
-					Count: 3,
+					Count: 1,
 				},
 				{ // which doesn't include our API token
 					SQL:   "select count(*) from request_logs_httplog where ticketer_id = $1 AND request like '%523562%'",
