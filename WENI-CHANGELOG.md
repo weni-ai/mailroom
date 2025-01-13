@@ -1,3 +1,7 @@
+1.48.1
+----------
+ * Temporarily remove Zendesk user search and creation
+
 1.48.0
 ----------
  * Add handle for zendesk csat
