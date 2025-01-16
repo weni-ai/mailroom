@@ -21,7 +21,7 @@ import (
 
 func setupMocks() {
 	httpx.SetRequestor(httpx.NewMockRequestor(map[string][]httpx.MockResponse{
-		"https://api.openai.com/v1/chat/completions": createRepeatedMocks(5, `{
+		"https://api.openai.com/v1/chat/completions": createRepeatedMocks(6, `{
 			"id": "chatcmpl-7IfBIQsTVKbwOiHPgcrpthaCn7K1t",
 			"object": "chat.completion",
 			"created":1684682560,
@@ -290,6 +290,7 @@ func TestService(t *testing.T) {
 		PostalCode:    "",
 		SellerId:      "10",
 		HasVtexAds:    true,
+		ExtraPrompt:   "Test Prompt",
 	}
 	call, err = svc.Call(session, params, logger.Log)
 	assert.NoError(t, err)
