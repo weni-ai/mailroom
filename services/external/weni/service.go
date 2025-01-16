@@ -345,7 +345,7 @@ func GetProductListFromChatGPT(ctx context.Context, rtConfig *runtime.Config, co
 	}
 
 	completionRequest := chatgpt.NewChatCompletionRequest([]chatgpt.ChatCompletionMessage{prompt1, prompt2, prompt3, prompt4, prompt5, prompt6, question})
-	if externalPrompt != "" {
+	if len(externalPrompt) > 0 {
 		completionRequest = chatgpt.NewChatCompletionRequest([]chatgpt.ChatCompletionMessage{prompt1, prompt2, prompt3, prompt5, prompt6, extraPrompt, question})
 	}
 
