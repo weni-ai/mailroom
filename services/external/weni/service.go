@@ -81,7 +81,8 @@ func (s *service) Call(session flows.Session, params assets.MsgCatalogParam, log
 	defer cancel()
 
 	content := params.ProductSearch
-	productList, traceWeniGPT, err := GetProductListFromChatGPT(ctx, s.rtConfig, content)
+	extraPrompt := params.ExtraPrompt
+	productList, traceWeniGPT, err := GetProductListFromChatGPT(ctx, s.rtConfig, content, extraPrompt)
 	callResult.Traces = append(callResult.Traces, traceWeniGPT)
 	if err != nil {
 		return callResult, err
@@ -306,7 +307,7 @@ func GetProductListFromSentenX(productSearch string, catalogID string, threshold
 	return pmap, trace, nil
 }
 
-func GetProductListFromChatGPT(ctx context.Context, rtConfig *runtime.Config, content string) ([]string, *httpx.Trace, error) {
+func GetProductListFromChatGPT(ctx context.Context, rtConfig *runtime.Config, content string, externalPrompt string) ([]string, *httpx.Trace, error) {
 	httpClient, httpRetries, _ := goflow.HTTP(rtConfig)
 	chatGPTClient := chatgpt.NewClient(httpClient, httpRetries, rtConfig.ChatgptBaseURL, rtConfig.ChatgptKey)
 
@@ -338,7 +339,16 @@ func GetProductListFromChatGPT(ctx context.Context, rtConfig *runtime.Config, co
 		Role:    chatgpt.ChatMessageRoleUser,
 		Content: content,
 	}
+	extraPrompt := chatgpt.ChatCompletionMessage{
+		Role:    chatgpt.ChatMessageRoleSystem,
+		Content: externalPrompt,
+	}
+
 	completionRequest := chatgpt.NewChatCompletionRequest([]chatgpt.ChatCompletionMessage{prompt1, prompt2, prompt3, prompt4, prompt5, prompt6, question})
+	if externalPrompt != "" {
+		completionRequest = chatgpt.NewChatCompletionRequest([]chatgpt.ChatCompletionMessage{prompt1, prompt2, prompt3, prompt5, prompt6, extraPrompt, question})
+	}
+
 	response, trace, err := chatGPTClient.CreateChatCompletion(completionRequest)
 	if err != nil {
 		return nil, trace, errors.Wrapf(err, "error on chatgpt call for list products")
