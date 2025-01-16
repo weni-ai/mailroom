@@ -135,7 +135,7 @@ type Msg struct {
 		URNAuth              null.String        `db:"urn_auth"        json:"urn_auth,omitempty"`
 		OrgID                OrgID              `db:"org_id"          json:"org_id"`
 		TopupID              TopupID            `db:"topup_id"        json:"-"`
-		Template             string             `db:"template"        json:"template"`
+		Template             null.String        `db:"template"        json:"template"`
 
 		SessionID     SessionID     `json:"session_id,omitempty"`
 		SessionStatus SessionStatus `json:"session_status,omitempty"`
@@ -179,7 +179,7 @@ func (m *Msg) TopupID() TopupID                 { return m.m.TopupID }
 func (m *Msg) ContactID() ContactID             { return m.m.ContactID }
 func (m *Msg) ContactURNID() *URNID             { return m.m.ContactURNID }
 func (m *Msg) IsResend() bool                   { return m.m.IsResend }
-func (m *Msg) Template() string                 { return m.m.Template }
+func (m *Msg) Template() null.String            { return m.m.Template }
 
 func (m *Msg) SetTopup(topupID TopupID) { m.m.TopupID = topupID }
 
@@ -383,6 +383,7 @@ func newOutgoingMsg(rt *runtime.Runtime, org *Org, channel *Channel, contactID C
 	m.OrgID = org.ID()
 	m.TopupID = NilTopupID
 	m.CreatedOn = createdOn
+	m.Template = null.NullString
 
 	msg.SetChannel(channel)
 	msg.SetURN(out.URN())
@@ -436,7 +437,7 @@ func newOutgoingMsg(rt *runtime.Runtime, org *Org, channel *Channel, contactID C
 		}
 		if out.Templating() != nil {
 			metadata["templating"] = out.Templating()
-			m.Template = out.Templating().Template().Name
+			m.Template = null.String(out.Templating().Template().Name)
 		}
 		if out.Topic() != flows.NilMsgTopic {
 			metadata["topic"] = string(out.Topic())
@@ -668,7 +669,7 @@ func newOutgoingMsgWpp(rt *runtime.Runtime, org *Org, channel *Channel, contactI
 		}
 		if msgWpp.Templating() != nil {
 			metadata["templating"] = msgWpp.Templating()
-			m.Template = msgWpp.Templating().Template().Name
+			m.Template = null.String(msgWpp.Templating().Template().Name)
 		}
 
 		m.Metadata = null.NewMap(metadata)
