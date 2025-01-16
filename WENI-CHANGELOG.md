@@ -1,3 +1,7 @@
+1.49.0
+----------
+ * Use extra prompt in search parameters
+
 1.48.1
 ----------
  * Temporarily remove Zendesk user search and creation
