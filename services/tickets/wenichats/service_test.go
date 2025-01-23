@@ -1,6 +1,7 @@
 package wenichats_test
 
 import (
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"testing"
@@ -385,7 +386,8 @@ func TestOpenAndForward(t *testing.T) {
 	assert.EqualError(t, err, "error send message to wenichats: unable to connect to server")
 
 	logger = &flows.HTTPLogger{}
-	err = svc.Forward(dbTicket, flows.MsgUUID("4fa340ae-1fb0-4666-98db-2177fe9bf31c"), "It's urgent", nil, nil, logger.Log)
+	metadata := json.RawMessage(`{"context":{"from": "12345","id": "98765"}}`)
+	err = svc.Forward(dbTicket, flows.MsgUUID("4fa340ae-1fb0-4666-98db-2177fe9bf31c"), "It's urgent", nil, metadata, logger.Log)
 	assert.NoError(t, err)
 	assert.Equal(t, 1, len(logger.Logs))
 	test.AssertSnapshot(t, "forward_message", logger.Logs[0].Request)

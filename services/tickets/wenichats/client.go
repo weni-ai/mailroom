@@ -205,7 +205,7 @@ type MessageRequest struct {
 	CreatedOn   time.Time       `json:"created_on"`
 	Direction   string          `json:"direction"`
 	Attachments []Attachment    `json:"attachments"`
-	Metadata    json.RawMessage `json:"metadata"`
+	Metadata    json.RawMessage `json:"metadata,omitempty"`
 }
 
 type MessageResponse struct {
