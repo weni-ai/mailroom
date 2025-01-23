@@ -1,3 +1,7 @@
+1.49.1
+----------
+ * Send created_on on wenichats message forward
+
 1.49.0
 ----------
  * Use extra prompt in search parameters
