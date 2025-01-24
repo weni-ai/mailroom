@@ -1,3 +1,7 @@
+1.49.2
+----------
+ * Fix template field to save null when empty
+
 1.49.1
 ----------
  * Send created_on on wenichats message forward
