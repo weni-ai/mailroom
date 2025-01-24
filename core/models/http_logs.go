@@ -123,6 +123,7 @@ func InsertHTTPLogs(ctx context.Context, tx Queryer, logs []*HTTPLog) error {
 
 	ls := make([]interface{}, len(logs))
 	for i := range logs {
+		truncateResponse(string(logs[i].Response))
 		ls[i] = &logs[i]
 	}
 
@@ -178,4 +179,17 @@ func (h *HTTPLogger) Insert(ctx context.Context, db Queryer) error {
 		return InsertHTTPLogs(ctx, db, h.logs)
 	}
 	return nil
+}
+
+func truncateResponse(response string) string {
+	const maxLength = 2048
+	if len(response) > maxLength {
+		excessLength := len(response) - maxLength
+		if excessLength < len(response) {
+			response = response[:len(response)-excessLength]
+		} else {
+			response = ""
+		}
+	}
+	return response
 }
