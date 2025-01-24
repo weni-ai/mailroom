@@ -341,6 +341,10 @@ func TestOpenAndForward(t *testing.T) {
 	msgTime, _ := time.Parse(time.RFC3339, "2019-10-07T15:21:30Z")
 	rows.AddRow(464, nil, "eb234953-38e7-491f-8a50-b03056a7d002", "ahoy", msgTime, "I", "H", "V", 1, 0, msgTime, "1026", nil, nil, 3, 1234567, 1, 1, 1)
 
+	mock.ExpectQuery("SELECT").WithArgs("1ae96956-4b34-433e-8d1a-f05fe6923d6d").WillReturnRows(
+		sqlmock.NewRows([]string{"row_to_json"}).AddRow(`{"uuid": "1ae96956-4b34-433e-8d1a-f05fe6923d6d", "id": 1, "name": "WeniChats", "ticketer_type": "wenichats", "config": {"project_uuid": "8a4bae05-993c-4f3b-91b5-80f4e09951f2", "project_name_origin": "Project 1"}}`),
+	)
+
 	after, err := time.Parse("2006-01-02T15:04:05", "2019-10-07T15:21:29")
 	assert.NoError(t, err)
 
