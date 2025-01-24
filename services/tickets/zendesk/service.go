@@ -83,28 +83,28 @@ func (s *service) Open(session flows.Session, topic *flows.Topic, body string, a
 	contactDisplay := session.Contact().Format(session.Environment())
 	contactUUID := string(session.Contact().UUID())
 
-	user, trace, err := s.restClient.SearchUser(contactUUID)
-	if trace != nil {
-		logHTTP(flows.NewHTTPLog(trace, flows.HTTPStatusFromCode, s.redactor))
-	}
-	if err != nil && trace.Response.StatusCode != http.StatusNotFound {
-		return nil, err
-	}
-	if trace.Response.StatusCode == http.StatusNotFound || user == nil {
-		user := &User{
-			Name:       contactDisplay,
-			ExternalID: contactUUID,
-			Verified:   true,
-			Role:       "end-user",
-		}
-		_, trace, err = s.restClient.CreateUser(user)
-		if trace != nil {
-			logHTTP(flows.NewHTTPLog(trace, flows.HTTPStatusFromCode, s.redactor))
-		}
-		if err != nil {
-			return nil, err
-		}
-	}
+	// user, trace, err := s.restClient.SearchUser(contactUUID)
+	// if trace != nil {
+	// 	logHTTP(flows.NewHTTPLog(trace, flows.HTTPStatusFromCode, s.redactor))
+	// }
+	// if err != nil && trace.Response.StatusCode != http.StatusNotFound {
+	// 	return nil, err
+	// }
+	// if trace.Response.StatusCode == http.StatusNotFound || user == nil {
+	// 	user := &User{
+	// 		Name:       contactDisplay,
+	// 		ExternalID: contactUUID,
+	// 		Verified:   true,
+	// 		Role:       "end-user",
+	// 	}
+	// 	_, trace, err = s.restClient.CreateUser(user)
+	// 	if trace != nil {
+	// 		logHTTP(flows.NewHTTPLog(trace, flows.HTTPStatusFromCode, s.redactor))
+	// 	}
+	// 	if err != nil {
+	// 		return nil, err
+	// 	}
+	// }
 
 	msg := &ExternalResource{
 		ExternalID: string(ticket.UUID()), // there's no local msg so use ticket UUID instead

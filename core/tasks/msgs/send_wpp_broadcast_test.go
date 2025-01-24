@@ -298,6 +298,7 @@ func TestWppBroadcastTask(t *testing.T) {
 			1,
 			buttonsMsg,
 			"hello Cathy",
+			models.NilChannelID,
 		},
 	}
 

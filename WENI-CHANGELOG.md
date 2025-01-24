@@ -1,3 +1,71 @@
+1.49.1
+----------
+ * Send created_on on wenichats message forward
+
+1.49.0
+----------
+ * Use extra prompt in search parameters
+
+1.48.1
+----------
+ * Temporarily remove Zendesk user search and creation
+
+1.48.0
+----------
+ * Add handle for zendesk csat
+
+1.47.5
+----------
+ * Add tolerance time to wait before shutdown mr webserver to avoid 502 and 503 errors
+
+1.47.4
+----------
+ * Sending the ticket uuid when opening wenichats rooms #211
+
+1.47.3
+----------
+ * Fix session ended_on null cases
+ * Add readme for mailroom services
+ * Increase test coverage for product research and bug fixes
+
+1.47.2
+----------
+ * Fix send_wpp_broadcast for msgs with failed reason D
+
+1.47.1
+----------
+ * Remove # at the beginning of sellerID
+
+1.47.0
+----------
+ * Revert "Merge users zendesk"
+ * Revert "Search for Zendesk user with identities and add retry"
+
+1.46.1
+----------
+ * Remove seller 1
+
+1.46.0
+----------
+ * Use sellerId returned in search in specific cases
+
+1.45.1
+----------
+ * Fix: Ninth digit generated owner urn map for broadcasts
+
+1.45.0
+----------
+ * Search for Zendesk user with identities and add retry
+
+1.44.0
+----------
+ * Merge users zendesk
+
+1.43.0
+----------
+ * feat: add buttons support to wpp broadcasts
+ * feat: add channel option to whatsapp broadcasts
+
 1.42.0
 ----------
  * Fix: handle new broadcast_type field

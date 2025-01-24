@@ -566,6 +566,8 @@ func newOutgoingMsgWpp(rt *runtime.Runtime, org *Org, channel *Channel, contactI
 		// if msg is missing the URN or channel, we also fail it
 		m.Status = MsgStatusFailed
 		m.FailedReason = MsgFailedNoDestination
+
+		logrus.WithFields(logrus.Fields{"urn": msg.URN(), "channel": channel, "contact_id": msg.ContactID, "broadcast_id": msg.BroadcastID}).Error("nil urn or channel, failing message")
 	} else {
 		// also fail right away if this looks like a loop
 		repetitions, err := GetWppMsgRepetitions(rt.RP, contactID, msgWpp)

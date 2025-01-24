@@ -81,7 +81,8 @@ func (s *service) Call(session flows.Session, params assets.MsgCatalogParam, log
 	defer cancel()
 
 	content := params.ProductSearch
-	productList, traceWeniGPT, err := GetProductListFromChatGPT(ctx, s.rtConfig, content)
+	extraPrompt := params.ExtraPrompt
+	productList, traceWeniGPT, err := GetProductListFromChatGPT(ctx, s.rtConfig, content, extraPrompt)
 	callResult.Traces = append(callResult.Traces, traceWeniGPT)
 	if err != nil {
 		return callResult, err
@@ -124,8 +125,8 @@ func (s *service) Call(session flows.Session, params assets.MsgCatalogParam, log
 	}
 
 	sellerID = strings.TrimSpace(params.SellerId)
-	if sellerID == "" {
-		sellerID = "1"
+	if sellerID != "" {
+		sellerID = "#" + sellerID
 	}
 
 	allProductsSponsored := []flows.ProductEntry{
@@ -191,9 +192,11 @@ func (s *service) Call(session flows.Session, params assets.MsgCatalogParam, log
 	}
 
 	// adds '#sellerID' formatting to the end of all retailer IDs
-	for _, productEntry := range callResult.ProductRetailerIDS {
-		for i, retailerID := range productEntry.ProductRetailerIDs {
-			productEntry.ProductRetailerIDs[i] = retailerID + "#" + sellerID
+	if sellerID != "" {
+		for _, productEntry := range callResult.ProductRetailerIDS {
+			for i, retailerID := range productEntry.ProductRetailerIDs {
+				productEntry.ProductRetailerIDs[i] = retailerID + sellerID
+			}
 		}
 	}
 
@@ -227,7 +230,7 @@ func (s *service) Call(session flows.Session, params assets.MsgCatalogParam, log
 		for _, productRetailerID := range productEntry.ProductRetailerIDs {
 			if hasSimulation {
 				for _, existingProductId := range existingProductsIds {
-					if productRetailerID == existingProductId+"#"+sellerID {
+					if productRetailerID == existingProductId+sellerID {
 						_, exists := productRetailerIDMap[productRetailerID]
 						if !exists {
 							if len(newEntry.ProductRetailerIDs) < qttProducts {
@@ -304,7 +307,7 @@ func GetProductListFromSentenX(productSearch string, catalogID string, threshold
 	return pmap, trace, nil
 }
 
-func GetProductListFromChatGPT(ctx context.Context, rtConfig *runtime.Config, content string) ([]string, *httpx.Trace, error) {
+func GetProductListFromChatGPT(ctx context.Context, rtConfig *runtime.Config, content string, externalPrompt string) ([]string, *httpx.Trace, error) {
 	httpClient, httpRetries, _ := goflow.HTTP(rtConfig)
 	chatGPTClient := chatgpt.NewClient(httpClient, httpRetries, rtConfig.ChatgptBaseURL, rtConfig.ChatgptKey)
 
@@ -336,7 +339,16 @@ func GetProductListFromChatGPT(ctx context.Context, rtConfig *runtime.Config, co
 		Role:    chatgpt.ChatMessageRoleUser,
 		Content: content,
 	}
+	extraPrompt := chatgpt.ChatCompletionMessage{
+		Role:    chatgpt.ChatMessageRoleSystem,
+		Content: externalPrompt,
+	}
+
 	completionRequest := chatgpt.NewChatCompletionRequest([]chatgpt.ChatCompletionMessage{prompt1, prompt2, prompt3, prompt4, prompt5, prompt6, question})
+	if len(externalPrompt) > 0 {
+		completionRequest = chatgpt.NewChatCompletionRequest([]chatgpt.ChatCompletionMessage{prompt1, prompt2, prompt3, prompt5, prompt6, extraPrompt, question})
+	}
+
 	response, trace, err := chatGPTClient.CreateChatCompletion(completionRequest)
 	if err != nil {
 		return nil, trace, errors.Wrapf(err, "error on chatgpt call for list products")
@@ -364,7 +376,11 @@ func GetProductListFromVtex(productSearch string, searchUrl string, apiType stri
 			return nil, productSponsored, traces, err
 		}
 	} else if apiType == "intelligent" {
-		result, traces, err = VtexIntelligentSearch(searchUrl, productSearch, hideUnavailableItems)
+		hasSellerID := false
+		if sellerID != "" {
+			hasSellerID = true
+		}
+		result, traces, err = VtexIntelligentSearch(searchUrl, productSearch, hideUnavailableItems, hasSellerID)
 		if err != nil {
 			return nil, productSponsored, traces, err
 		}
@@ -381,7 +397,7 @@ func GetProductListFromVtex(productSearch string, searchUrl string, apiType stri
 		var productEntry flows.ProductEntry
 
 		for _, productRetailerID := range resultSponsored {
-			productRetailerIDS = append(productRetailerIDS, productRetailerID+"#"+sellerID)
+			productRetailerIDS = append(productRetailerIDS, productRetailerID+sellerID)
 		}
 
 		if len(productRetailerIDS) > 0 {
@@ -426,7 +442,16 @@ type Item struct {
 }
 
 type VtexProduct struct {
-	ItemId string `json:"itemId"`
+	ItemId  string   `json:"itemId"`
+	Sellers []Seller `json:"sellers"`
+}
+
+type Seller struct {
+	SellerID        string `json:"sellerId"`
+	SellerDefault   bool   `json:"sellerDefault"`
+	CommertialOffer struct {
+		AvailableQuantity int `json:"AvailableQuantity"`
+	} `json:"commertialOffer"`
 }
 
 type VtexIntelligentProduct struct {
@@ -475,7 +500,7 @@ func VtexLegacySearch(searchUrl string, productSearch string) ([]string, []*http
 	return allItems, traces, nil
 }
 
-func VtexIntelligentSearch(searchUrl string, productSearch string, hideUnavailableItems bool) ([]string, []*httpx.Trace, error) {
+func VtexIntelligentSearch(searchUrl string, productSearch string, hideUnavailableItems bool, hasSellerID bool) ([]string, []*httpx.Trace, error) {
 
 	traces := []*httpx.Trace{}
 
@@ -538,7 +563,22 @@ func VtexIntelligentSearch(searchUrl string, productSearch string, hideUnavailab
 
 	for _, items := range response.Products {
 		for _, item := range items.Items {
-			allItems = append(allItems, item.ItemId)
+			if !hasSellerID {
+				if item.Sellers != nil {
+					for _, seller := range item.Sellers {
+						if seller.SellerDefault == true || seller.CommertialOffer.AvailableQuantity > 0 {
+							allItems = append(allItems, item.ItemId+"#"+seller.SellerID)
+						} else {
+							allItems = append(allItems, item.ItemId+"#1")
+						}
+					}
+				} else {
+					allItems = append(allItems, item.ItemId)
+				}
+
+			} else {
+				allItems = append(allItems, item.ItemId)
+			}
 		}
 	}
 
@@ -614,6 +654,8 @@ func CartSimulation(ProductRetailerIDS []flows.ProductEntry, sellerID string, ur
 	var traces []*httpx.Trace
 	var availableProducts []string
 	var products []string
+
+	sellerID = strings.TrimLeft(sellerID, "#")
 
 	urlSplit := strings.Split(url, "api")
 	urlSimulation := urlSplit[0] + "api/checkout/pub/orderForms/simulation"

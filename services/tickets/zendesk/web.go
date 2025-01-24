@@ -27,6 +27,7 @@ func init() {
 	web.RegisterJSONRoute(http.MethodPost, base+"/channelback", handleChannelback)
 	web.RegisterJSONRoute(http.MethodPost, base+"/event_callback", web.WithHTTPLogs(handleEventCallback))
 	web.RegisterJSONRoute(http.MethodPost, base+`/webhook/{ticketer:[a-f0-9\-]+}`, web.WithHTTPLogs(handleTicketerWebhook))
+	web.RegisterJSONRoute(http.MethodPost, base+`/csat`, web.WithHTTPLogs(handleCSAT))
 }
 
 type integrationMetadata struct {
@@ -41,6 +42,15 @@ type channelbackRequest struct {
 	ThreadID    string   `form:"thread_id"    validate:"required"`
 	RecipientID string   `form:"recipient_id" validate:"required"`
 	Metadata    string   `form:"metadata"     validate:"required"`
+}
+
+type CSATRequest struct {
+	Message      string `json:"message"`
+	URL          string `json:"csat_url"`
+	TicketerUUID string `json:"ticketer_uuid"`
+	TicketID     string `json:"ticket_id"`
+	ChannelUUID  string `json:"channel_uuid"`
+	ButtonText   string `json:"button_text"`
 }
 
 type channelbackResponse struct {
@@ -300,4 +310,33 @@ func handleTicketerWebhook(ctx context.Context, rt *runtime.Runtime, r *http.Req
 	}
 
 	return map[string]string{"status": "handled"}, http.StatusOK, nil
+}
+
+func handleCSAT(ctx context.Context, rt *runtime.Runtime, r *http.Request, l *models.HTTPLogger) (interface{}, int, error) {
+	request := &CSATRequest{}
+	if err := utils.UnmarshalAndValidateWithLimit(r.Body, request, web.MaxRequestBytes); err != nil {
+		return err, http.StatusBadRequest, nil
+	}
+
+	ticketerUUID := assets.TicketerUUID(request.TicketerUUID)
+
+	// look up our ticketer
+	ticketer, _, err := tickets.FromTicketerUUID(ctx, rt, ticketerUUID, typeZendesk)
+	if err != nil || ticketer == nil {
+		return errors.Errorf("no such ticketer %s", ticketerUUID), http.StatusNotFound, nil
+	}
+
+	// lookup ticket
+	ticket, err := models.LookupTicketByExternalID(ctx, rt.DB, ticketer.ID(), request.TicketID)
+	if err != nil || ticket == nil {
+		// we don't return an error here, because ticket might just belong to a different ticketer
+		return map[string]string{"status": "ignored"}, http.StatusOK, nil
+	}
+
+	msg, err := tickets.SendReplyCSAT(ctx, rt, ticket, request.ChannelUUID, request.Message, request.ButtonText, request.URL)
+	if err != nil {
+		return err, http.StatusBadRequest, nil
+	}
+
+	return &channelbackResponse{ExternalID: fmt.Sprintf("%d", msg.ID()), AllowChannelback: true}, http.StatusOK, nil
 }

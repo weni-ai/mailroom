@@ -660,7 +660,20 @@ func GetOrCreateContactIDsFromURNs(ctx context.Context, db QueryerWithTx, oa *Or
 			if err != nil {
 				return nil, errors.Wrapf(err, "error creating contact")
 			}
-			owners[urn] = contact.ID()
+
+			// search if we already have a owner with this contactID
+			alreadyPresent := false
+			for _, OContactID := range owners {
+				if contact.ID() == OContactID {
+					alreadyPresent = true
+				}
+			}
+			// if id already present in urnowners delete this urn to get the original
+			if alreadyPresent {
+				delete(owners, urn)
+			} else {
+				owners[urn] = contact.ID()
+			}
 		}
 	}
 	return owners, nil
@@ -730,7 +743,7 @@ func checkNinthDigitContacts(ctx context.Context, owners map[urns.URN]ContactID,
 			if err := rows.Scan(&id, &urn); err != nil {
 				return nil, errors.Wrapf(err, "error scanning URN result")
 			}
-			owners[urnVariationsMap[urn]] = id
+			owners[urn] = id
 		}
 	}
 

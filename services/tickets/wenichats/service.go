@@ -14,6 +14,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 
+	"github.com/nyaruka/gocommon/dates"
 	"github.com/nyaruka/gocommon/httpx"
 	"github.com/nyaruka/gocommon/jsonx"
 	"github.com/nyaruka/goflow/envs"
@@ -113,6 +114,7 @@ func (s *service) Open(session flows.Session, topic *flows.Topic, body string, a
 
 	roomData.SectorUUID = s.sectorUUID
 	roomData.QueueUUID = string(topic.QueueUUID())
+	roomData.TicketUUID = string(ticket.UUID())
 	preferredURN := session.Contact().PreferredURN()
 	if preferredURN != nil {
 		roomData.Contact.URN = preferredURN.URN().String()
@@ -262,6 +264,7 @@ func (s *service) Forward(ticket *models.Ticket, msgUUID flows.MsgUUID, text str
 		Room:        roomUUID,
 		Attachments: []Attachment{},
 		Direction:   "incoming",
+		CreatedOn:   dates.Now(),
 	}
 
 	if len(attachments) != 0 {
