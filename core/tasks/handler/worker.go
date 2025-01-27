@@ -714,7 +714,7 @@ func handleMsgEvent(ctx context.Context, rt *runtime.Runtime, event *MsgEvent) e
 			return fmt.Errorf("no project uuid found")
 		}
 
-		err = requestToRouter(event, rt.Config, projectUUID)
+		err = requestToRouter(event, rt.Config, contact, projectUUID)
 		if err != nil {
 			return errors.Wrap(err, "unable to send message to router")
 		}
@@ -918,23 +918,25 @@ type StopEvent struct {
 	OccurredOn time.Time        `json:"occurred_on"`
 }
 
-func requestToRouter(event *MsgEvent, rtConfig *runtime.Config, projectUUID uuids.UUID) error {
+func requestToRouter(event *MsgEvent, rtConfig *runtime.Config, contact *flows.Contact, projectUUID uuids.UUID) error {
 	httpClient, httpRetries, _ := goflow.HTTP(rtConfig)
 
 	body := struct {
-		ProjectUUID uuids.UUID         `json:"project_uuid"`
-		ContactURN  urns.URN           `json:"contact_urn"`
-		Text        string             `json:"text"`
-		Attachments []utils.Attachment `json:"attachments"`
-		Metadata    json.RawMessage    `json:"metadata"`
-		MsgEvent    MsgEvent           `json:"msg_event"`
+		ProjectUUID   uuids.UUID             `json:"project_uuid"`
+		ContactURN    urns.URN               `json:"contact_urn"`
+		Text          string                 `json:"text"`
+		Attachments   []utils.Attachment     `json:"attachments"`
+		Metadata      json.RawMessage        `json:"metadata"`
+		MsgEvent      MsgEvent               `json:"msg_event"`
+		ContactFields map[string]interface{} `json:"contact_fields"`
 	}{
-		ProjectUUID: projectUUID,
-		ContactURN:  event.URN.Identity(),
-		Text:        event.Text,
-		Attachments: event.Attachments,
-		Metadata:    event.Metadata,
-		MsgEvent:    *event,
+		ProjectUUID:   projectUUID,
+		ContactURN:    event.URN.Identity(),
+		Text:          event.Text,
+		Attachments:   event.Attachments,
+		Metadata:      event.Metadata,
+		MsgEvent:      *event,
+		ContactFields: mapContactFields(contact),
 	}
 
 	var b io.Reader
@@ -962,6 +964,26 @@ func requestToRouter(event *MsgEvent, rtConfig *runtime.Config, projectUUID uuid
 	}
 
 	return nil
+}
+
+func mapContactFields(contact *flows.Contact) map[string]interface{} {
+	if len(contact.Fields()) == 0 {
+		return nil
+	}
+
+	contactFields := make(map[string]interface{})
+
+	for key, field := range contact.Fields() {
+		contactFields[key] = struct {
+			Value interface{} `json:"value"`
+			Type  string      `json:"type"`
+		}{
+			Value: field.QueryValue(),
+			Type:  string(field.Type()),
+		}
+	}
+
+	return contactFields
 }
 
 // creates a new event task for the passed in timeout event
