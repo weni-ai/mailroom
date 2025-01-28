@@ -974,6 +974,12 @@ func mapContactFields(contact *flows.Contact) map[string]interface{} {
 	contactFields := make(map[string]interface{})
 
 	for key, field := range contact.Fields() {
+		if field == nil {
+			contactFields[key] = nil
+			continue
+		}
+
+
 		contactFields[key] = struct {
 			Value interface{} `json:"value"`
 			Type  string      `json:"type"`
