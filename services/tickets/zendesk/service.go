@@ -1,6 +1,7 @@
 package zendesk
 
 import (
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"net/url"
@@ -177,7 +178,7 @@ func (s *service) Open(session flows.Session, topic *flows.Topic, body string, a
 	return ticket, nil
 }
 
-func (s *service) Forward(ticket *models.Ticket, msgUUID flows.MsgUUID, text string, attachments []utils.Attachment, logHTTP flows.HTTPLogCallback) error {
+func (s *service) Forward(ticket *models.Ticket, msgUUID flows.MsgUUID, text string, attachments []utils.Attachment, metadata json.RawMessage, logHTTP flows.HTTPLogCallback) error {
 	contactUUID := ticket.Config("contact-uuid")
 	contactDisplay := ticket.Config("contact-display")
 

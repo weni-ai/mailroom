@@ -142,6 +142,7 @@ func TestOpenAndForward(t *testing.T) {
 		flows.MsgUUID("ca5607f0-cba8-4c94-9cd5-c4fbc24aa767"),
 		"It's urgent",
 		[]utils.Attachment{utils.Attachment("image/jpg:http://myfiles.com/media/0123/attachment1.jpg")},
+		nil,
 		logger.Log,
 	)
 
