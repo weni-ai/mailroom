@@ -184,12 +184,7 @@ func (h *HTTPLogger) Insert(ctx context.Context, db Queryer) error {
 func TruncateURL(url string) string {
 	const maxLength = 2048
 	if len(url) > maxLength {
-		excessLength := len(url) - maxLength
-		if excessLength < len(url) {
-			url = url[:len(url)-excessLength]
-		} else {
-			url = ""
-		}
+		return url[:maxLength]
 	}
 	return url
 }
