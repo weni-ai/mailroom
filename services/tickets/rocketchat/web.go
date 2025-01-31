@@ -95,7 +95,7 @@ func handleEventCallback(ctx context.Context, rt *runtime.Runtime, r *http.Reque
 			attachments = append(attachments, attachment.URL)
 		}
 
-		_, err = tickets.SendReply(ctx, rt, ticket, data.Text, files)
+		_, err = tickets.SendReply(ctx, rt, ticket, data.Text, files, nil)
 
 	case "close-room":
 		requestJSON, _ := json.Marshal(request)
