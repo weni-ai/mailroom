@@ -1,3 +1,7 @@
+1.49.3
+----------
+ * Fix http_logs insert url size error, truncating if greater than 2048
+
 1.49.2
 ----------
  * Fix template field to save null when empty
