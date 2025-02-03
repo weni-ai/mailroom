@@ -1,3 +1,7 @@
+1.50.0
+----------
+ * Send contact fields to router
+
 1.49.3
 ----------
  * Fix http_logs insert url size error, truncating if greater than 2048
