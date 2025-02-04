@@ -1,3 +1,7 @@
+1.50.1
+----------
+ * Fix worker metrics
+
 1.50.0
 ----------
  * Send contact fields to router
