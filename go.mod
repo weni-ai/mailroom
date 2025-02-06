@@ -75,7 +75,7 @@ require (
 	github.com/prometheus/procfs v0.8.0 // indirect
 )
 
-go 1.17
+go 1.23
 
 replace github.com/nyaruka/gocommon => github.com/Ilhasoft/gocommon v1.16.2-weni
 
