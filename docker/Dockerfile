@@ -1,8 +1,8 @@
-FROM golang:1.17.5-alpine3.14 AS builder
+FROM golang:1.23-alpine3.20 AS builder
 
 WORKDIR /app
 
-RUN apk add --no-cache --virtual build-deps curl gcc
+RUN apk update && apk --no-cache add build-base curl gcc
 
 COPY go.mod go.sum ./
 RUN --mount=type=cache,target=/go/pkg/mod/ \
@@ -16,7 +16,7 @@ COPY . .
 RUN --mount=type=cache,target=/go/pkg/mod/ \
     go install -v ./cmd/...
 
-FROM alpine:3.18.4
+FROM alpine:3.20
 
 RUN apk add --no-cache tzdata
 
