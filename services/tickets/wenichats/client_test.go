@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"net/http"
 	"testing"
+	"time"
 
 	"github.com/nyaruka/gocommon/httpx"
 	"github.com/nyaruka/mailroom/services/tickets/wenichats"
@@ -64,6 +65,15 @@ func TestCreateRoom(t *testing.T) {
 	data.Contact.ExternalID = "095be615-a8ad-4c33-8e9c-c7612fbf6c9f"
 	data.UserEmail = "john.doe@chats.weni.ai"
 	data.Contact.Name = "John"
+	data.CallbackURL = "http://foo.bar"
+	data.History = []wenichats.HistoryMessage{
+		{
+			Text:        "Hello",
+			Direction:   "incoming",
+			Attachments: nil,
+			CreatedOn:   time.Now(),
+		},
+	}
 
 	_, _, err := client.CreateRoom(data)
 	assert.EqualError(t, err, "unable to connect to server")

@@ -251,7 +251,7 @@ func TestOpenAndForward(t *testing.T) {
 			}`),
 		},
 		fmt.Sprintf("%s/msgs/", baseURL): {
-			httpx.NewMockResponse(200, nil, `{}`),
+			// httpx.NewMockResponse(200, nil, `{}`),
 			httpx.MockConnectionError,
 			httpx.NewMockResponse(200, nil, `{
 				"uuid": "b9312612-c26d-45ec-b9bb-7f116771fdd6",
@@ -373,7 +373,7 @@ func TestOpenAndForward(t *testing.T) {
 	assert.Equal(t, "General", ticket.Topic().Name())
 	assert.Equal(t, `{"custom_fields":{"country": "brazil","mood": "angry"}}`, ticket.Body())
 	assert.Equal(t, "8ecb1e4a-b457-4645-a161-e2b02ddffa88", ticket.ExternalID())
-	assert.Equal(t, 3, len(logger.Logs))
+	assert.Equal(t, 1, len(logger.Logs))
 	test.AssertSnapshot(t, "open_ticket", logger.Logs[0].Request)
 
 	dbTicket := models.NewTicket(ticket.UUID(), testdata.Org1.ID, testdata.Cathy.ID, testdata.Wenichats.ID, "8ecb1e4a-b457-4645-a161-e2b02ddffa88", testdata.DefaultTopic.ID, "Where are my cookies?", models.NilUserID, map[string]interface{}{
@@ -406,21 +406,9 @@ func TestOpenAndForward(t *testing.T) {
 	assert.Equal(t, 1, len(logger.Logs))
 
 	// test open with body empty
-
 	logger2 := &flows.HTTPLogger{}
 
 	wenichats.SetDB(rt.DB)
-	// svc, err = wenichats.NewService(
-	// 	rt.Config,
-	// 	http.DefaultClient,
-	// 	nil,
-	// 	ticketer,
-	// 	map[string]string{
-	// 		"project_auth": authToken,
-	// 		"sector_uuid":  "1a4bae05-993c-4f3b-91b5-80f4e09951f2",
-	// 	},
-	// )
-	// assert.NoError(t, err)
 
 	oa, err = models.GetOrgAssets(ctx, rt, testdata.Org1.ID)
 	require.NoError(t, err)
@@ -433,7 +421,7 @@ func TestOpenAndForward(t *testing.T) {
 	assert.Equal(t, "General", ticket.Topic().Name())
 	assert.Equal(t, "", ticket.Body())
 	assert.Equal(t, "e5cbc781-4e0e-4954-b078-0373308e11c3", ticket.ExternalID())
-	assert.Equal(t, 2, len(logger2.Logs))
+	assert.Equal(t, 1, len(logger2.Logs))
 	test.AssertSnapshot(t, "open_ticket_empty_body", logger2.Logs[0].Request)
 
 	//test with history after option
@@ -451,7 +439,7 @@ func TestOpenAndForward(t *testing.T) {
 	assert.Equal(t, "General", ticket.Topic().Name())
 	assert.Equal(t, "{\"history_after\":\"2019-10-07 15:21:30\"}", ticket.Body())
 	assert.Equal(t, "9688d21d-95aa-4bed-afc7-f31b35731a3d", ticket.ExternalID())
-	assert.Equal(t, 2, len(logger3.Logs))
+	assert.Equal(t, 1, len(logger3.Logs))
 	test.AssertSnapshot(t, "open_ticket_history_after", logger3.Logs[0].Request)
 
 	session.Contact().ClearURNs()
@@ -610,13 +598,6 @@ func TestOpenFails(t *testing.T) {
 	// Error on Create Room
 	logger := &flows.HTTPLogger{}
 	ticket, err := svc.Open(session, defaultTopic, `{"custom_fields":{"country": "brazil","mood": "angry"}}`, nil, logger.Log)
-
-	assert.Nil(t, ticket)
-	assert.Error(t, err)
-
-	// Error on update room to set callbackURL
-	logger = &flows.HTTPLogger{}
-	ticket, err = svc.Open(session, defaultTopic, `{"custom_fields":{"country": "brazil","mood": "angry"}}`, nil, logger.Log)
 
 	assert.Nil(t, ticket)
 	assert.Error(t, err)
