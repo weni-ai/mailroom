@@ -173,26 +173,28 @@ func (s *service) Open(session flows.Session, topic *flows.Topic, body string, a
 		return nil, errors.Wrap(selectErr, "failed to get history messages")
 	}
 
-	historyMsgs := make([]HistoryMessage, 0, len(msgs))
+	batchSize := 50
+	batches := make([][]HistoryMessage, 0)
 
-	//send history
-	for _, msg := range msgs {
-		var direction string
-		if msg.Direction() == "I" {
-			direction = "incoming"
-		} else {
-			direction = "outgoing"
+	currentBatch := make([]HistoryMessage, 0)
+
+	for i := 0; i < len(msgs); i++ {
+		m := historyMsgFromMsg(msgs[i])
+		currentBatch = append(currentBatch, m)
+
+		if len(currentBatch) == batchSize {
+			batches = append(batches, currentBatch)
+			currentBatch = make([]HistoryMessage, 0)
 		}
-		m := HistoryMessage{
-			Text:        msg.Text(),
-			CreatedOn:   msg.CreatedOn(),
-			Attachments: parseMsgAttachments(msg.Attachments()),
-			Direction:   direction,
-		}
-		historyMsgs = append(historyMsgs, m)
 	}
 
-	roomData.History = historyMsgs
+	var historyMsg []HistoryMessage
+	if len(batches) == 0 {
+		historyMsg = currentBatch
+	} else {
+		historyMsg = batches[0]
+	}
+	roomData.History = historyMsg
 
 	newRoom, trace, err := s.restClient.CreateRoom(roomData)
 	if trace != nil {
@@ -201,6 +203,19 @@ func (s *service) Open(session flows.Session, topic *flows.Topic, body string, a
 	if err != nil {
 		logrus.Error(errors.Wrap(err, fmt.Sprintf("failed to create wenichats room for: %+v", roomData)))
 		return nil, errors.Wrap(err, "failed to create wenichats room")
+	}
+
+	for i, batch := range batches {
+		if i == 0 { // to skip the first batch
+			continue
+		}
+		trace, err := s.restClient.SendHistoryBatch(newRoom.UUID, batch)
+		if trace != nil {
+			logHTTP(flows.NewHTTPLog(trace, flows.HTTPStatusFromCode, s.redactor))
+		}
+		if err != nil {
+			logrus.Error(errors.Wrap(err, "failed to send history batch"))
+		}
 	}
 
 	ticket.SetExternalID(newRoom.UUID)
@@ -278,4 +293,20 @@ func parseTime(historyAfter string) (time.Time, error) {
 	}
 
 	return time.Time{}, fmt.Errorf("failed to parse history_after: %q, expected formats: %v", historyAfter, formats)
+}
+
+func historyMsgFromMsg(msg *models.Msg) HistoryMessage {
+	var direction string
+	if msg.Direction() == "I" {
+		direction = "incoming"
+	} else {
+		direction = "outgoing"
+	}
+	m := HistoryMessage{
+		Text:        msg.Text(),
+		CreatedOn:   msg.CreatedOn(),
+		Attachments: parseMsgAttachments(msg.Attachments()),
+		Direction:   direction,
+	}
+	return m
 }

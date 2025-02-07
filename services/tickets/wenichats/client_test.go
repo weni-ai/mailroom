@@ -296,3 +296,36 @@ func TestGetQueues(t *testing.T) {
 	assert.Equal(t, "095be615-a8ad-4c33-8e9c-c7612fbf6c9f", response.Results[0].UUID)
 	assert.Equal(t, "Queue 1", response.Results[0].Name)
 }
+
+func TestSendBatch(t *testing.T) {
+	roomUUID := "8ecb1e4a-b457-4645-a161-e2b02ddffa88"
+	defer httpx.SetRequestor(httpx.DefaultRequestor)
+	httpx.SetRequestor(httpx.NewMockRequestor(map[string][]httpx.MockResponse{
+		fmt.Sprintf("%s/rooms/%s/history", baseURL, roomUUID): {
+			httpx.MockConnectionError,
+			httpx.NewMockResponse(400, nil, `{"detail": "Something went wrong"}`),
+			httpx.NewMockResponse(201, nil, `{}`),
+		},
+	}))
+
+	client := wenichats.NewClient(http.DefaultClient, nil, baseURL, authToken)
+
+	history := []wenichats.HistoryMessage{
+		{
+			Text:        "Hello",
+			Direction:   "incoming",
+			CreatedOn:   time.Now(),
+			Attachments: []wenichats.Attachment{},
+		},
+	}
+
+	_, err := client.SendHistoryBatch(roomUUID, history)
+	assert.EqualError(t, err, "unable to connect to server")
+
+	_, err = client.SendHistoryBatch(roomUUID, history)
+	assert.EqualError(t, err, "Something went wrong")
+
+	trace, err := client.SendHistoryBatch(roomUUID, history)
+	assert.NoError(t, err)
+	assert.Equal(t, "HTTP/1.0 201 Created\r\nContent-Length: 2\r\n\r\n", string(trace.ResponseTrace))
+}

@@ -126,6 +126,11 @@ func (c *Client) CloseRoom(roomUUID string) (*RoomResponse, *httpx.Trace, error)
 	return response, trace, nil
 }
 
+func (c *Client) SendHistoryBatch(roomUUID string, history []HistoryMessage) (*httpx.Trace, error) {
+	url := fmt.Sprintf("%s/rooms/%s/history", c.baseURL, roomUUID)
+	return c.post(url, history, nil)
+}
+
 func (c *Client) CreateMessage(msg *MessageRequest) (*MessageResponse, *httpx.Trace, error) {
 	url := fmt.Sprintf("%s/msgs/", c.baseURL)
 	response := &MessageResponse{}
