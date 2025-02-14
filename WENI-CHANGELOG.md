@@ -1,3 +1,7 @@
+1.50.2
+----------
+ * Remove log "fcm not configured"
+
 1.50.1
 ----------
  * Fix worker metrics
