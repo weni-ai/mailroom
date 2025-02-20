@@ -671,7 +671,23 @@ func newOutgoingMsgWpp(rt *runtime.Runtime, org *Org, channel *Channel, contactI
 			metadata["templating"] = msgWpp.Templating()
 			m.Template = null.String(msgWpp.Templating().Template().Name)
 		}
-
+		if msgWpp.Header() != "" {
+			metadata["header"] = string(msgWpp.Header())
+		}
+		if msgWpp.Body() != "" {
+			metadata["body"] = string(msgWpp.Body())
+		}
+		if len(msgWpp.Products()) != 0 {
+			metadata["products"] = msgWpp.Products()
+		}
+		if msgWpp.Action() != "" {
+			metadata["action"] = msgWpp.Action()
+		}
+		if msgWpp.Smart() {
+			metadata["send_catalog"] = false
+		} else {
+			metadata["send_catalog"] = msgWpp.SendCatalog()
+		}
 		m.Metadata = null.NewMap(metadata)
 	}
 	return msg, nil
@@ -1473,6 +1489,13 @@ type WppBroadcastMessage struct {
 	ListMessage     flows.ListMessage         `json:"list_message,omitempty"`
 	CTAMessage      flows.CTAMessage          `json:"cta_message,omitempty"`
 	Buttons         []flows.ButtonComponent   `json:"buttons,omitempty"`
+
+	Body          string               `json:"body,omitempty"`
+	Products      []flows.ProductEntry `json:"products,omitempty"`
+	Action        string               `json:"action,omitempty"`
+	Smart         bool                 `json:"smart"`
+	ProductSearch string               `json:"product_search,omitempty"`
+	SendCatalog   bool                 `json:"send_catalog,omitempty"`
 }
 
 type WppBroadcast struct {
@@ -1648,6 +1671,14 @@ func CreateWppBroadcastMessages(ctx context.Context, rt *runtime.Runtime, oa *Or
 		flowMessage := bcast.Msg().FlowMessage
 		orderDetails := bcast.Msg().OrderDetails
 
+		header := bcast.Msg().Header.Text
+		body := bcast.Msg().Body
+		products := bcast.Msg().Products
+		action := bcast.Msg().Action
+		smart := bcast.Msg().Smart
+		productSearch := bcast.Msg().ProductSearch
+		sendCatalog := bcast.Msg().SendCatalog
+
 		// build up the minimum viable context for evaluation
 		evaluationCtx := types.NewXObject(map[string]types.XValue{
 			"contact": flows.Context(oa.Env(), contact),
@@ -1731,7 +1762,7 @@ func CreateWppBroadcastMessages(ctx context.Context, rt *runtime.Runtime, oa *Or
 		}
 
 		// create our outgoing message
-		out := flows.NewMsgWppOut(urn, channel.ChannelReference(), bcast.Msg().InteractionType, headerType, headerText, text, footerText, ctaMessage, listMessage, flowMessage, orderDetails, attachments, quickReplies, buttons, templating, flows.NilMsgTopic)
+		out := flows.NewMsgWppOut(urn, channel.ChannelReference(), bcast.Msg().InteractionType, headerType, headerText, text, footerText, ctaMessage, listMessage, flowMessage, orderDetails, attachments, quickReplies, buttons, templating, flows.NilMsgTopic, header, body, products, action, smart, productSearch, sendCatalog)
 		msg, err := NewOutgoingWppBroadcastMsg(rt, oa.Org(), channel, c.ID(), out, time.Now(), bcast.BroadcastID())
 		if err != nil {
 			return nil, errors.Wrapf(err, "error creating outgoing message")
