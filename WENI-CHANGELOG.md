@@ -1,3 +1,15 @@
+1.50.3
+----------
+ * Update go version to 1.23 and dockerfile go and alpine versions
+
+1.50.2
+----------
+ * Remove log "fcm not configured"
+
+1.50.1
+----------
+ * Fix worker metrics
+
 1.50.0
 ----------
  * Send contact fields to router
