@@ -687,6 +687,7 @@ func newOutgoingMsgWpp(rt *runtime.Runtime, org *Org, channel *Channel, contactI
 
 		if metadata["body"] != "" {
 			metadata["text"] = ""
+			m.Text = ""
 		}
 
 		m.Metadata = null.NewMap(metadata)
