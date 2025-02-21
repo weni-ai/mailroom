@@ -673,11 +673,21 @@ func newOutgoingMsgWpp(rt *runtime.Runtime, org *Org, channel *Channel, contactI
 		}
 		if len(msgWpp.Products()) != 0 {
 			metadata["products"] = msgWpp.Products()
+			metadata["body"] = msgWpp.Text()
 		}
 		if len(msgWpp.ActionButtonText()) != 0 {
 			metadata["action"] = msgWpp.ActionButtonText()
+
 		}
-		metadata["send_catalog"] = msgWpp.SendCatalog()
+		metadata["send_catalog"] = false
+		if msgWpp.SendCatalog() {
+			metadata["send_catalog"] = true
+			metadata["body"] = msgWpp.Text()
+		}
+
+		if metadata["body"] != "" {
+			metadata["text"] = ""
+		}
 
 		m.Metadata = null.NewMap(metadata)
 	}
