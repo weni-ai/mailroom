@@ -664,13 +664,12 @@ func newOutgoingMsgWpp(rt *runtime.Runtime, org *Org, channel *Channel, contactI
 			metadata["templating"] = msgWpp.Templating()
 			m.Template = null.String(msgWpp.Templating().Template().Name)
 		}
-		if len(msgWpp.Products()) != 0 {
+		if len(msgWpp.Products()) > 0 {
 			metadata["products"] = msgWpp.Products()
 			metadata["body"] = msgWpp.Text()
 		}
 		if len(msgWpp.ActionButtonText()) != 0 {
 			metadata["action"] = msgWpp.ActionButtonText()
-
 		}
 		metadata["send_catalog"] = false
 		if msgWpp.SendCatalog() {
@@ -678,7 +677,7 @@ func newOutgoingMsgWpp(rt *runtime.Runtime, org *Org, channel *Channel, contactI
 			metadata["body"] = msgWpp.Text()
 		}
 
-		if metadata["body"] != "" {
+		if (len(msgWpp.Products()) > 0 || msgWpp.SendCatalog()) && metadata["body"] != "" && msgWpp.Templating() == nil {
 			metadata["text"] = ""
 			m.Text = ""
 		}
@@ -1686,6 +1685,9 @@ func CreateWppBroadcastMessages(ctx context.Context, rt *runtime.Runtime, oa *Or
 
 		// evaluate our footer text
 		footerText, _ = excellent.EvaluateTemplate(oa.Env(), evaluationCtx, footerText, nil)
+
+		// evaluate our action text
+		actionButtonText, _ = excellent.EvaluateTemplate(oa.Env(), evaluationCtx, actionButtonText, nil)
 
 		// evaluate our quick replies
 		for i, qr := range quickReplies {
