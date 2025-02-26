@@ -679,6 +679,7 @@ func newOutgoingMsgWpp(rt *runtime.Runtime, org *Org, channel *Channel, contactI
 
 		if (len(msgWpp.Products()) > 0 || msgWpp.SendCatalog()) && metadata["body"] != "" && msgWpp.Templating() == nil {
 			metadata["text"] = ""
+			metadata["header"] = string(msgWpp.HeaderText())
 			m.Text = ""
 		}
 
