@@ -156,6 +156,10 @@ func TestWppBroadcastTask(t *testing.T) {
 
 	catalogMsg := models.WppBroadcastMessage{
 		Text: "Check out our products",
+		Header: models.WppBroadcastMessageHeader{
+			Type: "text",
+			Text: "header for catalog",
+		},
 		CatalogMessage: models.WppBroadcastCatalogMessage{
 			Products: []flows.ProductEntry{
 				{
