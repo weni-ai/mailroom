@@ -1,3 +1,7 @@
+1.51.0
+----------
+ * Add support for catalog message in whatsapp messages
+
 1.50.3
 ----------
  * Update go version to 1.23 and dockerfile go and alpine versions
