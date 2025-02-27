@@ -1,0 +1,148 @@
+[
+  {
+    "label": "open ticket with assignee",
+    "http_mocks": {
+      "https://chats-engine.dev.cloud.weni.ai/v1/external/rooms/": [
+        {
+          "status": 200,
+          "body": "{\"uuid\":\"8ecb1e4a-b457-4645-a161-e2b02ddffa88\"}"
+        }
+      ],
+      "https://chats-engine.dev.cloud.weni.ai/v1/external/rooms/8ecb1e4a-b457-4645-a161-e2b02ddffa88/": [
+        {
+          "status": 200,
+          "body": "{\"uuid\":\"8ecb1e4a-b457-4645-a161-e2b02ddffa88\"}"
+        }
+      ]
+    },
+    "method": "POST",
+    "path": "/mr/ticket/open",
+    "body": {
+      "org_id": 1,
+      "contact_id": 10000,
+      "ticketer_id": 7,
+      "topic_id": 1,
+      "assignee_id": 3
+    },
+    "status": 200,
+    "response": {
+      "assignee": {
+          "email": "admin1@nyaruka.com",
+          "name": "Andy Admin"
+      },
+      "body": "",
+      "external_id": "8ecb1e4a-b457-4645-a161-e2b02ddffa88",
+      "ticketer": {
+          "name": "Weni Chats",
+          "uuid": "006d224e-107f-4e18-afb2-f41fe302abdc"
+      },
+      "topic": {
+          "name": "General",
+          "queue_uuid": "5c85fdf7-d54a-49dd-97ed-7e10077a1f6a",
+          "uuid": "ffc903f7-8cbb-443f-9627-87106842d1aa"
+      },
+      "uuid": "692926ea-09d6-4942-bd38-d266ec8d3716"
+    },
+    "db_assertions": [
+      {
+        "query": "SELECT count(*) FROM tickets_ticket WHERE status = 'O'",
+        "count": 1
+      }
+    ]
+  },
+  {
+    "label": "open ticket without assignee",
+    "http_mocks": {
+      "https://chats-engine.dev.cloud.weni.ai/v1/external/rooms/": [
+        {
+          "status": 200,
+          "body": "{\"uuid\":\"8ecb1e4a-b457-4645-a161-e2b02ddffa88\"}"
+        }
+      ],
+      "https://chats-engine.dev.cloud.weni.ai/v1/external/rooms/8ecb1e4a-b457-4645-a161-e2b02ddffa88/": [
+        {
+          "status": 200,
+          "body": "{\"uuid\":\"8ecb1e4a-b457-4645-a161-e2b02ddffa88\"}"
+        }
+      ]
+    },
+    "method": "POST",
+    "path": "/mr/ticket/open",
+    "body": {
+      "org_id": 1,
+      "contact_id": 10000,
+      "ticketer_id": 7,
+      "topic_id": 1,
+      "assignee_id": 0
+    },
+    "status": 200,
+    "response": {
+      "body": "",
+      "external_id": "8ecb1e4a-b457-4645-a161-e2b02ddffa88",
+      "ticketer": {
+          "name": "Weni Chats",
+          "uuid": "006d224e-107f-4e18-afb2-f41fe302abdc"
+      },
+      "topic": {
+          "name": "General",
+          "queue_uuid": "5c85fdf7-d54a-49dd-97ed-7e10077a1f6a",
+          "uuid": "ffc903f7-8cbb-443f-9627-87106842d1aa"
+      },
+      "uuid": "c34b6c7d-fa06-4563-92a3-d648ab64bccb"
+    },
+    "db_assertions": [
+      {
+        "query": "SELECT count(*) FROM tickets_ticket WHERE status = 'O'",
+        "count": 2
+      }
+    ]
+  },
+  {
+    "label": "open ticket with history_after",
+    "http_mocks": {
+      "https://chats-engine.dev.cloud.weni.ai/v1/external/rooms/": [
+        {
+          "status": 200,
+          "body": "{\"uuid\":\"8ecb1e4a-b457-4645-a161-e2b02ddffa88\"}"
+        }
+      ],
+      "https://chats-engine.dev.cloud.weni.ai/v1/external/rooms/8ecb1e4a-b457-4645-a161-e2b02ddffa88/": [
+        {
+          "status": 200,
+          "body": "{\"uuid\":\"8ecb1e4a-b457-4645-a161-e2b02ddffa88\"}"
+        }
+      ]
+    },
+    "method": "POST",
+    "path": "/mr/ticket/open",
+    "body": {
+      "org_id": 1,
+      "contact_id": 10000,
+      "ticketer_id": 7,
+      "topic_id": 1,
+      "assignee_id": 0,
+      "extra": "{\"history_after\":\"2025-01-01 00:00:00\"}"
+    },
+    "status": 200,
+    "response": {
+      "body": "{\"history_after\":\"2025-01-01 00:00:00\"}",
+      "external_id": "8ecb1e4a-b457-4645-a161-e2b02ddffa88",
+      "ticketer": {
+          "name": "Weni Chats",
+          "uuid": "006d224e-107f-4e18-afb2-f41fe302abdc"
+      },
+      "topic": {
+          "name": "General",
+          "queue_uuid": "5c85fdf7-d54a-49dd-97ed-7e10077a1f6a",
+          "uuid": "ffc903f7-8cbb-443f-9627-87106842d1aa"
+      },
+      "uuid": "970b8069-50f5-4f6f-8f41-6b2d9f33d623"
+    },
+    "db_assertions": [
+      {
+        "query": "SELECT count(*) FROM tickets_ticket WHERE status = 'O'",
+        "count": 3
+      }
+    ]
+  }
+]

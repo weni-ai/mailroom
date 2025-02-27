@@ -126,7 +126,11 @@ func (s *service) Open(session flows.Session, topic *flows.Topic, body string, a
 		}
 		roomData.Contact.URN = urns[0].String()
 	}
-	roomData.FlowUUID = session.Runs()[0].Flow().UUID()
+
+	if len(session.Runs()) > 0 && session.Runs()[0].Flow() != nil {
+		roomData.FlowUUID = session.Runs()[0].Flow().UUID()
+	}
+
 	roomData.Contact.Groups = groups
 
 	// if body is not configured with custom fields properly, send all fields from contact
@@ -213,7 +217,11 @@ func (s *service) Open(session flows.Session, topic *flows.Topic, body string, a
 	} else {
 		// get messages for history, based on first session run start time
 		startMargin := -time.Second * 1
-		after = session.Runs()[0].CreatedOn().Add(startMargin)
+		if len(session.Runs()) > 0 {
+			after = session.Runs()[0].CreatedOn().Add(startMargin)
+		} else {
+			after = time.Now().Add(startMargin)
+		}
 	}
 	cx, cancel = context.WithTimeout(context.Background(), 15*time.Second)
 	defer cancel()
