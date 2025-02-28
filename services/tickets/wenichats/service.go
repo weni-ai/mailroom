@@ -197,9 +197,8 @@ func (s *service) Open(session flows.Session, topic *flows.Topic, body string, a
 	var after time.Time
 	if historyAfter != "" {
 		// get msgs for history based on history_after param inside ticket body
-		after1, err1 := time.Parse("2006-01-02 15:04:05", historyAfter)
-		after2, err2 := time.Parse("2006-01-02T15:04:05Z", historyAfter)
-		if err1 != nil && err2 != nil {
+		after, err = parseDateTime(historyAfter)
+		if err != nil {
 			_, _, err = s.restClient.CloseRoom(newRoom.UUID)
 			if err != nil {
 				closeErr := errors.Wrap(err, "error closing wenichats room after failing to parse history messages")
@@ -207,12 +206,7 @@ func (s *service) Open(session flows.Session, topic *flows.Topic, body string, a
 				return nil, closeErr
 			}
 			logrus.Error(errors.Wrap(err, fmt.Sprintf("Error open ticket for: %+v", newRoom)))
-			return nil, errors.Wrap(err, fmt.Sprintf("failed to parse history_after from value from format DateTime or RFC3339. Expected format \"2006-01-02 15:04:05\" or \"2006-01-02T15:04:05Z\", current value is \"%s\"", historyAfter))
-		}
-		if err1 != nil {
-			after = after2
-		} else {
-			after = after1
+			return nil, errors.Wrap(err, "failed to parse historyAfter to time.Time")
 		}
 	} else {
 		// get messages for history, based on first session run start time
@@ -326,4 +320,20 @@ func (s *service) Close(tickets []*models.Ticket, logHTTP flows.HTTPLogCallback)
 
 func (s *service) Reopen(ticket []*models.Ticket, logHTTP flows.HTTPLogCallback) error {
 	return errors.New("wenichats ticket type doesn't support reopening")
+}
+
+func parseDateTime(dateString string) (time.Time, error) {
+	layouts := []string{
+		"2006-01-02 15:04:05",
+		"2006-01-02T15:04:05Z",
+		"2006-01-02 15:04:05-07:00",
+	}
+
+	for _, layout := range layouts {
+		if parsedTime, err := time.Parse(layout, dateString); err == nil {
+			return parsedTime, nil
+		}
+	}
+
+	return time.Time{}, fmt.Errorf("invalid date time format")
 }
