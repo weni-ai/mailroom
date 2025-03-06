@@ -41,13 +41,15 @@ func TestOpenAndForward(t *testing.T) {
 	uuids.SetGenerator(uuids.NewSeededGenerator(12345))
 
 	httpx.SetRequestor(httpx.NewMockRequestor(map[string][]httpx.MockResponse{
-		"https://chat.twilio.com/v2/Services/IS38067ec392f1486bb6e4de4610f26fb3/Users/1234567": {
+		"https://chat.twilio.com/v2/Services/IS38067ec392f1486bb6e4de4610f26fb3/Users/1234567_e7187099-7d38-4f60-955c-325957214c42": {
 			httpx.NewMockResponse(404, nil, `{
 				"code": 20404,
 				"message": "The requested resource /Services/IS38067ec392f1486bb6e4de4610f26fb3/Users/1234567 was not found",
 				"more_info": "https://www.twilio.com/docs/errors/20404",
 				"status": 404
 			}`),
+		},
+		"https://chat.twilio.com/v2/Services/IS38067ec392f1486bb6e4de4610f26fb3/Users/1234567_59d74b86-3e2f-4a93-aece-b05d2fdcde0c": {
 			httpx.NewMockResponse(200, nil, `{
 				"is_notifiable": null,
 				"date_updated": "2022-03-08T22:18:23Z",
@@ -640,6 +642,7 @@ func TestSendHistory(t *testing.T) {
 	twilioflex.SendHistory(
 		session,
 		2,
+		"1488d3ac-9cf6-4811-ae4c-2b7b31e5550a",
 		&twilioflex.FlexChannel{Sid: "CH6442c09c93ba4d13966fa42e9b78f620"},
 		logger.Log,
 		restClient,
