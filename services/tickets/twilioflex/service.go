@@ -199,6 +199,31 @@ func (s *service) Open(session flows.Session, topic *flows.Topic, body string, a
 func (s *service) Forward(ticket *models.Ticket, msgUUID flows.MsgUUID, text string, attachments []utils.Attachment, logHTTP flows.HTTPLogCallback) error {
 	identity := fmt.Sprintf("%d_%s", ticket.ContactID(), ticket.UUID())
 
+	// if is identity v2 handle this to maintain backwards compatibility
+	{
+		chatUser := &CreateChatUserParams{
+			Identity:     identity,
+			FriendlyName: identity,
+		}
+
+		contactUser, trace, err := s.restClient.FetchUser(chatUser.Identity)
+		if trace != nil {
+			logHTTP(flows.NewHTTPLog(trace, flows.HTTPStatusFromCode, s.redactor))
+		}
+		if err != nil && trace.Response.StatusCode != 404 {
+			return errors.Wrapf(err, "failed to get twilio chat user")
+		}
+		if contactUser == nil {
+			_, trace, err := s.restClient.CreateUser(chatUser)
+			if trace != nil {
+				logHTTP(flows.NewHTTPLog(trace, flows.HTTPStatusFromCode, s.redactor))
+			}
+			if err != nil {
+				return errors.Wrap(err, "failed to create twilio chat user")
+			}
+		}
+	}
+
 	if len(attachments) > 0 {
 		mediaAttachements := []CreateMediaParams{}
 		for _, attachment := range attachments {

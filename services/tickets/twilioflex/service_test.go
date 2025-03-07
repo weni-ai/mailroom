@@ -90,6 +90,25 @@ func TestOpenAndForward(t *testing.T) {
 						"user_bindings": "https://chat.twilio.com/v2/Services/IS38067ec392f1486bb6e4de4610f26fb3/Users/USf4015a97250d482889459f8e8819e09f/Bindings"
 				}
 			}`),
+			httpx.NewMockResponse(201, nil, `{
+				"is_notifiable": null,
+				"date_updated": "2022-03-08T22:18:23Z",
+				"is_online": null,
+				"friendly_name": "dummy user",
+				"account_sid": "AC81d44315e19372138bdaffcc13cf3b94",
+				"url": "https://chat.twilio.com/v2/Services/IS38067ec392f1486bb6e4de4610f26fb3/Users/USf4015a97250d482889459f8e8819e09f",
+				"date_created": "2022-03-08T22:18:23Z",
+				"role_sid": "RL6f3f490b35534130845f98202673ffb9",
+				"sid": "USf4015a97250d482889459f8e8819e09f",
+				"attributes": "{}",
+				"service_sid": "IS38067ec392f1486bb6e4de4610f26fb3",
+				"joined_channels_count": 0,
+				"identity": "10000",
+				"links": {
+						"user_channels": "https://chat.twilio.com/v2/Services/IS38067ec392f1486bb6e4de4610f26fb3/Users/USf4015a97250d482889459f8e8819e09f/Channels",
+						"user_bindings": "https://chat.twilio.com/v2/Services/IS38067ec392f1486bb6e4de4610f26fb3/Users/USf4015a97250d482889459f8e8819e09f/Bindings"
+				}
+			}`),
 		},
 		"https://flex-api.twilio.com/v1/Channels": {
 			httpx.NewMockResponse(201, nil, `{
@@ -318,6 +337,54 @@ func TestOpenAndForward(t *testing.T) {
 				"was_edited": false
 			}`),
 		},
+		"https://chat.twilio.com/v2/Services/IS38067ec392f1486bb6e4de4610f26fb3/Users/10000_59d74b86-3e2f-4a93-aece-b05d2fdcde0c": {
+			httpx.NewMockResponse(404, nil, `{
+				"code": 20404,
+				"message": "The requested resource /Services/IS38067ec392f1486bb6e4de4610f26fb3/Users/1234567 was not found",
+				"more_info": "https://www.twilio.com/docs/errors/20404",
+				"status": 404
+			}`),
+			httpx.NewMockResponse(200, nil, `{
+				"is_notifiable": null,
+				"date_updated": "2022-03-08T22:18:23Z",
+				"is_online": null,
+				"friendly_name": "dummy user",
+				"account_sid": "AC81d44315e19372138bdaffcc13cf3b94",
+				"url": "https://chat.twilio.com/v2/Services/IS38067ec392f1486bb6e4de4610f26fb3/Users/USf4015a97250d482889459f8e8819e09f",
+				"date_created": "2022-03-08T22:18:23Z",
+				"role_sid": "RL6f3f490b35534130845f98202673ffb9",
+				"sid": "USf4015a97250d482889459f8e8819e09f",
+				"attributes": "{}",
+				"service_sid": "IS38067ec392f1486bb6e4de4610f26fb3",
+				"joined_channels_count": 0,
+				"identity": "10000",
+				"links": {
+						"user_channels": "https://chat.twilio.com/v2/Services/IS38067ec392f1486bb6e4de4610f26fb3/Users/USf4015a97250d482889459f8e8819e09f/Channels",
+						"user_bindings": "https://chat.twilio.com/v2/Services/IS38067ec392f1486bb6e4de4610f26fb3/Users/USf4015a97250d482889459f8e8819e09f/Bindings"
+				}
+			}`),
+		},
+		"https://chat.twilio.com/v2/Services/IS38067ec392f1486bb6e4de4610f26fb3/Users/10000_645eee60-7e84-4a9e-ade3-4fce01ae28f1": {
+			httpx.NewMockResponse(200, nil, `{
+				"is_notifiable": null,
+				"date_updated": "2022-03-08T22:18:23Z",
+				"is_online": null,
+				"friendly_name": "dummy user",
+				"account_sid": "AC81d44315e19372138bdaffcc13cf3b94",
+				"url": "https://chat.twilio.com/v2/Services/IS38067ec392f1486bb6e4de4610f26fb3/Users/USf4015a97250d482889459f8e8819e09f",
+				"date_created": "2022-03-08T22:18:23Z",
+				"role_sid": "RL6f3f490b35534130845f98202673ffb9",
+				"sid": "USf4015a97250d482889459f8e8819e09f",
+				"attributes": "{}",
+				"service_sid": "IS38067ec392f1486bb6e4de4610f26fb3",
+				"joined_channels_count": 0,
+				"identity": "10000",
+				"links": {
+						"user_channels": "https://chat.twilio.com/v2/Services/IS38067ec392f1486bb6e4de4610f26fb3/Users/USf4015a97250d482889459f8e8819e09f/Channels",
+						"user_bindings": "https://chat.twilio.com/v2/Services/IS38067ec392f1486bb6e4de4610f26fb3/Users/USf4015a97250d482889459f8e8819e09f/Bindings"
+				}
+			}`),
+		},
 	}))
 
 	ticketer := flows.NewTicketer(static.NewTicketer(assets.TicketerUUID(uuids.New()), "Support", "twilioflex"))
@@ -378,7 +445,7 @@ func TestOpenAndForward(t *testing.T) {
 	logger = &flows.HTTPLogger{}
 	err = svc.Forward(dbTicket, flows.MsgUUID("4fa340ae-1fb0-4666-98db-2177fe9bf31c"), "It's urgent", nil, logger.Log)
 	assert.NoError(t, err)
-	assert.Equal(t, 1, len(logger.Logs))
+	assert.Equal(t, 2, len(logger.Logs))
 	test.AssertSnapshot(t, "forward_message", logger.Logs[0].Request)
 
 	dbTicket2 := models.NewTicket("645eee60-7e84-4a9e-ade3-4fce01ae28f1", testdata.Org1.ID, testdata.Cathy.ID, testdata.Twilioflex.ID, "CH180fa48ef2ba40a08fa5c9fb5c8ddd99", testdata.DefaultTopic.ID, "Where are my cookies?", models.NilUserID, map[string]interface{}{
@@ -394,7 +461,7 @@ func TestOpenAndForward(t *testing.T) {
 	}
 	err = svc.Forward(dbTicket2, flows.MsgUUID("5ga340ae-1fb0-4666-98db-2177fe9bf31c"), "It's urgent", attachments, logger.Log)
 	assert.NoError(t, err)
-	assert.Equal(t, 7, len(logger.Logs))
+	assert.Equal(t, 8, len(logger.Logs))
 }
 
 func TestCloseAndReopen(t *testing.T) {
