@@ -1,3 +1,7 @@
+1.52.0
+----------
+ * twillio-flex use the match of contactID and ticketUUID as identity for user
+
 1.51.0
 ----------
  * Add support for catalog message in whatsapp messages
