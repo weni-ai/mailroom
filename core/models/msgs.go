@@ -1464,6 +1464,7 @@ type WppBroadcastTemplate struct {
 	UUID      assets.TemplateUUID `json:"uuid" validate:"required,uuid"`
 	Name      string              `json:"name" validate:"required"`
 	Variables []string            `json:"variables,omitempty"`
+	Locale    string              `json:"locale" validate:"required"` // ex: "pt-BR"
 }
 
 type WppBroadcastMessageHeader struct {
@@ -1714,6 +1715,15 @@ func CreateWppBroadcastMessages(ctx context.Context, rt *runtime.Runtime, oa *Or
 				contact.Locale(oa.Env()),
 				oa.Env().DefaultLocale(),
 			}
+
+			if parts := strings.Split(strings.TrimSpace(bcast.Msg().Template.Locale), "-"); len(parts) == 2 {
+				language := envs.Language(strings.ToLower(parts[0]))
+				country := envs.Country(strings.ToUpper(parts[1]))
+				if country != envs.NilCountry && language != envs.NilLanguage {
+					locales = append([]envs.Locale{envs.NewLocale(language, country)}, locales...)
+				}
+			}
+
 			translation := oa.SessionAssets().Templates().FindTranslation(bcast.Msg().Template.UUID, channel.ChannelReference(), locales)
 			if translation != nil {
 				// evaluate our variables
