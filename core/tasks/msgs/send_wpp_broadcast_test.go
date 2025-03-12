@@ -136,6 +136,7 @@ func TestWppBroadcastTask(t *testing.T) {
 			Variables: []string{
 				"@contact.name",
 			},
+			Locale: "pt-BR",
 		},
 	}
 
