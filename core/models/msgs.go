@@ -1722,12 +1722,11 @@ func CreateWppBroadcastMessages(ctx context.Context, rt *runtime.Runtime, oa *Or
 				contact.Locale(oa.Env()),
 				oa.Env().DefaultLocale(),
 			}
-
-			if parts := strings.Split(strings.TrimSpace(bcast.Msg().Template.Locale), "-"); len(parts) == 2 {
-				language := envs.Language(strings.ToLower(parts[0]))
-				country := envs.Country(strings.ToUpper(parts[1]))
-				if country != envs.NilCountry && language != envs.NilLanguage {
-					locales = append([]envs.Locale{envs.NewLocale(language, country)}, locales...)
+			localeTemplate := strings.TrimSpace(bcast.Msg().Template.Locale)
+			if localeTemplate != "" {
+				templateLocale, _ := envs.FromBCP47(localeTemplate)
+				if templateLocale != envs.NilLocale {
+					locales = append([]envs.Locale{templateLocale}, locales...)
 				}
 			}
 
