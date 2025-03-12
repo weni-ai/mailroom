@@ -1722,6 +1722,9 @@ func CreateWppBroadcastMessages(ctx context.Context, rt *runtime.Runtime, oa *Or
 				if country != envs.NilCountry && language != envs.NilLanguage {
 					locales = append([]envs.Locale{envs.NewLocale(language, country)}, locales...)
 				}
+				fmt.Println("country: ", locales[0].Country)
+				fmt.Println("language: ", locales[0].Language)
+				fmt.Println("locales: ", locales)
 			}
 
 			translation := oa.SessionAssets().Templates().FindTranslation(bcast.Msg().Template.UUID, channel.ChannelReference(), locales)
