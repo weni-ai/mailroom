@@ -1715,13 +1715,19 @@ func CreateWppBroadcastMessages(ctx context.Context, rt *runtime.Runtime, oa *Or
 				contact.Locale(oa.Env()),
 				oa.Env().DefaultLocale(),
 			}
+
+			fmt.Println(" --------------------> Template Locale:", bcast.Msg().Template.Locale)
 			localeTemplate := strings.TrimSpace(bcast.Msg().Template.Locale)
 			if localeTemplate != "" {
-				templateLocale, _ := envs.FromBCP47(localeTemplate)
-				if templateLocale != envs.NilLocale {
+				fmt.Println(" --------------------> localeTemplate:", localeTemplate)
+				templateLocale, err := envs.FromBCP47(localeTemplate)
+				fmt.Println(" --------------------> templateLocale:", templateLocale, "err:", err)
+				if err == nil && templateLocale != envs.NilLocale {
+					fmt.Println(" --------------------> Adding templateLocale to locales")
 					locales = append([]envs.Locale{templateLocale}, locales...)
 				}
 			}
+			fmt.Println(" --------------------> Final locales:", locales)
 
 			translation := oa.SessionAssets().Templates().FindTranslation(bcast.Msg().Template.UUID, channel.ChannelReference(), locales)
 			if translation != nil {
