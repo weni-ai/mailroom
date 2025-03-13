@@ -1464,7 +1464,7 @@ type WppBroadcastTemplate struct {
 	UUID      assets.TemplateUUID `json:"uuid" validate:"required,uuid"`
 	Name      string              `json:"name" validate:"required"`
 	Variables []string            `json:"variables,omitempty"`
-	Locale    string              `json:"locale" validate:"required"` // ex: "pt-BR"
+	Locale    string              `json:"locale,omitempty"`
 }
 
 type WppBroadcastMessageHeader struct {
