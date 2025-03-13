@@ -1661,6 +1661,7 @@ func CreateWppBroadcastMessages(ctx context.Context, rt *runtime.Runtime, oa *Or
 		var templating *flows.MsgTemplating = nil
 		templateVariables := make([]string, len(bcast.Msg().Template.Variables))
 		copy(templateVariables, bcast.Msg().Template.Variables)
+		templateLocale := bcast.Msg().Template.Locale
 
 		ctaMessage := bcast.Msg().CTAMessage
 		listMessage := bcast.Msg().ListMessage
@@ -1696,6 +1697,9 @@ func CreateWppBroadcastMessages(ctx context.Context, rt *runtime.Runtime, oa *Or
 			quickReplies[i], _ = excellent.EvaluateTemplate(oa.Env(), evaluationCtx, qr, nil)
 		}
 
+		//evaluate our template locale
+		templateLocale, _ = excellent.EvaluateTemplate(oa.Env(), evaluationCtx, templateLocale, nil)
+
 		// evaluate our template
 		if bcast.Msg().Template.UUID != "" {
 			// load our template
@@ -1716,11 +1720,12 @@ func CreateWppBroadcastMessages(ctx context.Context, rt *runtime.Runtime, oa *Or
 				oa.Env().DefaultLocale(),
 			}
 
+			fmt.Println(" --------------------> Full Broadcast Message:", bcast.b)
+			fmt.Println(" --------------------> Template:", bcast.Msg().Template)
 			fmt.Println(" --------------------> Template Locale:", bcast.Msg().Template.Locale)
-			localeTemplate := strings.TrimSpace(bcast.Msg().Template.Locale)
-			if localeTemplate != "" {
-				fmt.Println(" --------------------> localeTemplate:", localeTemplate)
-				templateLocale, err := envs.FromBCP47(localeTemplate)
+			fmt.Println(" --------------------> templateLocale:", templateLocale)
+			if templateLocale != "" {
+				templateLocale, err := envs.FromBCP47(templateLocale)
 				fmt.Println(" --------------------> templateLocale:", templateLocale, "err:", err)
 				if err == nil && templateLocale != envs.NilLocale {
 					fmt.Println(" --------------------> Adding templateLocale to locales")
