@@ -79,7 +79,7 @@ func handleEventCallback(ctx context.Context, rt *runtime.Runtime, r *http.Reque
 	switch request.EventType {
 	case "onMessageSent":
 		if request.ClientIdentity != identity && request.From != identity { // prevent echo message
-			_, err = tickets.SendReply(ctx, rt, ticket, request.Body, []*tickets.File{})
+			_, err = tickets.SendReply(ctx, rt, ticket, request.Body, []*tickets.File{}, map[string]interface{}{})
 			if err != nil {
 				return err, http.StatusBadRequest, nil
 			}
@@ -104,7 +104,7 @@ func handleEventCallback(ctx context.Context, rt *runtime.Runtime, r *http.Reque
 				return errors.Wrapf(err, "error fetching ticket file '%s'", mediaContent.Links.ContentDirectTemporary), http.StatusBadRequest, nil
 			}
 			file.ContentType = mediaContent.ContentType
-			_, err = tickets.SendReply(ctx, rt, ticket, request.Body, []*tickets.File{file})
+			_, err = tickets.SendReply(ctx, rt, ticket, request.Body, []*tickets.File{file}, nil)
 			if err != nil {
 				return err, http.StatusBadRequest, nil
 			}

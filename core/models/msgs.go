@@ -340,7 +340,7 @@ func GetWppMsgRepetitions(rp *redis.Pool, contactID ContactID, msg *flows.MsgWpp
 
 // NewOutgoingFlowMsg creates an outgoing message for the passed in flow message
 func NewOutgoingFlowMsg(rt *runtime.Runtime, org *Org, channel *Channel, session *Session, out *flows.MsgOut, createdOn time.Time) (*Msg, error) {
-	return newOutgoingMsg(rt, org, channel, session.ContactID(), out, createdOn, session, NilBroadcastID)
+	return newOutgoingMsg(rt, org, channel, session.ContactID(), out, createdOn, session, NilBroadcastID, nil)
 }
 
 // NewOutgoingFlowMsgCatalog creates an outgoing message for the passed in flow message
@@ -354,8 +354,8 @@ func NewOutgoingFlowMsgWpp(rt *runtime.Runtime, org *Org, channel *Channel, sess
 }
 
 // NewOutgoingBroadcastMsg creates an outgoing message which is part of a broadcast
-func NewOutgoingBroadcastMsg(rt *runtime.Runtime, org *Org, channel *Channel, contactID ContactID, out *flows.MsgOut, createdOn time.Time, broadcastID BroadcastID) (*Msg, error) {
-	return newOutgoingMsg(rt, org, channel, contactID, out, createdOn, nil, broadcastID)
+func NewOutgoingBroadcastMsg(rt *runtime.Runtime, org *Org, channel *Channel, contactID ContactID, out *flows.MsgOut, createdOn time.Time, broadcastID BroadcastID, extraMetadata map[string]interface{}) (*Msg, error) {
+	return newOutgoingMsg(rt, org, channel, contactID, out, createdOn, nil, broadcastID, extraMetadata)
 }
 
 func NewOutgoingWppBroadcastMsg(rt *runtime.Runtime, org *Org, channel *Channel, contactID ContactID, out *flows.MsgWppOut, createdOn time.Time, broadcastID BroadcastID) (*Msg, error) {
@@ -363,11 +363,11 @@ func NewOutgoingWppBroadcastMsg(rt *runtime.Runtime, org *Org, channel *Channel,
 }
 
 // NewOutgoingMsg creates an outgoing message that does not belong to any flow or broadcast, it's used to the a direct message to the contact
-func NewOutgoingMsg(rt *runtime.Runtime, org *Org, channel *Channel, contactID ContactID, out *flows.MsgOut, createdOn time.Time) (*Msg, error) {
-	return newOutgoingMsg(rt, org, channel, contactID, out, createdOn, nil, NilBroadcastID)
+func NewOutgoingMsg(rt *runtime.Runtime, org *Org, channel *Channel, contactID ContactID, out *flows.MsgOut, createdOn time.Time, extraMetadata map[string]interface{}) (*Msg, error) {
+	return newOutgoingMsg(rt, org, channel, contactID, out, createdOn, nil, NilBroadcastID, extraMetadata)
 }
 
-func newOutgoingMsg(rt *runtime.Runtime, org *Org, channel *Channel, contactID ContactID, out *flows.MsgOut, createdOn time.Time, session *Session, broadcastID BroadcastID) (*Msg, error) {
+func newOutgoingMsg(rt *runtime.Runtime, org *Org, channel *Channel, contactID ContactID, out *flows.MsgOut, createdOn time.Time, session *Session, broadcastID BroadcastID, extraMetadata map[string]interface{}) (*Msg, error) {
 	msg := &Msg{}
 	m := &msg.m
 	m.UUID = out.UUID()
@@ -446,6 +446,13 @@ func newOutgoingMsg(rt *runtime.Runtime, org *Org, channel *Channel, contactID C
 			metadata["text_language"] = out.TextLanguage
 		}
 		m.Metadata = null.NewMap(metadata)
+	}
+
+	if extraMetadata != nil {
+		if len(m.Metadata.Map()) > 0 {
+			extraMetadata = MergeMaps(extraMetadata, m.Metadata.Map())
+		}
+		m.Metadata = null.NewMap(extraMetadata)
 	}
 
 	// if we're sending to a phone, message may have to be sent in multiple parts
@@ -1250,7 +1257,7 @@ func (b *BroadcastBatch) SetIsLast(last bool)          { b.b.IsLast = last }
 func (b *BroadcastBatch) MarshalJSON() ([]byte, error)    { return json.Marshal(b.b) }
 func (b *BroadcastBatch) UnmarshalJSON(data []byte) error { return json.Unmarshal(data, &b.b) }
 
-func CreateBroadcastMessages(ctx context.Context, rt *runtime.Runtime, oa *OrgAssets, bcast *BroadcastBatch) ([]*Msg, error) {
+func CreateBroadcastMessages(ctx context.Context, rt *runtime.Runtime, oa *OrgAssets, bcast *BroadcastBatch, extraMetadata map[string]interface{}) ([]*Msg, error) {
 	repeatedContacts := make(map[ContactID]bool)
 	broadcastURNs := bcast.URNs()
 
@@ -1396,7 +1403,7 @@ func CreateBroadcastMessages(ctx context.Context, rt *runtime.Runtime, oa *OrgAs
 
 		// create our outgoing message
 		out := flows.NewMsgOut(urn, channel.ChannelReference(), text, t.Attachments, t.QuickReplies, nil, flows.NilMsgTopic)
-		msg, err := NewOutgoingBroadcastMsg(rt, oa.Org(), channel, c.ID(), out, time.Now(), bcast.BroadcastID())
+		msg, err := NewOutgoingBroadcastMsg(rt, oa.Org(), channel, c.ID(), out, time.Now(), bcast.BroadcastID(), extraMetadata)
 		if err != nil {
 			return nil, errors.Wrapf(err, "error creating outgoing message")
 		}
@@ -2001,7 +2008,7 @@ func CreateOutgoingMessages(ctx context.Context, rt *runtime.Runtime, oa *OrgAss
 
 		// create our outgoing message
 		out := flows.NewMsgOut(urn, channel.ChannelReference(), msgText, nil, nil, nil, flows.NilMsgTopic)
-		msg, err := NewOutgoingMsg(rt, oa.Org(), channel, c.ID(), out, time.Now())
+		msg, err := NewOutgoingMsg(rt, oa.Org(), channel, c.ID(), out, time.Now(), nil)
 		if err != nil {
 			return nil, errors.Wrapf(err, "error creating outgoing message")
 		}
