@@ -1464,6 +1464,7 @@ type WppBroadcastTemplate struct {
 	UUID      assets.TemplateUUID `json:"uuid" validate:"required,uuid"`
 	Name      string              `json:"name" validate:"required"`
 	Variables []string            `json:"variables,omitempty"`
+	Locale    string              `json:"locale,omitempty" validate:"omitempty,bcp47"`
 }
 
 type WppBroadcastMessageHeader struct {
@@ -1660,6 +1661,7 @@ func CreateWppBroadcastMessages(ctx context.Context, rt *runtime.Runtime, oa *Or
 		var templating *flows.MsgTemplating = nil
 		templateVariables := make([]string, len(bcast.Msg().Template.Variables))
 		copy(templateVariables, bcast.Msg().Template.Variables)
+		templateLocale := bcast.Msg().Template.Locale
 
 		ctaMessage := bcast.Msg().CTAMessage
 		listMessage := bcast.Msg().ListMessage
@@ -1695,6 +1697,9 @@ func CreateWppBroadcastMessages(ctx context.Context, rt *runtime.Runtime, oa *Or
 			quickReplies[i], _ = excellent.EvaluateTemplate(oa.Env(), evaluationCtx, qr, nil)
 		}
 
+		//evaluate our template locale
+		templateLocale, _ = excellent.EvaluateTemplate(oa.Env(), evaluationCtx, templateLocale, nil)
+
 		// evaluate our template
 		if bcast.Msg().Template.UUID != "" {
 			// load our template
@@ -1714,6 +1719,14 @@ func CreateWppBroadcastMessages(ctx context.Context, rt *runtime.Runtime, oa *Or
 				contact.Locale(oa.Env()),
 				oa.Env().DefaultLocale(),
 			}
+
+			if templateLocale != "" {
+				parsedLocale, _ := envs.FromBCP47(templateLocale)
+				if parsedLocale != envs.NilLocale {
+					locales = append([]envs.Locale{parsedLocale}, locales...)
+				}
+			}
+
 			translation := oa.SessionAssets().Templates().FindTranslation(bcast.Msg().Template.UUID, channel.ChannelReference(), locales)
 			if translation != nil {
 				// evaluate our variables

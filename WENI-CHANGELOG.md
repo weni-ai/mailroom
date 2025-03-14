@@ -1,3 +1,7 @@
+1.53.0
+----------
+ * Add locale field to templates in broadcast messages
+
 1.52.0
 ----------
  * twillio-flex use the match of contactID and ticketUUID as identity for user
