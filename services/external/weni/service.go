@@ -184,7 +184,7 @@ func (s *service) Call(session flows.Session, params assets.MsgCatalogParam, log
 	if postalCode_ != "" && sellerID != "1" {
 		var tracesSimulation []*httpx.Trace
 		hasSimulation = true
-		existingProductsIds, tracesSimulation, err = CartSimulation(callResult.ProductRetailerIDS, sellerID, params.SearchUrl, postalCode_)
+		existingProductsIds, tracesSimulation, err = CartSimulation(callResult.ProductRetailerIDS, sellerID, params.SearchUrl, postalCode_, params.CartSimulationParams)
 		callResult.Traces = append(callResult.Traces, tracesSimulation...)
 		if err != nil {
 			return callResult, err
@@ -649,7 +649,7 @@ func VtexSponsoredSearch(searchUrl string, productSearch string, hideUnavailable
 
 }
 
-func CartSimulation(ProductRetailerIDS []flows.ProductEntry, sellerID string, url string, postalCode string) ([]string, []*httpx.Trace, error) {
+func CartSimulation(ProductRetailerIDS []flows.ProductEntry, sellerID string, url string, postalCode string, params string) ([]string, []*httpx.Trace, error) {
 	const batchSize = 300
 	var traces []*httpx.Trace
 	var availableProducts []string
@@ -659,6 +659,13 @@ func CartSimulation(ProductRetailerIDS []flows.ProductEntry, sellerID string, ur
 
 	urlSplit := strings.Split(url, "api")
 	urlSimulation := urlSplit[0] + "api/checkout/pub/orderForms/simulation"
+	if params != "" {
+		params, err := validateParams(params)
+		if err != nil {
+			return nil, traces, err
+		}
+		urlSimulation += params
+	}
 
 	for _, p := range ProductRetailerIDS {
 		products = append(products, p.ProductRetailerIDs...)
@@ -693,6 +700,29 @@ func CartSimulation(ProductRetailerIDS []flows.ProductEntry, sellerID string, ur
 	}
 
 	return availableProducts, traces, nil
+}
+
+func validateParams(params string) (string, error) {
+	// Verify if params starts with '?
+	if !strings.HasPrefix(params, "?") {
+
+		params = "?" + params
+		fmt.Println("params", params)
+	}
+	// Verify if params is in the correct format
+	if strings.Contains(params, "=") {
+		// Check if params has multiple parameters
+		pairs := strings.Split(params, "&")
+		for _, pair := range pairs {
+			// Verify each parameter has key=value format
+			if !strings.Contains(pair, "=") {
+				return "", errors.New("invalid parameter format - must be key=value")
+			}
+		}
+	} else {
+		return "", errors.New("invalid parameter format - must contain key=value pairs")
+	}
+	return params, nil
 }
 
 func sendBatchRequest(body SearchSeller, url string) ([]string, *httpx.Trace, error) {

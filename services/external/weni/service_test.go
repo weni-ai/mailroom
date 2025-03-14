@@ -168,7 +168,7 @@ func setupMocks() {
 								]
 							}`),
 		},
-		"https://vtex.com.br/intelligent/searchapi/checkout/pub/orderForms/simulation": {
+		"https://vtex.com.br/intelligent/searchapi/checkout/pub/orderForms/simulation?test=test&test2=test2": {
 			createMockResponse(`{
 				"items": [
 					{
@@ -252,13 +252,14 @@ func TestService(t *testing.T) {
 	assert.NotNil(t, call.Traces)
 
 	params = assets.MsgCatalogParam{
-		ProductSearch: "",
-		ChannelUUID:   uuids.UUID(testdata.TwilioChannel.UUID),
-		SearchType:    "vtex",
-		SearchUrl:     "https://vtex.com.br/intelligent/search",
-		ApiType:       "intelligent",
-		PostalCode:    "000000-000",
-		SellerId:      "10",
+		ProductSearch:        "",
+		ChannelUUID:          uuids.UUID(testdata.TwilioChannel.UUID),
+		SearchType:           "vtex",
+		SearchUrl:            "https://vtex.com.br/intelligent/search",
+		ApiType:              "intelligent",
+		PostalCode:           "000000-000",
+		SellerId:             "10",
+		CartSimulationParams: "test=test&test2=test2",
 	}
 	call, err = svc.Call(session, params, logger.Log)
 	assert.NoError(t, err)
