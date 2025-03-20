@@ -1,3 +1,7 @@
+1.54.0
+----------
+ * feat: support url parameters for cart simulation
+
 1.53.0
 ----------
  * Add locale field to templates in broadcast messages
