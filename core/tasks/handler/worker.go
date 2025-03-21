@@ -603,6 +603,7 @@ func handleMsgEvent(ctx context.Context, rt *runtime.Runtime, event *MsgEvent) e
 	msgIn.SetID(event.MsgID)
 	var order *flows.Order
 	var nfmReply *flows.NFMReply
+	var igComment *flows.IGComment
 	if event.Metadata != nil {
 		var metadata map[string]interface{}
 		err := json.Unmarshal(event.Metadata, &metadata)
@@ -622,8 +623,8 @@ func handleMsgEvent(ctx context.Context, rt *runtime.Runtime, event *MsgEvent) e
 			}
 			msgIn.SetOrder(order)
 		}
-		mdValue, ok := metadata["nfm_reply"]
-		if ok {
+		mdValue, isNFMReply := metadata["nfm_reply"]
+		if isNFMReply {
 			asJSON, err := json.Marshal(mdValue)
 			if err != nil {
 				log.WithError(err).Error("unable to marshal metadata from msg event")
@@ -633,6 +634,18 @@ func handleMsgEvent(ctx context.Context, rt *runtime.Runtime, event *MsgEvent) e
 				log.WithError(err).Error("unable to unmarshal orderJSON from metadata[\"nfm_reply\"]")
 			}
 			msgIn.SetNFMReply(nfmReply)
+		}
+		mdValue, isIGComment := metadata["ig_comment"]
+		if isIGComment {
+			asJSON, err := json.Marshal(mdValue)
+			if err != nil {
+				log.WithError(err).Error("unable to marshal metadata from msg event")
+			}
+			err = json.Unmarshal(asJSON, &igComment)
+			if err != nil {
+				log.WithError(err).Error("unable to unmarshal orderJSON from metadata[\"ig_comment\"]")
+			}
+			msgIn.SetIGComment(igComment)
 		}
 	}
 
@@ -978,7 +991,6 @@ func mapContactFields(contact *flows.Contact) map[string]interface{} {
 			contactFields[key] = nil
 			continue
 		}
-
 
 		contactFields[key] = struct {
 			Value interface{} `json:"value"`
