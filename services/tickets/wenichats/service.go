@@ -85,6 +85,7 @@ func NewService(rtCfg *runtime.Config, httpClient *http.Client, httpRetries *htt
 }
 
 func (s *service) Open(session flows.Session, topic *flows.Topic, body string, assignee *flows.User, logHTTP flows.HTTPLogCallback) (*flows.Ticket, error) {
+	time.Sleep(time.Second * 3)
 	ticket := flows.OpenTicket(s.ticketer, topic, body, assignee)
 	contact := session.Contact()
 
@@ -165,11 +166,10 @@ func (s *service) Open(session flows.Session, topic *flows.Topic, body string, a
 		}
 	} else {
 		// get messages for history, based on first session run start time
-		startMargin := -time.Second * 1
 		if len(session.Runs()) > 0 {
-			after = session.Runs()[0].CreatedOn().Add(startMargin)
+			after = session.Runs()[0].CreatedOn().Add(-time.Second * 1)
 		} else {
-			after = time.Now().Add(startMargin)
+			after = time.Now().Add(-time.Second * 4)
 		}
 	}
 
