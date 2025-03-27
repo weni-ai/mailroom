@@ -1,9 +1,9 @@
 POST /v1/external/rooms/ HTTP/1.1
 Host: chats-engine.dev.cloud.weni.ai
 User-Agent: Go-http-client/1.1
-Content-Length: 638
+Content-Length: 884
 Authorization: Bearer ****************
 Content-Type: application/json
 Accept-Encoding: gzip
 
-{"ticket_uuid":"e7187099-7d38-4f60-955c-325957214c42","queue_uuid":"5c85fdf7-d54a-49dd-97ed-7e10077a1f6a","sector_uuid":"1a4bae05-993c-4f3b-91b5-80f4e09951f2","contact":{"external_id":"5d76d86b-3bb9-4d5a-b822-c9d86f5d8e4f","name":"Ryan Lewis","urn":"tel:+12024561111?channel=57f1078f-88aa-46f4-a59a-948a5739c03d","groups":[{"uuid":"b7cf0d83-f1c9-411c-96fd-c511a4cfa86d","name":"Testers"},{"uuid":"4f1f98fc-27a7-4a69-bbdb-24744ba739a9","name":"Males"}]},"custom_fields":{"country":"brazil","mood":"angry"},"flow_uuid":"50c3706e-fedb-42c0-8eab-dda3335714b7","project_info":{"uuid":"8a4bae05-993c-4f3b-91b5-80f4e09951f2","name":"Project 1"}}
+{"ticket_uuid":"e7187099-7d38-4f60-955c-325957214c42","queue_uuid":"5c85fdf7-d54a-49dd-97ed-7e10077a1f6a","sector_uuid":"1a4bae05-993c-4f3b-91b5-80f4e09951f2","contact":{"external_id":"5d76d86b-3bb9-4d5a-b822-c9d86f5d8e4f","name":"Ryan Lewis","urn":"tel:+12024561111?channel=57f1078f-88aa-46f4-a59a-948a5739c03d","groups":[{"uuid":"b7cf0d83-f1c9-411c-96fd-c511a4cfa86d","name":"Testers"},{"uuid":"4f1f98fc-27a7-4a69-bbdb-24744ba739a9","name":"Males"}]},"custom_fields":{"country":"brazil","mood":"angry"},"callback_url":"https:///mr/tickets/types/wenichats/event_callback/1ae96956-4b34-433e-8d1a-f05fe6923d6d/e7187099-7d38-4f60-955c-325957214c42","flow_uuid":"50c3706e-fedb-42c0-8eab-dda3335714b7","project_info":{"uuid":"8a4bae05-993c-4f3b-91b5-80f4e09951f2","name":"Project 1"},"history":[{"text":"ahoy","direction":"incoming","attachments":[],"created_on":"2019-10-07T15:21:30Z"}]}
