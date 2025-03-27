@@ -7,12 +7,6 @@
           "status": 200,
           "body": "{\"uuid\":\"8ecb1e4a-b457-4645-a161-e2b02ddffa88\"}"
         }
-      ],
-      "https://chats-engine.dev.cloud.weni.ai/v1/external/rooms/8ecb1e4a-b457-4645-a161-e2b02ddffa88/": [
-        {
-          "status": 200,
-          "body": "{\"uuid\":\"8ecb1e4a-b457-4645-a161-e2b02ddffa88\"}"
-        }
       ]
     },
     "method": "POST",
@@ -58,12 +52,6 @@
           "status": 200,
           "body": "{\"uuid\":\"8ecb1e4a-b457-4645-a161-e2b02ddffa88\"}"
         }
-      ],
-      "https://chats-engine.dev.cloud.weni.ai/v1/external/rooms/8ecb1e4a-b457-4645-a161-e2b02ddffa88/": [
-        {
-          "status": 200,
-          "body": "{\"uuid\":\"8ecb1e4a-b457-4645-a161-e2b02ddffa88\"}"
-        }
       ]
     },
     "method": "POST",
@@ -101,12 +89,6 @@
     "label": "open ticket with history_after",
     "http_mocks": {
       "https://chats-engine.dev.cloud.weni.ai/v1/external/rooms/": [
-        {
-          "status": 200,
-          "body": "{\"uuid\":\"8ecb1e4a-b457-4645-a161-e2b02ddffa88\"}"
-        }
-      ],
-      "https://chats-engine.dev.cloud.weni.ai/v1/external/rooms/8ecb1e4a-b457-4645-a161-e2b02ddffa88/": [
         {
           "status": 200,
           "body": "{\"uuid\":\"8ecb1e4a-b457-4645-a161-e2b02ddffa88\"}"
