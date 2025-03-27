@@ -127,7 +127,7 @@ func (c *Client) CloseRoom(roomUUID string) (*RoomResponse, *httpx.Trace, error)
 }
 
 func (c *Client) SendHistoryBatch(roomUUID string, history []HistoryMessage) (*httpx.Trace, error) {
-	url := fmt.Sprintf("%s/rooms/%s/history", c.baseURL, roomUUID)
+	url := fmt.Sprintf("%s/rooms/%s/history/", c.baseURL, roomUUID)
 	return c.post(url, history, nil)
 }
 
