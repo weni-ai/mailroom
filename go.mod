@@ -79,4 +79,4 @@ go 1.23
 
 replace github.com/nyaruka/gocommon => github.com/Ilhasoft/gocommon v1.16.2-weni
 
-replace github.com/nyaruka/goflow => github.com/weni-ai/goflow v1.10.0-a1-dev
+replace github.com/nyaruka/goflow => github.com/weni-ai/goflow v1.10.0-a2-dev
