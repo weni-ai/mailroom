@@ -430,7 +430,7 @@ func newOutgoingMsg(rt *runtime.Runtime, org *Org, channel *Channel, contactID C
 	}
 
 	// populate metadata if we have any
-	if len(out.QuickReplies()) > 0 || out.Templating() != nil || out.Topic() != flows.NilMsgTopic || out.TextLanguage != "" || out.IGComment() != "" || out.IGResponseType() != "" {
+	if len(out.QuickReplies()) > 0 || out.Templating() != nil || out.Topic() != flows.NilMsgTopic || out.TextLanguage != "" || out.IGCommentID() != "" || out.IGResponseType() != "" {
 		metadata := make(map[string]interface{})
 		if len(out.QuickReplies()) > 0 {
 			metadata["quick_replies"] = out.QuickReplies()
@@ -445,8 +445,8 @@ func newOutgoingMsg(rt *runtime.Runtime, org *Org, channel *Channel, contactID C
 		if out.TextLanguage != "" {
 			metadata["text_language"] = out.TextLanguage
 		}
-		if out.IGComment() != "" {
-			metadata["ig_comment"] = out.IGComment()
+		if out.IGCommentID() != "" {
+			metadata["ig_comment_id"] = out.IGCommentID()
 		}
 		if out.IGResponseType() != "" {
 			metadata["ig_response_type"] = out.IGResponseType()
