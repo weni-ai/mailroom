@@ -22,6 +22,7 @@ import (
 	"github.com/nyaruka/goflow/utils"
 	"github.com/nyaruka/mailroom/core/models"
 	"github.com/nyaruka/mailroom/runtime"
+	"github.com/nyaruka/null"
 )
 
 const (
@@ -193,7 +194,7 @@ func (s *service) Open(session flows.Session, topic *flows.Topic, body string, a
 	return ticket, nil
 }
 
-func (s *service) Forward(ticket *models.Ticket, msgUUID flows.MsgUUID, text string, attachments []utils.Attachment, metadata json.RawMessage, logHTTP flows.HTTPLogCallback) error {
+func (s *service) Forward(ticket *models.Ticket, msgUUID flows.MsgUUID, text string, attachments []utils.Attachment, metadata json.RawMessage, msgExternalID null.String, logHTTP flows.HTTPLogCallback) error {
 	identity := fmt.Sprint(ticket.ContactID())
 
 	if len(attachments) > 0 {

@@ -23,6 +23,7 @@ import (
 	"github.com/nyaruka/goflow/utils"
 	"github.com/nyaruka/mailroom/core/models"
 	"github.com/nyaruka/mailroom/runtime"
+	"github.com/nyaruka/null"
 )
 
 const (
@@ -258,7 +259,7 @@ func parseMsgAttachments(atts []utils.Attachment) []Attachment {
 	return msgAtts
 }
 
-func (s *service) Forward(ticket *models.Ticket, msgUUID flows.MsgUUID, text string, attachments []utils.Attachment, metadata json.RawMessage, logHTTP flows.HTTPLogCallback) error {
+func (s *service) Forward(ticket *models.Ticket, msgUUID flows.MsgUUID, text string, attachments []utils.Attachment, metadata json.RawMessage, msgExternalID null.String, logHTTP flows.HTTPLogCallback) error {
 	roomUUID := string(ticket.ExternalID())
 
 	msg := &MessageRequest{
@@ -267,6 +268,7 @@ func (s *service) Forward(ticket *models.Ticket, msgUUID flows.MsgUUID, text str
 		Direction:   "incoming",
 		CreatedOn:   dates.Now(),
 		Metadata:    metadata,
+		ExternalID:  msgExternalID,
 	}
 
 	if len(attachments) != 0 {

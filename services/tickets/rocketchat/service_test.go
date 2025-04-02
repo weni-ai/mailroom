@@ -18,6 +18,7 @@ import (
 	"github.com/nyaruka/mailroom/services/tickets/rocketchat"
 	"github.com/nyaruka/mailroom/testsuite"
 	"github.com/nyaruka/mailroom/testsuite/testdata"
+	"github.com/nyaruka/null"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -93,7 +94,7 @@ func TestOpenAndForward(t *testing.T) {
 		"contact-display": "Cathy",
 	})
 	logger = &flows.HTTPLogger{}
-	err = svc.Forward(dbTicket, flows.MsgUUID("4fa340ae-1fb0-4666-98db-2177fe9bf31c"), "It's urgent", nil, nil, logger.Log)
+	err = svc.Forward(dbTicket, flows.MsgUUID("4fa340ae-1fb0-4666-98db-2177fe9bf31c"), "It's urgent", nil, nil, null.NullString, logger.Log)
 	assert.EqualError(t, err, "error calling RocketChat: unable to connect to server")
 
 	logger = &flows.HTTPLogger{}
@@ -102,7 +103,7 @@ func TestOpenAndForward(t *testing.T) {
 		"video/mp4:https://link.to/video.mp4",
 		"audio/ogg:https://link.to/audio.ogg",
 	}
-	err = svc.Forward(dbTicket, flows.MsgUUID("4fa340ae-1fb0-4666-98db-2177fe9bf31c"), "It's urgent", attachments, nil, logger.Log)
+	err = svc.Forward(dbTicket, flows.MsgUUID("4fa340ae-1fb0-4666-98db-2177fe9bf31c"), "It's urgent", attachments, nil, null.NullString, logger.Log)
 	require.NoError(t, err)
 	assert.Equal(t, 1, len(logger.Logs))
 	test.AssertSnapshot(t, "forward_message", logger.Logs[0].Request)
