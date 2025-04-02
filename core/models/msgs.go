@@ -430,7 +430,7 @@ func newOutgoingMsg(rt *runtime.Runtime, org *Org, channel *Channel, contactID C
 	}
 
 	// populate metadata if we have any
-	if len(out.QuickReplies()) > 0 || out.Templating() != nil || out.Topic() != flows.NilMsgTopic || out.TextLanguage != "" {
+	if len(out.QuickReplies()) > 0 || out.Templating() != nil || out.Topic() != flows.NilMsgTopic || out.TextLanguage != "" || out.IGCommentID() != "" || out.IGResponseType() != "" {
 		metadata := make(map[string]interface{})
 		if len(out.QuickReplies()) > 0 {
 			metadata["quick_replies"] = out.QuickReplies()
@@ -445,6 +445,16 @@ func newOutgoingMsg(rt *runtime.Runtime, org *Org, channel *Channel, contactID C
 		if out.TextLanguage != "" {
 			metadata["text_language"] = out.TextLanguage
 		}
+		if out.IGCommentID() != "" {
+			metadata["ig_comment_id"] = out.IGCommentID()
+		}
+		if out.IGResponseType() != "" {
+			metadata["ig_response_type"] = out.IGResponseType()
+		}
+		if out.IGTag() != "" {
+			metadata["ig_tag"] = out.IGTag()
+		}
+
 		m.Metadata = null.NewMap(metadata)
 	}
 
@@ -1402,7 +1412,7 @@ func CreateBroadcastMessages(ctx context.Context, rt *runtime.Runtime, oa *OrgAs
 		}
 
 		// create our outgoing message
-		out := flows.NewMsgOut(urn, channel.ChannelReference(), text, t.Attachments, t.QuickReplies, nil, flows.NilMsgTopic)
+		out := flows.NewMsgOut(urn, channel.ChannelReference(), text, t.Attachments, t.QuickReplies, nil, flows.NilMsgTopic, "", "", "")
 		msg, err := NewOutgoingBroadcastMsg(rt, oa.Org(), channel, c.ID(), out, time.Now(), bcast.BroadcastID(), extraMetadata)
 		if err != nil {
 			return nil, errors.Wrapf(err, "error creating outgoing message")
@@ -1727,19 +1737,12 @@ func CreateWppBroadcastMessages(ctx context.Context, rt *runtime.Runtime, oa *Or
 				oa.Env().DefaultLocale(),
 			}
 
-			fmt.Println(" --------------------> Full Broadcast Message:", bcast.b)
-			fmt.Println(" --------------------> Template:", bcast.Msg().Template)
-			fmt.Println(" --------------------> Template Locale:", bcast.Msg().Template.Locale)
-			fmt.Println(" --------------------> templateLocale:", templateLocale)
 			if templateLocale != "" {
-				templateLocale, err := envs.FromBCP47(templateLocale)
-				fmt.Println(" --------------------> templateLocale:", templateLocale, "err:", err)
-				if err == nil && templateLocale != envs.NilLocale {
-					fmt.Println(" --------------------> Adding templateLocale to locales")
-					locales = append([]envs.Locale{templateLocale}, locales...)
+				parsedLocale, _ := envs.FromBCP47(templateLocale)
+				if parsedLocale != envs.NilLocale {
+					locales = append([]envs.Locale{parsedLocale}, locales...)
 				}
 			}
-			fmt.Println(" --------------------> Final locales:", locales)
 
 			translation := oa.SessionAssets().Templates().FindTranslation(bcast.Msg().Template.UUID, channel.ChannelReference(), locales)
 			if translation != nil {
@@ -2007,7 +2010,7 @@ func CreateOutgoingMessages(ctx context.Context, rt *runtime.Runtime, oa *OrgAss
 		}
 
 		// create our outgoing message
-		out := flows.NewMsgOut(urn, channel.ChannelReference(), msgText, nil, nil, nil, flows.NilMsgTopic)
+		out := flows.NewMsgOut(urn, channel.ChannelReference(), msgText, nil, nil, nil, flows.NilMsgTopic, "", "", "")
 		msg, err := NewOutgoingMsg(rt, oa.Org(), channel, c.ID(), out, time.Now(), nil)
 		if err != nil {
 			return nil, errors.Wrapf(err, "error creating outgoing message")

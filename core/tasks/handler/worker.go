@@ -603,6 +603,8 @@ func handleMsgEvent(ctx context.Context, rt *runtime.Runtime, event *MsgEvent) e
 	msgIn.SetID(event.MsgID)
 	var order *flows.Order
 	var nfmReply *flows.NFMReply
+	var igComment *flows.IGComment
+	var isIGComment bool
 	if event.Metadata != nil {
 		var metadata map[string]interface{}
 		err := json.Unmarshal(event.Metadata, &metadata)
@@ -622,8 +624,8 @@ func handleMsgEvent(ctx context.Context, rt *runtime.Runtime, event *MsgEvent) e
 			}
 			msgIn.SetOrder(order)
 		}
-		mdValue, ok := metadata["nfm_reply"]
-		if ok {
+		mdValue, isNFMReply := metadata["nfm_reply"]
+		if isNFMReply {
 			asJSON, err := json.Marshal(mdValue)
 			if err != nil {
 				log.WithError(err).Error("unable to marshal metadata from msg event")
@@ -633,6 +635,18 @@ func handleMsgEvent(ctx context.Context, rt *runtime.Runtime, event *MsgEvent) e
 				log.WithError(err).Error("unable to unmarshal orderJSON from metadata[\"nfm_reply\"]")
 			}
 			msgIn.SetNFMReply(nfmReply)
+		}
+		mdValue, isIGComment = metadata["ig_comment"]
+		if isIGComment {
+			asJSON, err := json.Marshal(mdValue)
+			if err != nil {
+				log.WithError(err).Error("unable to marshal metadata from msg event")
+			}
+			err = json.Unmarshal(asJSON, &igComment)
+			if err != nil {
+				log.WithError(err).Error("unable to unmarshal orderJSON from metadata[\"ig_comment\"]")
+			}
+			msgIn.SetIGComment(igComment)
 		}
 	}
 
@@ -647,9 +661,15 @@ func handleMsgEvent(ctx context.Context, rt *runtime.Runtime, event *MsgEvent) e
 		return markMsgHandled(ctx, tx, contact, msgIn, models.MsgTypeFlow, topupID, tickets)
 	}
 
+	// check whether it is to direct to the brain or not
+	isBrain := false
+	if oa.Org().BrainOn() && !isIGComment {
+		isBrain = true
+	}
+
 	// we found a trigger and their session is nil or doesn't ignore keywords
 	if ((trigger != nil && trigger.TriggerType() != models.CatchallTriggerType && (flow == nil || !flow.IgnoreTriggers())) ||
-		(trigger != nil && trigger.TriggerType() == models.CatchallTriggerType && (flow == nil))) && !oa.Org().BrainOn() {
+		(trigger != nil && trigger.TriggerType() == models.CatchallTriggerType && (flow == nil))) && !isBrain {
 		// load our flow
 		flow, err := oa.FlowByID(trigger.FlowID())
 		if err != nil && err != models.ErrNotFound {
@@ -702,7 +722,7 @@ func handleMsgEvent(ctx context.Context, rt *runtime.Runtime, event *MsgEvent) e
 		return nil
 	}
 
-	if oa.Org().BrainOn() && len(tickets) == 0 {
+	if isBrain && len(tickets) == 0 {
 		db := rt.ReadonlyDB
 		var projectUUID uuids.UUID
 		err := db.GetContext(ctx, &projectUUID, `SELECT project_uuid FROM internal_project WHERE org_ptr_id = $1;`, oa.OrgID())
@@ -978,7 +998,6 @@ func mapContactFields(contact *flows.Contact) map[string]interface{} {
 			contactFields[key] = nil
 			continue
 		}
-
 
 		contactFields[key] = struct {
 			Value interface{} `json:"value"`
