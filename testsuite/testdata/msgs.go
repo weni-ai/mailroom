@@ -55,7 +55,7 @@ func insertOutgoingMsg(db *sqlx.DB, org *Org, channel *Channel, contact *Contact
 		channelID = channel.ID
 	}
 
-	msg := flows.NewMsgOut(contact.URN, channelRef, text, attachments, nil, nil, flows.NilMsgTopic)
+	msg := flows.NewMsgOut(contact.URN, channelRef, text, attachments, nil, nil, flows.NilMsgTopic, "", "", "")
 
 	var sentOn *time.Time
 	if status == models.MsgStatusWired || status == models.MsgStatusSent || status == models.MsgStatusDelivered {
