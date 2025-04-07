@@ -1,3 +1,7 @@
+1.55.0
+----------
+ * Add support for Instagram replies: comments, by tag and private reply
+
 1.54.0
 ----------
  * feat: support url parameters for cart simulation

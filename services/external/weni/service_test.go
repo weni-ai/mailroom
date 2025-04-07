@@ -224,7 +224,7 @@ func TestService(t *testing.T) {
 	logger := &flows.HTTPLogger{}
 
 	params := assets.MsgCatalogParam{
-		ProductSearch: "",
+		ProductSearch: "banana",
 		ChannelUUID:   uuids.UUID(testdata.TwilioChannel.UUID),
 		SearchType:    "default",
 		SearchUrl:     "",
@@ -236,9 +236,10 @@ func TestService(t *testing.T) {
 	assert.NotNil(t, call)
 	assert.Equal(t, "p1", call.ProductRetailerIDS[0].ProductRetailerIDs[0])
 	assert.NotNil(t, call.Traces)
+	assert.Equal(t, []string{"banana"}, call.SearchKeywords)
 
 	params = assets.MsgCatalogParam{
-		ProductSearch: "",
+		ProductSearch: "banana",
 		ChannelUUID:   uuids.UUID(testdata.TwilioChannel.UUID),
 		SearchType:    "vtex",
 		SearchUrl:     "https://vtex.com.br/legacy/search",
@@ -250,9 +251,9 @@ func TestService(t *testing.T) {
 	assert.NotNil(t, call)
 	assert.Equal(t, "1236", call.ProductRetailerIDS[0].ProductRetailerIDs[0])
 	assert.NotNil(t, call.Traces)
-
+	assert.Equal(t, []string{"banana"}, call.SearchKeywords)
 	params = assets.MsgCatalogParam{
-		ProductSearch:        "",
+		ProductSearch:        "banana",
 		ChannelUUID:          uuids.UUID(testdata.TwilioChannel.UUID),
 		SearchType:           "vtex",
 		SearchUrl:            "https://vtex.com.br/intelligent/search",
@@ -266,6 +267,7 @@ func TestService(t *testing.T) {
 	assert.NotNil(t, call)
 	assert.Equal(t, "1234#10", call.ProductRetailerIDS[0].ProductRetailerIDs[0])
 	assert.NotNil(t, call.Traces)
+	assert.Equal(t, []string{"banana"}, call.SearchKeywords)
 
 	params = assets.MsgCatalogParam{
 		ProductSearch: "",
@@ -281,9 +283,10 @@ func TestService(t *testing.T) {
 	assert.NotNil(t, call)
 	assert.Equal(t, "1234#2", call.ProductRetailerIDS[0].ProductRetailerIDs[0])
 	assert.NotNil(t, call.Traces)
+	assert.Equal(t, []string{"banana"}, call.SearchKeywords)
 
 	params = assets.MsgCatalogParam{
-		ProductSearch: "",
+		ProductSearch: "banana",
 		ChannelUUID:   uuids.UUID(testdata.TwilioChannel.UUID),
 		SearchType:    "vtex",
 		SearchUrl:     "https://vtex.com.br/intelligent/search",
@@ -298,4 +301,5 @@ func TestService(t *testing.T) {
 	assert.NotNil(t, call)
 	assert.Equal(t, "1234#10", call.ProductRetailerIDS[0].ProductRetailerIDs[0])
 	assert.NotNil(t, call.Traces)
+	assert.Equal(t, []string{"banana"}, call.SearchKeywords)
 }
