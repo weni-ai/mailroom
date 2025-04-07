@@ -84,6 +84,7 @@ func (s *service) Call(session flows.Session, params assets.MsgCatalogParam, log
 	extraPrompt := params.ExtraPrompt
 	productList, traceWeniGPT, err := GetProductListFromChatGPT(ctx, s.rtConfig, content, extraPrompt)
 	callResult.Traces = append(callResult.Traces, traceWeniGPT)
+	callResult.SearchKeywords = productList
 	if err != nil {
 		return callResult, err
 	}
@@ -219,6 +220,7 @@ func (s *service) Call(session flows.Session, params assets.MsgCatalogParam, log
 	finalResult := &flows.MsgCatalogCall{}
 	finalResult.Traces = callResult.Traces
 	finalResult.ResponseJSON = callResult.ResponseJSON
+	finalResult.SearchKeywords = callResult.SearchKeywords
 	if hasSponsored {
 		finalResult.ProductRetailerIDS = allProductsSponsored
 	}
@@ -605,7 +607,6 @@ func VtexSponsoredSearch(searchUrl string, productSearch string, hideUnavailable
 
 	parsedURL, err := url.Parse(searchUrl)
 	if err != nil {
-		fmt.Println("Erro ao fazer parse da URL:", err)
 		return nil, nil, err
 	}
 	domain := parsedURL.Host
@@ -705,9 +706,7 @@ func CartSimulation(ProductRetailerIDS []flows.ProductEntry, sellerID string, ur
 func validateParams(params string) (string, error) {
 	// Verify if params starts with '?
 	if !strings.HasPrefix(params, "?") {
-
 		params = "?" + params
-		fmt.Println("params", params)
 	}
 	// Verify if params is in the correct format
 	if strings.Contains(params, "=") {
