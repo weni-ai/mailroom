@@ -301,7 +301,7 @@ func TestSendBatch(t *testing.T) {
 	roomUUID := "8ecb1e4a-b457-4645-a161-e2b02ddffa88"
 	defer httpx.SetRequestor(httpx.DefaultRequestor)
 	httpx.SetRequestor(httpx.NewMockRequestor(map[string][]httpx.MockResponse{
-		fmt.Sprintf("%s/rooms/%s/history", baseURL, roomUUID): {
+		fmt.Sprintf("%s/rooms/%s/history/", baseURL, roomUUID): {
 			httpx.MockConnectionError,
 			httpx.NewMockResponse(400, nil, `{"detail": "Something went wrong"}`),
 			httpx.NewMockResponse(201, nil, `{}`),

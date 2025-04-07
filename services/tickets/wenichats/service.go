@@ -214,6 +214,11 @@ func (s *service) Open(session flows.Session, topic *flows.Topic, body string, a
 		}
 	}
 
+	// add the last batch if it's not empty
+	if len(currentBatch) > 0 {
+		batches = append(batches, currentBatch)
+	}
+
 	var historyMsg []HistoryMessage
 	if len(batches) == 0 {
 		historyMsg = currentBatch
