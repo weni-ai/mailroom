@@ -843,7 +843,8 @@ FROM
 	msgs_msg
 WHERE
 	contact_id = $1 AND
-	created_on >= $2
+	created_on >= $2 AND
+	status != 'F'
 ORDER BY
 	id ASC`
 
