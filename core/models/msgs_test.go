@@ -150,7 +150,7 @@ func TestOutgoingMsgs(t *testing.T) {
 			session.SetIncomingMsg(flows.MsgID(tc.ResponseTo), null.NullString)
 		}
 
-		flowMsg := flows.NewMsgOut(tc.URN, assets.NewChannelReference(tc.ChannelUUID, "Test Channel"), tc.Text, tc.Attachments, tc.QuickReplies, nil, tc.Topic)
+		flowMsg := flows.NewMsgOut(tc.URN, assets.NewChannelReference(tc.ChannelUUID, "Test Channel"), tc.Text, tc.Attachments, tc.QuickReplies, nil, tc.Topic, "", "", "")
 		msg, err := models.NewOutgoingFlowMsg(rt, oa.Org(), channel, session, flowMsg, now)
 
 		if tc.HasError {
@@ -197,7 +197,7 @@ func TestOutgoingMsgs(t *testing.T) {
 
 	// check that msg loop detection triggers after 20 repeats of the same text
 	newOutgoing := func(text string) *models.Msg {
-		flowMsg := flows.NewMsgOut(urns.URN(fmt.Sprintf("tel:+250700000001?id=%d", testdata.Cathy.URNID)), assets.NewChannelReference(testdata.TwilioChannel.UUID, "Twilio"), text, nil, nil, nil, flows.NilMsgTopic)
+		flowMsg := flows.NewMsgOut(urns.URN(fmt.Sprintf("tel:+250700000001?id=%d", testdata.Cathy.URNID)), assets.NewChannelReference(testdata.TwilioChannel.UUID, "Twilio"), text, nil, nil, nil, flows.NilMsgTopic, "", "", "")
 		msg, err := models.NewOutgoingFlowMsg(rt, oa.Org(), channel, session, flowMsg, now)
 		require.NoError(t, err)
 		return msg
@@ -241,6 +241,9 @@ func TestMarshalMsg(t *testing.T) {
 		[]string{"yes", "no"},
 		nil,
 		flows.MsgTopicPurchase,
+		"",
+		"",
+		"",
 	)
 
 	// create a non-priority flow message.. i.e. the session isn't responding to an incoming message
@@ -284,7 +287,7 @@ func TestMarshalMsg(t *testing.T) {
 		"session_id": %d,
 		"session_status": "W",
 		"status": "Q",
-		"template": "",
+		"template": null,
 		"text": "Hi there",
 		"tps_cost": 2,
 		"urn": "tel:+250700000001?id=10000",
@@ -299,6 +302,9 @@ func TestMarshalMsg(t *testing.T) {
 		"Hi there",
 		nil, nil, nil,
 		flows.NilMsgTopic,
+		"",
+		"",
+		"",
 	)
 	in1 := testdata.InsertIncomingMsg(db, testdata.Org1, testdata.TwilioChannel, testdata.Cathy, "test", models.MsgStatusHandled)
 	session.SetIncomingMsg(flows.MsgID(in1.ID()), null.String("EX123"))
@@ -333,7 +339,7 @@ func TestMarshalMsg(t *testing.T) {
 		"session_id": %d,
 		"session_status": "W",
 		"status": "Q",
-		"template": "",
+		"template": null,
 		"text": "Hi there",
 		"tps_cost": 1,
 		"urn": "tel:+250700000001?id=10000",
@@ -413,8 +419,8 @@ func TestGetMsgRepetitions(t *testing.T) {
 
 	dates.SetNowSource(dates.NewFixedNowSource(time.Date(2021, 11, 18, 12, 13, 3, 234567, time.UTC)))
 
-	msg1 := flows.NewMsgOut(testdata.Cathy.URN, nil, "foo", nil, nil, nil, flows.NilMsgTopic)
-	msg2 := flows.NewMsgOut(testdata.Cathy.URN, nil, "bar", nil, nil, nil, flows.NilMsgTopic)
+	msg1 := flows.NewMsgOut(testdata.Cathy.URN, nil, "foo", nil, nil, nil, flows.NilMsgTopic, "", "", "")
+	msg2 := flows.NewMsgOut(testdata.Cathy.URN, nil, "bar", nil, nil, nil, flows.NilMsgTopic, "", "", "")
 
 	assertRepetitions := func(m *flows.MsgOut, expected int) {
 		count, err := models.GetMsgRepetitions(rp, testdata.Cathy.ID, m)
@@ -581,7 +587,7 @@ func TestNewOutgoingIVR(t *testing.T) {
 
 	createdOn := time.Date(2021, 7, 26, 12, 6, 30, 0, time.UTC)
 
-	flowMsg := flows.NewMsgOut(testdata.Cathy.URN, vonage.ChannelReference(), "Hello", []utils.Attachment{"audio/mp3:http://example.com/hi.mp3"}, nil, nil, flows.NilMsgTopic)
+	flowMsg := flows.NewMsgOut(testdata.Cathy.URN, vonage.ChannelReference(), "Hello", []utils.Attachment{"audio/mp3:http://example.com/hi.mp3"}, nil, nil, flows.NilMsgTopic, "", "", "")
 	dbMsg := models.NewOutgoingIVR(rt.Config, testdata.Org1.ID, conn, flowMsg, createdOn)
 
 	assert.Equal(t, flowMsg.UUID(), dbMsg.UUID())

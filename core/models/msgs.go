@@ -135,7 +135,7 @@ type Msg struct {
 		URNAuth              null.String        `db:"urn_auth"        json:"urn_auth,omitempty"`
 		OrgID                OrgID              `db:"org_id"          json:"org_id"`
 		TopupID              TopupID            `db:"topup_id"        json:"-"`
-		Template             string             `db:"template"        json:"template"`
+		Template             null.String        `db:"template"        json:"template"`
 
 		SessionID     SessionID     `json:"session_id,omitempty"`
 		SessionStatus SessionStatus `json:"session_status,omitempty"`
@@ -179,7 +179,7 @@ func (m *Msg) TopupID() TopupID                 { return m.m.TopupID }
 func (m *Msg) ContactID() ContactID             { return m.m.ContactID }
 func (m *Msg) ContactURNID() *URNID             { return m.m.ContactURNID }
 func (m *Msg) IsResend() bool                   { return m.m.IsResend }
-func (m *Msg) Template() string                 { return m.m.Template }
+func (m *Msg) Template() null.String            { return m.m.Template }
 
 func (m *Msg) SetTopup(topupID TopupID) { m.m.TopupID = topupID }
 
@@ -383,6 +383,7 @@ func newOutgoingMsg(rt *runtime.Runtime, org *Org, channel *Channel, contactID C
 	m.OrgID = org.ID()
 	m.TopupID = NilTopupID
 	m.CreatedOn = createdOn
+	m.Template = null.NullString
 
 	msg.SetChannel(channel)
 	msg.SetURN(out.URN())
@@ -429,14 +430,14 @@ func newOutgoingMsg(rt *runtime.Runtime, org *Org, channel *Channel, contactID C
 	}
 
 	// populate metadata if we have any
-	if len(out.QuickReplies()) > 0 || out.Templating() != nil || out.Topic() != flows.NilMsgTopic || out.TextLanguage != "" {
+	if len(out.QuickReplies()) > 0 || out.Templating() != nil || out.Topic() != flows.NilMsgTopic || out.TextLanguage != "" || out.IGCommentID() != "" || out.IGResponseType() != "" {
 		metadata := make(map[string]interface{})
 		if len(out.QuickReplies()) > 0 {
 			metadata["quick_replies"] = out.QuickReplies()
 		}
 		if out.Templating() != nil {
 			metadata["templating"] = out.Templating()
-			m.Template = out.Templating().Template().Name
+			m.Template = null.String(out.Templating().Template().Name)
 		}
 		if out.Topic() != flows.NilMsgTopic {
 			metadata["topic"] = string(out.Topic())
@@ -444,6 +445,16 @@ func newOutgoingMsg(rt *runtime.Runtime, org *Org, channel *Channel, contactID C
 		if out.TextLanguage != "" {
 			metadata["text_language"] = out.TextLanguage
 		}
+		if out.IGCommentID() != "" {
+			metadata["ig_comment_id"] = out.IGCommentID()
+		}
+		if out.IGResponseType() != "" {
+			metadata["ig_response_type"] = out.IGResponseType()
+		}
+		if out.IGTag() != "" {
+			metadata["ig_tag"] = out.IGTag()
+		}
+
 		m.Metadata = null.NewMap(metadata)
 	}
 
@@ -661,7 +672,25 @@ func newOutgoingMsgWpp(rt *runtime.Runtime, org *Org, channel *Channel, contactI
 		}
 		if msgWpp.Templating() != nil {
 			metadata["templating"] = msgWpp.Templating()
-			m.Template = msgWpp.Templating().Template().Name
+			m.Template = null.String(msgWpp.Templating().Template().Name)
+		}
+		if len(msgWpp.Products()) > 0 {
+			metadata["products"] = msgWpp.Products()
+			metadata["body"] = msgWpp.Text()
+		}
+		if len(msgWpp.ActionButtonText()) != 0 {
+			metadata["action"] = msgWpp.ActionButtonText()
+		}
+		metadata["send_catalog"] = false
+		if msgWpp.SendCatalog() {
+			metadata["send_catalog"] = true
+			metadata["body"] = msgWpp.Text()
+		}
+
+		if (len(msgWpp.Products()) > 0 || msgWpp.SendCatalog()) && metadata["body"] != "" && msgWpp.Templating() == nil {
+			metadata["text"] = ""
+			metadata["header"] = string(msgWpp.HeaderText())
+			m.Text = ""
 		}
 
 		m.Metadata = null.NewMap(metadata)
@@ -1376,7 +1405,7 @@ func CreateBroadcastMessages(ctx context.Context, rt *runtime.Runtime, oa *OrgAs
 		}
 
 		// create our outgoing message
-		out := flows.NewMsgOut(urn, channel.ChannelReference(), text, t.Attachments, t.QuickReplies, nil, flows.NilMsgTopic)
+		out := flows.NewMsgOut(urn, channel.ChannelReference(), text, t.Attachments, t.QuickReplies, nil, flows.NilMsgTopic, "", "", "")
 		msg, err := NewOutgoingBroadcastMsg(rt, oa.Org(), channel, c.ID(), out, time.Now(), bcast.BroadcastID())
 		if err != nil {
 			return nil, errors.Wrapf(err, "error creating outgoing message")
@@ -1445,6 +1474,7 @@ type WppBroadcastTemplate struct {
 	UUID      assets.TemplateUUID `json:"uuid" validate:"required,uuid"`
 	Name      string              `json:"name" validate:"required"`
 	Variables []string            `json:"variables,omitempty"`
+	Locale    string              `json:"locale,omitempty" validate:"omitempty,bcp47"`
 }
 
 type WppBroadcastMessageHeader struct {
@@ -1452,19 +1482,26 @@ type WppBroadcastMessageHeader struct {
 	Text string `json:"text,omitempty"`
 }
 
+type WppBroadcastCatalogMessage struct {
+	Products         []flows.ProductEntry `json:"products,omitempty"`
+	ActionButtonText string               `json:"action_button_text,omitempty"`
+	SendCatalog      bool                 `json:"send_catalog,omitempty"`
+}
+
 type WppBroadcastMessage struct {
-	Text            string                    `json:"text,omitempty"`
-	Header          WppBroadcastMessageHeader `json:"header,omitempty"`
-	Footer          string                    `json:"footer,omitempty"`
-	Attachments     []utils.Attachment        `json:"attachments,omitempty"`
-	QuickReplies    []string                  `json:"quick_replies,omitempty"`
-	Template        WppBroadcastTemplate      `json:"template,omitempty"`
-	InteractionType string                    `json:"interaction_type,omitempty"`
-	OrderDetails    flows.OrderDetailsMessage `json:"order_details,omitempty"`
-	FlowMessage     flows.FlowMessage         `json:"flow_message,omitempty"`
-	ListMessage     flows.ListMessage         `json:"list_message,omitempty"`
-	CTAMessage      flows.CTAMessage          `json:"cta_message,omitempty"`
-	Buttons         []flows.ButtonComponent   `json:"buttons,omitempty"`
+	Text            string                     `json:"text,omitempty"`
+	Header          WppBroadcastMessageHeader  `json:"header,omitempty"`
+	Footer          string                     `json:"footer,omitempty"`
+	Attachments     []utils.Attachment         `json:"attachments,omitempty"`
+	QuickReplies    []string                   `json:"quick_replies,omitempty"`
+	Template        WppBroadcastTemplate       `json:"template,omitempty"`
+	InteractionType string                     `json:"interaction_type,omitempty"`
+	OrderDetails    flows.OrderDetailsMessage  `json:"order_details,omitempty"`
+	FlowMessage     flows.FlowMessage          `json:"flow_message,omitempty"`
+	ListMessage     flows.ListMessage          `json:"list_message,omitempty"`
+	CTAMessage      flows.CTAMessage           `json:"cta_message,omitempty"`
+	Buttons         []flows.ButtonComponent    `json:"buttons,omitempty"`
+	CatalogMessage  WppBroadcastCatalogMessage `json:"catalog_message,omitempty"`
 }
 
 type WppBroadcast struct {
@@ -1634,11 +1671,16 @@ func CreateWppBroadcastMessages(ctx context.Context, rt *runtime.Runtime, oa *Or
 		var templating *flows.MsgTemplating = nil
 		templateVariables := make([]string, len(bcast.Msg().Template.Variables))
 		copy(templateVariables, bcast.Msg().Template.Variables)
+		templateLocale := bcast.Msg().Template.Locale
 
 		ctaMessage := bcast.Msg().CTAMessage
 		listMessage := bcast.Msg().ListMessage
 		flowMessage := bcast.Msg().FlowMessage
 		orderDetails := bcast.Msg().OrderDetails
+
+		products := bcast.Msg().CatalogMessage.Products
+		actionButtonText := bcast.Msg().CatalogMessage.ActionButtonText
+		sendCatalog := bcast.Msg().CatalogMessage.SendCatalog
 
 		// build up the minimum viable context for evaluation
 		evaluationCtx := types.NewXObject(map[string]types.XValue{
@@ -1657,10 +1699,16 @@ func CreateWppBroadcastMessages(ctx context.Context, rt *runtime.Runtime, oa *Or
 		// evaluate our footer text
 		footerText, _ = excellent.EvaluateTemplate(oa.Env(), evaluationCtx, footerText, nil)
 
+		// evaluate our action text
+		actionButtonText, _ = excellent.EvaluateTemplate(oa.Env(), evaluationCtx, actionButtonText, nil)
+
 		// evaluate our quick replies
 		for i, qr := range quickReplies {
 			quickReplies[i], _ = excellent.EvaluateTemplate(oa.Env(), evaluationCtx, qr, nil)
 		}
+
+		//evaluate our template locale
+		templateLocale, _ = excellent.EvaluateTemplate(oa.Env(), evaluationCtx, templateLocale, nil)
 
 		// evaluate our template
 		if bcast.Msg().Template.UUID != "" {
@@ -1681,6 +1729,14 @@ func CreateWppBroadcastMessages(ctx context.Context, rt *runtime.Runtime, oa *Or
 				contact.Locale(oa.Env()),
 				oa.Env().DefaultLocale(),
 			}
+
+			if templateLocale != "" {
+				parsedLocale, _ := envs.FromBCP47(templateLocale)
+				if parsedLocale != envs.NilLocale {
+					locales = append([]envs.Locale{parsedLocale}, locales...)
+				}
+			}
+
 			translation := oa.SessionAssets().Templates().FindTranslation(bcast.Msg().Template.UUID, channel.ChannelReference(), locales)
 			if translation != nil {
 				// evaluate our variables
@@ -1723,7 +1779,7 @@ func CreateWppBroadcastMessages(ctx context.Context, rt *runtime.Runtime, oa *Or
 		}
 
 		// create our outgoing message
-		out := flows.NewMsgWppOut(urn, channel.ChannelReference(), bcast.Msg().InteractionType, headerType, headerText, text, footerText, ctaMessage, listMessage, flowMessage, orderDetails, attachments, quickReplies, buttons, templating, flows.NilMsgTopic)
+		out := flows.NewMsgWppOut(urn, channel.ChannelReference(), bcast.Msg().InteractionType, headerType, headerText, text, footerText, ctaMessage, listMessage, flowMessage, orderDetails, attachments, quickReplies, buttons, templating, flows.NilMsgTopic, products, actionButtonText, sendCatalog)
 		msg, err := NewOutgoingWppBroadcastMsg(rt, oa.Org(), channel, c.ID(), out, time.Now(), bcast.BroadcastID())
 		if err != nil {
 			return nil, errors.Wrapf(err, "error creating outgoing message")
@@ -1947,7 +2003,7 @@ func CreateOutgoingMessages(ctx context.Context, rt *runtime.Runtime, oa *OrgAss
 		}
 
 		// create our outgoing message
-		out := flows.NewMsgOut(urn, channel.ChannelReference(), msgText, nil, nil, nil, flows.NilMsgTopic)
+		out := flows.NewMsgOut(urn, channel.ChannelReference(), msgText, nil, nil, nil, flows.NilMsgTopic, "", "", "")
 		msg, err := NewOutgoingMsg(rt, oa.Org(), channel, c.ID(), out, time.Now())
 		if err != nil {
 			return nil, errors.Wrapf(err, "error creating outgoing message")

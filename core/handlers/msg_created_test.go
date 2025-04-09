@@ -38,7 +38,7 @@ func TestMsgCreated(t *testing.T) {
 
 	msg1 := testdata.InsertIncomingMsg(db, testdata.Org1, testdata.TwilioChannel, testdata.Cathy, "start", models.MsgStatusHandled)
 
-	templateAction := actions.NewSendMsg(handlers.NewActionUUID(), "Template time", nil, nil, false)
+	templateAction := actions.NewSendMsg(handlers.NewActionUUID(), "Template time", nil, nil, "", "", "", false)
 	templateAction.Templating = &actions.Templating{
 		UUID:      uuids.UUID("db297d56-ec8c-4231-bbe8-030369777ae1"),
 		Template:  &assets.TemplateReference{UUID: assets.TemplateUUID("9c22b594-fcab-4b29-9bcb-ce4404894a80"), Name: "revive_issue"},
@@ -49,13 +49,13 @@ func TestMsgCreated(t *testing.T) {
 		{
 			Actions: handlers.ContactActionMap{
 				testdata.Cathy: []flows.Action{
-					actions.NewSendMsg(handlers.NewActionUUID(), "Hello World", nil, []string{"yes", "no"}, true),
+					actions.NewSendMsg(handlers.NewActionUUID(), "Hello World", nil, []string{"yes", "no"}, "", "", "", true),
 				},
 				testdata.George: []flows.Action{
-					actions.NewSendMsg(handlers.NewActionUUID(), "Hello Attachments", []string{"image/png:/images/image1.png"}, nil, true),
+					actions.NewSendMsg(handlers.NewActionUUID(), "Hello Attachments", []string{"image/png:/images/image1.png"}, nil, "", "", "", true),
 				},
 				testdata.Bob: []flows.Action{
-					actions.NewSendMsg(handlers.NewActionUUID(), "No URNs", nil, nil, false),
+					actions.NewSendMsg(handlers.NewActionUUID(), "No URNs", nil, nil, "", "", "", false),
 				},
 				testdata.Alexandria: []flows.Action{
 					templateAction,
@@ -122,7 +122,7 @@ func TestNoTopup(t *testing.T) {
 		{
 			Actions: handlers.ContactActionMap{
 				testdata.Cathy: []flows.Action{
-					actions.NewSendMsg(handlers.NewActionUUID(), "No Topup", nil, nil, false),
+					actions.NewSendMsg(handlers.NewActionUUID(), "No Topup", nil, nil, "", "", "", false),
 				},
 			},
 			SQLAssertions: []handlers.SQLAssertion{
@@ -161,14 +161,14 @@ func TestNewURN(t *testing.T) {
 				testdata.Cathy: []flows.Action{
 					actions.NewAddContactURN(handlers.NewActionUUID(), "telegram", "12345"),
 					actions.NewSetContactChannel(handlers.NewActionUUID(), assets.NewChannelReference(telegramUUID, "telegram")),
-					actions.NewSendMsg(handlers.NewActionUUID(), "Cathy Message", nil, nil, false),
+					actions.NewSendMsg(handlers.NewActionUUID(), "Cathy Message", nil, nil, "", "", "", false),
 				},
 
 				// Bob is stealing a URN previously assigned to George
 				testdata.Bob: []flows.Action{
 					actions.NewAddContactURN(handlers.NewActionUUID(), "telegram", "67890"),
 					actions.NewSetContactChannel(handlers.NewActionUUID(), assets.NewChannelReference(telegramUUID, "telegram")),
-					actions.NewSendMsg(handlers.NewActionUUID(), "Bob Message", nil, nil, false),
+					actions.NewSendMsg(handlers.NewActionUUID(), "Bob Message", nil, nil, "", "", "", false),
 				},
 			},
 			SQLAssertions: []handlers.SQLAssertion{
