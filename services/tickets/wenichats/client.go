@@ -151,6 +151,11 @@ func (c *Client) GetQueues(params *url.Values) (*QueuesResponse, *httpx.Trace, e
 	return response, trace, nil
 }
 
+type ProjectInfo struct {
+	ProjectUUID string `json:"uuid,omitempty"`
+	ProjectName string `json:"name,omitempty"`
+}
+
 type RoomRequest struct {
 	TicketUUID   string                 `json:"ticket_uuid,omitempty"`
 	QueueUUID    string                 `json:"queue_uuid,omitempty"`
@@ -163,6 +168,7 @@ type RoomRequest struct {
 	FlowUUID     assets.FlowUUID        `json:"flow_uuid,omitempty"`
 	IsAnon       bool                   `json:"is_anon,omitempty"`
 	History      []HistoryMessage       `json:"history,omitempty"`
+	ProjectInfo  *ProjectInfo           `json:"project_info,omitempty"`
 }
 
 type Contact struct {

@@ -205,6 +205,22 @@ func (s *service) Open(session flows.Session, topic *flows.Topic, body string, a
 	}
 	roomData.History = historyMsg
 
+	cx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+	defer cancel()
+	ticketer, err := models.LookupTicketerByUUID(cx, db, s.ticketer.UUID())
+
+	if err != nil {
+		logrus.Error(errors.Wrap(err, fmt.Sprintf("failed to lookup ticketer: %s", s.ticketer.UUID())))
+		return nil, errors.Wrap(err, "failed to lookup ticketer")
+	}
+
+	if ticketer != nil && ticketer.Config("project_uuid") != "" && ticketer.Config("project_name_origin") != "" {
+		roomData.ProjectInfo = &ProjectInfo{
+			ProjectUUID: ticketer.Config("project_uuid"),
+			ProjectName: ticketer.Config("project_name_origin"),
+		}
+	}
+
 	newRoom, trace, err := s.restClient.CreateRoom(roomData)
 	if trace != nil {
 		logHTTP(flows.NewHTTPLog(trace, flows.HTTPStatusFromCode, s.redactor))
