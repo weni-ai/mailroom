@@ -205,7 +205,7 @@ func (s *service) Open(session flows.Session, topic *flows.Topic, body string, a
 	}
 	roomData.History = historyMsg
 
-	cx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+	cx, cancel = context.WithTimeout(context.Background(), 15*time.Second)
 	defer cancel()
 	ticketer, err := models.LookupTicketerByUUID(cx, db, s.ticketer.UUID())
 
