@@ -1,3 +1,39 @@
+1.55.0
+----------
+ * Add support for Instagram replies: comments, by tag and private reply
+
+1.54.0
+----------
+ * feat: support url parameters for cart simulation
+
+1.53.0
+----------
+ * Add locale field to templates in broadcast messages
+
+1.52.0
+----------
+ * twillio-flex use the match of contactID and ticketUUID as identity for user
+
+1.51.0
+----------
+ * Add support for catalog message in whatsapp messages
+
+1.50.3
+----------
+ * Update go version to 1.23 and dockerfile go and alpine versions
+
+1.50.2
+----------
+ * Remove log "fcm not configured"
+
+1.50.1
+----------
+ * Fix worker metrics
+
+1.50.0
+----------
+ * Send contact fields to router
+
 1.49.3
 ----------
  * Fix http_logs insert url size error, truncating if greater than 2048

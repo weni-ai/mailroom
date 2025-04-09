@@ -136,6 +136,7 @@ func TestWppBroadcastTask(t *testing.T) {
 			Variables: []string{
 				"@contact.name",
 			},
+			Locale: "pt-BR",
 		},
 	}
 
@@ -151,6 +152,24 @@ func TestWppBroadcastTask(t *testing.T) {
 					},
 				},
 			},
+		},
+	}
+
+	catalogMsg := models.WppBroadcastMessage{
+		Text: "Check out our products",
+		Header: models.WppBroadcastMessageHeader{
+			Type: "text",
+			Text: "header for catalog",
+		},
+		CatalogMessage: models.WppBroadcastCatalogMessage{
+			Products: []flows.ProductEntry{
+				{
+					Product:            "banana",
+					ProductRetailerIDs: []string{"123"},
+				},
+			},
+			ActionButtonText: "View Products",
+			SendCatalog:      true,
 		},
 	}
 
@@ -300,6 +319,18 @@ func TestWppBroadcastTask(t *testing.T) {
 			"hello Cathy",
 			models.NilChannelID,
 		},
+		{
+			models.NilBroadcastID,
+			nil,
+			cathyOnly,
+			nil,
+			queue.HandlerQueue,
+			1,
+			1,
+			catalogMsg,
+			"",
+			models.NilChannelID,
+		},
 	}
 
 	lastNow := time.Now()
@@ -392,9 +423,17 @@ func TestWppBroadcastTask(t *testing.T) {
 				Returns(1, "%d: unexpected buttons count", i)
 		}
 
+		// Assert catalog message
+		if len(tc.Msg.CatalogMessage.Products) > 0 || tc.Msg.CatalogMessage.SendCatalog {
+			testsuite.AssertQuery(t, db, `SELECT count(*) FROM msgs_msg WHERE org_id = 1 AND created_on > $1 AND metadata::jsonb @> $2::jsonb`,
+				lastNow,
+				`{"action":"View Products","body":"Check out our products","products":[{"product":"banana","product_retailer_ids":["123"]}],"send_catalog":true,"text":""}`,
+			).Returns(1, "%d: unexpected catalog message count", i)
+		}
+
 		// assert our template is being sent
 		if tc.Msg.Template.UUID != "" {
-			testsuite.AssertQuery(t, db, `SELECT count(*) FROM msgs_msg WHERE org_id = 1 AND created_on > $1 AND text = $2 AND metadata = $3`,
+			testsuite.AssertQuery(t, db, `SELECT count(*) FROM msgs_msg WHERE org_id = 1 AND created_on > $1 AND text = $2 AND metadata::jsonb @> $3::jsonb`,
 				lastNow,
 				tc.MsgText,
 				`{"templating":{"template":{"uuid":"17f52732-9655-4230-8225-6bd0800351e1","name":"welcome"},"language":"eng","country":"US","variables":["Alexandia"],"namespace":"7300ee93-b610-4ea5-98f0-f49d66dba123"},"text":"Welcome Alexandia!"}`,

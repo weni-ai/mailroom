@@ -166,11 +166,6 @@ func (mr *Mailroom) Start() error {
 		log.Info("elastic ok")
 	}
 
-	// warn if we won't be doing FCM syncing
-	if c.FCMKey == "" {
-		logrus.Error("fcm not configured, no syncing of android channels")
-	}
-
 	for _, initFunc := range initFunctions {
 		initFunc(mr.rt, mr.wg, mr.quit)
 	}

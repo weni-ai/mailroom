@@ -93,8 +93,11 @@ func NewService(rtCfg *runtime.Config, httpClient *http.Client, httpRetries *htt
 func (s *service) Open(session flows.Session, topic *flows.Topic, body string, assignee *flows.User, logHTTP flows.HTTPLogCallback) (*flows.Ticket, error) {
 	ticket := flows.OpenTicket(s.ticketer, topic, body, assignee)
 	contact := session.Contact()
+
+	userIdentity := fmt.Sprintf("%d_%s", contact.ID(), ticket.UUID())
+
 	chatUser := &CreateChatUserParams{
-		Identity:     fmt.Sprint(contact.ID()),
+		Identity:     userIdentity,
 		FriendlyName: contact.Name(),
 	}
 	contactUser, trace, err := s.restClient.FetchUser(chatUser.Identity)
@@ -116,7 +119,7 @@ func (s *service) Open(session flows.Session, topic *flows.Topic, body string, a
 
 	flexChannelParams := &CreateFlexChannelParams{
 		FlexFlowSid:          s.restClient.flexFlowSid,
-		Identity:             fmt.Sprint(contact.ID()),
+		Identity:             userIdentity,
 		ChatUserFriendlyName: contact.Name(),
 		ChatFriendlyName:     contact.Name(),
 	}
@@ -186,7 +189,7 @@ func (s *service) Open(session flows.Session, topic *flows.Topic, body string, a
 
 	go func() {
 		time.Sleep(time.Second * time.Duration(historyDelay))
-		SendHistory(session, contact.ID(), newFlexChannel, logHTTP, s.restClient, s.redactor)
+		SendHistory(session, contact.ID(), string(ticket.UUID()), newFlexChannel, logHTTP, s.restClient, s.redactor)
 	}()
 
 	ticket.SetExternalID(newFlexChannel.Sid)
@@ -194,7 +197,32 @@ func (s *service) Open(session flows.Session, topic *flows.Topic, body string, a
 }
 
 func (s *service) Forward(ticket *models.Ticket, msgUUID flows.MsgUUID, text string, attachments []utils.Attachment, logHTTP flows.HTTPLogCallback) error {
-	identity := fmt.Sprint(ticket.ContactID())
+	identity := fmt.Sprintf("%d_%s", ticket.ContactID(), ticket.UUID())
+
+	// if is identity v2 handle this to maintain backwards compatibility
+	{
+		chatUser := &CreateChatUserParams{
+			Identity:     identity,
+			FriendlyName: identity,
+		}
+
+		contactUser, trace, err := s.restClient.FetchUser(chatUser.Identity)
+		if trace != nil {
+			logHTTP(flows.NewHTTPLog(trace, flows.HTTPStatusFromCode, s.redactor))
+		}
+		if err != nil && trace.Response.StatusCode != 404 {
+			return errors.Wrapf(err, "failed to get twilio chat user")
+		}
+		if contactUser == nil {
+			_, trace, err := s.restClient.CreateUser(chatUser)
+			if trace != nil {
+				logHTTP(flows.NewHTTPLog(trace, flows.HTTPStatusFromCode, s.redactor))
+			}
+			if err != nil {
+				return errors.Wrap(err, "failed to create twilio chat user")
+			}
+		}
+	}
 
 	if len(attachments) > 0 {
 		mediaAttachements := []CreateMediaParams{}
@@ -295,7 +323,8 @@ func (s *service) Reopen(tickets []*models.Ticket, logHTTP flows.HTTPLogCallback
 	return errors.New("Twilio Flex ticket type doesn't support reopening")
 }
 
-func SendHistory(session flows.Session, contactID flows.ContactID, newFlexChannel *FlexChannel, logHTTP flows.HTTPLogCallback, restClient *Client, redactor utils.Redactor) {
+func SendHistory(session flows.Session, contactID flows.ContactID, ticketUUID string, newFlexChannel *FlexChannel, logHTTP flows.HTTPLogCallback, restClient *Client, redactor utils.Redactor) {
+	userIdentity := fmt.Sprintf("%d_%s", contactID, ticketUUID)
 	after := session.Runs()[0].CreatedOn().Add(time.Second * -1)
 	cx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 	defer cancel()
@@ -320,7 +349,7 @@ func SendHistory(session flows.Session, contactID flows.ContactID, newFlexChanne
 			DateCreated: msg.CreatedOn().Format(time.RFC3339),
 		}
 		if msg.Direction() == "I" {
-			m.From = fmt.Sprint(contactID)
+			m.From = userIdentity
 			headerWebhookEnabled := http.Header{"X-Twilio-Webhook-Enabled": []string{"True"}}
 			_, trace, err = restClient.CreateMessage(m, headerWebhookEnabled)
 		} else {
