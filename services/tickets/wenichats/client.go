@@ -126,6 +126,11 @@ func (c *Client) CloseRoom(roomUUID string) (*RoomResponse, *httpx.Trace, error)
 	return response, trace, nil
 }
 
+func (c *Client) SendHistoryBatch(roomUUID string, history []HistoryMessage) (*httpx.Trace, error) {
+	url := fmt.Sprintf("%s/rooms/%s/history/", c.baseURL, roomUUID)
+	return c.post(url, history, nil)
+}
+
 func (c *Client) CreateMessage(msg *MessageRequest) (*MessageResponse, *httpx.Trace, error) {
 	url := fmt.Sprintf("%s/msgs/", c.baseURL)
 	response := &MessageResponse{}
@@ -162,6 +167,7 @@ type RoomRequest struct {
 	CallbackURL  string                 `json:"callback_url,omitempty"`
 	FlowUUID     assets.FlowUUID        `json:"flow_uuid,omitempty"`
 	IsAnon       bool                   `json:"is_anon,omitempty"`
+	History      []HistoryMessage       `json:"history,omitempty"`
 	ProjectInfo  *ProjectInfo           `json:"project_info,omitempty"`
 }
 
@@ -203,6 +209,13 @@ type RoomResponse struct {
 	IsActive     bool                   `json:"is_active"`
 	CustomFields map[string]interface{} `json:"custom_fields"`
 	CallbackURL  string                 `json:"callback_url"`
+}
+
+type HistoryMessage struct {
+	Text        string       `json:"text"`
+	Direction   string       `json:"direction"`
+	Attachments []Attachment `json:"attachments"`
+	CreatedOn   time.Time    `json:"created_on"`
 }
 
 type MessageRequest struct {
