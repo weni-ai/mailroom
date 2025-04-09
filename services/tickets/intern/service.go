@@ -1,6 +1,7 @@
 package intern
 
 import (
+	"encoding/json"
 	"net/http"
 
 	"github.com/nyaruka/gocommon/httpx"
@@ -33,7 +34,7 @@ func (s *service) Open(session flows.Session, topic *flows.Topic, body string, a
 }
 
 // Forward is a noop
-func (s *service) Forward(ticket *models.Ticket, msgUUID flows.MsgUUID, text string, attachments []utils.Attachment, logHTTP flows.HTTPLogCallback) error {
+func (s *service) Forward(ticket *models.Ticket, msgUUID flows.MsgUUID, text string, attachments []utils.Attachment, metadata json.RawMessage, logHTTP flows.HTTPLogCallback) error {
 	return nil
 }
 

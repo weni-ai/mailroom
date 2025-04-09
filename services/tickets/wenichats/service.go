@@ -2,6 +2,7 @@ package wenichats
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"strconv"
@@ -259,7 +260,7 @@ func parseMsgAttachments(atts []utils.Attachment) []Attachment {
 	return msgAtts
 }
 
-func (s *service) Forward(ticket *models.Ticket, msgUUID flows.MsgUUID, text string, attachments []utils.Attachment, logHTTP flows.HTTPLogCallback) error {
+func (s *service) Forward(ticket *models.Ticket, msgUUID flows.MsgUUID, text string, attachments []utils.Attachment, metadata json.RawMessage, logHTTP flows.HTTPLogCallback) error {
 	roomUUID := string(ticket.ExternalID())
 
 	msg := &MessageRequest{
@@ -267,6 +268,7 @@ func (s *service) Forward(ticket *models.Ticket, msgUUID flows.MsgUUID, text str
 		Attachments: []Attachment{},
 		Direction:   "incoming",
 		CreatedOn:   dates.Now(),
+		Metadata:    metadata,
 	}
 
 	if len(attachments) != 0 {
