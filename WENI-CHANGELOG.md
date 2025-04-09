@@ -1,3 +1,8 @@
+1.56.0
+----------
+ * feat: Wenichats room with history
+ * feat: send msg metadata with context to wenichats
+
 1.55.0
 ----------
  * Add support for Instagram replies: comments, by tag and private reply
