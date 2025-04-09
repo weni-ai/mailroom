@@ -2,6 +2,7 @@ package mailgun
 
 import (
 	"encoding/base64"
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"strings"
@@ -127,7 +128,7 @@ func (s *service) Open(session flows.Session, topic *flows.Topic, body string, a
 	return ticket, nil
 }
 
-func (s *service) Forward(ticket *models.Ticket, msgUUID flows.MsgUUID, text string, attachments []utils.Attachment, logHTTP flows.HTTPLogCallback) error {
+func (s *service) Forward(ticket *models.Ticket, msgUUID flows.MsgUUID, text string, attachments []utils.Attachment, metadata json.RawMessage, logHTTP flows.HTTPLogCallback) error {
 	context := s.templateContext(ticket.Body(), text, ticket.Config(ticketConfigContactUUID), ticket.Config(ticketConfigContactDisplay))
 	body := evaluateTemplate(forwardBodyTemplate, context)
 

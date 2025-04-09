@@ -206,11 +206,12 @@ type RoomResponse struct {
 }
 
 type MessageRequest struct {
-	Room        string       `json:"room"`
-	Text        string       `json:"text"`
-	CreatedOn   time.Time    `json:"created_on"`
-	Direction   string       `json:"direction"`
-	Attachments []Attachment `json:"attachments"`
+	Room        string          `json:"room"`
+	Text        string          `json:"text"`
+	CreatedOn   time.Time       `json:"created_on"`
+	Direction   string          `json:"direction"`
+	Attachments []Attachment    `json:"attachments"`
+	Metadata    json.RawMessage `json:"metadata,omitempty"`
 }
 
 type MessageResponse struct {
