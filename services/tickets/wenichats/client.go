@@ -1,24 +1,36 @@
 package wenichats
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"net/url"
 	"strings"
+	"sync"
 	"time"
 
+	"github.com/gomodule/redigo/redis"
 	"github.com/nyaruka/gocommon/httpx"
 	"github.com/nyaruka/gocommon/jsonx"
 	"github.com/nyaruka/goflow/assets"
+	"github.com/nyaruka/mailroom/runtime"
 	"github.com/pkg/errors"
+	"github.com/sirupsen/logrus"
 )
 
 type baseClient struct {
-	httpClient  *http.Client
-	httpRetries *httpx.RetryConfig
-	authToken   string
-	baseURL     string
+	httpClient   *http.Client
+	httpRetries  *httpx.RetryConfig
+	authToken    string
+	baseURL      string
+	rt           *runtime.Runtime
+	clientID     string
+	clientSecret string
+	mu           sync.RWMutex
+	token        string
+	expiresAt    time.Time
 }
 
 func newBaseClient(httpClient *http.Client, httpRetries *httpx.RetryConfig, baseURL, authToken string) baseClient {
@@ -271,4 +283,178 @@ type Queue struct {
 type Group struct {
 	UUID string `json:"uuid"`
 	Name string `json:"name"`
+}
+
+const (
+	tokenCacheKey = "internal-user-token"
+	tokenExpiry   = 6 * time.Hour
+	lockTimeout   = 10 * time.Second
+)
+
+type authResponse struct {
+	AccessToken string `json:"access_token"`
+	TokenType   string `json:"token_type"`
+	ExpiresIn   int    `json:"expires_in"`
+}
+
+// getToken returns a valid authentication token, fetching a new one if necessary
+func (c *Client) getToken(ctx context.Context) (string, error) {
+	// First check memory cache
+	c.mu.RLock()
+	if c.token != "" && time.Now().Before(c.expiresAt) {
+		token := c.token
+		c.mu.RUnlock()
+		return token, nil
+	}
+	c.mu.RUnlock()
+
+	// Check Redis cache
+	rc := c.rt.RP.Get()
+	defer rc.Close()
+
+	// Try to get lock for token renewal
+	lockKey := tokenCacheKey + ":lock"
+	lockAcquired, err := redis.String(rc.Do("SET", lockKey, "1", "NX", "EX", int(lockTimeout.Seconds())))
+	if err != nil && err != redis.ErrNil {
+		return "", errors.Wrap(err, "error acquiring lock for token renewal")
+	}
+
+	if lockAcquired != "" {
+		// We have the lock, fetch a new token
+		defer rc.Do("DEL", lockKey) // Ensure lock is released
+
+		logrus.WithFields(logrus.Fields{
+			"component": "wenichats_client",
+		}).Debug("Acquired lock for token renewal")
+
+		token, expiry, err := c.fetchNewToken(ctx)
+		if err != nil {
+			return "", errors.Wrap(err, "error fetching new token")
+		}
+
+		// Save token to Redis
+		_, err = rc.Do("SETEX", tokenCacheKey, int(tokenExpiry.Seconds()), token)
+		if err != nil {
+			logrus.WithError(err).Error("Failed to save token to Redis")
+		}
+
+		// Update in-memory cache
+		c.mu.Lock()
+		c.token = token
+		c.expiresAt = expiry
+		c.mu.Unlock()
+
+		return token, nil
+	}
+
+	// We didn't get the lock, check if token exists in Redis
+	token, err := redis.String(rc.Do("GET", tokenCacheKey))
+	if err == nil && token != "" {
+		// Token found in Redis
+		ttl, _ := redis.Int(rc.Do("TTL", tokenCacheKey))
+
+		// Update in-memory cache
+		c.mu.Lock()
+		c.token = token
+		c.expiresAt = time.Now().Add(time.Duration(ttl) * time.Second)
+		c.mu.Unlock()
+
+		return token, nil
+	}
+
+	if err != redis.ErrNil {
+		logrus.WithError(err).Error("Error getting token from Redis")
+	}
+
+	// Wait briefly and try again (another process may be renewing)
+	time.Sleep(time.Millisecond * 100)
+	return c.getToken(ctx)
+}
+
+// fetchNewToken calls the auth API to get a new token
+func (c *Client) fetchNewToken(ctx context.Context) (string, time.Time, error) {
+	authURL := fmt.Sprintf("%s/auth/token", c.baseURL)
+
+	reqBody := strings.NewReader(fmt.Sprintf(
+		"client_id=%s&client_secret=%s&grant_type=client_credentials",
+		c.clientID, c.clientSecret,
+	))
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, authURL, reqBody)
+	if err != nil {
+		return "", time.Time{}, errors.Wrap(err, "error creating auth request")
+	}
+
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return "", time.Time{}, errors.Wrap(err, "error making auth request")
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		return "", time.Time{}, errors.Errorf("auth request failed with status %d: %s", resp.StatusCode, string(body))
+	}
+
+	var authResp authResponse
+	if err := json.NewDecoder(resp.Body).Decode(&authResp); err != nil {
+		return "", time.Time{}, errors.Wrap(err, "error decoding auth response")
+	}
+
+	// Calculate expiration time (use 90% of actual expiry to refresh before it expires)
+	expiryDuration := time.Duration(authResp.ExpiresIn) * time.Second
+	safeExpiry := time.Now().Add(expiryDuration * 9 / 10)
+
+	logrus.WithFields(logrus.Fields{
+		"component":  "wenichats_client",
+		"expires_in": authResp.ExpiresIn,
+	}).Debug("Successfully fetched new token")
+
+	return authResp.AccessToken, safeExpiry, nil
+}
+
+// GetTickets retrieves tickets from Wenichats API
+func (c *Client) GetTickets(ctx context.Context, filter map[string]string) ([]map[string]interface{}, error) {
+	token, err := c.getToken(ctx)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to get auth token")
+	}
+
+	endpoint := fmt.Sprintf("%s/tickets", c.baseURL)
+
+	// Add query parameters for filtering
+	if len(filter) > 0 {
+		queryParams := make([]string, 0, len(filter))
+		for k, v := range filter {
+			queryParams = append(queryParams, fmt.Sprintf("%s=%s", k, v))
+		}
+		endpoint = endpoint + "?" + strings.Join(queryParams, "&")
+	}
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, endpoint, nil)
+	if err != nil {
+		return nil, errors.Wrap(err, "error creating request")
+	}
+
+	req.Header.Set("Authorization", "Bearer "+token)
+
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return nil, errors.Wrap(err, "error fetching tickets")
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		return nil, errors.Errorf("tickets request failed with status %d: %s", resp.StatusCode, string(body))
+	}
+
+	var tickets []map[string]interface{}
+	if err := json.NewDecoder(resp.Body).Decode(&tickets); err != nil {
+		return nil, errors.Wrap(err, "error decoding tickets response")
+	}
+
+	return tickets, nil
 }
