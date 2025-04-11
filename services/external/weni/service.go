@@ -230,7 +230,8 @@ func (s *service) Call(session flows.Session, params assets.MsgCatalogParam, log
 		for _, productRetailerID := range productEntry.ProductRetailerIDs {
 			if hasSimulation {
 				for _, existingProductId := range existingProductsIds {
-					if productRetailerID == existingProductId+sellerID {
+					expectedID := existingProductId + sellerID
+					if productRetailerID == expectedID {
 						_, exists := productRetailerIDMap[productRetailerID]
 						if !exists {
 							if len(newEntry.ProductRetailerIDs) < qttProducts {
@@ -615,7 +616,6 @@ func VtexSponsoredSearch(searchUrl string, productSearch string, hideUnavailable
 
 	parsedURL, err := url.Parse(searchUrl)
 	if err != nil {
-		fmt.Println("Erro ao fazer parse da URL:", err)
 		return nil, nil, err
 	}
 	domain := parsedURL.Host
@@ -672,7 +672,8 @@ func CartSimulation(ProductRetailerIDS []flows.ProductEntry, sellerID string, ur
 	deliveryChannel := ""
 	if params != "" {
 		if strings.Contains(params, "deliveryChannel=") {
-			paramsValues := strings.Split(params, "&")
+			cleanParams := strings.TrimPrefix(params, "?")
+			paramsValues := strings.Split(cleanParams, "&")
 			for _, param := range paramsValues {
 				if strings.HasPrefix(param, "deliveryChannel=") {
 					deliveryChannel = strings.TrimPrefix(param, "deliveryChannel=")
@@ -725,9 +726,7 @@ func CartSimulation(ProductRetailerIDS []flows.ProductEntry, sellerID string, ur
 func validateParams(params string) (string, error) {
 	// Verify if params starts with '?
 	if !strings.HasPrefix(params, "?") {
-
 		params = "?" + params
-		fmt.Println("params", params)
 	}
 	// Verify if params is in the correct format
 	if strings.Contains(params, "=") {
@@ -778,17 +777,15 @@ func sendBatchRequest(body SearchSeller, url string, deliveryChannel string) ([]
 	}
 
 	availableProducts := []string{}
-	var deliveryChannelMap map[int][]DeliveryChannel
 
-	if deliveryChannel != "" {
-		deliveryChannelMap = make(map[int][]DeliveryChannel, len(response.LogisticsInfo))
-		for _, logistics := range response.LogisticsInfo {
-			deliveryChannelMap[logistics.ItemIndex] = logistics.DeliveryChannels
-		}
+	itemIndexToItem := make(map[int]Item)
+	for i, item := range response.Items {
+		itemIndexToItem[i] = item
 	}
 
-	for index, item := range response.Items {
-		if item.Availability != "available" {
+	for _, logistics := range response.LogisticsInfo {
+		item, ok := itemIndexToItem[logistics.ItemIndex]
+		if !ok || item.Availability != "available" {
 			continue
 		}
 
@@ -797,8 +794,11 @@ func sendBatchRequest(body SearchSeller, url string, deliveryChannel string) ([]
 			continue
 		}
 
-		for _, channel := range deliveryChannelMap[index] {
-			if channel.ID == deliveryChannel {
+		for _, channel := range logistics.DeliveryChannels {
+			channelID := strings.ToLower(channel.ID)
+			deliveryChannelNormalized := strings.ToLower(strings.ReplaceAll(deliveryChannel, " ", "-"))
+
+			if channelID == deliveryChannelNormalized {
 				availableProducts = append(availableProducts, item.ID)
 				break
 			}
