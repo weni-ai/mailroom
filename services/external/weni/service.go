@@ -205,6 +205,17 @@ func (s *service) Call(session flows.Session, params assets.MsgCatalogParam, log
 	retries := 2
 	var productSections []flows.ProductEntry
 	var tracesMeta []*httpx.Trace
+
+	fmt.Printf("\n=== PRODUTOS ENVIADOS PARA O META ===\n")
+	productsForMeta := []string{}
+	for _, p := range callResult.ProductRetailerIDS {
+		for _, id := range p.ProductRetailerIDs {
+			productsForMeta = append(productsForMeta, id+sellerID)
+		}
+	}
+	fmt.Printf("Total de produtos enviados para o Meta: %d\n", len(productsForMeta))
+	fmt.Printf("Lista enviada para o Meta: %v\n", productsForMeta)
+
 	for i := 0; i < retries; i++ {
 		productSections, tracesMeta, err = ProductsSearchMeta(callResult.ProductRetailerIDS, fmt.Sprint(catalog.FacebookCatalogID()), s.rtConfig.WhatsappSystemUserToken)
 		callResult.Traces = append(callResult.Traces, tracesMeta...)
@@ -217,6 +228,17 @@ func (s *service) Call(session flows.Session, params assets.MsgCatalogParam, log
 		return callResult, err
 	}
 
+	// Mostrar produtos retornados pelo Meta
+	fmt.Printf("\n=== PRODUTOS RETORNADOS PELO META ===\n")
+	productsFromMeta := []string{}
+	for _, section := range productSections {
+		for _, id := range section.ProductRetailerIDs {
+			productsFromMeta = append(productsFromMeta, id)
+		}
+	}
+	fmt.Printf("Total de produtos retornados pelo Meta: %d\n", len(productsFromMeta))
+	fmt.Printf("Lista retornada pelo Meta: %v\n", productsFromMeta)
+
 	finalResult := &flows.MsgCatalogCall{}
 	finalResult.Traces = callResult.Traces
 	finalResult.ResponseJSON = callResult.ResponseJSON
@@ -226,33 +248,72 @@ func (s *service) Call(session flows.Session, params assets.MsgCatalogParam, log
 	}
 
 	// checks available products and limits to 5 per section
+	fmt.Printf("\n=== FILTRAGEM FINAL ===\n")
+	fmt.Printf("hasSimulation=%v, existingProductsIds=%d\n", hasSimulation, len(existingProductsIds))
+
+	if hasSimulation {
+		fmt.Printf("Lista de produtos da simulação: %v\n", existingProductsIds)
+	}
+
 	for _, productEntry := range productSections {
 		newEntry := productEntry
 		newEntry.ProductRetailerIDs = []string{}
+		fmt.Printf("Processando seção '%s' com %d produtos\n", productEntry.Product, len(productEntry.ProductRetailerIDs))
+
 		for _, productRetailerID := range productEntry.ProductRetailerIDs {
 			if hasSimulation {
+				found := false
+
 				for _, existingProductId := range existingProductsIds {
-					if productRetailerID == existingProductId+sellerID {
+					expectedID := existingProductId + sellerID
+					if productRetailerID == expectedID {
+						fmt.Printf("✓ Produto %s encontrado na simulação\n", productRetailerID)
 						_, exists := productRetailerIDMap[productRetailerID]
 						if !exists {
 							if len(newEntry.ProductRetailerIDs) < qttProducts {
 								newEntry.ProductRetailerIDs = append(newEntry.ProductRetailerIDs, productRetailerID)
+								fmt.Printf("  ✓ Adicionado ao resultado final\n")
+							} else {
+								fmt.Printf("  ✗ Não adicionado - atingiu limite de %d produtos\n", qttProducts)
 							}
 							productRetailerIDMap[productRetailerID] = struct{}{}
+						} else {
+							fmt.Printf("  ✗ Não adicionado - duplicado\n")
 						}
+						found = true
+						break
 					}
+				}
+
+				if !found {
+					fmt.Printf("✗ Produto %s NÃO encontrado na simulação\n", productRetailerID)
 				}
 			} else {
 				if len(newEntry.ProductRetailerIDs) < qttProducts {
 					newEntry.ProductRetailerIDs = append(newEntry.ProductRetailerIDs, productRetailerID)
+					fmt.Printf("✓ Produto %s adicionado (sem simulação)\n", productRetailerID)
 				}
 			}
 		}
 
 		if len(newEntry.ProductRetailerIDs) > 0 {
 			finalResult.ProductRetailerIDS = append(finalResult.ProductRetailerIDS, newEntry)
+			fmt.Printf("Seção adicionada com %d produtos\n", len(newEntry.ProductRetailerIDs))
+		} else {
+			fmt.Printf("Seção ignorada - sem produtos após filtragem\n")
 		}
 	}
+
+	// Mostrar resultado final
+	fmt.Printf("\n=== RESULTADO FINAL ===\n")
+	fmt.Printf("Total de seções: %d\n", len(finalResult.ProductRetailerIDS))
+	finalProductsList := []string{}
+	for i, section := range finalResult.ProductRetailerIDS {
+		fmt.Printf("Seção %d (%s): %v\n", i, section.Product, section.ProductRetailerIDs)
+		finalProductsList = append(finalProductsList, section.ProductRetailerIDs...)
+	}
+	fmt.Printf("Total de produtos no resultado final: %d\n", len(finalProductsList))
+	fmt.Printf("Lista final: %v\n\n", finalProductsList)
 
 	return finalResult, nil
 }
@@ -704,6 +765,15 @@ func CartSimulation(ProductRetailerIDS []flows.ProductEntry, sellerID string, ur
 		urlSimulation += params
 	}
 
+	fmt.Printf("\n\n=== PRODUTOS ANTES DA SIMULAÇÃO ===\n")
+	allProductsBeforeSimulation := []string{}
+	for _, p := range ProductRetailerIDS {
+		fmt.Printf("Entrada '%s' com produtos: %v\n", p.Product, p.ProductRetailerIDs)
+		allProductsBeforeSimulation = append(allProductsBeforeSimulation, p.ProductRetailerIDs...)
+	}
+	fmt.Printf("Total de produtos antes da simulação: %d\n", len(allProductsBeforeSimulation))
+	fmt.Printf("Lista completa: %v\n", allProductsBeforeSimulation)
+
 	for _, p := range ProductRetailerIDS {
 		products = append(products, p.ProductRetailerIDs...)
 	}
@@ -735,6 +805,29 @@ func CartSimulation(ProductRetailerIDS []flows.ProductEntry, sellerID string, ur
 
 		availableProducts = append(availableProducts, batchAvailableProducts...)
 	}
+
+	fmt.Printf("\n=== PRODUTOS APÓS A SIMULAÇÃO ===\n")
+	fmt.Printf("Delivery Channel: %s\n", deliveryChannel)
+	fmt.Printf("Total de produtos após simulação: %d\n", len(availableProducts))
+	fmt.Printf("Lista após simulação: %v\n", availableProducts)
+
+	// Mostrar quais produtos foram filtrados
+	fmt.Printf("\n=== PRODUTOS FILTRADOS PELA SIMULAÇÃO ===\n")
+	filteredProducts := []string{}
+	for _, product := range allProductsBeforeSimulation {
+		found := false
+		for _, availableProduct := range availableProducts {
+			if product == availableProduct {
+				found = true
+				break
+			}
+		}
+		if !found {
+			filteredProducts = append(filteredProducts, product)
+		}
+	}
+	fmt.Printf("Total de produtos filtrados: %d\n", len(filteredProducts))
+	fmt.Printf("Produtos filtrados: %v\n\n", filteredProducts)
 
 	return availableProducts, traces, nil
 }
