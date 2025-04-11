@@ -735,7 +735,8 @@ func CartSimulation(ProductRetailerIDS []flows.ProductEntry, sellerID string, ur
 	deliveryChannel := ""
 	if params != "" {
 		if strings.Contains(params, "deliveryChannel=") {
-			paramsValues := strings.Split(params, "&")
+			cleanParams := strings.TrimPrefix(params, "?")
+			paramsValues := strings.Split(cleanParams, "&")
 			for _, param := range paramsValues {
 				if strings.HasPrefix(param, "deliveryChannel=") {
 					deliveryChannel = strings.TrimPrefix(param, "deliveryChannel=")
@@ -901,7 +902,6 @@ func sendBatchRequest(body SearchSeller, url string, deliveryChannel string) ([]
 
 	return availableProducts, trace, nil
 }
-
 
 // Filter represents the structure of the filter for the API request
 type Filter struct {
