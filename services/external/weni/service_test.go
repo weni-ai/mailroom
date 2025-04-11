@@ -168,12 +168,22 @@ func setupMocks() {
 								]
 							}`),
 		},
-		"https://vtex.com.br/intelligent/searchapi/checkout/pub/orderForms/simulation?test=test&test2=test2": {
+		"https://vtex.com.br/intelligent/searchapi/checkout/pub/orderForms/simulation?test=test&deliveryChannel=delivery": {
 			createMockResponse(`{
 				"items": [
 					{
 						"id": "1234",
 						"availability": "available"
+					}
+				],
+				"logisticsInfo": [
+					{
+						"itemIndex": 0,
+						"deliveryChannels": [
+							{
+								"id": "delivery"
+							}
+						]
 					}
 				]
 			}`),
@@ -259,7 +269,7 @@ func TestService(t *testing.T) {
 		ApiType:              "intelligent",
 		PostalCode:           "000000-000",
 		SellerId:             "10",
-		CartSimulationParams: "test=test&test2=test2",
+		CartSimulationParams: "test=test&deliveryChannel=delivery",
 	}
 	call, err = svc.Call(session, params, logger.Log)
 	assert.NoError(t, err)
