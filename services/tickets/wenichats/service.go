@@ -164,7 +164,7 @@ func (s *service) Open(session flows.Session, topic *flows.Topic, body string, a
 		if err != nil {
 			return nil, err
 		}
-	} else {
+	} else if len(session.Runs()) > 0 {
 		// get messages for history, based on first session run start time
 		startMargin := -time.Second * 1
 		after = session.Runs()[0].CreatedOn().Add(startMargin)
