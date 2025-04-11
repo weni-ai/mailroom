@@ -1,3 +1,8 @@
+1.57.0
+----------
+ * Modify service logic to include search keywords in call results
+ * Add logistics info and delivery channel filter to seller search
+
 1.56.0
 ----------
  * feat: Wenichats room with history
