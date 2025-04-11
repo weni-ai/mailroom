@@ -871,17 +871,15 @@ func sendBatchRequest(body SearchSeller, url string, deliveryChannel string) ([]
 	}
 
 	availableProducts := []string{}
-	var deliveryChannelMap map[int][]DeliveryChannel
 
-	if deliveryChannel != "" {
-		deliveryChannelMap = make(map[int][]DeliveryChannel, len(response.LogisticsInfo))
-		for _, logistics := range response.LogisticsInfo {
-			deliveryChannelMap[logistics.ItemIndex] = logistics.DeliveryChannels
-		}
+	itemIndexToItem := make(map[int]Item)
+	for i, item := range response.Items {
+		itemIndexToItem[i] = item
 	}
 
-	for _, item := range response.Items {
-		if item.Availability != "available" {
+	for _, logistics := range response.LogisticsInfo {
+		item, ok := itemIndexToItem[logistics.ItemIndex]
+		if !ok || item.Availability != "available" {
 			continue
 		}
 
@@ -890,9 +888,11 @@ func sendBatchRequest(body SearchSeller, url string, deliveryChannel string) ([]
 			continue
 		}
 
-		itemIndex := item.RequestIndex
-		for _, channel := range deliveryChannelMap[itemIndex] {
-			if channel.ID == deliveryChannel {
+		for _, channel := range logistics.DeliveryChannels {
+			channelID := strings.ToLower(channel.ID)
+			deliveryChannelNormalized := strings.ToLower(strings.ReplaceAll(deliveryChannel, " ", "-"))
+
+			if channelID == deliveryChannelNormalized {
 				availableProducts = append(availableProducts, item.ID)
 				break
 			}
@@ -901,6 +901,7 @@ func sendBatchRequest(body SearchSeller, url string, deliveryChannel string) ([]
 
 	return availableProducts, trace, nil
 }
+
 
 // Filter represents the structure of the filter for the API request
 type Filter struct {
