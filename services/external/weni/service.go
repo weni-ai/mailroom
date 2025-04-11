@@ -503,6 +503,7 @@ type Item struct {
 	Quantity     int    `json:"quantity"`
 	Seller       string `json:"seller"`
 	Availability string `json:"availability,omitempty"`
+	RequestIndex int    `json:"requestIndex,omitempty"`
 }
 
 type VtexProduct struct {
@@ -879,7 +880,7 @@ func sendBatchRequest(body SearchSeller, url string, deliveryChannel string) ([]
 		}
 	}
 
-	for index, item := range response.Items {
+	for _, item := range response.Items {
 		if item.Availability != "available" {
 			continue
 		}
@@ -889,7 +890,8 @@ func sendBatchRequest(body SearchSeller, url string, deliveryChannel string) ([]
 			continue
 		}
 
-		for _, channel := range deliveryChannelMap[index] {
+		itemIndex := item.RequestIndex
+		for _, channel := range deliveryChannelMap[itemIndex] {
 			if channel.ID == deliveryChannel {
 				availableProducts = append(availableProducts, item.ID)
 				break
