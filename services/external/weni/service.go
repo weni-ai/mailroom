@@ -492,20 +492,10 @@ func GetProductListFromVtex(productSearch string, searchUrl string, apiType stri
 }
 
 type SearchSeller struct {
-	Items              []Item            `json:"items"`
-	PostalCode         string            `json:"postalCode"`
-	Country            string            `json:"country"`
-	LogisticsInfo      []LogisticsInfo   `json:"logisticsInfo"`
-	PurchaseConditions PurchaseCondition `json:"purchaseConditions"`
-}
-
-type PurchaseCondition struct {
-	ItemPurchaseConditions []ItemPurchaseCondition `json:"itemPurchaseConditions"`
-}
-
-type ItemPurchaseCondition struct {
-	ID   string `json:"id"`
-	SLAs []SLAs `json:"SLAs"`
+	Items         []Item          `json:"items"`
+	PostalCode    string          `json:"postalCode"`
+	Country       string          `json:"country"`
+	LogisticsInfo []LogisticsInfo `json:"logisticsInfo"`
 }
 
 type Item struct {
@@ -531,12 +521,6 @@ type Seller struct {
 type LogisticsInfo struct {
 	ItemIndex        int               `json:"itemIndex"`
 	DeliveryChannels []DeliveryChannel `json:"deliveryChannels"`
-	SLAs             []SLAs            `json:"SLAs"`
-}
-
-type SLAs struct {
-	ID              string `json:"id"`
-	DeliveryChannel string `json:"deliveryChannel"`
 }
 
 type DeliveryChannel struct {
@@ -886,57 +870,34 @@ func sendBatchRequest(body SearchSeller, url string, deliveryChannel string) ([]
 	}
 
 	availableProducts := []string{}
+	var deliveryChannelMap map[int][]DeliveryChannel
 
-	if deliveryChannel == "" {
-		for _, item := range response.Items {
-			if item.Availability == "available" {
+	if deliveryChannel != "" {
+		deliveryChannelMap = make(map[int][]DeliveryChannel, len(response.LogisticsInfo))
+		for _, logistics := range response.LogisticsInfo {
+			deliveryChannelMap[logistics.ItemIndex] = logistics.DeliveryChannels
+		}
+	}
+
+	for index, item := range response.Items {
+		if item.Availability != "available" {
+			continue
+		}
+
+		if deliveryChannel == "" {
+			availableProducts = append(availableProducts, item.ID)
+			continue
+		}
+
+		for _, channel := range deliveryChannelMap[index] {
+			if channel.ID == deliveryChannel {
 				availableProducts = append(availableProducts, item.ID)
-			}
-		}
-		return availableProducts, trace, nil
-	}
-
-	itemIDs := make(map[string]bool)
-	for _, item := range response.Items {
-		if item.Availability == "available" {
-			itemIDs[item.ID] = true
-		}
-	}
-
-	for _, logistic := range response.LogisticsInfo {
-		for _, sla := range logistic.SLAs {
-			if sla.DeliveryChannel == deliveryChannel {
-				for _, item := range response.Items {
-					for _, condition := range response.PurchaseConditions.ItemPurchaseConditions {
-						if condition.ID == item.ID {
-							hasDeliveryChannel := false
-							for _, conditionSla := range condition.SLAs {
-								if conditionSla.DeliveryChannel == deliveryChannel {
-									hasDeliveryChannel = true
-									break
-								}
-							}
-							if item.Availability == "available" && hasDeliveryChannel {
-								availableProducts = append(availableProducts, item.ID)
-							}
-						}
-					}
-				}
+				break
 			}
 		}
 	}
 
-	uniqueProducts := make(map[string]bool)
-	for _, id := range availableProducts {
-		uniqueProducts[id] = true
-	}
-
-	finalProducts := []string{}
-	for id := range uniqueProducts {
-		finalProducts = append(finalProducts, id)
-	}
-
-	return finalProducts, trace, nil
+	return availableProducts, trace, nil
 }
 
 // Filter represents the structure of the filter for the API request
