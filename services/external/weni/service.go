@@ -84,6 +84,7 @@ func (s *service) Call(session flows.Session, params assets.MsgCatalogParam, log
 	extraPrompt := params.ExtraPrompt
 	productList, traceWeniGPT, err := GetProductListFromChatGPT(ctx, s.rtConfig, content, extraPrompt)
 	callResult.Traces = append(callResult.Traces, traceWeniGPT)
+	callResult.SearchKeywords = productList
 	if err != nil {
 		return callResult, err
 	}
@@ -219,6 +220,7 @@ func (s *service) Call(session flows.Session, params assets.MsgCatalogParam, log
 	finalResult := &flows.MsgCatalogCall{}
 	finalResult.Traces = callResult.Traces
 	finalResult.ResponseJSON = callResult.ResponseJSON
+	finalResult.SearchKeywords = callResult.SearchKeywords
 	if hasSponsored {
 		finalResult.ProductRetailerIDS = allProductsSponsored
 	}
@@ -230,7 +232,8 @@ func (s *service) Call(session flows.Session, params assets.MsgCatalogParam, log
 		for _, productRetailerID := range productEntry.ProductRetailerIDs {
 			if hasSimulation {
 				for _, existingProductId := range existingProductsIds {
-					if productRetailerID == existingProductId+sellerID {
+					expectedID := existingProductId + sellerID
+					if productRetailerID == expectedID {
 						_, exists := productRetailerIDMap[productRetailerID]
 						if !exists {
 							if len(newEntry.ProductRetailerIDs) < qttProducts {
@@ -429,9 +432,10 @@ func GetProductListFromVtex(productSearch string, searchUrl string, apiType stri
 }
 
 type SearchSeller struct {
-	Items      []Item `json:"items"`
-	PostalCode string `json:"postalCode"`
-	Country    string `json:"country"`
+	Items         []Item          `json:"items"`
+	PostalCode    string          `json:"postalCode"`
+	Country       string          `json:"country"`
+	LogisticsInfo []LogisticsInfo `json:"logisticsInfo"`
 }
 
 type Item struct {
@@ -452,6 +456,15 @@ type Seller struct {
 	CommertialOffer struct {
 		AvailableQuantity int `json:"AvailableQuantity"`
 	} `json:"commertialOffer"`
+}
+
+type LogisticsInfo struct {
+	ItemIndex        int               `json:"itemIndex"`
+	DeliveryChannels []DeliveryChannel `json:"deliveryChannels"`
+}
+
+type DeliveryChannel struct {
+	ID string `json:"id"`
 }
 
 type VtexIntelligentProduct struct {
@@ -605,7 +618,6 @@ func VtexSponsoredSearch(searchUrl string, productSearch string, hideUnavailable
 
 	parsedURL, err := url.Parse(searchUrl)
 	if err != nil {
-		fmt.Println("Erro ao fazer parse da URL:", err)
 		return nil, nil, err
 	}
 	domain := parsedURL.Host
@@ -659,7 +671,18 @@ func CartSimulation(ProductRetailerIDS []flows.ProductEntry, sellerID string, ur
 
 	urlSplit := strings.Split(url, "api")
 	urlSimulation := urlSplit[0] + "api/checkout/pub/orderForms/simulation"
+	deliveryChannel := ""
 	if params != "" {
+		if strings.Contains(params, "deliveryChannel=") {
+			cleanParams := strings.TrimPrefix(params, "?")
+			paramsValues := strings.Split(cleanParams, "&")
+			for _, param := range paramsValues {
+				if strings.HasPrefix(param, "deliveryChannel=") {
+					deliveryChannel = strings.TrimPrefix(param, "deliveryChannel=")
+					break
+				}
+			}
+		}
 		params, err := validateParams(params)
 		if err != nil {
 			return nil, traces, err
@@ -690,7 +713,7 @@ func CartSimulation(ProductRetailerIDS []flows.ProductEntry, sellerID string, ur
 			searchSeller.Items = append(searchSeller.Items, Item{ID: product, Quantity: 1, Seller: sellerID})
 		}
 
-		batchAvailableProducts, trace, err := sendBatchRequest(searchSeller, urlSimulation)
+		batchAvailableProducts, trace, err := sendBatchRequest(searchSeller, urlSimulation, deliveryChannel)
 		traces = append(traces, trace)
 		if err != nil {
 			return nil, traces, err
@@ -705,9 +728,7 @@ func CartSimulation(ProductRetailerIDS []flows.ProductEntry, sellerID string, ur
 func validateParams(params string) (string, error) {
 	// Verify if params starts with '?
 	if !strings.HasPrefix(params, "?") {
-
 		params = "?" + params
-		fmt.Println("params", params)
 	}
 	// Verify if params is in the correct format
 	if strings.Contains(params, "=") {
@@ -725,7 +746,7 @@ func validateParams(params string) (string, error) {
 	return params, nil
 }
 
-func sendBatchRequest(body SearchSeller, url string) ([]string, *httpx.Trace, error) {
+func sendBatchRequest(body SearchSeller, url string, deliveryChannel string) ([]string, *httpx.Trace, error) {
 	client := &http.Client{}
 
 	headers := map[string]string{
@@ -758,9 +779,31 @@ func sendBatchRequest(body SearchSeller, url string) ([]string, *httpx.Trace, er
 	}
 
 	availableProducts := []string{}
-	for _, item := range response.Items {
-		if item.Availability == "available" {
+
+	itemIndexToItem := make(map[int]Item)
+	for i, item := range response.Items {
+		itemIndexToItem[i] = item
+	}
+
+	for _, logistics := range response.LogisticsInfo {
+		item, ok := itemIndexToItem[logistics.ItemIndex]
+		if !ok || item.Availability != "available" {
+			continue
+		}
+
+		if deliveryChannel == "" {
 			availableProducts = append(availableProducts, item.ID)
+			continue
+		}
+
+		for _, channel := range logistics.DeliveryChannels {
+			channelID := strings.ToLower(channel.ID)
+			deliveryChannelNormalized := strings.ToLower(strings.ReplaceAll(deliveryChannel, " ", "-"))
+
+			if channelID == deliveryChannelNormalized {
+				availableProducts = append(availableProducts, item.ID)
+				break
+			}
 		}
 	}
 

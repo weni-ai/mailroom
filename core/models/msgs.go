@@ -430,7 +430,7 @@ func newOutgoingMsg(rt *runtime.Runtime, org *Org, channel *Channel, contactID C
 	}
 
 	// populate metadata if we have any
-	if len(out.QuickReplies()) > 0 || out.Templating() != nil || out.Topic() != flows.NilMsgTopic || out.TextLanguage != "" {
+	if len(out.QuickReplies()) > 0 || out.Templating() != nil || out.Topic() != flows.NilMsgTopic || out.TextLanguage != "" || out.IGCommentID() != "" || out.IGResponseType() != "" {
 		metadata := make(map[string]interface{})
 		if len(out.QuickReplies()) > 0 {
 			metadata["quick_replies"] = out.QuickReplies()
@@ -445,6 +445,16 @@ func newOutgoingMsg(rt *runtime.Runtime, org *Org, channel *Channel, contactID C
 		if out.TextLanguage != "" {
 			metadata["text_language"] = out.TextLanguage
 		}
+		if out.IGCommentID() != "" {
+			metadata["ig_comment_id"] = out.IGCommentID()
+		}
+		if out.IGResponseType() != "" {
+			metadata["ig_response_type"] = out.IGResponseType()
+		}
+		if out.IGTag() != "" {
+			metadata["ig_tag"] = out.IGTag()
+		}
+
 		m.Metadata = null.NewMap(metadata)
 	}
 
@@ -868,7 +878,8 @@ FROM
 	msgs_msg
 WHERE
 	contact_id = $1 AND
-	created_on >= $2
+	created_on >= $2 AND
+	status != 'F'
 ORDER BY
 	id ASC`
 
@@ -1404,6 +1415,7 @@ func CreateBroadcastMessages(ctx context.Context, rt *runtime.Runtime, oa *OrgAs
 		// create our outgoing message
 		out := flows.NewMsgOut(urn, channel.ChannelReference(), text, t.Attachments, t.QuickReplies, nil, flows.NilMsgTopic)
 		msg, err := NewOutgoingBroadcastMsg(rt, oa.Org(), channel, c.ID(), out, time.Now(), bcast.BroadcastID(), extraMetadata)
+
 		if err != nil {
 			return nil, errors.Wrapf(err, "error creating outgoing message")
 		}

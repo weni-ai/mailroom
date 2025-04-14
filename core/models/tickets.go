@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"database/sql/driver"
+	"encoding/json"
 	"net/http"
 	"time"
 
@@ -152,7 +153,7 @@ func (t *Ticket) FlowTicket(oa *OrgAssets) (*flows.Ticket, error) {
 }
 
 // ForwardIncoming forwards an incoming message from a contact to this ticket
-func (t *Ticket) ForwardIncoming(ctx context.Context, rt *runtime.Runtime, org *OrgAssets, msgUUID flows.MsgUUID, text string, attachments []utils.Attachment) error {
+func (t *Ticket) ForwardIncoming(ctx context.Context, rt *runtime.Runtime, org *OrgAssets, msgUUID flows.MsgUUID, text string, attachments []utils.Attachment, metadata json.RawMessage) error {
 	ticketer := org.TicketerByID(t.t.TicketerID)
 	if ticketer == nil {
 		return errors.Errorf("can't find ticketer with id %d", t.t.TicketerID)
@@ -164,7 +165,7 @@ func (t *Ticket) ForwardIncoming(ctx context.Context, rt *runtime.Runtime, org *
 	}
 
 	logger := &HTTPLogger{}
-	err = service.Forward(t, msgUUID, text, attachments, logger.Ticketer(ticketer))
+	err = service.Forward(t, msgUUID, text, attachments, metadata, logger.Ticketer(ticketer))
 
 	logger.Insert(ctx, rt.DB)
 
@@ -741,7 +742,7 @@ func (t *Ticketer) UpdateConfig(ctx context.Context, db Queryer, add map[string]
 type TicketService interface {
 	flows.TicketService
 
-	Forward(*Ticket, flows.MsgUUID, string, []utils.Attachment, flows.HTTPLogCallback) error
+	Forward(*Ticket, flows.MsgUUID, string, []utils.Attachment, json.RawMessage, flows.HTTPLogCallback) error
 	Close([]*Ticket, flows.HTTPLogCallback) error
 	Reopen([]*Ticket, flows.HTTPLogCallback) error
 }

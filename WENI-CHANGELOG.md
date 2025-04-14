@@ -1,3 +1,17 @@
+1.57.0
+----------
+ * Modify service logic to include search keywords in call results
+ * Add logistics info and delivery channel filter to seller search
+
+1.56.0
+----------
+ * feat: Wenichats room with history
+ * feat: send msg metadata with context to wenichats
+
+1.55.0
+----------
+ * Add support for Instagram replies: comments, by tag and private reply
+
 1.54.0
 ----------
  * feat: support url parameters for cart simulation

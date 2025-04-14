@@ -2,6 +2,7 @@ package wenichats
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"strconv"
@@ -147,6 +148,80 @@ func (s *service) Open(session flows.Session, topic *flows.Topic, body string, a
 		}
 	}
 
+	callbackURL := fmt.Sprintf(
+		"https://%s/mr/tickets/types/wenichats/event_callback/%s/%s",
+		s.rtConfig.Domain,
+		s.ticketer.UUID(),
+		ticket.UUID(),
+	)
+	roomData.CallbackURL = callbackURL
+
+	historyAfter, _ := jsonparser.GetString([]byte(body), "history_after")
+
+	var after time.Time
+	if historyAfter != "" {
+		after, err = parseTime(historyAfter)
+		if err != nil {
+			return nil, err
+		}
+	} else if len(session.Runs()) > 0 {
+		// get messages for history, based on first session run start time
+		startMargin := -time.Second * 1
+		after = session.Runs()[0].CreatedOn().Add(startMargin)
+	}
+
+	cx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+	defer cancel()
+
+	msgs, selectErr := models.SelectContactMessages(cx, db, int(contact.ID()), after)
+	if selectErr != nil {
+		return nil, errors.Wrap(selectErr, "failed to get history messages")
+	}
+
+	batchSize := 50
+	batches := make([][]HistoryMessage, 0)
+
+	currentBatch := make([]HistoryMessage, 0)
+
+	for i := 0; i < len(msgs); i++ {
+		m := historyMsgFromMsg(msgs[i])
+		currentBatch = append(currentBatch, m)
+
+		if len(currentBatch) == batchSize {
+			batches = append(batches, currentBatch)
+			currentBatch = make([]HistoryMessage, 0)
+		}
+	}
+
+	// add the last batch if it's not empty
+	if len(currentBatch) > 0 {
+		batches = append(batches, currentBatch)
+	}
+
+	var historyMsg []HistoryMessage
+	if len(batches) == 0 {
+		historyMsg = currentBatch
+	} else {
+		historyMsg = batches[0]
+	}
+	roomData.History = historyMsg
+
+	cx, cancel = context.WithTimeout(context.Background(), 15*time.Second)
+	defer cancel()
+	ticketer, err := models.LookupTicketerByUUID(cx, db, s.ticketer.UUID())
+
+	if err != nil {
+		logrus.Error(errors.Wrap(err, fmt.Sprintf("failed to lookup ticketer: %s", s.ticketer.UUID())))
+		return nil, errors.Wrap(err, "failed to lookup ticketer")
+	}
+
+	if ticketer != nil && ticketer.Config("project_uuid") != "" && ticketer.Config("project_name_origin") != "" {
+		roomData.ProjectInfo = &ProjectInfo{
+			ProjectUUID: ticketer.Config("project_uuid"),
+			ProjectName: ticketer.Config("project_name_origin"),
+		}
+	}
+
 	newRoom, trace, err := s.restClient.CreateRoom(roomData)
 	if trace != nil {
 		logHTTP(flows.NewHTTPLog(trace, flows.HTTPStatusFromCode, s.redactor))
@@ -156,90 +231,16 @@ func (s *service) Open(session flows.Session, topic *flows.Topic, body string, a
 		return nil, errors.Wrap(err, "failed to create wenichats room")
 	}
 
-	callbackURL := fmt.Sprintf(
-		"https://%s/mr/tickets/types/wenichats/event_callback/%s/%s",
-		s.rtConfig.Domain,
-		s.ticketer.UUID(),
-		ticket.UUID(),
-	)
-
-	roomCB := &RoomRequest{CallbackURL: callbackURL}
-
-	//updates room to set callback_url to be able to receive messages
-	_, trace, err = s.restClient.UpdateRoom(newRoom.UUID, roomCB)
-	if trace != nil {
-		logHTTP(flows.NewHTTPLog(trace, flows.HTTPStatusFromCode, s.redactor))
-	}
-	if err != nil {
-		logrus.Error(errors.Wrap(err, fmt.Sprintf("Error updating wenichats room for: %+v", newRoom)))
-		return nil, errors.Wrap(err, "failed to create wenichats room webhook")
-	}
-
-	historyAfter, _ := jsonparser.GetString([]byte(body), "history_after")
-
-	var after time.Time
-	if historyAfter != "" {
-		// get msgs for history based on history_after param inside ticket body
-		after, err = parseDateTime(historyAfter)
-		if err != nil {
-			_, _, err = s.restClient.CloseRoom(newRoom.UUID)
-			if err != nil {
-				closeErr := errors.Wrap(err, "error closing wenichats room after failing to parse history messages")
-				logrus.Error(closeErr)
-				return nil, closeErr
-			}
-			logrus.Error(errors.Wrap(err, fmt.Sprintf("Error open ticket for: %+v", newRoom)))
-			return nil, errors.Wrap(err, "failed to parse historyAfter to time.Time")
+	for i, batch := range batches {
+		if i == 0 { // to skip the first batch
+			continue
 		}
-	} else {
-		// get messages for history, based on first session run start time
-		startMargin := -time.Second * 1
-		if len(session.Runs()) > 0 {
-			after = session.Runs()[0].CreatedOn().Add(startMargin)
-		} else {
-			after = time.Now().Add(startMargin)
-		}
-	}
-	cx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
-	defer cancel()
-	msgs, selectErr := models.SelectContactMessages(cx, db, int(contact.ID()), after)
-	if selectErr != nil {
-		_, _, err = s.restClient.CloseRoom(newRoom.UUID)
-		if err != nil {
-			closeErr := errors.Wrap(err, "error closing wenichats room after failing to select history messages")
-			logrus.Error(closeErr)
-			return nil, closeErr
-		}
-		return nil, errors.Wrap(selectErr, "failed to get history messages")
-	}
-
-	//send history
-	for _, msg := range msgs {
-		var direction string
-		if msg.Direction() == "I" {
-			direction = "incoming"
-		} else {
-			direction = "outgoing"
-		}
-		m := &MessageRequest{
-			Room:        newRoom.UUID,
-			Text:        msg.Text(),
-			CreatedOn:   msg.CreatedOn(),
-			Attachments: parseMsgAttachments(msg.Attachments()),
-			Direction:   direction,
-		}
-		_, trace, err = s.restClient.CreateMessage(m)
+		trace, err := s.restClient.SendHistoryBatch(newRoom.UUID, batch)
 		if trace != nil {
 			logHTTP(flows.NewHTTPLog(trace, flows.HTTPStatusFromCode, s.redactor))
 		}
 		if err != nil {
-			_, _, err = s.restClient.CloseRoom(newRoom.UUID)
-			if err != nil {
-				closeErr := errors.Wrap(err, "error closing wenichats room after failing to send history messages")
-				logrus.Error(closeErr)
-				return nil, closeErr
-			}
-			return nil, errors.Wrap(err, "error calling wenichats to create a history message, closing newly opened ticket")
+			logrus.Error(errors.Wrap(err, "failed to send history batch"))
 		}
 	}
 
@@ -259,7 +260,7 @@ func parseMsgAttachments(atts []utils.Attachment) []Attachment {
 	return msgAtts
 }
 
-func (s *service) Forward(ticket *models.Ticket, msgUUID flows.MsgUUID, text string, attachments []utils.Attachment, logHTTP flows.HTTPLogCallback) error {
+func (s *service) Forward(ticket *models.Ticket, msgUUID flows.MsgUUID, text string, attachments []utils.Attachment, metadata json.RawMessage, logHTTP flows.HTTPLogCallback) error {
 	roomUUID := string(ticket.ExternalID())
 
 	msg := &MessageRequest{
@@ -267,6 +268,7 @@ func (s *service) Forward(ticket *models.Ticket, msgUUID flows.MsgUUID, text str
 		Attachments: []Attachment{},
 		Direction:   "incoming",
 		CreatedOn:   dates.Now(),
+		Metadata:    metadata,
 	}
 
 	if len(attachments) != 0 {
@@ -304,18 +306,34 @@ func (s *service) Reopen(ticket []*models.Ticket, logHTTP flows.HTTPLogCallback)
 	return errors.New("wenichats ticket type doesn't support reopening")
 }
 
-func parseDateTime(dateString string) (time.Time, error) {
-	layouts := []string{
+func parseTime(historyAfter string) (time.Time, error) {
+	formats := []string{
 		"2006-01-02 15:04:05",
 		"2006-01-02T15:04:05Z",
-		"2006-01-02 15:04:05-07:00",
 	}
 
-	for _, layout := range layouts {
-		if parsedTime, err := time.Parse(layout, dateString); err == nil {
-			return parsedTime, nil
+	for _, format := range formats {
+		t, err := time.Parse(format, historyAfter)
+		if err == nil {
+			return t, nil
 		}
 	}
 
-	return time.Time{}, fmt.Errorf("invalid date time format")
+	return time.Time{}, fmt.Errorf("failed to parse history_after: %q, expected formats: %v", historyAfter, formats)
+}
+
+func historyMsgFromMsg(msg *models.Msg) HistoryMessage {
+	var direction string
+	if msg.Direction() == "I" {
+		direction = "incoming"
+	} else {
+		direction = "outgoing"
+	}
+	m := HistoryMessage{
+		Text:        msg.Text(),
+		CreatedOn:   msg.CreatedOn(),
+		Attachments: parseMsgAttachments(msg.Attachments()),
+		Direction:   direction,
+	}
+	return m
 }
