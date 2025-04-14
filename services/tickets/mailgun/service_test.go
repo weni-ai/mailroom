@@ -18,6 +18,7 @@ import (
 	"github.com/nyaruka/mailroom/services/tickets/mailgun"
 	"github.com/nyaruka/mailroom/testsuite"
 	"github.com/nyaruka/mailroom/testsuite/testdata"
+	"github.com/nyaruka/null"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -110,6 +111,7 @@ func TestOpenAndForward(t *testing.T) {
 		"It's urgent",
 		[]utils.Attachment{utils.Attachment("image/jpg:http://myfiles.com/media/0123/attachment1.jpg")},
 		nil,
+		null.NullString,
 		logger.Log,
 	)
 

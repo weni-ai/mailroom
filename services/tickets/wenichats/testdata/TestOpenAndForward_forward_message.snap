@@ -1,9 +1,9 @@
 POST /v1/external/msgs/ HTTP/1.1
 Host: chats-engine.dev.cloud.weni.ai
 User-Agent: Go-http-client/1.1
-Content-Length: 197
+Content-Length: 217
 Authorization: Bearer ****************
 Content-Type: application/json
 Accept-Encoding: gzip
 
-{"room":"8ecb1e4a-b457-4645-a161-e2b02ddffa88","text":"It's urgent","created_on":"2019-10-07T15:22:38Z","direction":"incoming","attachments":[],"metadata":{"context":{"from":"12345","id":"98765"}}}
+{"room":"8ecb1e4a-b457-4645-a161-e2b02ddffa88","text":"It's urgent","created_on":"2019-10-07T15:22:38Z","direction":"incoming","attachments":[],"metadata":{"context":{"from":"12345","id":"98765"}},"external_id":"123"}
