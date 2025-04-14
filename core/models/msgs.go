@@ -1413,7 +1413,7 @@ func CreateBroadcastMessages(ctx context.Context, rt *runtime.Runtime, oa *OrgAs
 		}
 
 		// create our outgoing message
-		out := flows.NewMsgOut(urn, channel.ChannelReference(), text, t.Attachments, t.QuickReplies, nil, flows.NilMsgTopic)
+		out := flows.NewMsgOut(urn, channel.ChannelReference(), text, t.Attachments, t.QuickReplies, nil, flows.NilMsgTopic, "", "", "")
 		msg, err := NewOutgoingBroadcastMsg(rt, oa.Org(), channel, c.ID(), out, time.Now(), bcast.BroadcastID(), extraMetadata)
 
 		if err != nil {
@@ -2012,7 +2012,7 @@ func CreateOutgoingMessages(ctx context.Context, rt *runtime.Runtime, oa *OrgAss
 		}
 
 		// create our outgoing message
-		out := flows.NewMsgOut(urn, channel.ChannelReference(), msgText, nil, nil, nil, flows.NilMsgTopic)
+		out := flows.NewMsgOut(urn, channel.ChannelReference(), msgText, nil, nil, nil, flows.NilMsgTopic, "", "", "")
 		msg, err := NewOutgoingMsg(rt, oa.Org(), channel, c.ID(), out, time.Now(), nil)
 		if err != nil {
 			return nil, errors.Wrapf(err, "error creating outgoing message")
