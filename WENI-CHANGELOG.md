@@ -1,3 +1,8 @@
+1.58.0
+----------
+ * Send external_id field to wenichats when creating message
+ * propagate wenichats msg UUID through msg metadata
+
 1.57.0
 ----------
  * Modify service logic to include search keywords in call results
