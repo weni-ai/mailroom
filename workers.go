@@ -79,9 +79,9 @@ func (f *Foreman) Assign() {
 
 	lastSleep := false
 
+	go f.RecordWorkerMetrics()
+
 	for {
-		metrics.SetAvailableWorkers(f.queue, len(f.availableWorkers))
-		metrics.SetUsedWorkers(f.queue, len(f.workers)-len(f.availableWorkers))
 		select {
 		// return if we have been told to stop
 		case <-f.quit:
@@ -114,6 +114,14 @@ func (f *Foreman) Assign() {
 				time.Sleep(250 * time.Millisecond)
 			}
 		}
+	}
+}
+
+func (f *Foreman) RecordWorkerMetrics() {
+	for {
+		metrics.SetAvailableWorkers(f.queue, len(f.availableWorkers))
+		metrics.SetUsedWorkers(f.queue, len(f.workers)-len(f.availableWorkers))
+		time.Sleep(250 * time.Millisecond)
 	}
 }
 

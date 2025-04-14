@@ -25,10 +25,10 @@ func TestMsgReceived(t *testing.T) {
 		{
 			Actions: handlers.ContactActionMap{
 				testdata.Cathy: []flows.Action{
-					actions.NewSendMsg(handlers.NewActionUUID(), "Hello World", nil, nil, false),
+					actions.NewSendMsg(handlers.NewActionUUID(), "Hello World", nil, nil, "", "", "", false),
 				},
 				testdata.George: []flows.Action{
-					actions.NewSendMsg(handlers.NewActionUUID(), "Hello world", nil, nil, false),
+					actions.NewSendMsg(handlers.NewActionUUID(), "Hello world", nil, nil, "", "", "", false),
 				},
 			},
 			Msgs: handlers.ContactMsgMap{
@@ -51,7 +51,7 @@ func TestMsgReceived(t *testing.T) {
 			FlowType: flows.FlowTypeMessagingOffline,
 			Actions: handlers.ContactActionMap{
 				testdata.Bob: []flows.Action{
-					actions.NewSendMsg(handlers.NewActionUUID(), "Hello World", nil, nil, false),
+					actions.NewSendMsg(handlers.NewActionUUID(), "Hello World", nil, nil, "", "", "", false),
 				},
 			},
 			Msgs: handlers.ContactMsgMap{

@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	_ "github.com/nyaruka/mailroom/services/tickets/mailgun"
+	"github.com/nyaruka/mailroom/services/tickets/wenichats"
 	_ "github.com/nyaruka/mailroom/services/tickets/zendesk"
 	"github.com/nyaruka/mailroom/testsuite"
 	"github.com/nyaruka/mailroom/testsuite/testdata"
@@ -72,4 +73,13 @@ func TestTicketReopen(t *testing.T) {
 	testdata.InsertOpenTicket(db, testdata.Org1, testdata.Cathy, testdata.Zendesk, testdata.DefaultTopic, "Have you seen my cookies?", "34", testdata.Editor)
 
 	web.RunWebTests(t, ctx, rt, "testdata/reopen.json", nil)
+}
+
+func TestOpenTicket(t *testing.T) {
+	ctx, rt, _, _ := testsuite.Get()
+
+	defer testsuite.Reset(testsuite.ResetData)
+
+	wenichats.SetDB(rt.DB)
+	web.RunWebTests(t, ctx, rt, "testdata/open.json", nil)
 }
