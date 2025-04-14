@@ -270,7 +270,10 @@ func (s *service) Forward(ticket *models.Ticket, msgUUID flows.MsgUUID, text str
 		Direction:   "incoming",
 		CreatedOn:   dates.Now(),
 		Metadata:    metadata,
-		ExternalID:  msgExternalID,
+	}
+
+	if msgExternalID != null.NullString {
+		msg.ExternalID = msgExternalID
 	}
 
 	if len(attachments) != 0 {
