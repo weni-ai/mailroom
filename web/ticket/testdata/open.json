@@ -103,11 +103,11 @@
       "ticketer_id": 7,
       "topic_id": 1,
       "assignee_id": 0,
-      "extra": "{\"history_after\":\"2025-01-01 00:00:00\"}"
+      "extra": "{\"history_after\":\"2025-01-01 00:00:00-00:00\"}"
     },
     "status": 200,
     "response": {
-      "body": "{\"history_after\":\"2025-01-01 00:00:00\"}",
+      "body": "{\"history_after\":\"2025-01-01 00:00:00-00:00\"}",
       "external_id": "8ecb1e4a-b457-4645-a161-e2b02ddffa88",
       "ticketer": {
           "name": "Weni Chats",
