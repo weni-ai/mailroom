@@ -1,3 +1,7 @@
+1.58.1
+----------
+ * Fix open ticket endpoint putting back the time parse format for "2006-01-02 15:04:05-07:00" on wenichats service parseTime
+
 1.58.0
 ----------
  * Send external_id field to wenichats when creating message
