@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/nyaruka/gocommon/httpx"
+	"github.com/nyaruka/mailroom/runtime"
 	"github.com/nyaruka/mailroom/services/tickets/wenichats"
 	"github.com/stretchr/testify/assert"
 )
@@ -57,7 +58,7 @@ func TestCreateRoom(t *testing.T) {
 		},
 	}))
 
-	client := wenichats.NewClient(http.DefaultClient, nil, baseURL, authToken)
+	client := wenichats.NewClient(http.DefaultClient, nil, baseURL, authToken, time.Now().Add(time.Hour*6), runtime.NewDefaultConfig(), nil)
 	data := &wenichats.RoomRequest{
 		QueueUUID: "449f48d9-4905-4d6f-8abf-f1ff6afb803e",
 		Contact:   &wenichats.Contact{},
@@ -129,7 +130,7 @@ func TestUpdateRoom(t *testing.T) {
 		},
 	}))
 
-	client := wenichats.NewClient(http.DefaultClient, nil, baseURL, authToken)
+	client := wenichats.NewClient(http.DefaultClient, nil, baseURL, authToken, time.Now().Add(time.Hour*6), runtime.NewDefaultConfig(), nil)
 	data := &wenichats.RoomRequest{
 		CallbackURL: "http://example.com",
 	}
@@ -188,7 +189,7 @@ func TestCloseRoom(t *testing.T) {
 		},
 	}))
 
-	client := wenichats.NewClient(http.DefaultClient, nil, baseURL, authToken)
+	client := wenichats.NewClient(http.DefaultClient, nil, baseURL, authToken, time.Now().Add(time.Hour*6), runtime.NewDefaultConfig(), nil)
 
 	_, _, err := client.CloseRoom(roomUUID)
 	assert.EqualError(t, err, "unable to connect to server")
@@ -235,7 +236,7 @@ func TestSendMessage(t *testing.T) {
 		},
 	}))
 
-	client := wenichats.NewClient(http.DefaultClient, nil, baseURL, authToken)
+	client := wenichats.NewClient(http.DefaultClient, nil, baseURL, authToken, time.Now().Add(time.Hour*6), runtime.NewDefaultConfig(), nil)
 
 	msg := &wenichats.MessageRequest{
 		Room:      roomUUID,
@@ -281,7 +282,7 @@ func TestGetQueues(t *testing.T) {
 		},
 	}))
 
-	client := wenichats.NewClient(http.DefaultClient, nil, baseURL, authToken)
+	client := wenichats.NewClient(http.DefaultClient, nil, baseURL, authToken, time.Now().Add(time.Hour*6), runtime.NewDefaultConfig(), nil)
 
 	_, _, err := client.GetQueues(nil)
 	assert.EqualError(t, err, "unable to connect to server")
@@ -308,7 +309,7 @@ func TestSendBatch(t *testing.T) {
 		},
 	}))
 
-	client := wenichats.NewClient(http.DefaultClient, nil, baseURL, authToken)
+	client := wenichats.NewClient(http.DefaultClient, nil, baseURL, authToken, time.Now().Add(time.Hour*6), runtime.NewDefaultConfig(), nil)
 
 	history := []wenichats.HistoryMessage{
 		{
