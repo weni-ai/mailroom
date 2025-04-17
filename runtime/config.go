@@ -98,6 +98,10 @@ type Config struct {
 	MetaWebhookURL          string `help:"Meta webhook URL"`
 
 	ShutdownToleranceTime int `help:"Shutdown tolerance time(in seconds)"`
+
+	OidcRpClientID      string `help:"OIDC RP Client ID"`
+	OidcRpClientSecret  string `help:"OIDC RP Client Secret"`
+	OidcOpTokenEndpoint string `help:"OIDC OP Token Endpoint"`
 }
 
 // NewDefaultConfig returns a new default configuration object
