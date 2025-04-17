@@ -373,7 +373,7 @@ func FetchNewToken(rtCfg *runtime.Config) (string, time.Time, error) {
 		rtCfg.OidcRpClientID, rtCfg.OidcRpClientSecret,
 	))
 
-	req, err := http.NewRequestWithContext(nil, http.MethodPost, authURL, reqBody)
+	req, err := httpx.NewRequest(http.MethodPost, authURL, reqBody, nil)
 	if err != nil {
 		return "", time.Time{}, errors.Wrap(err, "error creating auth request")
 	}
