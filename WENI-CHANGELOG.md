@@ -1,3 +1,17 @@
+1.58.1
+----------
+ * Fix open ticket endpoint putting back the time parse format for "2006-01-02 15:04:05-07:00" on wenichats service parseTime
+
+1.58.0
+----------
+ * Send external_id field to wenichats when creating message
+ * propagate wenichats msg UUID through msg metadata
+
+1.57.0
+----------
+ * Modify service logic to include search keywords in call results
+ * Add logistics info and delivery channel filter to seller search
+
 1.56.0
 ----------
  * feat: Wenichats room with history

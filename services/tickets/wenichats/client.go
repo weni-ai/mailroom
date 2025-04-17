@@ -14,6 +14,7 @@ import (
 	"github.com/nyaruka/gocommon/jsonx"
 	"github.com/nyaruka/goflow/assets"
 	"github.com/nyaruka/mailroom/runtime"
+	"github.com/nyaruka/null"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 )
@@ -252,6 +253,7 @@ type MessageRequest struct {
 	Direction   string          `json:"direction"`
 	Attachments []Attachment    `json:"attachments"`
 	Metadata    json.RawMessage `json:"metadata,omitempty"`
+	ExternalID  null.String     `json:"external_id,omitempty"`
 }
 
 type MessageResponse struct {

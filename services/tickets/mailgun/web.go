@@ -133,7 +133,7 @@ func handleReceive(ctx context.Context, rt *runtime.Runtime, r *http.Request, l 
 		}
 	}
 
-	msg, err := tickets.SendReply(ctx, rt, ticket, request.StrippedText, files)
+	msg, err := tickets.SendReply(ctx, rt, ticket, request.StrippedText, files, nil)
 	if err != nil {
 		return err, http.StatusInternalServerError, nil
 	}

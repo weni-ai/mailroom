@@ -25,6 +25,7 @@ import (
 	"github.com/nyaruka/goflow/utils"
 	"github.com/nyaruka/mailroom/core/models"
 	"github.com/nyaruka/mailroom/runtime"
+	"github.com/nyaruka/null"
 )
 
 const (
@@ -228,7 +229,7 @@ func (s *service) Open(session flows.Session, topic *flows.Topic, body string, a
 		if err != nil {
 			return nil, err
 		}
-	} else {
+	} else if len(session.Runs()) > 0 {
 		// get messages for history, based on first session run start time
 		startMargin := -time.Second * 1
 		after = session.Runs()[0].CreatedOn().Add(startMargin)
@@ -324,7 +325,7 @@ func parseMsgAttachments(atts []utils.Attachment) []Attachment {
 	return msgAtts
 }
 
-func (s *service) Forward(ticket *models.Ticket, msgUUID flows.MsgUUID, text string, attachments []utils.Attachment, metadata json.RawMessage, logHTTP flows.HTTPLogCallback) error {
+func (s *service) Forward(ticket *models.Ticket, msgUUID flows.MsgUUID, text string, attachments []utils.Attachment, metadata json.RawMessage, msgExternalID null.String, logHTTP flows.HTTPLogCallback) error {
 	roomUUID := string(ticket.ExternalID())
 
 	msg := &MessageRequest{
@@ -333,6 +334,10 @@ func (s *service) Forward(ticket *models.Ticket, msgUUID flows.MsgUUID, text str
 		Direction:   "incoming",
 		CreatedOn:   dates.Now(),
 		Metadata:    metadata,
+	}
+
+	if msgExternalID != null.NullString {
+		msg.ExternalID = msgExternalID
 	}
 
 	if len(attachments) != 0 {
@@ -374,6 +379,7 @@ func parseTime(historyAfter string) (time.Time, error) {
 	formats := []string{
 		"2006-01-02 15:04:05",
 		"2006-01-02T15:04:05Z",
+		"2006-01-02 15:04:05-07:00",
 	}
 
 	for _, format := range formats {

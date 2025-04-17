@@ -1,7 +1,7 @@
 POST /v1/external/rooms/ HTTP/1.1
 Host: chats-engine.dev.cloud.weni.ai
 User-Agent: Go-http-client/1.1
-Content-Length: 802
+Content-Length: 884
 Authorization: Bearer ****************
 Content-Type: application/json
 Accept-Encoding: gzip

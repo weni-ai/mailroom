@@ -168,12 +168,22 @@ func setupMocks() {
 								]
 							}`),
 		},
-		"https://vtex.com.br/intelligent/searchapi/checkout/pub/orderForms/simulation?test=test&test2=test2": {
+		"https://vtex.com.br/intelligent/searchapi/checkout/pub/orderForms/simulation?test=test&deliveryChannel=delivery": {
 			createMockResponse(`{
 				"items": [
 					{
 						"id": "1234",
 						"availability": "available"
+					}
+				],
+				"logisticsInfo": [
+					{
+						"itemIndex": 0,
+						"deliveryChannels": [
+							{
+								"id": "delivery"
+							}
+						]
 					}
 				]
 			}`),
@@ -224,7 +234,7 @@ func TestService(t *testing.T) {
 	logger := &flows.HTTPLogger{}
 
 	params := assets.MsgCatalogParam{
-		ProductSearch: "",
+		ProductSearch: "banana",
 		ChannelUUID:   uuids.UUID(testdata.TwilioChannel.UUID),
 		SearchType:    "default",
 		SearchUrl:     "",
@@ -236,9 +246,10 @@ func TestService(t *testing.T) {
 	assert.NotNil(t, call)
 	assert.Equal(t, "p1", call.ProductRetailerIDS[0].ProductRetailerIDs[0])
 	assert.NotNil(t, call.Traces)
+	assert.Equal(t, []string{"banana"}, call.SearchKeywords)
 
 	params = assets.MsgCatalogParam{
-		ProductSearch: "",
+		ProductSearch: "banana",
 		ChannelUUID:   uuids.UUID(testdata.TwilioChannel.UUID),
 		SearchType:    "vtex",
 		SearchUrl:     "https://vtex.com.br/legacy/search",
@@ -250,22 +261,23 @@ func TestService(t *testing.T) {
 	assert.NotNil(t, call)
 	assert.Equal(t, "1236", call.ProductRetailerIDS[0].ProductRetailerIDs[0])
 	assert.NotNil(t, call.Traces)
-
+	assert.Equal(t, []string{"banana"}, call.SearchKeywords)
 	params = assets.MsgCatalogParam{
-		ProductSearch:        "",
+		ProductSearch:        "banana",
 		ChannelUUID:          uuids.UUID(testdata.TwilioChannel.UUID),
 		SearchType:           "vtex",
 		SearchUrl:            "https://vtex.com.br/intelligent/search",
 		ApiType:              "intelligent",
 		PostalCode:           "000000-000",
 		SellerId:             "10",
-		CartSimulationParams: "test=test&test2=test2",
+		CartSimulationParams: "test=test&deliveryChannel=delivery",
 	}
 	call, err = svc.Call(session, params, logger.Log)
 	assert.NoError(t, err)
 	assert.NotNil(t, call)
 	assert.Equal(t, "1234#10", call.ProductRetailerIDS[0].ProductRetailerIDs[0])
 	assert.NotNil(t, call.Traces)
+	assert.Equal(t, []string{"banana"}, call.SearchKeywords)
 
 	params = assets.MsgCatalogParam{
 		ProductSearch: "",
@@ -281,9 +293,10 @@ func TestService(t *testing.T) {
 	assert.NotNil(t, call)
 	assert.Equal(t, "1234#2", call.ProductRetailerIDS[0].ProductRetailerIDs[0])
 	assert.NotNil(t, call.Traces)
+	assert.Equal(t, []string{"banana"}, call.SearchKeywords)
 
 	params = assets.MsgCatalogParam{
-		ProductSearch: "",
+		ProductSearch: "banana",
 		ChannelUUID:   uuids.UUID(testdata.TwilioChannel.UUID),
 		SearchType:    "vtex",
 		SearchUrl:     "https://vtex.com.br/intelligent/search",
@@ -298,4 +311,5 @@ func TestService(t *testing.T) {
 	assert.NotNil(t, call)
 	assert.Equal(t, "1234#10", call.ProductRetailerIDS[0].ProductRetailerIDs[0])
 	assert.NotNil(t, call.Traces)
+	assert.Equal(t, []string{"banana"}, call.SearchKeywords)
 }
