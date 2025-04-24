@@ -5,12 +5,14 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"net/url"
 	"strconv"
 	"strings"
 	"sync"
 	"time"
 
 	"github.com/buger/jsonparser"
+	"github.com/gomodule/redigo/redis"
 	"github.com/jmoiron/sqlx"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
@@ -52,6 +54,59 @@ func SetDB(newDB *sqlx.DB) {
 	db = newDB
 }
 
+var redisPool *redis.Pool
+var redisLock = &sync.Mutex{}
+
+func initRedis(redisUrl string) error {
+	redisURL, _ := url.Parse(redisUrl)
+	if redisPool == nil {
+		redisLock.Lock()
+		defer redisLock.Unlock()
+
+		newPool := &redis.Pool{
+			MaxIdle:     3,
+			IdleTimeout: 240 * time.Second,
+			Dial: func() (redis.Conn, error) {
+				conn, err := redis.Dial("tcp", redisURL.Host)
+				if err != nil {
+					return nil, err
+				}
+
+				// send auth if required
+				if redisURL.User != nil {
+					pass, authRequired := redisURL.User.Password()
+					if authRequired {
+						if _, err := conn.Do("AUTH", pass); err != nil {
+							conn.Close()
+							return nil, err
+						}
+					}
+				}
+
+				// switch to the right DB
+				_, err = conn.Do("SELECT", strings.TrimLeft(redisURL.Path, "/"))
+				return conn, err
+			},
+		}
+
+		// Test the connection
+		conn := newPool.Get()
+		defer conn.Close()
+
+		_, err := conn.Do("PING")
+		if err != nil {
+			return errors.Wrap(err, "unable to connect to redis")
+		}
+
+		SetRedis(newPool)
+	}
+	return nil
+}
+
+func SetRedis(pool *redis.Pool) {
+	redisPool = pool
+}
+
 func init() {
 	models.RegisterTicketService(typeWenichats, NewService)
 }
@@ -65,31 +120,39 @@ type service struct {
 }
 
 func NewService(rtCfg *runtime.Config, httpClient *http.Client, httpRetries *httpx.RetryConfig, ticketer *flows.Ticketer, config map[string]string) (models.TicketService, error) {
-	authToken := config[configurationProjectAuth]
 	sectorUUID := config[configurationSectorUUID]
 	baseURL := rtCfg.WenichatsServiceURL
-	if authToken != "" && sectorUUID != "" {
-
-		if err := initDB(rtCfg.DB); err != nil {
-			return nil, err
-		}
-
-		return &service{
-			rtConfig:   rtCfg,
-			restClient: NewClient(httpClient, httpRetries, baseURL, authToken),
-			ticketer:   ticketer,
-			redactor:   utils.NewRedactor(flows.RedactionMask, authToken),
-			sectorUUID: sectorUUID,
-		}, nil
+	if sectorUUID == "" {
+		return nil, errors.New("missing project_auth or sector_uuid")
 	}
 
-	return nil, errors.New("missing project_auth or sector_uuid")
+	if err := initDB(rtCfg.DB); err != nil {
+		return nil, err
+	}
+
+	if err := initRedis(rtCfg.Redis); err != nil {
+		return nil, err
+	}
+
+	token, expiry, err := GetToken(httpClient, redisPool, rtCfg)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to get auth token")
+	}
+
+	client := NewClient(httpClient, httpRetries, baseURL, token, expiry, rtCfg, redisPool)
+
+	return &service{
+		rtConfig:   rtCfg,
+		restClient: client,
+		ticketer:   ticketer,
+		redactor:   utils.NewRedactor(flows.RedactionMask, token),
+		sectorUUID: sectorUUID,
+	}, nil
 }
 
 func (s *service) Open(session flows.Session, topic *flows.Topic, body string, assignee *flows.User, logHTTP flows.HTTPLogCallback) (*flows.Ticket, error) {
 	ticket := flows.OpenTicket(s.ticketer, topic, body, assignee)
 	contact := session.Contact()
-
 	roomData := &RoomRequest{Contact: &Contact{}, CustomFields: map[string]interface{}{}}
 
 	if assignee != nil {
@@ -101,7 +164,6 @@ func (s *service) Open(session flows.Session, topic *flows.Topic, body string, a
 		g := Group{UUID: string(group.UUID()), Name: group.Name()}
 		groups = append(groups, g)
 	}
-
 	roomData.Contact.ExternalID = string(contact.UUID())
 
 	// check if the organization has restrictions in RedactionPolicy
@@ -113,7 +175,6 @@ func (s *service) Open(session flows.Session, topic *flows.Topic, body string, a
 		roomData.Contact.Name = contact.Name()
 		roomData.IsAnon = false
 	}
-
 	roomData.SectorUUID = s.sectorUUID
 	roomData.QueueUUID = string(topic.QueueUUID())
 	roomData.TicketUUID = string(ticket.UUID())
@@ -127,11 +188,9 @@ func (s *service) Open(session flows.Session, topic *flows.Topic, body string, a
 		}
 		roomData.Contact.URN = urns[0].String()
 	}
-
 	if len(session.Runs()) > 0 && session.Runs()[0].Flow() != nil {
 		roomData.FlowUUID = session.Runs()[0].Flow().UUID()
 	}
-
 	roomData.Contact.Groups = groups
 
 	// if body is not configured with custom fields properly, send all fields from contact
@@ -181,7 +240,7 @@ func (s *service) Open(session flows.Session, topic *flows.Topic, body string, a
 		if err != nil {
 			return nil, err
 		}
-	} else {
+	} else if len(session.Runs()) > 0 {
 		// get messages for history, based on first session run start time
 		startMargin := -time.Second * 1
 		if len(session.Runs()) > 0 {
@@ -203,7 +262,6 @@ func (s *service) Open(session flows.Session, topic *flows.Topic, body string, a
 	batches := make([][]HistoryMessage, 0)
 
 	currentBatch := make([]HistoryMessage, 0)
-
 	for i := 0; i < len(msgs); i++ {
 		m := historyMsgFromMsg(msgs[i])
 		currentBatch = append(currentBatch, m)
@@ -227,6 +285,21 @@ func (s *service) Open(session flows.Session, topic *flows.Topic, body string, a
 	}
 	roomData.History = historyMsg
 
+	cx, cancel = context.WithTimeout(context.Background(), 15*time.Second)
+	defer cancel()
+	ticketer, err = models.LookupTicketerByUUID(cx, db, s.ticketer.UUID())
+
+	if err != nil {
+		logrus.Error(errors.Wrap(err, fmt.Sprintf("failed to lookup ticketer: %s", s.ticketer.UUID())))
+		return nil, errors.Wrap(err, "failed to lookup ticketer")
+	}
+
+	if ticketer != nil && ticketer.Config("project_uuid") != "" && ticketer.Config("project_name_origin") != "" {
+		roomData.ProjectInfo = &ProjectInfo{
+			ProjectUUID: ticketer.Config("project_uuid"),
+			ProjectName: ticketer.Config("project_name_origin"),
+		}
+	}
 	newRoom, trace, err := s.restClient.CreateRoom(roomData)
 	if trace != nil {
 		logHTTP(flows.NewHTTPLog(trace, flows.HTTPStatusFromCode, s.redactor))
@@ -274,7 +347,10 @@ func (s *service) Forward(ticket *models.Ticket, msgUUID flows.MsgUUID, text str
 		Direction:   "incoming",
 		CreatedOn:   dates.Now(),
 		Metadata:    metadata,
-		ExternalID:  msgExternalID,
+	}
+
+	if msgExternalID != null.NullString {
+		msg.ExternalID = msgExternalID
 	}
 
 	if len(attachments) != 0 {
@@ -316,6 +392,7 @@ func parseTime(historyAfter string) (time.Time, error) {
 	formats := []string{
 		"2006-01-02 15:04:05",
 		"2006-01-02T15:04:05Z",
+		"2006-01-02 15:04:05-07:00",
 	}
 
 	for _, format := range formats {

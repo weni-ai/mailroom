@@ -267,7 +267,6 @@ func (s *service) Call(session flows.Session, params assets.MsgCatalogParam, log
 				for _, existingProductId := range existingProductsIds {
 					expectedID := existingProductId + sellerID
 					if productRetailerID == expectedID {
-						fmt.Printf("✓ Produto %s encontrado na simulação\n", productRetailerID)
 						_, exists := productRetailerIDMap[productRetailerID]
 						if !exists {
 							if len(newEntry.ProductRetailerIDs) < qttProducts {

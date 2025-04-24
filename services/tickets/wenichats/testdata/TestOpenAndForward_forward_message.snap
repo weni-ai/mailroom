@@ -6,4 +6,4 @@ Authorization: Bearer ****************
 Content-Type: application/json
 Accept-Encoding: gzip
 
-{"room":"8ecb1e4a-b457-4645-a161-e2b02ddffa88","text":"It's urgent","created_on":"2019-10-07T15:22:42Z","direction":"incoming","attachments":[],"metadata":{"context":{"from":"12345","id":"98765"}},"external_id":"123"}
+{"room":"8ecb1e4a-b457-4645-a161-e2b02ddffa88","text":"It's urgent","created_on":"2019-10-07T15:22:40Z","direction":"incoming","attachments":[],"metadata":{"context":{"from":"12345","id":"98765"}},"external_id":"123"}
