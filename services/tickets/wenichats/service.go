@@ -134,7 +134,7 @@ func NewService(rtCfg *runtime.Config, httpClient *http.Client, httpRetries *htt
 		return nil, err
 	}
 
-	token, expiry, err := GetToken(redisPool, rtCfg)
+	token, expiry, err := GetToken(httpClient, redisPool, rtCfg)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to get auth token")
 	}
@@ -153,7 +153,6 @@ func NewService(rtCfg *runtime.Config, httpClient *http.Client, httpRetries *htt
 func (s *service) Open(session flows.Session, topic *flows.Topic, body string, assignee *flows.User, logHTTP flows.HTTPLogCallback) (*flows.Ticket, error) {
 	ticket := flows.OpenTicket(s.ticketer, topic, body, assignee)
 	contact := session.Contact()
-
 	roomData := &RoomRequest{Contact: &Contact{}, CustomFields: map[string]interface{}{}}
 
 	if assignee != nil {
@@ -165,7 +164,6 @@ func (s *service) Open(session flows.Session, topic *flows.Topic, body string, a
 		g := Group{UUID: string(group.UUID()), Name: group.Name()}
 		groups = append(groups, g)
 	}
-
 	roomData.Contact.ExternalID = string(contact.UUID())
 
 	// check if the organization has restrictions in RedactionPolicy
@@ -177,7 +175,6 @@ func (s *service) Open(session flows.Session, topic *flows.Topic, body string, a
 		roomData.Contact.Name = contact.Name()
 		roomData.IsAnon = false
 	}
-
 	roomData.SectorUUID = s.sectorUUID
 	roomData.QueueUUID = string(topic.QueueUUID())
 	roomData.TicketUUID = string(ticket.UUID())
@@ -191,11 +188,9 @@ func (s *service) Open(session flows.Session, topic *flows.Topic, body string, a
 		}
 		roomData.Contact.URN = urns[0].String()
 	}
-
 	if len(session.Runs()) > 0 && session.Runs()[0].Flow() != nil {
 		roomData.FlowUUID = session.Runs()[0].Flow().UUID()
 	}
-
 	roomData.Contact.Groups = groups
 
 	// if body is not configured with custom fields properly, send all fields from contact
@@ -212,7 +207,6 @@ func (s *service) Open(session flows.Session, topic *flows.Topic, body string, a
 			}
 		}
 	}
-
 	callbackURL := fmt.Sprintf(
 		"https://%s/mr/tickets/types/wenichats/event_callback/%s/%s",
 		s.rtConfig.Domain,
@@ -247,7 +241,6 @@ func (s *service) Open(session flows.Session, topic *flows.Topic, body string, a
 	batches := make([][]HistoryMessage, 0)
 
 	currentBatch := make([]HistoryMessage, 0)
-
 	for i := 0; i < len(msgs); i++ {
 		m := historyMsgFromMsg(msgs[i])
 		currentBatch = append(currentBatch, m)
@@ -286,7 +279,6 @@ func (s *service) Open(session flows.Session, topic *flows.Topic, body string, a
 			ProjectName: ticketer.Config("project_name_origin"),
 		}
 	}
-
 	newRoom, trace, err := s.restClient.CreateRoom(roomData)
 	if trace != nil {
 		logHTTP(flows.NewHTTPLog(trace, flows.HTTPStatusFromCode, s.redactor))

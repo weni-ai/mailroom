@@ -3,7 +3,6 @@ package wenichats
 import (
 	"encoding/json"
 	"fmt"
-	"io"
 	"net/http"
 	"net/url"
 	"strings"
@@ -48,7 +47,7 @@ type errorResponse struct {
 
 func (c *baseClient) ensureTokenValid() error {
 	if c.expiresAt.Before(time.Now()) {
-		token, expiry, err := GetToken(c.redisPool, c.rtCfg)
+		token, expiry, err := GetToken(c.httpClient, c.redisPool, c.rtCfg)
 		if err != nil {
 			return err
 		}
@@ -315,10 +314,9 @@ type authResponse struct {
 }
 
 // GetToken returns a valid authentication token, fetching a new one if necessary
-func GetToken(rp *redis.Pool, rtCfg *runtime.Config) (string, time.Time, error) {
+func GetToken(httpClient *http.Client, rp *redis.Pool, rtCfg *runtime.Config) (string, time.Time, error) {
 	// First try in Redis
 	rc := rp.Get()
-	defer rc.Close()
 
 	// Try to acquire lock for token renewal
 	lockKey := tokenCacheKey + ":lock"
@@ -335,12 +333,11 @@ func GetToken(rp *redis.Pool, rtCfg *runtime.Config) (string, time.Time, error) 
 			"component": "wenichats_token",
 		}).Debug("Acquired lock for token renewal")
 
-		token, expiry, err := FetchNewToken(rtCfg)
+		token, expiry, err := FetchNewToken(httpClient, rtCfg)
 		if err != nil {
 			return "", time.Time{}, errors.Wrap(err, "error fetching new token")
 		}
 
-		// Save token in Redis
 		_, err = rc.Do("SETEX", tokenCacheKey, int(tokenExpiry.Seconds()), token)
 		if err != nil {
 			logrus.WithError(err).Error("Failed to save token to Redis")
@@ -361,11 +358,11 @@ func GetToken(rp *redis.Pool, rtCfg *runtime.Config) (string, time.Time, error) 
 
 	// Wait and try again
 	time.Sleep(time.Millisecond * 100)
-	return GetToken(rp, rtCfg)
+	return GetToken(httpClient, rp, rtCfg)
 }
 
 // fetchNewToken calls the auth API to get a new token
-func FetchNewToken(rtCfg *runtime.Config) (string, time.Time, error) {
+func FetchNewToken(httpClient *http.Client, rtCfg *runtime.Config) (string, time.Time, error) {
 	authURL := rtCfg.OidcOpTokenEndpoint
 
 	reqBody := strings.NewReader(fmt.Sprintf(
@@ -377,27 +374,27 @@ func FetchNewToken(rtCfg *runtime.Config) (string, time.Time, error) {
 	if err != nil {
 		return "", time.Time{}, errors.Wrap(err, "error creating auth request")
 	}
-
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 
-	client := &http.Client{}
-	resp, err := client.Do(req)
+	trace, err := httpx.DoTrace(httpClient, req, nil, nil, -1)
 	if err != nil {
 		return "", time.Time{}, errors.Wrap(err, "error making auth request")
 	}
-	defer resp.Body.Close()
 
-	if resp.StatusCode != http.StatusOK {
-		body, _ := io.ReadAll(resp.Body)
-		return "", time.Time{}, errors.Errorf("auth request failed with status %d: %s", resp.StatusCode, string(body))
+	if trace.Response.StatusCode >= 400 {
+		response := &errorResponse{}
+		err := jsonx.Unmarshal(trace.ResponseBody, response)
+		if err != nil {
+			return "", time.Time{}, errors.Wrap(err, fmt.Sprintf("couldn't parse error response: %v", string(trace.ResponseBody)))
+		}
+		return "", time.Time{}, errors.New(response.Detail)
 	}
 
 	var authResp authResponse
-	if err := json.NewDecoder(resp.Body).Decode(&authResp); err != nil {
+	if err := json.Unmarshal(trace.ResponseBody, &authResp); err != nil {
 		return "", time.Time{}, errors.Wrap(err, "error decoding auth response")
 	}
 
-	// Calculate expiration time (use 90% of actual expiry to refresh before it expires)
 	expiryDuration := time.Duration(authResp.ExpiresIn) * time.Second
 	safeExpiry := time.Now().Add(expiryDuration * 9 / 10)
 

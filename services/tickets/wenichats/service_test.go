@@ -43,6 +43,14 @@ func TestOpenAndForward(t *testing.T) {
 	uuids.SetGenerator(uuids.NewSeededGenerator(12345))
 
 	httpx.SetRequestor(httpx.NewMockRequestor(map[string][]httpx.MockResponse{
+		"https://auth.weni.ai/oauth/token": {
+			httpx.NewMockResponse(200, nil, `{
+				"access_token": "token",
+				"token_type": "Bearer",
+				"expires_in": 3600
+			}`),
+		},
+
 		fmt.Sprintf("%s/rooms/", baseURL): {
 			httpx.NewMockResponse(201, nil, `{
 				"uuid": "8ecb1e4a-b457-4645-a161-e2b02ddffa88",
@@ -471,6 +479,13 @@ func TestOpenFails(t *testing.T) {
 	uuids.SetGenerator(uuids.NewSeededGenerator(12345))
 
 	httpx.SetRequestor(httpx.NewMockRequestor(map[string][]httpx.MockResponse{
+		"https://auth.weni.ai/oauth/token": {
+			httpx.NewMockResponse(200, nil, `{
+				"access_token": "token",
+				"token_type": "Bearer",
+				"expires_in": 3600
+			}`),
+		},
 		fmt.Sprintf("%s/rooms/", baseURL): {
 			httpx.NewMockResponse(502, nil, `502 Bad Gateway`),
 			httpx.NewMockResponse(201, nil, `{
@@ -635,6 +650,13 @@ func TestCloseAndReopen(t *testing.T) {
 	roomUUID := "8ecb1e4a-b457-4645-a161-e2b02ddffa88"
 
 	httpx.SetRequestor(httpx.NewMockRequestor(map[string][]httpx.MockResponse{
+		"https://auth.weni.ai/oauth/token": {
+			httpx.NewMockResponse(200, nil, `{
+				"access_token": "token",
+				"token_type": "Bearer",
+				"expires_in": 3600
+			}`),
+		},
 		fmt.Sprintf("%s/rooms/%s/close/", baseURL, roomUUID): {
 			httpx.MockConnectionError,
 			httpx.NewMockResponse(500, nil, `{

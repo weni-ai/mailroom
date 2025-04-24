@@ -171,6 +171,10 @@ func NewDefaultConfig() *Config {
 		MetaWebhookURL:          "https://graph.facebook.com/v21.0",
 
 		ShutdownToleranceTime: 10,
+
+		OidcRpClientID:      "1234567890",
+		OidcRpClientSecret:  "1234567890",
+		OidcOpTokenEndpoint: "https://auth.weni.ai/oauth/token",
 	}
 }
 

@@ -20,6 +20,13 @@ const (
 func TestCreateRoom(t *testing.T) {
 	defer httpx.SetRequestor(httpx.DefaultRequestor)
 	httpx.SetRequestor(httpx.NewMockRequestor(map[string][]httpx.MockResponse{
+		"https://auth.weni.ai/oauth/token": {
+			httpx.NewMockResponse(200, nil, `{
+				"access_token": "test_token",
+				"token_type": "Bearer",
+				"expires_in": 3600
+			}`),
+		},
 		fmt.Sprintf("%s/rooms/", baseURL): {
 			httpx.MockConnectionError,
 			httpx.NewMockResponse(400, nil, `{"detail":"Something went wrong"}`),
