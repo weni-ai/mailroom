@@ -153,3 +153,7 @@ func (s *service) Reopen(tickets []*models.Ticket, logHTTP flows.HTTPLogCallback
 func (t VisitorToken) String() string {
 	return strconv.FormatInt(int64(t), 10)
 }
+
+func (s *service) SendHistory(ticket *models.Ticket) error {
+	return nil
+}

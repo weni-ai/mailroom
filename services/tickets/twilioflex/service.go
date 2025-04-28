@@ -366,3 +366,7 @@ func SendHistory(session flows.Session, contactID flows.ContactID, ticketUUID st
 		}
 	}
 }
+
+func (s *service) SendHistory(ticket *models.Ticket) error {
+	return nil
+}

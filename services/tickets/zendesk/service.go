@@ -369,3 +369,7 @@ func (s *service) convertAttachments(attachments []utils.Attachment) ([]string, 
 	}
 	return fileURLs, nil
 }
+
+func (s *service) SendHistory(ticket *models.Ticket) error {
+	return nil
+}

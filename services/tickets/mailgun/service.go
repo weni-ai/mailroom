@@ -15,6 +15,7 @@ import (
 	"github.com/nyaruka/mailroom/runtime"
 	"github.com/nyaruka/mailroom/services/tickets"
 	"github.com/nyaruka/null"
+	"github.com/sirupsen/logrus"
 
 	"github.com/pkg/errors"
 )
@@ -233,4 +234,10 @@ func evaluateTemplate(t *template.Template, c map[string]string) string {
 
 func subjectFromBody(body string) string {
 	return utils.Truncate(strings.ReplaceAll(body, "\n", ""), 64)
+}
+
+func (s *service) SendHistory(ticket *models.Ticket) error {
+	logrus.Debug("Sending History")
+	logrus.Debug("History Sent")
+	return nil
 }
