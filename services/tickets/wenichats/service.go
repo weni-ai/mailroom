@@ -343,3 +343,8 @@ func historyMsgFromMsg(msg *models.Msg) HistoryMessage {
 	}
 	return m
 }
+
+func (s *service) SendHistory(ticket *models.Ticket) error {
+	logrus.Debug("History sent")
+	return nil
+}
