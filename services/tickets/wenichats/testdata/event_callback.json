@@ -38,10 +38,19 @@
       "content": {
         "text": "we can help"
       }
-     },
+    },
     "status": 400,
     "response": {
       "error": "invalid event type"
+    },
+    "http_mocks": {
+      "https://auth.weni.ai/oauth/token": [
+        {
+          "status": 200,
+          "body": "{\"access_token\":\"test_token\",\"token_type\":\"Bearer\",\"expires_in\":3600}",
+          "repeat": true
+        }
+      ]
     }
   },
   {
@@ -57,6 +66,15 @@
     "status": 200,
     "response": {
       "status": "handled"
+    },
+    "http_mocks": {
+      "https://auth.weni.ai/oauth/token": [
+        {
+          "status": 200,
+          "body": "{\"access_token\":\"test_token\",\"token_type\":\"Bearer\",\"expires_in\":3600}",
+          "repeat": true
+        }
+      ]
     },
     "db_assertions": [
       {
@@ -83,6 +101,15 @@
     "status": 200,
     "response": {
       "status": "handled"
+    },
+    "http_mocks": {
+      "https://auth.weni.ai/oauth/token": [
+        {
+          "status": 200,
+          "body": "{\"access_token\":\"test_token\",\"token_type\":\"Bearer\",\"expires_in\":3600}",
+          "repeat": true
+        }
+      ]
     },
     "db_assertions": [
       {
@@ -112,6 +139,13 @@
       }
     },
     "http_mocks": {
+      "https://auth.weni.ai/oauth/token": [
+        {
+          "status": 200,
+          "body": "{\"access_token\":\"test_token\",\"token_type\":\"Bearer\",\"expires_in\":3600}",
+          "repeat": true
+        }
+      ],
       "https://link.to/image.jpg": [
         {
           "status": 200,
@@ -136,6 +170,15 @@
     "path": "/mr/tickets/types/wenichats/event_callback/006d224e-107f-4e18-afb2-f41fe302abdc/$cathy_ticket_uuid$",
     "body": {
       "type": "room.update"
+    },
+    "http_mocks": {
+      "https://auth.weni.ai/oauth/token": [
+        {
+          "status": 200,
+          "body": "{\"access_token\":\"test_token\",\"token_type\":\"Bearer\",\"expires_in\":3600}",
+          "repeat": true
+        }
+      ]
     },
     "status": 200,
     "response": {
