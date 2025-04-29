@@ -1,3 +1,7 @@
+1.58.2
+----------
+ * Fix hideUnavailable implementation
+
 1.58.1
 ----------
  * Fix open ticket endpoint putting back the time parse format for "2006-01-02 15:04:05-07:00" on wenichats service parseTime
