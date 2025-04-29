@@ -1,3 +1,7 @@
+1.59.0
+----------
+ * Add OIDC configuration and enhance Wenichats client with token management
+
 1.58.2
 ----------
  * Fix hideUnavailable implementation
