@@ -118,6 +118,19 @@ func setupMocks() {
 				]
 			}`),
 		},
+		"https://vtex.com.br/intelligent/search?hideUnavailableItems=true&locale=pt-BR&query=banana": {
+			createMockResponse(`{
+				"products": [
+					{
+						"items": [
+							{
+								"itemId": "1234"
+							}
+						]
+					}
+				]
+			}`),
+		},
 		"https://graph.facebook.com/v14.0/123456789/products?access_token=&fields=%5B%22category%22%2C%22name%22%2C%22retailer_id%22%2C%22availability%22%5D&filter=%7B%22or%22%3A%5B%7B%22and%22%3A%5B%7B%22retailer_id%22%3A%7B%22i_contains%22%3A%22p1%22%7D%7D%2C%7B%22availability%22%3A%7B%22i_contains%22%3A%22in+stock%22%7D%7D%2C%7B%22visibility%22%3A%7B%22i_contains%22%3A%22published%22%7D%7D%5D%7D%5D%7D&summary=true": {
 			createMockResponse(`{
 				"data": [
@@ -188,7 +201,7 @@ func setupMocks() {
 				]
 			}`),
 		},
-		"http://vtex.com.br/api/io/_v/api/intelligent-search/sponsored_products?hideUnavailableItems=false&locale=pt-BR&query=banana": {
+		"http://vtex.com.br/api/io/_v/api/intelligent-search/sponsored_products?hideUnavailableItems=true&locale=pt-BR&query=banana": {
 			createMockResponse(`[{
 				"items": [
 					{
@@ -296,15 +309,16 @@ func TestService(t *testing.T) {
 	assert.Equal(t, []string{"banana"}, call.SearchKeywords)
 
 	params = assets.MsgCatalogParam{
-		ProductSearch: "banana",
-		ChannelUUID:   uuids.UUID(testdata.TwilioChannel.UUID),
-		SearchType:    "vtex",
-		SearchUrl:     "https://vtex.com.br/intelligent/search",
-		ApiType:       "intelligent",
-		PostalCode:    "",
-		SellerId:      "10",
-		HasVtexAds:    true,
-		ExtraPrompt:   "Test Prompt",
+		ProductSearch:   "banana",
+		ChannelUUID:     uuids.UUID(testdata.TwilioChannel.UUID),
+		SearchType:      "vtex",
+		SearchUrl:       "https://vtex.com.br/intelligent/search",
+		ApiType:         "intelligent",
+		PostalCode:      "",
+		SellerId:        "10",
+		HasVtexAds:      true,
+		ExtraPrompt:     "Test Prompt",
+		HideUnavailable: true,
 	}
 	call, err = svc.Call(session, params, logger.Log)
 	assert.NoError(t, err)
