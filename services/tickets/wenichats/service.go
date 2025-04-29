@@ -344,7 +344,60 @@ func historyMsgFromMsg(msg *models.Msg) HistoryMessage {
 	return m
 }
 
-func (s *service) SendHistory(ticket *models.Ticket) error {
+func (s *service) SendHistory(ticket *models.Ticket, contactID models.ContactID, runs []*models.FlowRun, logHTTP flows.HTTPLogCallback) error {
+	historyAfter, _ := jsonparser.GetString([]byte(ticket.Body()), "history_after")
+	var after time.Time
+	var err error
+	if historyAfter != "" {
+		after, err = parseTime(historyAfter)
+		if err != nil {
+			return err
+		}
+	} else if len(runs) > 0 {
+		// get messages for history, based on first session run start time
+		startMargin := -time.Second * 1
+		after = runs[0].CreatedOn().Add(startMargin)
+	}
+
+	cx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+	defer cancel()
+
+	msgs, selectErr := models.SelectContactMessages(cx, db, int(contactID), after)
+	if selectErr != nil {
+		return errors.Wrap(selectErr, "failed to get history messages")
+	}
+
+	batchSize := 50
+	batches := make([][]HistoryMessage, 0)
+
+	currentBatch := make([]HistoryMessage, 0)
+
+	for i := 0; i < len(msgs); i++ {
+		m := historyMsgFromMsg(msgs[i])
+		currentBatch = append(currentBatch, m)
+
+		if len(currentBatch) == batchSize {
+			batches = append(batches, currentBatch)
+			currentBatch = make([]HistoryMessage, 0)
+		}
+	}
+
+	// add the last batch if it's not empty
+	if len(currentBatch) > 0 {
+		batches = append(batches, currentBatch)
+	}
+
+	roomUUID := string(ticket.ExternalID())
+	for _, batch := range batches {
+		trace, err := s.restClient.SendHistoryBatch(roomUUID, batch)
+		if trace != nil {
+			logHTTP(flows.NewHTTPLog(trace, flows.HTTPStatusFromCode, s.redactor))
+		}
+		if err != nil {
+			logrus.Error(errors.Wrap(err, "failed to send history batch"))
+		}
+	}
+
 	logrus.Debug("History sent")
 	return nil
 }

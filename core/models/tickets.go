@@ -745,7 +745,7 @@ type TicketService interface {
 	Forward(*Ticket, flows.MsgUUID, string, []utils.Attachment, json.RawMessage, null.String, flows.HTTPLogCallback) error
 	Close([]*Ticket, flows.HTTPLogCallback) error
 	Reopen([]*Ticket, flows.HTTPLogCallback) error
-	SendHistory(*Ticket) error
+	SendHistory(*Ticket, ContactID, []*FlowRun, flows.HTTPLogCallback) error
 }
 
 // TicketServiceFunc is a func which creates a ticket service
