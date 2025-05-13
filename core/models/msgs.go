@@ -700,6 +700,13 @@ func newOutgoingMsgWpp(rt *runtime.Runtime, org *Org, channel *Channel, contactI
 			m.Text = ""
 		}
 
+		if msgWpp.ActionType() != "" {
+			metadata["action_type"] = msgWpp.ActionType()
+		}
+		if msgWpp.ActionExternalID() != "" {
+			metadata["action_external_id"] = msgWpp.ActionExternalID()
+		}
+
 		m.Metadata = null.NewMap(metadata)
 	}
 	return msg, nil
@@ -1498,19 +1505,21 @@ type WppBroadcastCatalogMessage struct {
 }
 
 type WppBroadcastMessage struct {
-	Text            string                     `json:"text,omitempty"`
-	Header          WppBroadcastMessageHeader  `json:"header,omitempty"`
-	Footer          string                     `json:"footer,omitempty"`
-	Attachments     []utils.Attachment         `json:"attachments,omitempty"`
-	QuickReplies    []string                   `json:"quick_replies,omitempty"`
-	Template        WppBroadcastTemplate       `json:"template,omitempty"`
-	InteractionType string                     `json:"interaction_type,omitempty"`
-	OrderDetails    flows.OrderDetailsMessage  `json:"order_details,omitempty"`
-	FlowMessage     flows.FlowMessage          `json:"flow_message,omitempty"`
-	ListMessage     flows.ListMessage          `json:"list_message,omitempty"`
-	CTAMessage      flows.CTAMessage           `json:"cta_message,omitempty"`
-	Buttons         []flows.ButtonComponent    `json:"buttons,omitempty"`
-	CatalogMessage  WppBroadcastCatalogMessage `json:"catalog_message,omitempty"`
+	Text             string                     `json:"text,omitempty"`
+	Header           WppBroadcastMessageHeader  `json:"header,omitempty"`
+	Footer           string                     `json:"footer,omitempty"`
+	Attachments      []utils.Attachment         `json:"attachments,omitempty"`
+	QuickReplies     []string                   `json:"quick_replies,omitempty"`
+	Template         WppBroadcastTemplate       `json:"template,omitempty"`
+	InteractionType  string                     `json:"interaction_type,omitempty"`
+	OrderDetails     flows.OrderDetailsMessage  `json:"order_details,omitempty"`
+	FlowMessage      flows.FlowMessage          `json:"flow_message,omitempty"`
+	ListMessage      flows.ListMessage          `json:"list_message,omitempty"`
+	CTAMessage       flows.CTAMessage           `json:"cta_message,omitempty"`
+	Buttons          []flows.ButtonComponent    `json:"buttons,omitempty"`
+	CatalogMessage   WppBroadcastCatalogMessage `json:"catalog_message,omitempty"`
+	ActionExternalID string                     `json:"action_external_id,omitempty"`
+	ActionType       string                     `json:"action_type,omitempty"`
 }
 
 type WppBroadcast struct {
@@ -1691,6 +1700,9 @@ func CreateWppBroadcastMessages(ctx context.Context, rt *runtime.Runtime, oa *Or
 		actionButtonText := bcast.Msg().CatalogMessage.ActionButtonText
 		sendCatalog := bcast.Msg().CatalogMessage.SendCatalog
 
+		actionType := bcast.Msg().ActionType
+		actionExternalID := bcast.Msg().ActionExternalID
+
 		// build up the minimum viable context for evaluation
 		evaluationCtx := types.NewXObject(map[string]types.XValue{
 			"contact": flows.Context(oa.Env(), contact),
@@ -1788,7 +1800,7 @@ func CreateWppBroadcastMessages(ctx context.Context, rt *runtime.Runtime, oa *Or
 		}
 
 		// create our outgoing message
-		out := flows.NewMsgWppOut(urn, channel.ChannelReference(), bcast.Msg().InteractionType, headerType, headerText, text, footerText, ctaMessage, listMessage, flowMessage, orderDetails, attachments, quickReplies, buttons, templating, flows.NilMsgTopic, products, actionButtonText, sendCatalog)
+		out := flows.NewMsgWppOut(urn, channel.ChannelReference(), bcast.Msg().InteractionType, headerType, headerText, text, footerText, ctaMessage, listMessage, flowMessage, orderDetails, attachments, quickReplies, buttons, templating, flows.NilMsgTopic, products, actionButtonText, sendCatalog, actionType, actionExternalID)
 		msg, err := NewOutgoingWppBroadcastMsg(rt, oa.Org(), channel, c.ID(), out, time.Now(), bcast.BroadcastID())
 		if err != nil {
 			return nil, errors.Wrapf(err, "error creating outgoing message")
