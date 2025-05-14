@@ -1482,6 +1482,7 @@ func CreateBroadcastMessages(ctx context.Context, rt *runtime.Runtime, oa *OrgAs
 type WppBroadcastTemplate struct {
 	UUID      assets.TemplateUUID `json:"uuid" validate:"required,uuid"`
 	Name      string              `json:"name" validate:"required"`
+	Category  string              `json:"category"`
 	Variables []string            `json:"variables,omitempty"`
 	Locale    string              `json:"locale,omitempty" validate:"omitempty,bcp47"`
 }
@@ -1759,7 +1760,7 @@ func CreateWppBroadcastMessages(ctx context.Context, rt *runtime.Runtime, oa *Or
 				}
 
 				text = translation.Substitute(evaluatedVariables)
-				var templateReference = assets.NewTemplateReference(bcast.Msg().Template.UUID, bcast.Msg().Template.Name)
+				var templateReference = assets.NewTemplateReference(bcast.Msg().Template.UUID, bcast.Msg().Template.Name, bcast.Msg().Template.Category)
 				templating = flows.NewMsgTemplating(templateReference, translation.Language(), translation.Country(), evaluatedVariables, translation.Namespace())
 			} else {
 				return nil, errors.Errorf("translation not found for template: %s, in channel: %s", bcast.Msg().Template.UUID, channel.UUID())
