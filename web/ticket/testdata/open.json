@@ -2,6 +2,12 @@
   {
     "label": "open ticket with assignee",
     "http_mocks": {
+      "https://auth.weni.ai/oauth/token": [
+        {
+          "status": 200,
+          "body": "{\"access_token\":\"test_token\",\"token_type\":\"Bearer\",\"expires_in\":3600}"
+        }
+      ],
       "https://chats-engine.dev.cloud.weni.ai/v1/external/rooms/": [
         {
           "status": 200,
@@ -21,19 +27,19 @@
     "status": 200,
     "response": {
       "assignee": {
-          "email": "admin1@nyaruka.com",
-          "name": "Andy Admin"
+        "email": "admin1@nyaruka.com",
+        "name": "Andy Admin"
       },
       "body": "",
       "external_id": "8ecb1e4a-b457-4645-a161-e2b02ddffa88",
       "ticketer": {
-          "name": "Weni Chats",
-          "uuid": "006d224e-107f-4e18-afb2-f41fe302abdc"
+        "name": "Weni Chats",
+        "uuid": "006d224e-107f-4e18-afb2-f41fe302abdc"
       },
       "topic": {
-          "name": "General",
-          "queue_uuid": "5c85fdf7-d54a-49dd-97ed-7e10077a1f6a",
-          "uuid": "ffc903f7-8cbb-443f-9627-87106842d1aa"
+        "name": "General",
+        "queue_uuid": "5c85fdf7-d54a-49dd-97ed-7e10077a1f6a",
+        "uuid": "ffc903f7-8cbb-443f-9627-87106842d1aa"
       },
       "uuid": "692926ea-09d6-4942-bd38-d266ec8d3716"
     },
@@ -47,6 +53,12 @@
   {
     "label": "open ticket without assignee",
     "http_mocks": {
+      "https://auth.weni.ai/oauth/token": [
+        {
+          "status": 200,
+          "body": "{\"access_token\":\"test_token\",\"token_type\":\"Bearer\",\"expires_in\":3600}"
+        }
+      ],
       "https://chats-engine.dev.cloud.weni.ai/v1/external/rooms/": [
         {
           "status": 200,
@@ -68,13 +80,13 @@
       "body": "",
       "external_id": "8ecb1e4a-b457-4645-a161-e2b02ddffa88",
       "ticketer": {
-          "name": "Weni Chats",
-          "uuid": "006d224e-107f-4e18-afb2-f41fe302abdc"
+        "name": "Weni Chats",
+        "uuid": "006d224e-107f-4e18-afb2-f41fe302abdc"
       },
       "topic": {
-          "name": "General",
-          "queue_uuid": "5c85fdf7-d54a-49dd-97ed-7e10077a1f6a",
-          "uuid": "ffc903f7-8cbb-443f-9627-87106842d1aa"
+        "name": "General",
+        "queue_uuid": "5c85fdf7-d54a-49dd-97ed-7e10077a1f6a",
+        "uuid": "ffc903f7-8cbb-443f-9627-87106842d1aa"
       },
       "uuid": "c34b6c7d-fa06-4563-92a3-d648ab64bccb"
     },
@@ -88,6 +100,12 @@
   {
     "label": "open ticket with history_after",
     "http_mocks": {
+      "https://auth.weni.ai/oauth/token": [
+        {
+          "status": 200,
+          "body": "{\"access_token\":\"test_token\",\"token_type\":\"Bearer\",\"expires_in\":3600}"
+        }
+      ],
       "https://chats-engine.dev.cloud.weni.ai/v1/external/rooms/": [
         {
           "status": 200,
@@ -110,13 +128,13 @@
       "body": "{\"history_after\":\"2025-01-01 00:00:00-00:00\"}",
       "external_id": "8ecb1e4a-b457-4645-a161-e2b02ddffa88",
       "ticketer": {
-          "name": "Weni Chats",
-          "uuid": "006d224e-107f-4e18-afb2-f41fe302abdc"
+        "name": "Weni Chats",
+        "uuid": "006d224e-107f-4e18-afb2-f41fe302abdc"
       },
       "topic": {
-          "name": "General",
-          "queue_uuid": "5c85fdf7-d54a-49dd-97ed-7e10077a1f6a",
-          "uuid": "ffc903f7-8cbb-443f-9627-87106842d1aa"
+        "name": "General",
+        "queue_uuid": "5c85fdf7-d54a-49dd-97ed-7e10077a1f6a",
+        "uuid": "ffc903f7-8cbb-443f-9627-87106842d1aa"
       },
       "uuid": "970b8069-50f5-4f6f-8f41-6b2d9f33d623"
     },

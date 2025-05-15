@@ -98,6 +98,10 @@ type Config struct {
 	MetaWebhookURL          string `help:"Meta webhook URL"`
 
 	ShutdownToleranceTime int `help:"Shutdown tolerance time(in seconds)"`
+
+	OidcRpClientID      string `help:"OIDC RP Client ID"`
+	OidcRpClientSecret  string `help:"OIDC RP Client Secret"`
+	OidcOpTokenEndpoint string `help:"OIDC OP Token Endpoint"`
 }
 
 // NewDefaultConfig returns a new default configuration object
@@ -167,6 +171,10 @@ func NewDefaultConfig() *Config {
 		MetaWebhookURL:          "https://graph.facebook.com/v21.0",
 
 		ShutdownToleranceTime: 10,
+
+		OidcRpClientID:      "1234567890",
+		OidcRpClientSecret:  "1234567890",
+		OidcOpTokenEndpoint: "https://auth.weni.ai/oauth/token",
 	}
 }
 
