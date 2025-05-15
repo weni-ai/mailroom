@@ -687,14 +687,6 @@ func LinxSearch(searchUrl string, productSearch string, productIDs []string) ([]
 		query.Set("terms", productSearch)
 	}
 
-	// Add product IDs as pids parameter if provided
-	// TODO: validate if it will be necessary via ids
-	for _, pid := range productIDs {
-		if pid != "" {
-			query.Add("pids", pid)
-		}
-	}
-
 	// Construct the final URL with query parameters
 	requestURL := fmt.Sprintf("%s://%s%s?%s", parsedURL.Scheme, parsedURL.Host, parsedURL.Path, query.Encode())
 
