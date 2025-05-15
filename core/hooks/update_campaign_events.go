@@ -2,6 +2,7 @@ package hooks
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	"github.com/jmoiron/sqlx"
@@ -56,6 +57,7 @@ func (h *updateCampaignEventsHook) Apply(ctx context.Context, rt *runtime.Runtim
 			case *events.MsgReceivedEvent:
 				field := oa.FieldByKey(models.LastSeenOnKey)
 				fieldChanges[field.ID()] = true
+				fmt.Println("MESSAGE RECEIVED EVENT FIELD CHANGED: ", field.ID())
 			}
 		}
 
@@ -69,9 +71,11 @@ func (h *updateCampaignEventsHook) Apply(ctx context.Context, rt *runtime.Runtim
 		for g := range groupRemoves {
 			for _, c := range oa.CampaignByGroupID(g) {
 				for _, e := range c.Events() {
+					fmt.Println("1 GROUP REMOVE EVENT FIELD CHANGED: ", e.ID())
 					// only delete events that we qualify for or that were changed
 					if e.QualifiesByField(s.Contact()) || fieldChanges[e.RelativeToID()] {
 						deleteEvents[e.ID()] = true
+						fmt.Println("2GROUP REMOVE EVENT FIELD CHANGED: ", e.ID())
 					}
 				}
 			}
@@ -81,8 +85,10 @@ func (h *updateCampaignEventsHook) Apply(ctx context.Context, rt *runtime.Runtim
 		for f := range fieldChanges {
 			fieldEvents := oa.CampaignEventsByFieldID(f)
 			for _, e := range fieldEvents {
+				fmt.Println("GOING TO CHECK FIELD CHANGE EVENT: ", e.ID())
 				// only recalculate the events if this contact qualifies for this event or this group was removed
 				if e.QualifiesByGroup(s.Contact()) || groupRemoves[e.Campaign().GroupID()] {
+					fmt.Println("GOING TO CHECK FIELD CHANGE EVENT 2: ", e.ID())
 					deleteEvents[e.ID()] = true
 					addEvents[e] = true
 				}
@@ -91,6 +97,7 @@ func (h *updateCampaignEventsHook) Apply(ctx context.Context, rt *runtime.Runtim
 
 		// ok, create all our deletes
 		for e := range deleteEvents {
+			fmt.Println("GOING TO DELETE EVENT: ", e)
 			deletes = append(deletes, &models.FireDelete{
 				ContactID: s.ContactID(),
 				EventID:   e,
@@ -99,8 +106,10 @@ func (h *updateCampaignEventsHook) Apply(ctx context.Context, rt *runtime.Runtim
 
 		// add in all the events we qualify for in campaigns we are now part of
 		for g := range groupAdds {
+			fmt.Println("GOING TO ADD EVENT: ", g)
 			for _, c := range oa.CampaignByGroupID(g) {
 				for _, e := range c.Events() {
+					fmt.Println("GOING TO ADD EVENT 2: ", e.ID())
 					addEvents[e] = true
 				}
 			}
@@ -110,6 +119,7 @@ func (h *updateCampaignEventsHook) Apply(ctx context.Context, rt *runtime.Runtim
 		tz := oa.Env().Timezone()
 		now := time.Now()
 		for ce := range addEvents {
+			fmt.Println("GOING TO SCHEDULE EVENT: ", ce.ID())
 			scheduled, err := ce.ScheduleForContact(tz, now, s.Contact())
 			if err != nil {
 				return errors.Wrapf(err, "error calculating offset")
@@ -117,6 +127,7 @@ func (h *updateCampaignEventsHook) Apply(ctx context.Context, rt *runtime.Runtim
 
 			// no scheduled date? move on
 			if scheduled == nil {
+				fmt.Println("NO SCHEDULED DATE: ", ce.ID())
 				continue
 			}
 
@@ -126,16 +137,19 @@ func (h *updateCampaignEventsHook) Apply(ctx context.Context, rt *runtime.Runtim
 				EventID:   ce.ID(),
 				Scheduled: *scheduled,
 			})
+			fmt.Println("GOING TO INSERT EVENT: ", ce.ID())
 		}
 	}
 
 	// first delete all our removed fires
+	fmt.Println("GOING TO DELETE UNFIRED EVENT FIRES: ", len(deletes))
 	err := models.DeleteUnfiredEventFires(ctx, tx, deletes)
 	if err != nil {
 		return errors.Wrapf(err, "error deleting unfired event fires")
 	}
 
 	// then insert our new ones
+	fmt.Println("GOING TO INSERT NEW EVENT FIRES: ", len(inserts))
 	err = models.AddEventFires(ctx, tx, inserts)
 	if err != nil {
 		return errors.Wrapf(err, "error inserting new event fires")
