@@ -1,3 +1,7 @@
+1.60.0
+----------
+ * Add Linx Search functionality to retrieve product
+
 1.59.0
 ----------
  * Add OIDC configuration and enhance Wenichats client with token management
