@@ -446,6 +446,11 @@ func GetProductListFromVtex(productSearch string, searchUrl string, apiType stri
 		if err != nil {
 			return nil, productSponsored, traces, err
 		}
+	} else if apiType == "linx" {
+		result, traces, err = LinxSearch(searchUrl, productSearch, nil)
+		if err != nil {
+			return nil, productSponsored, traces, err
+		}
 	}
 	if hasVtexAds {
 		resultSponsored, tracesAds, err := VtexSponsoredSearch(searchUrl, productSearch, hideUnavailableItems)
@@ -719,6 +724,85 @@ func VtexSponsoredSearch(searchUrl string, productSearch string, hideUnavailable
 
 	return allItems, traces, nil
 
+}
+
+func LinxSearch(searchUrl string, productSearch string, productIDs []string) ([]string, []*httpx.Trace, error) {
+	parsedURL, err := url.Parse(searchUrl)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	// Prepare query parameters
+	query := url.Values{}
+
+	// Get existing parameters if any
+	for key, values := range parsedURL.Query() {
+		for _, value := range values {
+			query.Add(key, value)
+		}
+	}
+
+	// Add productSearch as terms parameter if provided
+	if productSearch != "" {
+		query.Set("terms", productSearch)
+	}
+
+	// Add product IDs as pids parameter if provided
+	// TODO: validate if it will be necessary via ids
+	for _, pid := range productIDs {
+		if pid != "" {
+			query.Add("pids", pid)
+		}
+	}
+
+	// Construct the final URL with query parameters
+	requestURL := fmt.Sprintf("%s://%s%s?%s", parsedURL.Scheme, parsedURL.Host, parsedURL.Path, query.Encode())
+
+	req, err := httpx.NewRequest("GET", requestURL, nil, nil)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	client := &http.Client{}
+	trace, err := httpx.DoTrace(client, req, nil, nil, -1)
+	traces := []*httpx.Trace{trace}
+	if err != nil {
+		return nil, traces, err
+	}
+
+	if trace.Response.StatusCode >= 400 {
+		return nil, traces, fmt.Errorf("error when searching in Linx: status code %d", trace.Response.StatusCode)
+	}
+
+	// Parse the response
+	var response struct {
+		Products []struct {
+			ID   string     `json:"id"` //product id
+			SKUs []struct { //product skus
+				SKU        string `json:"sku"`
+				Properties struct {
+					Status string `json:"status"`
+					Stock  int    `json:"stock"`
+				} `json:"properties"`
+			} `json:"skus"`
+		} `json:"products"`
+	}
+
+	err = json.Unmarshal(trace.ResponseBody, &response)
+	if err != nil {
+		return nil, traces, errors.Wrap(err, "error unmarshalling Linx response")
+	}
+
+	allItems := []string{}
+	for _, product := range response.Products {
+		for _, sku := range product.SKUs {
+			if sku.Properties.Status == "available" && sku.Properties.Stock > 0 {
+				allItems = append(allItems, sku.SKU)
+			}
+		}
+	}
+
+	return allItems, traces, nil
 }
 
 func CartSimulation(ProductRetailerIDS []flows.ProductEntry, sellerID string, url string, postalCode string, params string) ([]string, []*httpx.Trace, error) {
