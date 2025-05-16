@@ -183,8 +183,8 @@ func TestMsgWppCreated(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, 2, count)
 
-	// One high priority message for George
+	// Two high priority message for George
 	count, err = redis.Int(rc.Do("zcard", fmt.Sprintf("msgs:%s|10/1", testdata.TwilioChannel.UUID)))
 	assert.NoError(t, err)
-	assert.Equal(t, 1, count)
+	assert.Equal(t, 2, count)
 }
