@@ -160,7 +160,7 @@ func TestMsgWppCreated(t *testing.T) {
 					Count: 2,
 				},
 				{
-					SQL:   "SELECT COUNT(*) FROM msgs_msg WHERE text='Hi' AND contact_id = $1 AND attachments[1] = $2 AND status = 'Q' AND high_priority = FALSE",
+					SQL:   "SELECT COUNT(*) FROM msgs_msg WHERE text='Hi' AND contact_id = $1 AND attachments[1] = $2 AND status = 'Q' AND high_priority = TRUE",
 					Args:  []interface{}{testdata.George.ID, "image/png:https://foo.bar.com/images/image1.png"},
 					Count: 1,
 				},
