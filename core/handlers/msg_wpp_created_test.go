@@ -178,13 +178,13 @@ func TestMsgWppCreated(t *testing.T) {
 	rc := rp.Get()
 	defer rc.Close()
 
-	// Cathy should have 1 batch of queued messages at high priority
+	// Cathy should have 2 batch of queued messages at high priority
 	count, err := redis.Int(rc.Do("zcard", fmt.Sprintf("msgs:%s|10/1", testdata.TwilioChannel.UUID)))
 	assert.NoError(t, err)
-	assert.Equal(t, 1, count)
+	assert.Equal(t, 2, count)
 
-	// One bulk for George
-	count, err = redis.Int(rc.Do("zcard", fmt.Sprintf("msgs:%s|10/0", testdata.TwilioChannel.UUID)))
+	// One high priority message for George
+	count, err = redis.Int(rc.Do("zcard", fmt.Sprintf("msgs:%s|10/1", testdata.TwilioChannel.UUID)))
 	assert.NoError(t, err)
 	assert.Equal(t, 1, count)
 }
