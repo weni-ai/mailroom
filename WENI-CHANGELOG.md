@@ -1,3 +1,8 @@
+1.60.1
+----------
+ * feat: Set default high priority for outgoing WPP messages
+ * remove return on worker handleMsgEvent on isBrain
+
 1.60.0
 ----------
  * Add Linx Search functionality to retrieve product
