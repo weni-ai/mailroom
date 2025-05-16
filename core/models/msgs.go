@@ -561,7 +561,7 @@ func newOutgoingMsgWpp(rt *runtime.Runtime, org *Org, channel *Channel, contactI
 	m := &msg.m
 	m.UUID = msgWpp.UUID()
 	m.Text = msgWpp.Text()
-	m.HighPriority = false
+	m.HighPriority = true // by default, we send wpp messages as high priority since they're usually sent as an agent response
 	m.Direction = DirectionOut
 	m.Status = MsgStatusQueued
 	m.Visibility = VisibilityVisible
@@ -680,6 +680,7 @@ func newOutgoingMsgWpp(rt *runtime.Runtime, org *Org, channel *Channel, contactI
 		if msgWpp.Templating() != nil {
 			metadata["templating"] = msgWpp.Templating()
 			m.Template = null.String(msgWpp.Templating().Template().Name)
+			m.HighPriority = false // template messages are usually sent for a large number of contacts, so we don't want to block other messages
 		}
 		if len(msgWpp.Products()) > 0 {
 			metadata["products"] = msgWpp.Products()

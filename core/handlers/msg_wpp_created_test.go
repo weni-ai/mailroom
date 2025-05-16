@@ -160,7 +160,7 @@ func TestMsgWppCreated(t *testing.T) {
 					Count: 2,
 				},
 				{
-					SQL:   "SELECT COUNT(*) FROM msgs_msg WHERE text='Hi' AND contact_id = $1 AND attachments[1] = $2 AND status = 'Q' AND high_priority = FALSE",
+					SQL:   "SELECT COUNT(*) FROM msgs_msg WHERE text='Hi' AND contact_id = $1 AND attachments[1] = $2 AND status = 'Q' AND high_priority = TRUE",
 					Args:  []interface{}{testdata.George.ID, "image/png:https://foo.bar.com/images/image1.png"},
 					Count: 1,
 				},
@@ -178,13 +178,13 @@ func TestMsgWppCreated(t *testing.T) {
 	rc := rp.Get()
 	defer rc.Close()
 
-	// Cathy should have 1 batch of queued messages at high priority
+	// Cathy should have 2 batch of queued messages at high priority
 	count, err := redis.Int(rc.Do("zcard", fmt.Sprintf("msgs:%s|10/1", testdata.TwilioChannel.UUID)))
 	assert.NoError(t, err)
-	assert.Equal(t, 1, count)
+	assert.Equal(t, 2, count)
 
-	// One bulk for George
-	count, err = redis.Int(rc.Do("zcard", fmt.Sprintf("msgs:%s|10/0", testdata.TwilioChannel.UUID)))
+	// Two high priority message for George
+	count, err = redis.Int(rc.Do("zcard", fmt.Sprintf("msgs:%s|10/1", testdata.TwilioChannel.UUID)))
 	assert.NoError(t, err)
-	assert.Equal(t, 1, count)
+	assert.Equal(t, 2, count)
 }
