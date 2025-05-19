@@ -78,12 +78,13 @@ const (
 type MsgFailedReason null.String
 
 const (
-	NilMsgFailedReason     = MsgFailedReason("")
-	MsgFailedSuspended     = MsgFailedReason("S")
-	MsgFailedLooping       = MsgFailedReason("L")
-	MsgFailedErrorLimit    = MsgFailedReason("E")
-	MsgFailedTooOld        = MsgFailedReason("O")
-	MsgFailedNoDestination = MsgFailedReason("D")
+	NilMsgFailedReason       = MsgFailedReason("")
+	MsgFailedSuspended       = MsgFailedReason("S")
+	MsgFailedLooping         = MsgFailedReason("L")
+	MsgFailedErrorLimit      = MsgFailedReason("E")
+	MsgFailedTooOld          = MsgFailedReason("O")
+	MsgFailedNoDestination   = MsgFailedReason("D")
+	MsgFailedSuspendTemplate = MsgFailedReason("T")
 )
 
 // BroadcastID is our internal type for broadcast ids, which can be null/0
@@ -576,6 +577,8 @@ func newOutgoingMsgWpp(rt *runtime.Runtime, org *Org, channel *Channel, contactI
 	msg.SetChannel(channel)
 	msg.SetURN(msgWpp.URN())
 
+	suspend_template := org.o.Config.Get("suspend_template", false)
+
 	if org.Suspended() {
 		// we fail messages for suspended orgs right away
 		m.Status = MsgStatusFailed
@@ -681,6 +684,12 @@ func newOutgoingMsgWpp(rt *runtime.Runtime, org *Org, channel *Channel, contactI
 			metadata["templating"] = msgWpp.Templating()
 			m.Template = null.String(msgWpp.Templating().Template().Name)
 			m.HighPriority = false // template messages are usually sent for a large number of contacts, so we don't want to block other messages
+
+			if ok, st := suspend_template.(bool); ok && st {
+				m.Status = MsgStatusFailed
+				m.FailedReason = MsgFailedSuspendTemplate // Suspend Template
+			}
+
 		}
 		if len(msgWpp.Products()) > 0 {
 			metadata["products"] = msgWpp.Products()
