@@ -1,5 +1,9 @@
 1.60.1
 ----------
+ * Fail template msg if org conf suspend_template is true
+
+1.60.1
+----------
  * feat: Set default high priority for outgoing WPP messages
  * remove return on worker handleMsgEvent on isBrain
 
