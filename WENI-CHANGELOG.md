@@ -1,3 +1,7 @@
+1.61.0
+----------
+ * Enhance WppBroadcastMessage structure by adding ActionType and ActionExternalID fields.
+
 1.60.1
 ----------
  * Fail template msg if org conf suspend_template is true
