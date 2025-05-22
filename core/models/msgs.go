@@ -1629,6 +1629,10 @@ func CreateWppBroadcastMessages(ctx context.Context, rt *runtime.Runtime, oa *Or
 	// for each contact, build our message
 	msgs := make([]*Msg, 0, len(contacts))
 
+	// Separate regular messages from typing_indicator actions
+	regularMsgs := make([]*Msg, 0, len(contacts))
+	typingIndicatorMsgs := make([]*Msg, 0)
+
 	// utility method to build up our message
 	buildMessage := func(c *Contact, forceURN urns.URN) (*Msg, error) {
 		if c.Status() != ContactStatusActive {
@@ -1834,26 +1838,53 @@ func CreateWppBroadcastMessages(ctx context.Context, rt *runtime.Runtime, oa *Or
 		}
 	}
 
-	// allocate a topup for these message if org uses topups
-	topup, err := AllocateTopups(ctx, rt.DB, rt.RP, oa.Org(), len(msgs))
-	if err != nil {
-		return nil, errors.Wrapf(err, "error allocating topup for broadcast messages")
+	// Separate regular messages from typing_indicator actions
+	for _, msg := range msgs {
+		metadata := msg.Metadata()
+		if metadata != nil {
+			actionType, ok := metadata["action_type"].(string)
+			if ok && actionType == "typing_indicator" {
+				// This is a typing_indicator action - won't be saved in the database
+				typingIndicatorMsgs = append(typingIndicatorMsgs, msg)
+				continue
+			}
+		}
+		// Normal message - will be saved in the database
+		regularMsgs = append(regularMsgs, msg)
 	}
 
-	// if we have an active topup, assign it to our messages
-	if topup != NilTopupID {
-		for _, m := range msgs {
-			m.SetTopup(topup)
+	// allocate a topup for these message if org uses topups
+	if len(regularMsgs) > 0 {
+		topup, err := AllocateTopups(ctx, rt.DB, rt.RP, oa.Org(), len(regularMsgs))
+		if err != nil {
+			return nil, errors.Wrapf(err, "error allocating topup for broadcast messages")
+		}
+
+		// if we have an active topup, assign it to our messages
+		if topup != NilTopupID {
+			for _, m := range regularMsgs {
+				m.SetTopup(topup)
+			}
+		}
+
+		// Insert only regular messages into the database (not typing_indicator)
+		err = InsertMessages(ctx, rt.DB, regularMsgs)
+		if err != nil {
+			return nil, errors.Wrapf(err, "error inserting broadcast messages")
 		}
 	}
 
-	// insert them in a single request
-	err = InsertMessages(ctx, rt.DB, msgs)
-	if err != nil {
-		return nil, errors.Wrapf(err, "error inserting broadcast messages")
+	// Debug log if we have typing_indicators
+	if len(typingIndicatorMsgs) > 0 {
+		logrus.WithFields(logrus.Fields{
+			"typing_indicators": len(typingIndicatorMsgs),
+			"regular_msgs":      len(regularMsgs),
+		}).Info("separating typing_indicator actions from regular messages")
 	}
 
-	return msgs, nil
+	// Return all messages (regular + typing_indicator) for courier to process
+	allMessages := append(regularMsgs, typingIndicatorMsgs...)
+	return allMessages, nil
 }
 
 const updateMsgForResendingSQL = `
