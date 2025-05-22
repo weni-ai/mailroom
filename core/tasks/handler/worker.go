@@ -744,8 +744,6 @@ func handleMsgEvent(ctx context.Context, rt *runtime.Runtime, event *MsgEvent) e
 			return errors.Wrapf(err, "error marking message as handled")
 		}
 
-		return nil
-
 	}
 
 	// this message didn't trigger and new sessions or resume any existing ones, so handle as inbox
