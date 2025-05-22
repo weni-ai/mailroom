@@ -619,7 +619,7 @@ func newOutgoingMsgWpp(rt *runtime.Runtime, org *Org, channel *Channel, contactI
 		}
 	}
 
-	if len(msgWpp.QuickReplies()) > 0 || len(msgWpp.ListMessage().ListItems) > 0 || msgWpp.Topic() != flows.NilMsgTopic || msgWpp.Text() != "" || msgWpp.Footer() != "" || msgWpp.HeaderType() != "" || msgWpp.InteractionType() != "" || msgWpp.Templating() != nil {
+	if len(msgWpp.QuickReplies()) > 0 || len(msgWpp.ListMessage().ListItems) > 0 || msgWpp.Topic() != flows.NilMsgTopic || msgWpp.Text() != "" || msgWpp.Footer() != "" || msgWpp.HeaderType() != "" || msgWpp.InteractionType() != "" || msgWpp.Templating() != nil || msgWpp.ActionType() != "" {
 		metadata := make(map[string]interface{})
 		if msgWpp.Topic() != flows.NilMsgTopic {
 			metadata["topic"] = string(msgWpp.Topic())
@@ -1795,7 +1795,7 @@ func CreateWppBroadcastMessages(ctx context.Context, rt *runtime.Runtime, oa *Or
 		}
 
 		// don't do anything if we have no text or attachments
-		if text == "" && len(attachments) == 0 {
+		if text == "" && len(attachments) == 0 && actionType == "" {
 			return nil, nil
 		}
 
