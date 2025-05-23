@@ -335,6 +335,5 @@ func (s *service) SendHistory(ticket *models.Ticket, contactID models.ContactID,
 		}
 	}
 
-	logrus.Debug("History sent")
 	return nil
 }
