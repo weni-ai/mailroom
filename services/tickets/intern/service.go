@@ -49,6 +49,6 @@ func (s *service) Reopen(tickets []*models.Ticket, logHTTP flows.HTTPLogCallback
 	return nil
 }
 
-func (s *service) SendHistory(ticket *models.Ticket) error {
+func (s *service) SendHistory(ticket *models.Ticket, contactID models.ContactID, runs []*models.FlowRun, logHTTP flows.HTTPLogCallback) error {
 	return nil
 }
