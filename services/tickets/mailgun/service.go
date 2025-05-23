@@ -15,7 +15,6 @@ import (
 	"github.com/nyaruka/mailroom/runtime"
 	"github.com/nyaruka/mailroom/services/tickets"
 	"github.com/nyaruka/null"
-	"github.com/sirupsen/logrus"
 
 	"github.com/pkg/errors"
 )
@@ -236,8 +235,6 @@ func subjectFromBody(body string) string {
 	return utils.Truncate(strings.ReplaceAll(body, "\n", ""), 64)
 }
 
-func (s *service) SendHistory(ticket *models.Ticket) error {
-	logrus.Debug("Sending History")
-	logrus.Debug("History Sent")
+func (s *service) SendHistory(ticket *models.Ticket, contactID models.ContactID, runs []*models.FlowRun, logHTTP flows.HTTPLogCallback) error {
 	return nil
 }

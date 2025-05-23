@@ -154,6 +154,6 @@ func (t VisitorToken) String() string {
 	return strconv.FormatInt(int64(t), 10)
 }
 
-func (s *service) SendHistory(ticket *models.Ticket) error {
+func (s *service) SendHistory(ticket *models.Ticket, contactID models.ContactID, runs []*models.FlowRun, logHTTP flows.HTTPLogCallback) error {
 	return nil
 }
