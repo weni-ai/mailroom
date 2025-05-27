@@ -364,7 +364,7 @@ func TestService(t *testing.T) {
 		SearchType:    "vtex",
 		SearchUrl:     "https://api.linximpulse.com/engage/search/v3/search?apiKey=1234567890&secretKey=1234567890",
 		ApiType:       "linx",
-		PostalCode:    "",
+		PostalCode:    "000000-000",
 		SellerId:      "",
 		HasVtexAds:    false,
 		ExtraPrompt:   "",
