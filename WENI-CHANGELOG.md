@@ -1,3 +1,16 @@
+1.60.1
+----------
+ * Fail template msg if org conf suspend_template is true
+
+1.60.1
+----------
+ * feat: Set default high priority for outgoing WPP messages
+ * remove return on worker handleMsgEvent on isBrain
+
+1.60.0
+----------
+ * Add Linx Search functionality to retrieve product
+
 1.59.0
 ----------
  * Add OIDC configuration and enhance Wenichats client with token management

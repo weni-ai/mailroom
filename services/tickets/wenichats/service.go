@@ -306,7 +306,7 @@ func (s *service) Open(session flows.Session, topic *flows.Topic, body string, a
 	}
 	if err != nil {
 		logrus.Error(errors.Wrap(err, fmt.Sprintf("failed to create wenichats room for: %+v", roomData)))
-		return nil, errors.Wrap(err, "failed to create wenichats room")
+		return nil, errors.New(string(trace.ResponseBody))
 	}
 
 	for i, batch := range batches {
