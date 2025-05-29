@@ -171,7 +171,7 @@
       "assignee_id": 0,
       "extra": "{\"history_after\":\"2025-01-01 00:00:00-00:00\"}"
     },
-    "status": 500,
+    "status": 400,
     "response": {
       "error": "{\"error\":\"The contact already have an open room in the project\"}"
     },
