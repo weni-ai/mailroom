@@ -182,7 +182,7 @@ func (s *service) Call(session flows.Session, params assets.MsgCatalogParam, log
 
 	// simulates cart in VTEX with all products
 	hasSimulation := false
-	if postalCode_ != "" && sellerID != "1" {
+	if postalCode_ != "" && sellerID != "1" && params.ApiType != "linx" {
 		var tracesSimulation []*httpx.Trace
 		hasSimulation = true
 		existingProductsIds, tracesSimulation, err = CartSimulation(callResult.ProductRetailerIDS, sellerID, params.SearchUrl, postalCode_, params.CartSimulationParams)
