@@ -128,7 +128,7 @@ func (s *Server) WrapJSONHandler(handler JSONHandler) http.HandlerFunc {
 
 		if err != nil {
 			logrus.WithError(err).WithField("http_request", r).Error("error handling request")
-			w.WriteHeader(http.StatusInternalServerError)
+			w.WriteHeader(status)
 			w.Write(serialized)
 			return
 		}
