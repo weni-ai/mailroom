@@ -1,3 +1,7 @@
+1.61.1
+----------
+ * Add condition for linx API type in cart simulation logic
+
 1.61.0
 ----------
  * Enhance WppBroadcastMessage structure by adding ActionType and ActionExternalID fields.
