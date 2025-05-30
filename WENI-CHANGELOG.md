@@ -1,3 +1,7 @@
+1.61.2
+----------
+ * Fix open ticket error message return
+
 1.61.1
 ----------
  * Add condition for linx API type in cart simulation logic
@@ -6,7 +10,7 @@
 ----------
  * Enhance WppBroadcastMessage structure by adding ActionType and ActionExternalID fields.
 
-1.60.1
+1.60.2
 ----------
  * Fail template msg if org conf suspend_template is true
 
