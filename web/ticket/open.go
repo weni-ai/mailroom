@@ -71,7 +71,7 @@ func handleOpen(ctx context.Context, rt *runtime.Runtime, r *http.Request, l *mo
 
 	openedTicket, err := svc.Open(currentSession, topic, request.Extra, assignee, l.Ticketer(ticketer))
 	if err != nil {
-		return nil, 500, errors.Wrapf(err, "error opening ticket")
+		return nil, 400, err
 	}
 
 	newTicket := models.NewTicket(
