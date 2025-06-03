@@ -78,12 +78,13 @@ const (
 type MsgFailedReason null.String
 
 const (
-	NilMsgFailedReason     = MsgFailedReason("")
-	MsgFailedSuspended     = MsgFailedReason("S")
-	MsgFailedLooping       = MsgFailedReason("L")
-	MsgFailedErrorLimit    = MsgFailedReason("E")
-	MsgFailedTooOld        = MsgFailedReason("O")
-	MsgFailedNoDestination = MsgFailedReason("D")
+	NilMsgFailedReason       = MsgFailedReason("")
+	MsgFailedSuspended       = MsgFailedReason("S")
+	MsgFailedLooping         = MsgFailedReason("L")
+	MsgFailedErrorLimit      = MsgFailedReason("E")
+	MsgFailedTooOld          = MsgFailedReason("O")
+	MsgFailedNoDestination   = MsgFailedReason("D")
+	MsgFailedSuspendTemplate = MsgFailedReason("T")
 )
 
 // BroadcastID is our internal type for broadcast ids, which can be null/0
@@ -561,7 +562,7 @@ func newOutgoingMsgWpp(rt *runtime.Runtime, org *Org, channel *Channel, contactI
 	m := &msg.m
 	m.UUID = msgWpp.UUID()
 	m.Text = msgWpp.Text()
-	m.HighPriority = false
+	m.HighPriority = true // by default, we send wpp messages as high priority since they're usually sent as an agent response
 	m.Direction = DirectionOut
 	m.Status = MsgStatusQueued
 	m.Visibility = VisibilityVisible
@@ -575,6 +576,8 @@ func newOutgoingMsgWpp(rt *runtime.Runtime, org *Org, channel *Channel, contactI
 
 	msg.SetChannel(channel)
 	msg.SetURN(msgWpp.URN())
+
+	suspend_template := org.o.Config.Get("suspend_template", false)
 
 	if org.Suspended() {
 		// we fail messages for suspended orgs right away
@@ -619,7 +622,7 @@ func newOutgoingMsgWpp(rt *runtime.Runtime, org *Org, channel *Channel, contactI
 		}
 	}
 
-	if len(msgWpp.QuickReplies()) > 0 || len(msgWpp.ListMessage().ListItems) > 0 || msgWpp.Topic() != flows.NilMsgTopic || msgWpp.Text() != "" || msgWpp.Footer() != "" || msgWpp.HeaderType() != "" || msgWpp.InteractionType() != "" || msgWpp.Templating() != nil {
+	if len(msgWpp.QuickReplies()) > 0 || len(msgWpp.ListMessage().ListItems) > 0 || msgWpp.Topic() != flows.NilMsgTopic || msgWpp.Text() != "" || msgWpp.Footer() != "" || msgWpp.HeaderType() != "" || msgWpp.InteractionType() != "" || msgWpp.Templating() != nil || msgWpp.ActionType() != "" {
 		metadata := make(map[string]interface{})
 		if msgWpp.Topic() != flows.NilMsgTopic {
 			metadata["topic"] = string(msgWpp.Topic())
@@ -680,6 +683,13 @@ func newOutgoingMsgWpp(rt *runtime.Runtime, org *Org, channel *Channel, contactI
 		if msgWpp.Templating() != nil {
 			metadata["templating"] = msgWpp.Templating()
 			m.Template = null.String(msgWpp.Templating().Template().Name)
+			m.HighPriority = false // template messages are usually sent for a large number of contacts, so we don't want to block other messages
+
+			if ok, st := suspend_template.(bool); ok && st {
+				m.Status = MsgStatusFailed
+				m.FailedReason = MsgFailedSuspendTemplate // Suspend Template
+			}
+
 		}
 		if len(msgWpp.Products()) > 0 {
 			metadata["products"] = msgWpp.Products()
@@ -698,6 +708,13 @@ func newOutgoingMsgWpp(rt *runtime.Runtime, org *Org, channel *Channel, contactI
 			metadata["text"] = ""
 			metadata["header"] = string(msgWpp.HeaderText())
 			m.Text = ""
+		}
+
+		if msgWpp.ActionType() != "" {
+			metadata["action_type"] = msgWpp.ActionType()
+		}
+		if msgWpp.ActionExternalID() != "" {
+			metadata["action_external_id"] = msgWpp.ActionExternalID()
 		}
 
 		m.Metadata = null.NewMap(metadata)
@@ -1498,19 +1515,21 @@ type WppBroadcastCatalogMessage struct {
 }
 
 type WppBroadcastMessage struct {
-	Text            string                     `json:"text,omitempty"`
-	Header          WppBroadcastMessageHeader  `json:"header,omitempty"`
-	Footer          string                     `json:"footer,omitempty"`
-	Attachments     []utils.Attachment         `json:"attachments,omitempty"`
-	QuickReplies    []string                   `json:"quick_replies,omitempty"`
-	Template        WppBroadcastTemplate       `json:"template,omitempty"`
-	InteractionType string                     `json:"interaction_type,omitempty"`
-	OrderDetails    flows.OrderDetailsMessage  `json:"order_details,omitempty"`
-	FlowMessage     flows.FlowMessage          `json:"flow_message,omitempty"`
-	ListMessage     flows.ListMessage          `json:"list_message,omitempty"`
-	CTAMessage      flows.CTAMessage           `json:"cta_message,omitempty"`
-	Buttons         []flows.ButtonComponent    `json:"buttons,omitempty"`
-	CatalogMessage  WppBroadcastCatalogMessage `json:"catalog_message,omitempty"`
+	Text             string                     `json:"text,omitempty"`
+	Header           WppBroadcastMessageHeader  `json:"header,omitempty"`
+	Footer           string                     `json:"footer,omitempty"`
+	Attachments      []utils.Attachment         `json:"attachments,omitempty"`
+	QuickReplies     []string                   `json:"quick_replies,omitempty"`
+	Template         WppBroadcastTemplate       `json:"template,omitempty"`
+	InteractionType  string                     `json:"interaction_type,omitempty"`
+	OrderDetails     flows.OrderDetailsMessage  `json:"order_details,omitempty"`
+	FlowMessage      flows.FlowMessage          `json:"flow_message,omitempty"`
+	ListMessage      flows.ListMessage          `json:"list_message,omitempty"`
+	CTAMessage       flows.CTAMessage           `json:"cta_message,omitempty"`
+	Buttons          []flows.ButtonComponent    `json:"buttons,omitempty"`
+	CatalogMessage   WppBroadcastCatalogMessage `json:"catalog_message,omitempty"`
+	ActionExternalID string                     `json:"action_external_id,omitempty"`
+	ActionType       string                     `json:"action_type,omitempty"`
 }
 
 type WppBroadcast struct {
@@ -1621,6 +1640,10 @@ func CreateWppBroadcastMessages(ctx context.Context, rt *runtime.Runtime, oa *Or
 	// for each contact, build our message
 	msgs := make([]*Msg, 0, len(contacts))
 
+	// Separate regular messages from typing_indicator actions
+	regularMsgs := make([]*Msg, 0, len(contacts))
+	typingIndicatorMsgs := make([]*Msg, 0)
+
 	// utility method to build up our message
 	buildMessage := func(c *Contact, forceURN urns.URN) (*Msg, error) {
 		if c.Status() != ContactStatusActive {
@@ -1690,6 +1713,9 @@ func CreateWppBroadcastMessages(ctx context.Context, rt *runtime.Runtime, oa *Or
 		products := bcast.Msg().CatalogMessage.Products
 		actionButtonText := bcast.Msg().CatalogMessage.ActionButtonText
 		sendCatalog := bcast.Msg().CatalogMessage.SendCatalog
+
+		actionType := bcast.Msg().ActionType
+		actionExternalID := bcast.Msg().ActionExternalID
 
 		// build up the minimum viable context for evaluation
 		evaluationCtx := types.NewXObject(map[string]types.XValue{
@@ -1783,12 +1809,12 @@ func CreateWppBroadcastMessages(ctx context.Context, rt *runtime.Runtime, oa *Or
 		}
 
 		// don't do anything if we have no text or attachments
-		if text == "" && len(attachments) == 0 {
+		if text == "" && len(attachments) == 0 && actionType == "" {
 			return nil, nil
 		}
 
 		// create our outgoing message
-		out := flows.NewMsgWppOut(urn, channel.ChannelReference(), bcast.Msg().InteractionType, headerType, headerText, text, footerText, ctaMessage, listMessage, flowMessage, orderDetails, attachments, quickReplies, buttons, templating, flows.NilMsgTopic, products, actionButtonText, sendCatalog)
+		out := flows.NewMsgWppOut(urn, channel.ChannelReference(), bcast.Msg().InteractionType, headerType, headerText, text, footerText, ctaMessage, listMessage, flowMessage, orderDetails, attachments, quickReplies, buttons, templating, flows.NilMsgTopic, products, actionButtonText, sendCatalog, actionType, actionExternalID)
 		msg, err := NewOutgoingWppBroadcastMsg(rt, oa.Org(), channel, c.ID(), out, time.Now(), bcast.BroadcastID())
 		if err != nil {
 			return nil, errors.Wrapf(err, "error creating outgoing message")
@@ -1823,26 +1849,53 @@ func CreateWppBroadcastMessages(ctx context.Context, rt *runtime.Runtime, oa *Or
 		}
 	}
 
-	// allocate a topup for these message if org uses topups
-	topup, err := AllocateTopups(ctx, rt.DB, rt.RP, oa.Org(), len(msgs))
-	if err != nil {
-		return nil, errors.Wrapf(err, "error allocating topup for broadcast messages")
+	// Separate regular messages from typing_indicator actions
+	for _, msg := range msgs {
+		metadata := msg.Metadata()
+		if metadata != nil {
+			actionType, ok := metadata["action_type"].(string)
+			if ok && actionType == "typing_indicator" {
+				// This is a typing_indicator action - won't be saved in the database
+				typingIndicatorMsgs = append(typingIndicatorMsgs, msg)
+				continue
+			}
+		}
+		// Normal message - will be saved in the database
+		regularMsgs = append(regularMsgs, msg)
 	}
 
-	// if we have an active topup, assign it to our messages
-	if topup != NilTopupID {
-		for _, m := range msgs {
-			m.SetTopup(topup)
+	// allocate a topup for these message if org uses topups
+	if len(regularMsgs) > 0 {
+		topup, err := AllocateTopups(ctx, rt.DB, rt.RP, oa.Org(), len(regularMsgs))
+		if err != nil {
+			return nil, errors.Wrapf(err, "error allocating topup for broadcast messages")
+		}
+
+		// if we have an active topup, assign it to our messages
+		if topup != NilTopupID {
+			for _, m := range regularMsgs {
+				m.SetTopup(topup)
+			}
+		}
+
+		// Insert only regular messages into the database (not typing_indicator)
+		err = InsertMessages(ctx, rt.DB, regularMsgs)
+		if err != nil {
+			return nil, errors.Wrapf(err, "error inserting broadcast messages")
 		}
 	}
 
-	// insert them in a single request
-	err = InsertMessages(ctx, rt.DB, msgs)
-	if err != nil {
-		return nil, errors.Wrapf(err, "error inserting broadcast messages")
+	// Debug log if we have typing_indicators
+	if len(typingIndicatorMsgs) > 0 {
+		logrus.WithFields(logrus.Fields{
+			"typing_indicators": len(typingIndicatorMsgs),
+			"regular_msgs":      len(regularMsgs),
+		}).Info("separating typing_indicator actions from regular messages")
 	}
 
-	return msgs, nil
+	// Return all messages (regular + typing_indicator) for courier to process
+	allMessages := append(regularMsgs, typingIndicatorMsgs...)
+	return allMessages, nil
 }
 
 const updateMsgForResendingSQL = `
