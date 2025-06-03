@@ -1,3 +1,7 @@
+1.62.0
+----------
+ * SendHistory ticketer actions
+
 1.61.2
 ----------
  * Fix open ticket error message return
