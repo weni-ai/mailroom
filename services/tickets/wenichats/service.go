@@ -308,6 +308,7 @@ func (s *service) Reopen(ticket []*models.Ticket, logHTTP flows.HTTPLogCallback)
 func parseTime(historyAfter string) (time.Time, error) {
 	formats := []string{
 		"2006-01-02 15:04:05",
+		"2006-01-02T15:04:05",
 		"2006-01-02T15:04:05Z",
 		"2006-01-02 15:04:05-07:00",
 	}
@@ -389,6 +390,7 @@ func (s *service) SendHistory(ticket *models.Ticket, contactID models.ContactID,
 		}
 		if err != nil {
 			logrus.Error(errors.Wrap(err, "failed to send history batch"))
+			return err
 		}
 	}
 
