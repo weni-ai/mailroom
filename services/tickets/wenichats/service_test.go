@@ -758,6 +758,13 @@ func TestSendHistory(t *testing.T) {
 	roomUUID := "8ecb1e4a-b457-4645-a161-e2b02ddffa88"
 
 	httpx.SetRequestor(httpx.NewMockRequestor(map[string][]httpx.MockResponse{
+		"https://auth.weni.ai/oauth/token": {
+			httpx.NewMockResponse(200, nil, `{
+				"access_token": "token",
+				"token_type": "Bearer",
+				"expires_in": 3600
+			}`),
+		},
 		fmt.Sprintf("%s/rooms/%s/history/", baseURL, roomUUID): {
 			httpx.MockConnectionError,
 			httpx.NewMockResponse(200, nil, `{}`),
