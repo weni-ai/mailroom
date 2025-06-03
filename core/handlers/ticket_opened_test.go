@@ -1,6 +1,7 @@
 package handlers_test
 
 import (
+	"encoding/json"
 	"testing"
 
 	"github.com/nyaruka/gocommon/httpx"
@@ -8,10 +9,12 @@ import (
 	"github.com/nyaruka/goflow/assets"
 	"github.com/nyaruka/goflow/flows"
 	"github.com/nyaruka/goflow/flows/actions"
+	"github.com/nyaruka/goflow/utils"
 	"github.com/nyaruka/mailroom/core/handlers"
 	"github.com/nyaruka/mailroom/core/models"
 	"github.com/nyaruka/mailroom/testsuite"
 	"github.com/nyaruka/mailroom/testsuite/testdata"
+	"github.com/nyaruka/null"
 
 	_ "github.com/nyaruka/mailroom/services/tickets/mailgun"
 	_ "github.com/nyaruka/mailroom/services/tickets/zendesk"
@@ -145,4 +148,36 @@ func TestTicketOpened(t *testing.T) {
 	}
 
 	handlers.RunTestCases(t, ctx, rt, tcs)
+}
+
+type mockTicketService struct {
+	sendHistoryCalled bool
+	tickets           []*models.Ticket
+	ticketer          *flows.Ticketer
+	contactID         models.ContactID
+	runs              []*models.FlowRun
+}
+
+func (m *mockTicketService) SendHistory(ticket *models.Ticket, contactID models.ContactID, runs []*models.FlowRun, logHTTP flows.HTTPLogCallback) error {
+	m.sendHistoryCalled = true
+	m.tickets = append(m.tickets, ticket)
+	m.contactID = contactID
+	m.runs = runs
+	return nil
+}
+
+func (m *mockTicketService) Close(tickets []*models.Ticket, logHTTP flows.HTTPLogCallback) error {
+	return nil
+}
+
+func (m *mockTicketService) Reopen(tickets []*models.Ticket, logHTTP flows.HTTPLogCallback) error {
+	return nil
+}
+
+func (m *mockTicketService) Open(session flows.Session, topic *flows.Topic, body string, assignee *flows.User, logHTTP flows.HTTPLogCallback) (*flows.Ticket, error) {
+	return flows.OpenTicket(m.ticketer, topic, body, assignee), nil
+}
+
+func (m *mockTicketService) Forward(ticket *models.Ticket, msgUUID flows.MsgUUID, msgType string, attachments []utils.Attachment, body json.RawMessage, subject null.String, logHTTP flows.HTTPLogCallback) error {
+	return nil
 }

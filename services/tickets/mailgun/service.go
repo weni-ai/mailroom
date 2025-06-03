@@ -234,3 +234,7 @@ func evaluateTemplate(t *template.Template, c map[string]string) string {
 func subjectFromBody(body string) string {
 	return utils.Truncate(strings.ReplaceAll(body, "\n", ""), 64)
 }
+
+func (s *service) SendHistory(ticket *models.Ticket, contactID models.ContactID, runs []*models.FlowRun, logHTTP flows.HTTPLogCallback) error {
+	return nil
+}
