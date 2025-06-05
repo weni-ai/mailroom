@@ -1,3 +1,7 @@
+1.63.0
+----------
+ * SendHistory ticketer task
+
 1.62.0
 ----------
  * SendHistory ticketer actions
