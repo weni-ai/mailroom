@@ -389,6 +389,8 @@ func newOutgoingMsg(rt *runtime.Runtime, org *Org, channel *Channel, contactID C
 	msg.SetChannel(channel)
 	msg.SetURN(out.URN())
 
+	suspendTemplate := org.o.Config.Get("suspend_template", false)
+
 	if org.Suspended() {
 		// we fail messages for suspended orgs right away
 		m.Status = MsgStatusFailed
@@ -439,6 +441,12 @@ func newOutgoingMsg(rt *runtime.Runtime, org *Org, channel *Channel, contactID C
 		if out.Templating() != nil {
 			metadata["templating"] = out.Templating()
 			m.Template = null.String(out.Templating().Template().Name)
+
+			if ok, st := suspendTemplate.(bool); ok && st {
+				m.Status = MsgStatusFailed
+				m.FailedReason = MsgFailedSuspendTemplate // Suspend Template
+				logrus.WithFields(logrus.Fields{"org_id": org.ID()}).Debug("suspend template, failing message")
+			}
 		}
 		if out.Topic() != flows.NilMsgTopic {
 			metadata["topic"] = string(out.Topic())
@@ -577,7 +585,7 @@ func newOutgoingMsgWpp(rt *runtime.Runtime, org *Org, channel *Channel, contactI
 	msg.SetChannel(channel)
 	msg.SetURN(msgWpp.URN())
 
-	suspend_template := org.o.Config.Get("suspend_template", false)
+	suspendTemplate := org.o.Config.Get("suspend_template", false)
 
 	if org.Suspended() {
 		// we fail messages for suspended orgs right away
@@ -685,9 +693,10 @@ func newOutgoingMsgWpp(rt *runtime.Runtime, org *Org, channel *Channel, contactI
 			m.Template = null.String(msgWpp.Templating().Template().Name)
 			m.HighPriority = false // template messages are usually sent for a large number of contacts, so we don't want to block other messages
 
-			if ok, st := suspend_template.(bool); ok && st {
+			if ok, st := suspendTemplate.(bool); ok && st {
 				m.Status = MsgStatusFailed
 				m.FailedReason = MsgFailedSuspendTemplate // Suspend Template
+				logrus.WithFields(logrus.Fields{"org_id": org.ID()}).Debug("suspend template, failing message")
 			}
 
 		}
