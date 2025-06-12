@@ -1,3 +1,11 @@
+1.63.1
+----------
+ * Fix to suspend template org config for Check suspend_template on newOutgoingMsg too
+
+1.63.0
+----------
+ * SendHistory ticketer task
+
 1.62.0
 ----------
  * SendHistory ticketer actions
