@@ -44,6 +44,15 @@ const (
 	// FlowBatchQueue is our queue for flow batch tasks
 	FlowBatchQueue = "flow_batch"
 
+	// WppBroadcastBatchQueue is our queue for wpp broadcast batch tasks primarily used by nexus application and general uses
+	WppBroadcastBatchQueue = "wpp_broadcast_batch"
+
+	// TemplateBatchQueue is our queue for template batch tasks primarily used on templates campaigns
+	TemplateBatchQueue = "template_batch"
+
+	// TemplateNotificationBatchQueue is our queue for template notification batch tasks primarily used by commerce application
+	TemplateNotificationBatchQueue = "template_notification_batch"
+
 	// SendBroadcast is our type for sending a broadcast
 	SendBroadcast = "send_broadcast"
 

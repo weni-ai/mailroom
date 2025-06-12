@@ -31,9 +31,13 @@ type Config struct {
 	Domain           string `help:"the domain that mailroom is listening on"`
 	AttachmentDomain string `help:"the domain that will be used for relative attachment"`
 
-	BatchWorkers         int  `help:"the number of go routines that will be used to handle batch events"`
-	HandlerWorkers       int  `help:"the number of go routines that will be used to handle messages"`
-	FlowBatchWorkers     int  `help:"the number of go routines that will be used to handle flow batch events"`
+	BatchWorkers                     int `help:"the number of go routines that will be used to handle batch events"`
+	HandlerWorkers                   int `help:"the number of go routines that will be used to handle messages"`
+	FlowBatchWorkers                 int `help:"the number of go routines that will be used to handle flow batch events"`
+	WppBroadcastBatchWorkers         int `help:"the number of go routines that will be used to handle wpp broadcast batch events"`
+	TemplateBatchWorkers             int `help:"the number of go routines that will be used to handle template batch events"`
+	TemplateNotificationBatchWorkers int `help:"the number of go routines that will be used to handle template notification batch events"`
+
 	RetryPendingMessages bool `help:"whether to requeue pending messages older than five minutes to retry"`
 
 	WebhooksTimeout              int     `help:"the timeout in milliseconds for webhook calls from engine"`
@@ -118,10 +122,13 @@ func NewDefaultConfig() *Config {
 		Address: "localhost",
 		Port:    8090,
 
-		BatchWorkers:         4,
-		HandlerWorkers:       32,
-		FlowBatchWorkers:     8,
-		RetryPendingMessages: true,
+		BatchWorkers:                     4,
+		HandlerWorkers:                   32,
+		FlowBatchWorkers:                 8,
+		WppBroadcastBatchWorkers:         4,
+		TemplateBatchWorkers:             4,
+		TemplateNotificationBatchWorkers: 4,
+		RetryPendingMessages:             true,
 
 		WebhooksTimeout:              15000,
 		WebhooksMaxRetries:           2,

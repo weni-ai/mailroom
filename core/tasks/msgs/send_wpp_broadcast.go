@@ -3,6 +3,7 @@ package msgs
 import (
 	"context"
 	"encoding/json"
+	"slices"
 
 	"time"
 
@@ -68,11 +69,23 @@ func CreateWppBroadcastBatches(ctx context.Context, rt *runtime.Runtime, bcast *
 	urnContacts := make(map[models.ContactID]urns.URN)
 	repeatedContacts := make(map[models.ContactID]urns.URN)
 
-	q := queue.BatchQueue
+	q := queue.WppBroadcastBatchQueue
+	priority := queue.DefaultPriority
 
-	// two or fewer contacts? queue to our handler queue for sending
-	if len(contactIDs) <= 2 {
-		q = queue.HandlerQueue
+	if bcast.Queue() != "" {
+		// check if the queue is valid
+		allowedQueues := []string{queue.WppBroadcastBatchQueue, queue.TemplateBatchQueue, queue.TemplateNotificationBatchQueue}
+		if !slices.Contains(allowedQueues, bcast.Queue()) {
+			return errors.Errorf("invalid queue for wpp broadcast: %s", bcast.Queue())
+		}
+
+		q = bcast.Queue()
+
+		// if we are on the template batch or template notification batch queue, we want to use low priority
+		lowPriorityQueues := []string{queue.TemplateBatchQueue, queue.TemplateNotificationBatchQueue}
+		if slices.Contains(lowPriorityQueues, bcast.Queue()) {
+			priority = queue.LowPriority
+		}
 	}
 
 	// we want to remove contacts that are also present in URN sends, these will be a special case in our last batch
@@ -106,7 +119,7 @@ func CreateWppBroadcastBatches(ctx context.Context, rt *runtime.Runtime, bcast *
 			batch.SetURNs(urnContacts)
 		}
 
-		err = queue.AddTask(rc, q, queue.SendWppBroadcastBatch, int(bcast.OrgID()), batch, queue.DefaultPriority)
+		err = queue.AddTask(rc, q, queue.SendWppBroadcastBatch, int(bcast.OrgID()), batch, priority)
 		if err != nil {
 			logrus.WithError(err).Error("error while queuing wpp broadcast batch")
 		}
