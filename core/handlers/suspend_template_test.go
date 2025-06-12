@@ -6,6 +6,7 @@ import (
 	"github.com/nyaruka/gocommon/urns"
 	"github.com/nyaruka/goflow/assets"
 	"github.com/nyaruka/mailroom/core/models"
+	"github.com/nyaruka/mailroom/core/queue"
 	"github.com/nyaruka/mailroom/testsuite"
 	"github.com/nyaruka/mailroom/testsuite/testdata"
 )
@@ -43,6 +44,7 @@ func TestSuspendTemplate(t *testing.T) {
 		[]models.ContactID{testdata.George.ID},
 		nil,
 		testdata.WhatsAppCloudChannel.ID,
+		queue.WppBroadcastBatchQueue,
 	)
 
 	batch := broadcast.CreateBatch([]models.ContactID{testdata.George.ID})
