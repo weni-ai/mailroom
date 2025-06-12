@@ -27,14 +27,15 @@ type TriggerID int
 
 // trigger type constants
 const (
-	CatchallTriggerType        = TriggerType("C")
-	KeywordTriggerType         = TriggerType("K")
-	MissedCallTriggerType      = TriggerType("M")
-	NewConversationTriggerType = TriggerType("N")
-	ReferralTriggerType        = TriggerType("R")
-	IncomingCallTriggerType    = TriggerType("V")
-	ScheduleTriggerType        = TriggerType("S")
-	TicketClosedTriggerType    = TriggerType("T")
+	CatchallTriggerType                = TriggerType("C")
+	KeywordTriggerType                 = TriggerType("K")
+	MissedCallTriggerType              = TriggerType("M")
+	NewConversationTriggerType         = TriggerType("N")
+	ReferralTriggerType                = TriggerType("R")
+	IncomingCallTriggerType            = TriggerType("V")
+	ScheduleTriggerType                = TriggerType("S")
+	TicketClosedTriggerType            = TriggerType("T")
+	TicketClosedInvokeAgentTriggerType = TriggerType("A")
 )
 
 // match type constants
@@ -193,6 +194,12 @@ func FindMatchingTicketClosedTrigger(oa *OrgAssets, contact *flows.Contact) *Tri
 	return findBestTriggerMatch(candidates, nil, contact)
 }
 
+// FindMatchingTicketClosedInvokeAgentTrigger finds the best match trigger for ticket closed events that invoke an agent
+func FindMatchingTicketClosedInvokeAgentTrigger(oa *OrgAssets, contact *flows.Contact) *Trigger {
+	candidates := findTriggerCandidates(oa, TicketClosedInvokeAgentTriggerType, nil)
+	return findBestTriggerMatch(candidates, nil, contact)
+}
+
 // finds trigger candidates based on type and optional filter
 func findTriggerCandidates(oa *OrgAssets, type_ TriggerType, filter func(*Trigger) bool) []*Trigger {
 	candidates := make([]*Trigger, 0, 10)
@@ -221,7 +228,6 @@ type triggerMatch struct {
 // include (2) + exclude (1) = 3
 // include (2) = 2
 // exclude (1) = 1
-//
 const triggerScoreByChannel = 4
 const triggerScoreByInclusion = 2
 const triggerScoreByExclusion = 1

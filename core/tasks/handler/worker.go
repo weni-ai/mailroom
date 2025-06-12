@@ -797,7 +797,10 @@ func handleTicketEvent(ctx context.Context, rt *runtime.Runtime, event *models.T
 
 	switch event.EventType() {
 	case models.TicketEventTypeClosed:
-		trigger = models.FindMatchingTicketClosedTrigger(oa, contact)
+		trigger = models.FindMatchingTicketClosedInvokeAgentTrigger(oa, contact)
+		if trigger == nil {
+			trigger = models.FindMatchingTicketClosedTrigger(oa, contact)
+		}
 	default:
 		return errors.Errorf("unknown ticket event type: %s", event.EventType())
 	}
@@ -805,6 +808,15 @@ func handleTicketEvent(ctx context.Context, rt *runtime.Runtime, event *models.T
 	// no trigger, noop, move on
 	if trigger == nil {
 		logrus.WithField("ticket_id", event.TicketID).WithField("event_type", event.EventType()).Info("ignoring ticket event, no trigger found")
+		return nil
+	}
+
+	if trigger.TriggerType() == models.TicketClosedInvokeAgentTriggerType {
+		// TODO: invoke agent after ticket closed
+		logrus.WithFields(logrus.Fields{
+			"org_id":     event.OrgID(),
+			"contact_id": contact.ID(),
+		}).Info("invoke agent after ticket closed")
 		return nil
 	}
 
