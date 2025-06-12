@@ -6,6 +6,7 @@ import (
 	"database/sql/driver"
 	"encoding/json"
 	"fmt"
+	"slices"
 	"strings"
 	"time"
 
@@ -20,6 +21,7 @@ import (
 	"github.com/nyaruka/goflow/flows/definition/legacy/expressions"
 	"github.com/nyaruka/goflow/flows/events"
 	"github.com/nyaruka/goflow/utils"
+	"github.com/nyaruka/mailroom/core/queue"
 	"github.com/nyaruka/mailroom/runtime"
 	"github.com/nyaruka/null"
 
@@ -351,7 +353,7 @@ func NewOutgoingFlowMsgCatalog(rt *runtime.Runtime, org *Org, channel *Channel, 
 
 // NewOutgoingFlowMsgWpp creates an outgoing message for the passed in flow message
 func NewOutgoingFlowMsgWpp(rt *runtime.Runtime, org *Org, channel *Channel, session *Session, out *flows.MsgWppOut, createdOn time.Time) (*Msg, error) {
-	return newOutgoingMsgWpp(rt, org, channel, session.ContactID(), out, createdOn, session, NilBroadcastID)
+	return newOutgoingMsgWpp(rt, org, channel, session.ContactID(), out, createdOn, session, NilBroadcastID, true)
 }
 
 // NewOutgoingBroadcastMsg creates an outgoing message which is part of a broadcast
@@ -359,8 +361,8 @@ func NewOutgoingBroadcastMsg(rt *runtime.Runtime, org *Org, channel *Channel, co
 	return newOutgoingMsg(rt, org, channel, contactID, out, createdOn, nil, broadcastID, extraMetadata)
 }
 
-func NewOutgoingWppBroadcastMsg(rt *runtime.Runtime, org *Org, channel *Channel, contactID ContactID, out *flows.MsgWppOut, createdOn time.Time, broadcastID BroadcastID) (*Msg, error) {
-	return newOutgoingMsgWpp(rt, org, channel, contactID, out, createdOn, nil, broadcastID)
+func NewOutgoingWppBroadcastMsg(rt *runtime.Runtime, org *Org, channel *Channel, contactID ContactID, out *flows.MsgWppOut, createdOn time.Time, broadcastID BroadcastID, highPriority bool) (*Msg, error) {
+	return newOutgoingMsgWpp(rt, org, channel, contactID, out, createdOn, nil, broadcastID, highPriority)
 }
 
 // NewOutgoingMsg creates an outgoing message that does not belong to any flow or broadcast, it's used to the a direct message to the contact
@@ -565,12 +567,12 @@ func newOutgoingMsgCatalog(rt *runtime.Runtime, org *Org, channel *Channel, cont
 	return msg, nil
 }
 
-func newOutgoingMsgWpp(rt *runtime.Runtime, org *Org, channel *Channel, contactID ContactID, msgWpp *flows.MsgWppOut, createdOn time.Time, session *Session, broadcastID BroadcastID) (*Msg, error) {
+func newOutgoingMsgWpp(rt *runtime.Runtime, org *Org, channel *Channel, contactID ContactID, msgWpp *flows.MsgWppOut, createdOn time.Time, session *Session, broadcastID BroadcastID, highPriority bool) (*Msg, error) {
 	msg := &Msg{}
 	m := &msg.m
 	m.UUID = msgWpp.UUID()
 	m.Text = msgWpp.Text()
-	m.HighPriority = true // by default, we send wpp messages as high priority since they're usually sent as an agent response
+	m.HighPriority = highPriority
 	m.Direction = DirectionOut
 	m.Status = MsgStatusQueued
 	m.Visibility = VisibilityVisible
@@ -1551,6 +1553,7 @@ type WppBroadcast struct {
 		ParentID    BroadcastID         `json:"parent_id,omitempty"    db:"parent_id"`
 		Msg         WppBroadcastMessage `json:"msg"`
 		ChannelID   ChannelID           `json:"channel_id,omitempty"`
+		Queue       string              `json:"queue,omitempty"`
 	}
 }
 
@@ -1561,11 +1564,12 @@ func (b *WppBroadcast) GroupIDs() []GroupID      { return b.b.GroupIDs }
 func (b *WppBroadcast) URNs() []urns.URN         { return b.b.URNs }
 func (b *WppBroadcast) Msg() WppBroadcastMessage { return b.b.Msg }
 func (b *WppBroadcast) ChannelID() ChannelID     { return b.b.ChannelID }
+func (b *WppBroadcast) Queue() string            { return b.b.Queue }
 
 func (b *WppBroadcast) MarshalJSON() ([]byte, error)    { return json.Marshal(b.b) }
 func (b *WppBroadcast) UnmarshalJSON(data []byte) error { return json.Unmarshal(data, &b.b) }
 
-func NewWppBroadcast(orgID OrgID, id BroadcastID, msg WppBroadcastMessage, urns []urns.URN, contactIDs []ContactID, groupIDs []GroupID, channelID ChannelID) *WppBroadcast {
+func NewWppBroadcast(orgID OrgID, id BroadcastID, msg WppBroadcastMessage, urns []urns.URN, contactIDs []ContactID, groupIDs []GroupID, channelID ChannelID, queue string) *WppBroadcast {
 	bcast := &WppBroadcast{}
 	bcast.b.OrgID = orgID
 	bcast.b.BroadcastID = id
@@ -1574,6 +1578,7 @@ func NewWppBroadcast(orgID OrgID, id BroadcastID, msg WppBroadcastMessage, urns 
 	bcast.b.ContactIDs = contactIDs
 	bcast.b.GroupIDs = groupIDs
 	bcast.b.ChannelID = channelID
+	bcast.b.Queue = queue
 
 	return bcast
 }
@@ -1585,6 +1590,7 @@ func (b *WppBroadcast) CreateBatch(contactIDs []ContactID) *WppBroadcastBatch {
 	batch.b.OrgID = b.b.OrgID
 	batch.b.ChannelID = b.b.ChannelID
 	batch.b.ContactIDs = contactIDs
+	batch.b.Queue = b.b.Queue
 	return batch
 }
 
@@ -1597,6 +1603,7 @@ type WppBroadcastBatch struct {
 		IsLast      bool                   `json:"is_last"`
 		OrgID       OrgID                  `json:"org_id"`
 		ChannelID   ChannelID              `json:"channel_id,omitempty"`
+		Queue       string                 `json:"queue,omitempty"`
 	}
 }
 
@@ -1607,6 +1614,7 @@ func (b *WppBroadcastBatch) SetURNs(urns map[ContactID]urns.URN) { b.b.URNs = ur
 func (b *WppBroadcastBatch) OrgID() OrgID                        { return b.b.OrgID }
 func (b *WppBroadcastBatch) Msg() WppBroadcastMessage            { return b.b.Msg }
 func (b *WppBroadcastBatch) ChannelID() ChannelID                { return b.b.ChannelID }
+func (b *WppBroadcastBatch) Queue() string                       { return b.b.Queue }
 
 func (b *WppBroadcastBatch) IsLast() bool        { return b.b.IsLast }
 func (b *WppBroadcastBatch) SetIsLast(last bool) { b.b.IsLast = last }
@@ -1822,9 +1830,16 @@ func CreateWppBroadcastMessages(ctx context.Context, rt *runtime.Runtime, oa *Or
 			return nil, nil
 		}
 
+		// define our priority based on the queue
+		highPriority := true
+		lowPriorityQueues := []string{queue.TemplateBatchQueue, queue.TemplateNotificationBatchQueue}
+		if slices.Contains(lowPriorityQueues, bcast.Queue()) {
+			highPriority = false
+		}
+
 		// create our outgoing message
 		out := flows.NewMsgWppOut(urn, channel.ChannelReference(), bcast.Msg().InteractionType, headerType, headerText, text, footerText, ctaMessage, listMessage, flowMessage, orderDetails, attachments, quickReplies, buttons, templating, flows.NilMsgTopic, products, actionButtonText, sendCatalog, actionType, actionExternalID)
-		msg, err := NewOutgoingWppBroadcastMsg(rt, oa.Org(), channel, c.ID(), out, time.Now(), bcast.BroadcastID())
+		msg, err := NewOutgoingWppBroadcastMsg(rt, oa.Org(), channel, c.ID(), out, time.Now(), bcast.BroadcastID(), highPriority)
 		if err != nil {
 			return nil, errors.Wrapf(err, "error creating outgoing message")
 		}

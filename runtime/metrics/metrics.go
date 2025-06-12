@@ -36,10 +36,10 @@ func orgIdToString(orgId models.OrgID) string {
 }
 
 var summaryObjectives = map[float64]float64{
-	0.5: 0.05,		// 50th percentile with a max. absolute error of 0.05.
-	0.90: 0.01,		// 90th percentile with a max. absolute error of 0.01.
-	0.95: 0.005,	// 95th percentile with a max. absolute error of 0.005.
-	0.99: 0.001,	// 99th percentile with a max. absolute error of 0.001.
+	0.5:  0.05,  // 50th percentile with a max. absolute error of 0.05.
+	0.90: 0.01,  // 90th percentile with a max. absolute error of 0.01.
+	0.95: 0.005, // 95th percentile with a max. absolute error of 0.005.
+	0.99: 0.001, // 99th percentile with a max. absolute error of 0.001.
 }
 
 var usedWorkers = promauto.NewGaugeVec(prometheus.GaugeOpts{
@@ -63,53 +63,53 @@ var dbStats = promauto.NewGaugeVec(prometheus.GaugeOpts{
 }, []string{"stat"})
 
 var flowStartElapsed = promauto.NewSummaryVec(prometheus.SummaryOpts{
-	Name:    "mr_flow_start_elapsed",
-	Help:    "The time a flow engine execution took to complete for a single contact",
+	Name:       "mr_flow_start_elapsed",
+	Help:       "The time a flow engine execution took to complete for a single contact",
 	Objectives: summaryObjectives,
 }, []string{"orgId"})
 
 var flowBatchStartElapsed = promauto.NewSummaryVec(prometheus.SummaryOpts{
-	Name:    "mr_flow_batch_start_elapsed",
-	Help:    "The time a flow batch start took to complete for the contact batch",
+	Name:       "mr_flow_batch_start_elapsed",
+	Help:       "The time a flow batch start took to complete for the contact batch",
 	Objectives: summaryObjectives,
 }, []string{"orgId"})
 
 var flowBatchStartCount = promauto.NewGaugeVec(prometheus.GaugeOpts{
-	Name:    "mr_flow_batch_start_count",
-	Help:    "The number of contacts that were started in a flow batch",
+	Name: "mr_flow_batch_start_count",
+	Help: "The number of contacts that were started in a flow batch",
 }, []string{"orgId"})
 
 var campaignEventElapsed = promauto.NewSummaryVec(prometheus.SummaryOpts{
-	Name:    "mr_campaign_event_elapsed",
-	Help:    "The time a campaign event execution took to complete",
+	Name:       "mr_campaign_event_elapsed",
+	Help:       "The time a campaign event execution took to complete",
 	Objectives: summaryObjectives,
 }, []string{"orgId"})
 
 var campaignEventCount = promauto.NewGaugeVec(prometheus.GaugeOpts{
-	Name:    "mr_campaign_event_count",
-	Help:    "The number of sessions that where started due to campaign events",
+	Name: "mr_campaign_event_count",
+	Help: "The number of sessions that where started due to campaign events",
 }, []string{"orgId"})
 
 var campaignEventCronElapsed = promauto.NewSummaryVec(prometheus.SummaryOpts{
-	Name:    "mr_campaign_event_cron_elapsed",
-	Help:    "The time a campaign event cron execution took to queue all batches",
+	Name:       "mr_campaign_event_cron_elapsed",
+	Help:       "The time a campaign event cron execution took to queue all batches",
 	Objectives: summaryObjectives,
 }, []string{"orgId"})
 
 var campaignEventCronCount = promauto.NewGaugeVec(prometheus.GaugeOpts{
-	Name:    "mr_campaign_event_cron_count",
-	Help:    "The number of campaign events that where queued",
+	Name: "mr_campaign_event_cron_count",
+	Help: "The number of campaign events that where queued",
 }, []string{"orgId"})
 
 var contactEventElapsed = promauto.NewSummaryVec(prometheus.SummaryOpts{
-	Name:    "mr_contact_event_elapsed",
-	Help:    "The time a contact event handling took to complete in this runtime",
+	Name:       "mr_contact_event_elapsed",
+	Help:       "The time a contact event handling took to complete in this runtime",
 	Objectives: summaryObjectives,
 }, []string{"orgId", "event_type"})
 
 var contactEventLatency = promauto.NewSummaryVec(prometheus.SummaryOpts{
-	Name:    "mr_contact_event_latency",
-	Help:    "The time a contact event handling took to complete since it was queued",
+	Name:       "mr_contact_event_latency",
+	Help:       "The time a contact event handling took to complete since it was queued",
 	Objectives: summaryObjectives,
 }, []string{"orgId", "event_type"})
 
