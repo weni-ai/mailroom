@@ -118,6 +118,24 @@ func setupMocks() {
 				]
 			}`),
 		},
+		"https://api.linximpulse.com/engage/search/v3/search?apiKey=1234567890&secretKey=1234567890&terms=banana": {
+			createMockResponse(`{
+				"products": [
+					{
+						"id": "12346",
+						"skus": [
+							{
+								"sku": "1234",
+								"properties": {
+									"status": "available",
+									"stock": 10
+								}
+							}
+						]
+					}
+				]
+			}`),
+		},
 		"https://vtex.com.br/intelligent/search?hideUnavailableItems=true&locale=pt-BR&query=banana": {
 			createMockResponse(`{
 				"products": [
@@ -180,6 +198,19 @@ func setupMocks() {
 									}
 								]
 							}`),
+		},
+		"https://graph.facebook.com/v14.0/123456789/products?access_token=&fields=%5B%22category%22%2C%22name%22%2C%22retailer_id%22%2C%22availability%22%5D&filter=%7B%22or%22%3A%5B%7B%22and%22%3A%5B%7B%22retailer_id%22%3A%7B%22i_contains%22%3A%221234%22%7D%7D%2C%7B%22availability%22%3A%7B%22i_contains%22%3A%22in+stock%22%7D%7D%2C%7B%22visibility%22%3A%7B%22i_contains%22%3A%22published%22%7D%7D%5D%7D%5D%7D&summary=true": {
+			createMockResponse(`{
+				"data": [
+					{
+						"name": "banana prata (Kg)",
+						"retailer_id": "1234",
+						"availability": "in stock",
+						"visibility": "published",
+						"id": "111111222233333"
+					}
+				]
+			}`),
 		},
 		"https://vtex.com.br/intelligent/searchapi/checkout/pub/orderForms/simulation?test=test&deliveryChannel=delivery": {
 			createMockResponse(`{
@@ -324,6 +355,24 @@ func TestService(t *testing.T) {
 	assert.NoError(t, err)
 	assert.NotNil(t, call)
 	assert.Equal(t, "1234#10", call.ProductRetailerIDS[0].ProductRetailerIDs[0])
+	assert.NotNil(t, call.Traces)
+	assert.Equal(t, []string{"banana"}, call.SearchKeywords)
+
+	params = assets.MsgCatalogParam{
+		ProductSearch: "banana",
+		ChannelUUID:   uuids.UUID(testdata.TwilioChannel.UUID),
+		SearchType:    "vtex",
+		SearchUrl:     "https://api.linximpulse.com/engage/search/v3/search?apiKey=1234567890&secretKey=1234567890",
+		ApiType:       "linx",
+		PostalCode:    "000000-000",
+		SellerId:      "",
+		HasVtexAds:    false,
+		ExtraPrompt:   "",
+	}
+	call, err = svc.Call(session, params, logger.Log)
+	assert.NoError(t, err)
+	assert.NotNil(t, call)
+	assert.Equal(t, "1234", call.ProductRetailerIDS[0].ProductRetailerIDs[0])
 	assert.NotNil(t, call.Traces)
 	assert.Equal(t, []string{"banana"}, call.SearchKeywords)
 }

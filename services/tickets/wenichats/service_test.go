@@ -344,19 +344,6 @@ func TestOpenAndForward(t *testing.T) {
 	defer mockDB.Close()
 	sqlxDB := sqlx.NewDb(mockDB, "sqlmock")
 
-	rows := sqlmock.NewRows([]string{
-		"id", "broadcast_id", "uuid", "text", "created_on", "direction", "status", "visibility", "msg_count", "error_count", "next_attempt", "external_id", "attachments", "metadata", "channel_id", "contact_id", "contact_urn_id", "org_id", "topup_id",
-	})
-	msgTime, _ := time.Parse(time.RFC3339, "2019-10-07T15:21:30Z")
-	rows.AddRow(464, nil, "eb234953-38e7-491f-8a50-b03056a7d002", "ahoy", msgTime, "I", "H", "V", 1, 0, msgTime, "1026", nil, nil, 3, 1234567, 1, 1, 1)
-
-	after, err := time.Parse("2006-01-02T15:04:05", "2019-10-07T15:21:29")
-	assert.NoError(t, err)
-
-	mock.ExpectQuery("SELECT").
-		WithArgs(1234567, after).
-		WillReturnRows(rows)
-
 	mock.ExpectQuery("SELECT").WithArgs("1ae96956-4b34-433e-8d1a-f05fe6923d6d").WillReturnRows(
 		sqlmock.NewRows([]string{"row_to_json"}).AddRow(`{"uuid": "1ae96956-4b34-433e-8d1a-f05fe6923d6d", "id": 1, "name": "WeniChats", "ticketer_type": "wenichats", "config": {"project_uuid": "8a4bae05-993c-4f3b-91b5-80f4e09951f2", "project_name_origin": "Project 1"}}`),
 	)
@@ -757,4 +744,79 @@ func TestCloseAndReopen(t *testing.T) {
 
 	err = svc.Reopen([]*models.Ticket{ticket2}, logger.Log)
 	assert.EqualError(t, err, "wenichats ticket type doesn't support reopening")
+}
+
+func TestSendHistory(t *testing.T) {
+
+	_, rt, _, _ := testsuite.Get()
+
+	defer uuids.SetGenerator(uuids.DefaultGenerator)
+	defer httpx.SetRequestor(httpx.DefaultRequestor)
+
+	uuids.SetGenerator(uuids.NewSeededGenerator(12345))
+
+	roomUUID := "8ecb1e4a-b457-4645-a161-e2b02ddffa88"
+
+	httpx.SetRequestor(httpx.NewMockRequestor(map[string][]httpx.MockResponse{
+		"https://auth.weni.ai/oauth/token": {
+			httpx.NewMockResponse(200, nil, `{
+				"access_token": "token",
+				"token_type": "Bearer",
+				"expires_in": 3600
+			}`),
+		},
+		fmt.Sprintf("%s/rooms/%s/history/", baseURL, roomUUID): {
+			httpx.MockConnectionError,
+			httpx.NewMockResponse(200, nil, `{}`),
+		},
+	}))
+
+	ticketer := flows.NewTicketer(static.NewTicketer(assets.TicketerUUID(uuids.New()), "Support", "wenichats"))
+
+	svc, err := wenichats.NewService(
+		rt.Config,
+		http.DefaultClient,
+		nil,
+		ticketer,
+		map[string]string{
+			"project_auth": authToken,
+			"sector_uuid":  "1a4bae05-993c-4f3b-91b5-80f4e09951f2",
+		},
+	)
+	assert.NoError(t, err)
+
+	ticket := models.NewTicket("88bfa1dc-be33-45c2-b469-294ecb0eba90", testdata.Org1.ID, testdata.Cathy.ID, testdata.Wenichats.ID, roomUUID, testdata.DefaultTopic.ID, `{"history_after": "2019-10-07 15:21:29"}`, models.NilUserID, nil)
+
+	logger := &flows.HTTPLogger{}
+
+	mockDB, mock, _ := sqlmock.New()
+	defer mockDB.Close()
+	sqlxDB := sqlx.NewDb(mockDB, "sqlmock")
+
+	wenichats.SetDB(sqlxDB)
+
+	err = svc.SendHistory(ticket, models.ContactID(testdata.Cathy.ID), nil, logger.Log)
+	assert.Error(t, err)
+
+	rows := sqlmock.NewRows([]string{
+		"id", "broadcast_id", "uuid", "text", "created_on", "direction", "status", "visibility", "msg_count", "error_count", "next_attempt", "external_id", "attachments", "metadata", "channel_id", "contact_id", "contact_urn_id", "org_id", "topup_id",
+	})
+	msgTime, _ := time.Parse(time.RFC3339, "2019-10-07T15:21:30Z")
+	rows.AddRow(464, nil, "eb234953-38e7-491f-8a50-b03056a7d002", "ahoy", msgTime, "I", "H", "V", 1, 0, msgTime, "1026", nil, nil, 3, 10000, 1, 1, 1)
+
+	after, _ := time.Parse("2006-01-02T15:04:05", "2019-10-07T15:21:29")
+
+	mock.ExpectQuery("SELECT").
+		WithArgs(10000, after).
+		WillReturnRows(rows)
+
+	err = svc.SendHistory(ticket, models.ContactID(testdata.Cathy.ID), nil, logger.Log)
+	assert.Error(t, err)
+
+	mock.ExpectQuery("SELECT").
+		WithArgs(10000, after).
+		WillReturnRows(rows)
+
+	err = svc.SendHistory(ticket, models.ContactID(testdata.Cathy.ID), nil, logger.Log)
+	assert.NoError(t, err)
 }

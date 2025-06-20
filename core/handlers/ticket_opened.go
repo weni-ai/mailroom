@@ -62,6 +62,7 @@ func handleTicketOpened(ctx context.Context, rt *runtime.Runtime, tx *sqlx.Tx, o
 	)
 
 	scene.AppendToEventPreCommitHook(hooks.InsertTicketsHook, ticket)
+	scene.AppendToEventPostCommitHook(hooks.SendTicketsHistoryHook, ticket)
 
 	logrus.WithFields(logrus.Fields{
 		"contact_uuid":  scene.ContactUUID(),

@@ -215,57 +215,9 @@ func (s *service) Open(session flows.Session, topic *flows.Topic, body string, a
 	)
 	roomData.CallbackURL = callbackURL
 
-	historyAfter, _ := jsonparser.GetString([]byte(body), "history_after")
-
-	var after time.Time
-	if historyAfter != "" {
-		after, err = parseTime(historyAfter)
-		if err != nil {
-			return nil, err
-		}
-	} else if len(session.Runs()) > 0 {
-		// get messages for history, based on first session run start time
-		startMargin := -time.Second * 1
-		after = session.Runs()[0].CreatedOn().Add(startMargin)
-	}
-
 	cx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 	defer cancel()
 
-	msgs, selectErr := models.SelectContactMessages(cx, db, int(contact.ID()), after)
-	if selectErr != nil {
-		return nil, errors.Wrap(selectErr, "failed to get history messages")
-	}
-
-	batchSize := 50
-	batches := make([][]HistoryMessage, 0)
-
-	currentBatch := make([]HistoryMessage, 0)
-	for i := 0; i < len(msgs); i++ {
-		m := historyMsgFromMsg(msgs[i])
-		currentBatch = append(currentBatch, m)
-
-		if len(currentBatch) == batchSize {
-			batches = append(batches, currentBatch)
-			currentBatch = make([]HistoryMessage, 0)
-		}
-	}
-
-	// add the last batch if it's not empty
-	if len(currentBatch) > 0 {
-		batches = append(batches, currentBatch)
-	}
-
-	var historyMsg []HistoryMessage
-	if len(batches) == 0 {
-		historyMsg = currentBatch
-	} else {
-		historyMsg = batches[0]
-	}
-	roomData.History = historyMsg
-
-	cx, cancel = context.WithTimeout(context.Background(), 15*time.Second)
-	defer cancel()
 	ticketer, err := models.LookupTicketerByUUID(cx, db, s.ticketer.UUID())
 
 	if err != nil {
@@ -285,20 +237,7 @@ func (s *service) Open(session flows.Session, topic *flows.Topic, body string, a
 	}
 	if err != nil {
 		logrus.Error(errors.Wrap(err, fmt.Sprintf("failed to create wenichats room for: %+v", roomData)))
-		return nil, errors.Wrap(err, "failed to create wenichats room")
-	}
-
-	for i, batch := range batches {
-		if i == 0 { // to skip the first batch
-			continue
-		}
-		trace, err := s.restClient.SendHistoryBatch(newRoom.UUID, batch)
-		if trace != nil {
-			logHTTP(flows.NewHTTPLog(trace, flows.HTTPStatusFromCode, s.redactor))
-		}
-		if err != nil {
-			logrus.Error(errors.Wrap(err, "failed to send history batch"))
-		}
+		return nil, errors.New(string(trace.ResponseBody))
 	}
 
 	ticket.SetExternalID(newRoom.UUID)
@@ -370,6 +309,7 @@ func (s *service) Reopen(ticket []*models.Ticket, logHTTP flows.HTTPLogCallback)
 func parseTime(historyAfter string) (time.Time, error) {
 	formats := []string{
 		"2006-01-02 15:04:05",
+		"2006-01-02T15:04:05",
 		"2006-01-02T15:04:05Z",
 		"2006-01-02 15:04:05-07:00",
 	}
@@ -398,4 +338,62 @@ func historyMsgFromMsg(msg *models.Msg) HistoryMessage {
 		Direction:   direction,
 	}
 	return m
+}
+
+func (s *service) SendHistory(ticket *models.Ticket, contactID models.ContactID, runs []*models.FlowRun, logHTTP flows.HTTPLogCallback) error {
+	historyAfter, _ := jsonparser.GetString([]byte(ticket.Body()), "history_after")
+	var after time.Time
+	var err error
+	if historyAfter != "" {
+		after, err = parseTime(historyAfter)
+		if err != nil {
+			return err
+		}
+	} else if len(runs) > 0 {
+		// get messages for history, based on first session run start time
+		startMargin := -time.Second * 1
+		after = runs[0].CreatedOn().Add(startMargin)
+	}
+
+	cx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+	defer cancel()
+
+	msgs, selectErr := models.SelectContactMessages(cx, db, int(contactID), after)
+	if selectErr != nil {
+		return errors.Wrap(selectErr, "failed to get history messages")
+	}
+
+	batchSize := 50
+	batches := make([][]HistoryMessage, 0)
+
+	currentBatch := make([]HistoryMessage, 0)
+
+	for i := 0; i < len(msgs); i++ {
+		m := historyMsgFromMsg(msgs[i])
+		currentBatch = append(currentBatch, m)
+
+		if len(currentBatch) == batchSize {
+			batches = append(batches, currentBatch)
+			currentBatch = make([]HistoryMessage, 0)
+		}
+	}
+
+	// add the last batch if it's not empty
+	if len(currentBatch) > 0 {
+		batches = append(batches, currentBatch)
+	}
+
+	roomUUID := string(ticket.ExternalID())
+	for _, batch := range batches {
+		trace, err := s.restClient.SendHistoryBatch(roomUUID, batch)
+		if trace != nil {
+			logHTTP(flows.NewHTTPLog(trace, flows.HTTPStatusFromCode, s.redactor))
+		}
+		if err != nil {
+			logrus.Error(errors.Wrap(err, "failed to send history batch"))
+			return err
+		}
+	}
+
+	return nil
 }

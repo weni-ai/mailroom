@@ -1,3 +1,40 @@
+1.63.1
+----------
+ * Fix to suspend template org config for Check suspend_template on newOutgoingMsg too
+
+1.63.0
+----------
+ * SendHistory ticketer task
+
+1.62.0
+----------
+ * SendHistory ticketer actions
+
+1.61.2
+----------
+ * Fix open ticket error message return
+
+1.61.1
+----------
+ * Add condition for linx API type in cart simulation logic
+
+1.61.0
+----------
+ * Enhance WppBroadcastMessage structure by adding ActionType and ActionExternalID fields.
+
+1.60.2
+----------
+ * Fail template msg if org conf suspend_template is true
+
+1.60.1
+----------
+ * feat: Set default high priority for outgoing WPP messages
+ * remove return on worker handleMsgEvent on isBrain
+
+1.60.0
+----------
+ * Add Linx Search functionality to retrieve product
+
 1.59.0
 ----------
  * Add OIDC configuration and enhance Wenichats client with token management

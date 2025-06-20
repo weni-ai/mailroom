@@ -67,6 +67,9 @@ const (
 
 	// StartIVRFlowBatch is our task for starting an ivr batch
 	StartIVRFlowBatch = "start_ivr_flow_batch"
+
+	// SendHistory is our task for sending history to a ticket integration
+	SendHistory = "send_history"
 )
 
 // Size returns the number of tasks for the passed in queue

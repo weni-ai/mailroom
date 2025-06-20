@@ -11,6 +11,7 @@ import (
 	"github.com/nyaruka/goflow/flows"
 	"github.com/nyaruka/goflow/utils"
 	"github.com/nyaruka/mailroom/core/models"
+	"github.com/nyaruka/mailroom/core/tasks/tickets"
 	"github.com/nyaruka/mailroom/runtime"
 	"github.com/nyaruka/mailroom/web"
 	"github.com/pkg/errors"
@@ -71,7 +72,7 @@ func handleOpen(ctx context.Context, rt *runtime.Runtime, r *http.Request, l *mo
 
 	openedTicket, err := svc.Open(currentSession, topic, request.Extra, assignee, l.Ticketer(ticketer))
 	if err != nil {
-		return nil, 500, errors.Wrapf(err, "error opening ticket")
+		return nil, 400, err
 	}
 
 	newTicket := models.NewTicket(
@@ -111,6 +112,15 @@ func handleOpen(ctx context.Context, rt *runtime.Runtime, r *http.Request, l *mo
 	if err != nil {
 		return nil, 500, errors.Wrap(err, "error committing transaction")
 	}
+
+	rc := rt.RP.Get()
+	defer rc.Close()
+
+	err = tickets.QueueSendHistory(rc, newTicket, request.ContactID)
+	if err != nil {
+		return nil, 500, errors.Wrap(err, "error queuing send history")
+	}
+
 	return openedTicket, 200, nil
 }
 

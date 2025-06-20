@@ -109,6 +109,7 @@ func (r *FlowRun) SetConnectionID(connID *ConnectionID) { r.r.ConnectionID = con
 func (r *FlowRun) SetStartID(startID StartID)           { r.r.StartID = startID }
 func (r *FlowRun) UUID() flows.RunUUID                  { return r.r.UUID }
 func (r *FlowRun) ModifiedOn() time.Time                { return r.r.ModifiedOn }
+func (r *FlowRun) CreatedOn() time.Time                 { return r.r.CreatedOn }
 
 // MarshalJSON is our custom marshaller so that our inner struct get output
 func (r *FlowRun) MarshalJSON() ([]byte, error) {

@@ -144,5 +144,42 @@
         "count": 3
       }
     ]
+  },
+  {
+    "label": "open ticket with history_after",
+    "http_mocks": {
+      "https://auth.weni.ai/oauth/token": [
+        {
+          "status": 200,
+          "body": "{\"access_token\":\"test_token\",\"token_type\":\"Bearer\",\"expires_in\":3600}"
+        }
+      ],
+      "https://chats-engine.dev.cloud.weni.ai/v1/external/rooms/": [
+        {
+          "status": 500,
+          "body": "{\"error\":\"The contact already have an open room in the project\"}"
+        }
+      ]
+    },
+    "method": "POST",
+    "path": "/mr/ticket/open",
+    "body": {
+      "org_id": 1,
+      "contact_id": 10000,
+      "ticketer_id": 7,
+      "topic_id": 1,
+      "assignee_id": 0,
+      "extra": "{\"history_after\":\"2025-01-01 00:00:00-00:00\"}"
+    },
+    "status": 400,
+    "response": {
+      "error": "{\"error\":\"The contact already have an open room in the project\"}"
+    },
+    "db_assertions": [
+      {
+        "query": "SELECT count(*) FROM tickets_ticket WHERE status = 'O'",
+        "count": 3
+      }
+    ]
   }
 ]
