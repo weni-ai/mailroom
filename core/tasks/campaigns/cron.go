@@ -173,23 +173,20 @@ SELECT
     ef.id as fire_id,
     ef.event_id as event_id,
     ce.uuid as event_uuid,
-	f.uuid as flow_uuid,
-	c.uuid as campaign_uuid,
+    f.uuid as flow_uuid,
+    c.uuid as campaign_uuid,
     c.name as campaign_name,
     f.org_id as org_id
 FROM
-    campaigns_eventfire ef,
-    campaigns_campaignevent ce,
-    campaigns_campaign c,
-    flows_flow f
+    campaigns_eventfire ef
+    INNER JOIN campaigns_campaignevent ce ON ce.id = ef.event_id AND ce.is_active = TRUE
+    INNER JOIN flows_flow f ON f.id = ce.flow_id
+    INNER JOIN campaigns_campaign c ON c.id = ce.campaign_id
 WHERE
-    ef.fired IS NULL AND ef.scheduled <= NOW() AND
-	ce.id = ef.event_id AND
-	ce.is_active = TRUE AND
-    f.id = ce.flow_id AND
-    ce.campaign_id = c.id
+    ef.fired IS NULL 
+    AND ef.scheduled <= NOW()
 ORDER BY
-    DATE_TRUNC('minute', scheduled) ASC,
+    DATE_TRUNC('minute', ef.scheduled) ASC,
     ef.event_id ASC
 LIMIT
     25000;
