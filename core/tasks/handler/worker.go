@@ -220,7 +220,7 @@ func handleTimedEvent(ctx context.Context, rt *runtime.Runtime, eventType string
 	}
 
 	// load our contact
-	contacts, err := models.LoadContacts(ctx, rt.ReadonlyDB, oa, []models.ContactID{event.ContactID})
+	contacts, err := models.LoadContactsBasic(ctx, rt.ReadonlyDB, oa, []models.ContactID{event.ContactID})
 	if err != nil {
 		return errors.Wrapf(err, "error loading contact")
 	}
