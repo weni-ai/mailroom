@@ -196,6 +196,7 @@ type RoomRequest struct {
 	IsAnon       bool                   `json:"is_anon,omitempty"`
 	History      []HistoryMessage       `json:"history,omitempty"`
 	ProjectInfo  *ProjectInfo           `json:"project_info,omitempty"`
+	Protocol     string                 `json:"protocol"`
 }
 
 type Contact struct {
