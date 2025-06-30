@@ -192,6 +192,8 @@ func (s *service) Open(session flows.Session, topic *flows.Topic, body string, a
 		roomData.FlowUUID = session.Runs()[0].Flow().UUID()
 	}
 	roomData.Contact.Groups = groups
+	protocol, _ := jsonparser.GetString([]byte(body), "protocol")
+	roomData.Protocol = protocol
 
 	// if body is not configured with custom fields properly, send all fields from contact
 	extra := &struct {
