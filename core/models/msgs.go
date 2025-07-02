@@ -690,8 +690,6 @@ func newOutgoingMsgWpp(rt *runtime.Runtime, org *Org, channel *Channel, contactI
 		}
 		if msgWpp.Templating() != nil {
 			metadata["templating"] = msgWpp.Templating()
-			fmt.Printf("Templating added to metadata: %+v\n", msgWpp.Templating())
-			fmt.Printf("Template in templating: %+v\n", msgWpp.Templating().Template())
 			m.Template = null.String(msgWpp.Templating().Template().Name)
 			m.HighPriority = false // template messages are usually sent for a large number of contacts, so we don't want to block other messages
 
@@ -1510,7 +1508,6 @@ func CreateBroadcastMessages(ctx context.Context, rt *runtime.Runtime, oa *OrgAs
 type WppBroadcastTemplate struct {
 	UUID      assets.TemplateUUID `json:"uuid" validate:"required,uuid"`
 	Name      string              `json:"name" validate:"required"`
-	Category  string              `json:"category"`
 	Variables []string            `json:"variables,omitempty"`
 	Locale    string              `json:"locale,omitempty" validate:"omitempty,bcp47"`
 }
@@ -1797,11 +1794,8 @@ func CreateWppBroadcastMessages(ctx context.Context, rt *runtime.Runtime, oa *Or
 				}
 
 				text = translation.Substitute(evaluatedVariables)
-				fmt.Println("CATEGORY: ", bcast.Msg().Template.Category)
-				var templateReference = assets.NewTemplateReference(bcast.Msg().Template.UUID, bcast.Msg().Template.Name, bcast.Msg().Template.Category)
-				fmt.Printf("TemplateReference created: UUID=%s, Name=%s, Category=%s\n", templateReference.UUID, templateReference.Name, templateReference.Category)
+				var templateReference = assets.NewTemplateReference(bcast.Msg().Template.UUID, bcast.Msg().Template.Name, templateMatch.Category())
 				templating = flows.NewMsgTemplating(templateReference, translation.Language(), translation.Country(), evaluatedVariables, translation.Namespace())
-				fmt.Printf("MsgTemplating created: %+v\n", templating)
 			} else {
 				return nil, errors.Errorf("translation not found for template: %s, in channel: %s", bcast.Msg().Template.UUID, channel.UUID())
 			}
