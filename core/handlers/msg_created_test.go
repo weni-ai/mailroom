@@ -41,7 +41,7 @@ func TestMsgCreated(t *testing.T) {
 	templateAction := actions.NewSendMsg(handlers.NewActionUUID(), "Template time", nil, nil, "", "", "", false)
 	templateAction.Templating = &actions.Templating{
 		UUID:      uuids.UUID("db297d56-ec8c-4231-bbe8-030369777ae1"),
-		Template:  &assets.TemplateReference{UUID: assets.TemplateUUID("9c22b594-fcab-4b29-9bcb-ce4404894a80"), Name: "revive_issue"},
+		Template:  &assets.TemplateReference{UUID: assets.TemplateUUID("9c22b594-fcab-4b29-9bcb-ce4404894a80"), Name: "revive_issue", Category: "marketing"},
 		Variables: []string{"@contact.name", "tooth"},
 	}
 
