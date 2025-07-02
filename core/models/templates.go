@@ -20,6 +20,7 @@ type Template struct {
 		Name         string                 `json:"name"          validate:"required"`
 		UUID         assets.TemplateUUID    `json:"uuid"          validate:"required"`
 		Translations []*TemplateTranslation `json:"translations"  validate:"dive"`
+		Category     string                 `json:"category"`
 	}
 }
 
@@ -32,6 +33,7 @@ func (t *Template) Translations() []assets.TemplateTranslation {
 	}
 	return trs
 }
+func (t *Template) Category() string { return t.t.Category }
 
 // UnmarshalJSON is our unmarshaller for json data
 func (t *Template) UnmarshalJSON(data []byte) error { return json.Unmarshal(data, &t.t) }
@@ -93,6 +95,7 @@ const selectTemplatesSQL = `
 SELECT ROW_TO_JSON(r) FROM (SELECT
 	t.name as name, 
 	t.uuid as uuid,
+	t.category as category,
 	(SELECT ARRAY_TO_JSON(ARRAY_AGG(ROW_TO_JSON(tr))) FROM (
 		SELECT
 			tr.language as language,
