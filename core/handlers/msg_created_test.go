@@ -41,7 +41,7 @@ func TestMsgCreated(t *testing.T) {
 	templateAction := actions.NewSendMsg(handlers.NewActionUUID(), "Template time", nil, nil, "", "", "", false)
 	templateAction.Templating = &actions.Templating{
 		UUID:      uuids.UUID("db297d56-ec8c-4231-bbe8-030369777ae1"),
-		Template:  &assets.TemplateReference{UUID: assets.TemplateUUID("9c22b594-fcab-4b29-9bcb-ce4404894a80"), Name: "revive_issue"},
+		Template:  &assets.TemplateReference{UUID: assets.TemplateUUID("9c22b594-fcab-4b29-9bcb-ce4404894a80"), Name: "revive_issue", Category: "marketing"},
 		Variables: []string{"@contact.name", "tooth"},
 	}
 
@@ -85,7 +85,7 @@ func TestMsgCreated(t *testing.T) {
 					Args: []interface{}{
 						testdata.Alexandria.ID,
 						`Hi Alexandia, are you still experiencing problems with tooth?`,
-						`{"templating":{"template":{"uuid":"9c22b594-fcab-4b29-9bcb-ce4404894a80","name":"revive_issue"},"language":"eng","country":"US","variables":["Alexandia","tooth"],"namespace":"2d40b45c_25cd_4965_9019_f05d0124c5fa"}}`,
+						`{"templating":{"template":{"uuid":"9c22b594-fcab-4b29-9bcb-ce4404894a80","name":"revive_issue","category":"marketing"},"language":"eng","country":"US","variables":["Alexandia","tooth"],"namespace":"2d40b45c_25cd_4965_9019_f05d0124c5fa"}}`,
 						testdata.TwitterChannel.ID,
 					},
 					Count: 1,
