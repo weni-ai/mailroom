@@ -1,3 +1,7 @@
+1.65.0
+----------
+ * Enhance requestToRouter function to include channel information and contact name.
+
 1.64.0
 ----------
  * Add category field to Template model and update SQL selection
