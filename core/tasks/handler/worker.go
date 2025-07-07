@@ -17,6 +17,7 @@ import (
 	"github.com/nyaruka/gocommon/jsonx"
 	"github.com/nyaruka/gocommon/urns"
 	"github.com/nyaruka/gocommon/uuids"
+	"github.com/nyaruka/goflow/assets"
 	"github.com/nyaruka/goflow/excellent/types"
 	"github.com/nyaruka/goflow/flows"
 	"github.com/nyaruka/goflow/flows/events"
@@ -734,7 +735,7 @@ func handleMsgEvent(ctx context.Context, rt *runtime.Runtime, event *MsgEvent) e
 			return fmt.Errorf("no project uuid found")
 		}
 
-		err = requestToRouter(event, rt.Config, contact, projectUUID)
+		err = requestToRouter(event, rt.Config, contact, projectUUID, channel)
 		if err != nil {
 			return errors.Wrap(err, "unable to send message to router")
 		}
@@ -936,7 +937,7 @@ type StopEvent struct {
 	OccurredOn time.Time        `json:"occurred_on"`
 }
 
-func requestToRouter(event *MsgEvent, rtConfig *runtime.Config, contact *flows.Contact, projectUUID uuids.UUID) error {
+func requestToRouter(event *MsgEvent, rtConfig *runtime.Config, contact *flows.Contact, projectUUID uuids.UUID, channel *models.Channel) error {
 	httpClient, httpRetries, _ := goflow.HTTP(rtConfig)
 
 	body := struct {
@@ -947,6 +948,8 @@ func requestToRouter(event *MsgEvent, rtConfig *runtime.Config, contact *flows.C
 		Metadata      json.RawMessage        `json:"metadata"`
 		MsgEvent      MsgEvent               `json:"msg_event"`
 		ContactFields map[string]interface{} `json:"contact_fields"`
+		ChannelUUID   assets.ChannelUUID     `json:"channel_uuid"`
+		ContactName   string                 `json:"contact_name"`
 	}{
 		ProjectUUID:   projectUUID,
 		ContactURN:    event.URN.Identity(),
@@ -955,6 +958,8 @@ func requestToRouter(event *MsgEvent, rtConfig *runtime.Config, contact *flows.C
 		Metadata:      event.Metadata,
 		MsgEvent:      *event,
 		ContactFields: mapContactFields(contact),
+		ChannelUUID:   channel.UUID(),
+		ContactName:   contact.Name(),
 	}
 
 	var b io.Reader
