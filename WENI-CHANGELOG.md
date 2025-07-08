@@ -1,3 +1,8 @@
+1.65.2
+----------
+ * Tweak select eventfire query with explicit joins to avoid implicit less performatic joins
+ * Optimize contact loading with LoadContactsBasic
+
 1.65.1
 ----------
  * Add protocol on request to open wenichats room
