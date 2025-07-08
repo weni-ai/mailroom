@@ -246,6 +246,95 @@ func LoadContact(ctx context.Context, db Queryer, org *OrgAssets, id ContactID) 
 	return contacts[0], nil
 }
 
+// LoadContactBasic loads a contact with basic data only (no groups or tickets) from the passed in id
+func LoadContactBasic(ctx context.Context, db Queryer, org *OrgAssets, id ContactID) (*Contact, error) {
+	contacts, err := LoadContactsBasic(ctx, db, org, []ContactID{id})
+	if err != nil {
+		return nil, err
+	}
+	if len(contacts) == 0 {
+		return nil, nil
+	}
+	return contacts[0], nil
+}
+
+// LoadContactsBasic loads a set of contacts with basic data only (no groups or tickets) for the passed in ids.
+// This is a performance-optimized version for cases where groups and tickets are not needed.
+// Note that the order of the returned contacts won't necessarily match the order of the ids.
+func LoadContactsBasic(ctx context.Context, db Queryer, org *OrgAssets, ids []ContactID) ([]*Contact, error) {
+	start := time.Now()
+
+	rows, err := db.QueryxContext(ctx, selectContactBasicSQL, pq.Array(ids), org.OrgID())
+	if err != nil {
+		return nil, errors.Wrap(err, "error selecting contacts")
+	}
+	defer rows.Close()
+
+	contacts := make([]*Contact, 0, len(ids))
+	for rows.Next() {
+		e := &contactEnvelope{}
+		err := dbutil.ReadJSONRow(rows, e)
+		if err != nil {
+			return nil, errors.Wrap(err, "error scanning contact json")
+		}
+
+		contact := &Contact{
+			id:         ContactID(e.ID),
+			uuid:       e.UUID,
+			name:       e.Name,
+			language:   e.Language,
+			status:     e.Status,
+			createdOn:  e.CreatedOn,
+			modifiedOn: e.ModifiedOn,
+			lastSeenOn: e.LastSeenOn,
+		}
+
+		// no groups loaded in basic version
+		contact.groups = []*Group{}
+
+		// create our map of field values filtered by what we know exists
+		fields := make(map[string]*flows.Value)
+		orgFields, _ := org.Fields()
+		for _, f := range orgFields {
+			field := f.(*Field)
+			cv, found := e.Fields[field.UUID()]
+			if found {
+				value := flows.NewValue(
+					cv.Text,
+					cv.Datetime,
+					cv.Number,
+					cv.State,
+					cv.District,
+					cv.Ward,
+				)
+				fields[field.Key()] = value
+			}
+		}
+		contact.fields = fields
+
+		// finally build up our URN objects
+		contactURNs := make([]urns.URN, 0, len(e.URNs))
+		for _, u := range e.URNs {
+			urn, err := u.AsURN(org)
+			if err != nil {
+				logrus.WithField("urn", u).WithField("org_id", org.OrgID()).WithField("contact_id", contact.id).Warn("invalid URN, ignoring")
+				continue
+			}
+			contactURNs = append(contactURNs, urn)
+		}
+		contact.urns = contactURNs
+
+		// no tickets loaded in basic version
+		contact.tickets = []*Ticket{}
+
+		contacts = append(contacts, contact)
+	}
+
+	logrus.WithField("elapsed", time.Since(start)).WithField("count", len(contacts)).Debug("loaded contacts (basic)")
+
+	return contacts, nil
+}
+
 // LoadContacts loads a set of contacts for the passed in ids. Note that the order of the returned contacts
 // won't necessarily match the order of the ids.
 func LoadContacts(ctx context.Context, db Queryer, org *OrgAssets, ids []ContactID) ([]*Contact, error) {
@@ -546,6 +635,50 @@ LEFT JOIN (
 	GROUP BY
 		contact_id
 ) t ON c.id = t.contact_id
+WHERE 
+	c.id = ANY($1) AND
+	is_active = TRUE AND
+	c.org_id = $2
+) r;
+`
+
+const selectContactBasicSQL = `
+SELECT ROW_TO_JSON(r) FROM (SELECT
+	id,
+	org_id,
+	uuid,
+	name,
+	language,
+	status,
+	is_active,
+	created_on,
+	modified_on,
+	last_seen_on,
+	fields,
+	u.urns AS urns
+FROM
+	contacts_contact c
+LEFT JOIN (
+	SELECT 
+		contact_id, 
+		array_agg(
+			json_build_object(
+				'id', u.id, 
+				'scheme', u.scheme,
+				'path', path,
+				'display', display,
+            	'auth', auth,
+				'channel_id', channel_id,
+				'priority', priority
+			) ORDER BY priority DESC, id ASC
+		) as urns 
+	FROM 
+		contacts_contacturn u 
+	WHERE
+		u.contact_id = ANY($1)
+	GROUP BY 
+		contact_id
+) u ON c.id = u.contact_id
 WHERE 
 	c.id = ANY($1) AND
 	is_active = TRUE AND

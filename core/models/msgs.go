@@ -1319,7 +1319,7 @@ func CreateBroadcastMessages(ctx context.Context, rt *runtime.Runtime, oa *OrgAs
 	}
 
 	// load all our contacts
-	contacts, err := LoadContacts(ctx, rt.DB, oa, contactIDs)
+	contacts, err := LoadContactsBasic(ctx, rt.DB, oa, contactIDs)
 	if err != nil {
 		return nil, errors.Wrapf(err, "error loading contacts for broadcast")
 	}
@@ -1639,7 +1639,7 @@ func CreateWppBroadcastMessages(ctx context.Context, rt *runtime.Runtime, oa *Or
 	}
 
 	// load all our contacts
-	contacts, err := LoadContacts(ctx, rt.DB, oa, contactIDs)
+	contacts, err := LoadContactsBasic(ctx, rt.DB, oa, contactIDs)
 	if err != nil {
 		return nil, errors.Wrapf(err, "error loading contacts for broadcast")
 	}
@@ -2019,7 +2019,7 @@ func CreateOutgoingMessages(ctx context.Context, rt *runtime.Runtime, oa *OrgAss
 	}
 
 	// load all our contacts
-	contacts, err := LoadContacts(ctx, rt.DB, oa, contactIDs)
+	contacts, err := LoadContactsBasic(ctx, rt.DB, oa, contactIDs)
 	if err != nil {
 		return nil, errors.Wrapf(err, "error loading contacts for")
 	}
