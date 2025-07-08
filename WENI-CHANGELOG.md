@@ -1,3 +1,7 @@
+1.65.1
+----------
+ * Add protocol on request to open wenichats room
+
 1.65.0
 ----------
  * Enhance requestToRouter function to include channel information and contact name.
