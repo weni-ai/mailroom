@@ -735,6 +735,8 @@ func handleMsgEvent(ctx context.Context, rt *runtime.Runtime, event *MsgEvent) e
 			return fmt.Errorf("no project uuid found")
 		}
 
+		fmt.Println("[requestToRouter]: project uuid: ", projectUUID, ", channel uuid: ", channel.UUID())
+
 		err = requestToRouter(event, rt.Config, contact, projectUUID, channel)
 		if err != nil {
 			return errors.Wrap(err, "unable to send message to router")
@@ -981,6 +983,9 @@ func requestToRouter(event *MsgEvent, rtConfig *runtime.Config, contact *flows.C
 	if err != nil {
 		return err
 	}
+
+	fmt.Println("[requestToRouter]: url: ", url_)
+	fmt.Println("[requestToRouter]: body: ", string(data))
 
 	if trace.Response.StatusCode >= 400 {
 		return fmt.Errorf("router call error: status code %d", trace.Response.StatusCode)
