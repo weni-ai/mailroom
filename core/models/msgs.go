@@ -130,6 +130,7 @@ type Msg struct {
 		ChannelID            ChannelID          `db:"channel_id"      json:"channel_id"`
 		ChannelUUID          assets.ChannelUUID `                     json:"channel_uuid"`
 		ContactID            ContactID          `db:"contact_id"      json:"contact_id"`
+		ContactName          string             `                     json:"contact_name"`
 		ContactURNID         *URNID             `db:"contact_urn_id"  json:"contact_urn_id"`
 		IsResend             bool               `                     json:"is_resend,omitempty"`
 		URN                  urns.URN           `db:"urn_urn"         json:"urn"`
@@ -178,11 +179,14 @@ func (m *Msg) URNAuth() null.String             { return m.m.URNAuth }
 func (m *Msg) OrgID() OrgID                     { return m.m.OrgID }
 func (m *Msg) TopupID() TopupID                 { return m.m.TopupID }
 func (m *Msg) ContactID() ContactID             { return m.m.ContactID }
+func (m *Msg) ContactName() string              { return m.m.ContactName }
 func (m *Msg) ContactURNID() *URNID             { return m.m.ContactURNID }
 func (m *Msg) IsResend() bool                   { return m.m.IsResend }
 func (m *Msg) Template() null.String            { return m.m.Template }
 
 func (m *Msg) SetTopup(topupID TopupID) { m.m.TopupID = topupID }
+
+func (m *Msg) SetContactName(contactName string) { m.m.ContactName = contactName }
 
 func (m *Msg) SetChannel(channel *Channel) {
 	m.channel = channel
@@ -419,6 +423,11 @@ func newOutgoingMsg(rt *runtime.Runtime, org *Org, channel *Channel, contactID C
 		m.SessionID = session.ID()
 		m.SessionStatus = session.Status()
 
+		// set the contact name from the session
+		if session.Contact() != nil {
+			m.ContactName = session.Contact().Name()
+		}
+
 		// if we're responding to an incoming message, send as high priority
 		if session.IncomingMsgID() != NilMsgID {
 			m.HighPriority = true
@@ -518,6 +527,11 @@ func newOutgoingMsgCatalog(rt *runtime.Runtime, org *Org, channel *Channel, cont
 		m.SessionID = session.ID()
 		m.SessionStatus = session.Status()
 
+		// set the contact name from the session
+		if session.Contact() != nil {
+			m.ContactName = session.Contact().Name()
+		}
+
 		// if we're responding to an incoming message, send as high priority
 		if session.IncomingMsgID() != NilMsgID {
 			m.HighPriority = true
@@ -616,6 +630,11 @@ func newOutgoingMsgWpp(rt *runtime.Runtime, org *Org, channel *Channel, contactI
 		m.ResponseToExternalID = session.IncomingMsgExternalID()
 		m.SessionID = session.ID()
 		m.SessionStatus = session.Status()
+
+		// set the contact name from the session
+		if session.Contact() != nil {
+			m.ContactName = session.Contact().Name()
+		}
 
 		// if we're responding to an incoming message, send as high priority
 		if session.IncomingMsgID() != NilMsgID {
@@ -1446,6 +1465,9 @@ func CreateBroadcastMessages(ctx context.Context, rt *runtime.Runtime, oa *OrgAs
 			return nil, errors.Wrapf(err, "error creating outgoing message")
 		}
 
+		// set the contact name
+		msg.SetContactName(c.Name())
+
 		return msg, nil
 	}
 
@@ -1829,6 +1851,9 @@ func CreateWppBroadcastMessages(ctx context.Context, rt *runtime.Runtime, oa *Or
 			return nil, errors.Wrapf(err, "error creating outgoing message")
 		}
 
+		// set the contact name
+		msg.SetContactName(c.Name())
+
 		return msg, nil
 	}
 
@@ -2079,6 +2104,9 @@ func CreateOutgoingMessages(ctx context.Context, rt *runtime.Runtime, oa *OrgAss
 		if err != nil {
 			return nil, errors.Wrapf(err, "error creating outgoing message")
 		}
+
+		// set the contact name
+		msg.SetContactName(c.Name())
 
 		return msg, nil
 	}
