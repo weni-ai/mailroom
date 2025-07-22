@@ -1,3 +1,7 @@
+1.65.3
+----------
+ * Add contact name atribute to msg struct
+
 1.65.2
 ----------
  * Tweak select eventfire query with explicit joins to avoid implicit less performatic joins
