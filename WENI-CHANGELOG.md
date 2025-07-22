@@ -1,3 +1,24 @@
+1.65.3
+----------
+ * Add contact name atribute to msg struct
+
+1.65.2
+----------
+ * Tweak select eventfire query with explicit joins to avoid implicit less performatic joins
+ * Optimize contact loading with LoadContactsBasic
+
+1.65.1
+----------
+ * Add protocol on request to open wenichats room
+
+1.65.0
+----------
+ * Enhance requestToRouter function to include channel information and contact name.
+
+1.64.0
+----------
+ * Add category field to Template model and update SQL selection
+
 1.63.1
 ----------
  * Fix to suspend template org config for Check suspend_template on newOutgoingMsg too

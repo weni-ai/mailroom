@@ -628,3 +628,45 @@ func TestUpdateContactURNs(t *testing.T) {
 
 	testsuite.AssertQuery(t, db, `SELECT count(*) FROM contacts_contacturn`).Returns(numInitialURNs + 3)
 }
+
+func TestLoadContactsBasic(t *testing.T) {
+	ctx, rt, db, _ := testsuite.Get()
+
+	defer testsuite.Reset(testsuite.ResetAll)
+
+	testdata.InsertContactURN(db, testdata.Org1, testdata.Bob, "whatsapp:250788373373", 999)
+	testdata.InsertOpenTicket(db, testdata.Org1, testdata.Bob, testdata.Zendesk, testdata.SupportTopic, "Where are my shoes?", "1234", testdata.Agent)
+
+	org, err := models.GetOrgAssetsWithRefresh(ctx, rt, testdata.Org1.ID, models.RefreshAll)
+	assert.NoError(t, err)
+
+	// Load contact with full version (should have groups and tickets)
+	fullContacts, err := models.LoadContacts(ctx, db, org, []models.ContactID{testdata.Bob.ID})
+	require.NoError(t, err)
+	require.Equal(t, 1, len(fullContacts))
+
+	fullContact, err := fullContacts[0].FlowContact(org)
+	require.NoError(t, err)
+
+	// Load same contact with basic version
+	basicContacts, err := models.LoadContactsBasic(ctx, db, org, []models.ContactID{testdata.Bob.ID})
+	require.NoError(t, err)
+	require.Equal(t, 1, len(basicContacts))
+
+	basicContact, err := basicContacts[0].FlowContact(org)
+	require.NoError(t, err)
+
+	// Basic contact should have same core data
+	assert.Equal(t, fullContact.Name(), basicContact.Name())
+	assert.Equal(t, fullContact.UUID(), basicContact.UUID())
+	assert.Equal(t, len(fullContact.URNs()), len(basicContact.URNs()))
+	assert.Equal(t, fullContact.Fields()["joined"].QueryValue(), basicContact.Fields()["joined"].QueryValue())
+
+	// But basic version should not have groups or tickets (always empty)
+	assert.Equal(t, 0, basicContact.Groups().Count())
+	assert.Equal(t, 0, basicContact.Tickets().Count())
+
+	// While full version may have groups and tickets
+	// (in this test Bob doesn't have groups but has a ticket)
+	assert.Equal(t, 1, fullContact.Tickets().Count())
+}

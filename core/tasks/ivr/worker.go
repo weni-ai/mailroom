@@ -79,7 +79,7 @@ func HandleFlowStartBatch(bg context.Context, rt *runtime.Runtime, batch *models
 	}
 
 	// ok, we can initiate calls for the remaining contacts
-	contacts, err := models.LoadContacts(ctx, rt.ReadonlyDB, oa, contactIDs)
+	contacts, err := models.LoadContactsBasic(ctx, rt.ReadonlyDB, oa, contactIDs)
 	if err != nil {
 		return errors.Wrapf(err, "error loading contacts")
 	}
