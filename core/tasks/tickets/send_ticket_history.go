@@ -49,6 +49,10 @@ func handleSendTicketHistory(ctx context.Context, rt *runtime.Runtime, task *que
 		return errors.Wrapf(err, "error unmarshalling send history task: %s", string(task.Task))
 	}
 
+	if sendHistoryTask.ErrorCount > 0 {
+		time.Sleep(time.Duration(sendHistoryTask.ErrorCount*1000) * time.Millisecond)
+	}
+
 	err = SendTicketHistory(ctx, rt, sendHistoryTask)
 	if err != nil {
 		log := logrus.WithFields(logrus.Fields{
@@ -57,15 +61,12 @@ func handleSendTicketHistory(ctx context.Context, rt *runtime.Runtime, task *que
 			"contact_id":  sendHistoryTask.ContactID,
 			"error_count": sendHistoryTask.ErrorCount,
 		})
-
 		sendHistoryTask.ErrorCount++
 		if sendHistoryTask.ErrorCount < 3 {
 			rc := rt.RP.Get()
 			defer rc.Close()
 
-			priority := queue.Priority(sendHistoryTask.ErrorCount * 10000)
-
-			retryErr := queue.AddTask(rc, queue.HandlerQueue, queue.SendHistory, task.OrgID, sendHistoryTask, priority)
+			retryErr := queue.AddTask(rc, queue.HandlerQueue, queue.SendHistory, task.OrgID, sendHistoryTask, queue.DefaultPriority)
 			if retryErr != nil {
 				log.WithError(retryErr).Error("error requeuing send history task")
 			}
