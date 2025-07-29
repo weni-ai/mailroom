@@ -12,6 +12,7 @@ import (
 	"github.com/nyaruka/mailroom/core/queue"
 	"github.com/nyaruka/mailroom/runtime"
 	"github.com/pkg/errors"
+	"github.com/sirupsen/logrus"
 )
 
 func init() {
@@ -22,6 +23,7 @@ func init() {
 type SendHistoryTask struct {
 	TicketUUID flows.TicketUUID `json:"ticket_uuid"`
 	ContactID  models.ContactID `json:"contact_id"`
+	ErrorCount int              `json:"error_count,omitempty"`
 }
 
 // HandleSendTicketHistory processes the send ticket history task (exported for testing)
@@ -34,6 +36,8 @@ func handleSendTicketHistory(ctx context.Context, rt *runtime.Runtime, task *que
 	ctx, cancel := context.WithTimeout(ctx, time.Minute*10)
 	defer cancel()
 
+	start := time.Now()
+
 	// decode our task body
 	if task.Type != queue.SendHistory {
 		return errors.Errorf("unknown event type passed to send history worker: %s", task.Type)
@@ -45,7 +49,38 @@ func handleSendTicketHistory(ctx context.Context, rt *runtime.Runtime, task *que
 		return errors.Wrapf(err, "error unmarshalling send history task: %s", string(task.Task))
 	}
 
-	return SendTicketHistory(ctx, rt, sendHistoryTask)
+	if sendHistoryTask.ErrorCount > 0 {
+		time.Sleep(time.Duration(sendHistoryTask.ErrorCount*1000) * time.Millisecond)
+	}
+
+	err = SendTicketHistory(ctx, rt, sendHistoryTask)
+	if err != nil {
+		log := logrus.WithFields(logrus.Fields{
+			"org_id":      task.OrgID,
+			"ticket_uuid": sendHistoryTask.TicketUUID,
+			"contact_id":  sendHistoryTask.ContactID,
+			"error_count": sendHistoryTask.ErrorCount,
+		})
+		sendHistoryTask.ErrorCount++
+		if sendHistoryTask.ErrorCount < 3 {
+			rc := rt.RP.Get()
+			defer rc.Close()
+
+			retryErr := queue.AddTask(rc, queue.HandlerQueue, queue.SendHistory, task.OrgID, sendHistoryTask, queue.DefaultPriority)
+			if retryErr != nil {
+				log.WithError(retryErr).Error("error requeuing send history task")
+			}
+
+			log.WithError(err).Info("error sending ticket history, requeued for retry")
+			return nil
+		}
+
+		log.WithError(err).Error("error sending ticket history, max retries exceeded")
+		return nil
+	}
+
+	logrus.WithField("elapsed", time.Since(start)).Info("handled send history task")
+	return nil
 }
 
 // SendTicketHistory executes the ticket history sending logic

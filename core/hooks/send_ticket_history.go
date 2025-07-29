@@ -4,10 +4,9 @@ import (
 	"context"
 
 	"github.com/jmoiron/sqlx"
-	"github.com/nyaruka/goflow/flows"
 	"github.com/nyaruka/mailroom/core/models"
+	"github.com/nyaruka/mailroom/core/tasks/tickets"
 	"github.com/nyaruka/mailroom/runtime"
-	"github.com/pkg/errors"
 )
 
 var SendTicketsHistoryHook models.EventCommitHook = &sendTicketsHistoryHook{}
@@ -20,26 +19,13 @@ func (h *sendTicketsHistoryHook) Apply(ctx context.Context, rt *runtime.Runtime,
 		session := s.Session()
 		for _, t := range ts {
 			ticket := t.(*models.Ticket)
-			ticketer := oa.TicketerByID(ticket.TicketerID())
-			if ticketer == nil {
-				return errors.Errorf("can't find ticketer with id %d", ticket.TicketerID())
-			}
-
-			service, err := ticketer.AsService(rt.Config, flows.NewTicketer(ticketer))
-			if err != nil {
-				return err
-			}
-
-			logger := &models.HTTPLogger{}
-			contactID := session.ContactID()
-			runs := session.Runs()
-			err = service.SendHistory(ticket, contactID, runs, logger.Ticketer(ticketer))
-			logger.Insert(ctx, rt.DB)
+			rc := rt.RP.Get()
+			defer rc.Close()
+			err := tickets.QueueSendHistory(rc, ticket, session.ContactID())
 			if err != nil {
 				return err
 			}
 		}
 	}
 	return nil
-
 }
