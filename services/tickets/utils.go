@@ -18,6 +18,7 @@ import (
 	"github.com/nyaruka/goflow/utils"
 	"github.com/nyaruka/mailroom/core/models"
 	"github.com/nyaruka/mailroom/core/msgio"
+	"github.com/nyaruka/mailroom/core/queue"
 	"github.com/nyaruka/mailroom/core/tasks/handler"
 	"github.com/nyaruka/mailroom/runtime"
 
@@ -138,7 +139,7 @@ func SendReplyCSAT(ctx context.Context, rt *runtime.Runtime, ticket *models.Tick
 	}
 
 	// we'll use a broadcast to send this message
-	bcast := models.NewWppBroadcast(oa.OrgID(), models.NilBroadcastID, msg, nil, []models.ContactID{ticket.ContactID()}, nil, channel.ID())
+	bcast := models.NewWppBroadcast(oa.OrgID(), models.NilBroadcastID, msg, nil, []models.ContactID{ticket.ContactID()}, nil, channel.ID(), queue.WppBroadcastBatchQueue)
 	batch := bcast.CreateBatch([]models.ContactID{ticket.ContactID()})
 	msgs, err := models.CreateWppBroadcastMessages(ctx, rt, oa, batch)
 	if err != nil {
