@@ -51,9 +51,12 @@ type Mailroom struct {
 	wg   *sync.WaitGroup
 	quit chan bool
 
-	batchForeman     *Foreman
-	handlerForeman   *Foreman
-	flowBatchForeman *Foreman
+	batchForeman                     *Foreman
+	handlerForeman                   *Foreman
+	flowBatchForeman                 *Foreman
+	wppBroadcastForeman              *Foreman
+	templateBatchForeman             *Foreman
+	templateNotificationBatchForeman *Foreman
 
 	webserver *web.Server
 }
@@ -69,6 +72,9 @@ func NewMailroom(config *runtime.Config) *Mailroom {
 	mr.batchForeman = NewForeman(mr.rt, mr.wg, queue.BatchQueue, config.BatchWorkers)
 	mr.handlerForeman = NewForeman(mr.rt, mr.wg, queue.HandlerQueue, config.HandlerWorkers)
 	mr.flowBatchForeman = NewForeman(mr.rt, mr.wg, queue.FlowBatchQueue, config.FlowBatchWorkers)
+	mr.wppBroadcastForeman = NewForeman(mr.rt, mr.wg, queue.WppBroadcastBatchQueue, config.WppBroadcastBatchWorkers)
+	mr.templateBatchForeman = NewForeman(mr.rt, mr.wg, queue.TemplateBatchQueue, config.TemplateBatchWorkers)
+	mr.templateNotificationBatchForeman = NewForeman(mr.rt, mr.wg, queue.TemplateNotificationBatchQueue, config.TemplateNotificationBatchWorkers)
 
 	// set authentication token for zeroshot requests in goflow
 	routers.SetZeroshotToken(mr.rt.Config.ZeroshotAPIToken)
@@ -180,6 +186,9 @@ func (mr *Mailroom) Start() error {
 	mr.batchForeman.Start()
 	mr.handlerForeman.Start()
 	mr.flowBatchForeman.Start()
+	mr.wppBroadcastForeman.Start()
+	mr.templateBatchForeman.Start()
+	mr.templateNotificationBatchForeman.Start()
 
 	// start our web server
 	mr.webserver = web.NewServer(mr.ctx, mr.rt, mr.wg)
@@ -196,6 +205,9 @@ func (mr *Mailroom) Stop() error {
 	mr.batchForeman.Stop()
 	mr.handlerForeman.Stop()
 	mr.flowBatchForeman.Stop()
+	mr.wppBroadcastForeman.Stop()
+	mr.templateBatchForeman.Stop()
+	mr.templateNotificationBatchForeman.Stop()
 	close(mr.quit)
 	mr.cancel()
 
