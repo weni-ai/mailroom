@@ -1,3 +1,11 @@
+1.66.0
+----------
+ * Add WPP broadcast and template batch support to Mailroom in specific queues
+
+1.65.4
+----------
+ * Retry for ticketer send history task
+
 1.65.3
 ----------
  * Add contact name atribute to msg struct
