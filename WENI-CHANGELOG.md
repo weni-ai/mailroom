@@ -1,3 +1,7 @@
+1.67.0
+----------
+ * Update goflow version to v1.14.1
+
 1.66.0
 ----------
  * Add WPP broadcast and template batch support to Mailroom in specific queues
