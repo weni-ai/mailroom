@@ -2,6 +2,7 @@ package models_test
 
 import (
 	"testing"
+	"time"
 
 	"github.com/nyaruka/gocommon/uuids"
 	"github.com/nyaruka/goflow/assets"
@@ -36,6 +37,7 @@ func TestLoadTriggers(t *testing.T) {
 		excludeGroups    []models.GroupID
 		includeContacts  []models.ContactID
 		channelID        models.ChannelID
+		createdOn        time.Time
 	}{
 		{
 			id:               testdata.InsertKeywordTrigger(db, testdata.Org1, testdata.Favorites, "join", models.MatchFirst, nil, nil),
@@ -43,6 +45,7 @@ func TestLoadTriggers(t *testing.T) {
 			flowID:           testdata.Favorites.ID,
 			keyword:          "join",
 			keywordMatchType: models.MatchFirst,
+			createdOn:        time.Date(2025, 1, 1, 0, 0, 0, 0, time.UTC),
 		},
 		{
 			id: testdata.InsertKeywordTrigger(
@@ -56,6 +59,7 @@ func TestLoadTriggers(t *testing.T) {
 			keywordMatchType: models.MatchOnly,
 			includeGroups:    []models.GroupID{testdata.DoctorsGroup.ID, testdata.TestersGroup.ID},
 			excludeGroups:    []models.GroupID{farmersGroup.ID},
+			createdOn:        time.Date(2025, 1, 1, 0, 0, 0, 0, time.UTC),
 		},
 		{
 			id:            testdata.InsertIncomingCallTrigger(db, testdata.Org1, testdata.Favorites, []*testdata.Group{testdata.DoctorsGroup, testdata.TestersGroup}, []*testdata.Group{farmersGroup}),
@@ -63,22 +67,26 @@ func TestLoadTriggers(t *testing.T) {
 			flowID:        testdata.Favorites.ID,
 			includeGroups: []models.GroupID{testdata.DoctorsGroup.ID, testdata.TestersGroup.ID},
 			excludeGroups: []models.GroupID{farmersGroup.ID},
+			createdOn:     time.Date(2025, 1, 1, 0, 0, 0, 0, time.UTC),
 		},
 		{
-			id:     testdata.InsertMissedCallTrigger(db, testdata.Org1, testdata.Favorites),
-			type_:  models.MissedCallTriggerType,
-			flowID: testdata.Favorites.ID,
+			id:        testdata.InsertMissedCallTrigger(db, testdata.Org1, testdata.Favorites),
+			type_:     models.MissedCallTriggerType,
+			flowID:    testdata.Favorites.ID,
+			createdOn: time.Date(2025, 1, 1, 0, 0, 0, 0, time.UTC),
 		},
 		{
 			id:        testdata.InsertNewConversationTrigger(db, testdata.Org1, testdata.Favorites, testdata.TwilioChannel),
 			type_:     models.NewConversationTriggerType,
 			flowID:    testdata.Favorites.ID,
 			channelID: testdata.TwilioChannel.ID,
+			createdOn: time.Date(2025, 1, 1, 0, 0, 0, 0, time.UTC),
 		},
 		{
-			id:     testdata.InsertReferralTrigger(db, testdata.Org1, testdata.Favorites, "", nil),
-			type_:  models.ReferralTriggerType,
-			flowID: testdata.Favorites.ID,
+			id:        testdata.InsertReferralTrigger(db, testdata.Org1, testdata.Favorites, "", nil),
+			type_:     models.ReferralTriggerType,
+			flowID:    testdata.Favorites.ID,
+			createdOn: time.Date(2025, 1, 1, 0, 0, 0, 0, time.UTC),
 		},
 		{
 			id:         testdata.InsertReferralTrigger(db, testdata.Org1, testdata.Favorites, "3256437635", testdata.TwilioChannel),
@@ -86,11 +94,13 @@ func TestLoadTriggers(t *testing.T) {
 			flowID:     testdata.Favorites.ID,
 			referrerID: "3256437635",
 			channelID:  testdata.TwilioChannel.ID,
+			createdOn:  time.Date(2025, 1, 1, 0, 0, 0, 0, time.UTC),
 		},
 		{
-			id:     testdata.InsertCatchallTrigger(db, testdata.Org1, testdata.Favorites, nil, nil),
-			type_:  models.CatchallTriggerType,
-			flowID: testdata.Favorites.ID,
+			id:        testdata.InsertCatchallTrigger(db, testdata.Org1, testdata.Favorites, nil, nil),
+			type_:     models.CatchallTriggerType,
+			flowID:    testdata.Favorites.ID,
+			createdOn: time.Date(2025, 1, 1, 0, 0, 0, 0, time.UTC),
 		},
 	}
 
@@ -320,6 +330,71 @@ func TestArchiveContactTriggers(t *testing.T) {
 	assertTriggerArchived(cathyAndGeorgeID, false)
 	assertTriggerArchived(cathyAndGroupID, false)
 	assertTriggerArchived(georgeOnlyID, false)
+}
+
+func TestTriggerMatchingWithSameScore(t *testing.T) {
+	ctx, rt, db, _ := testsuite.Get()
+
+	defer testsuite.Reset(testsuite.ResetAll)
+
+	db.MustExec(`DELETE FROM triggers_trigger`)
+
+	// Create first trigger
+	olderTriggerID := testdata.InsertKeywordTrigger(
+		db, testdata.Org1, testdata.Favorites,
+		"hello", models.MatchFirst,
+		[]*testdata.Group{testdata.DoctorsGroup},
+		nil,
+	)
+
+	// Force a delay to ensure different created_on timestamps
+	time.Sleep(time.Millisecond * 100)
+
+	// Create second trigger with same matching criteria (will have same score)
+	newerTriggerID := testdata.InsertKeywordTrigger(
+		db, testdata.Org1, testdata.SingleMessage,
+		"hello", models.MatchFirst,
+		[]*testdata.Group{testdata.DoctorsGroup},
+		nil,
+	)
+
+	oa, err := models.GetOrgAssetsWithRefresh(ctx, rt, testdata.Org1.ID, models.RefreshTriggers)
+	require.NoError(t, err)
+
+	// Add test contact to doctors group
+	testdata.DoctorsGroup.Add(db, testdata.Cathy)
+	_, cathy := testdata.Cathy.Load(db, oa)
+
+	// Test cases
+	tcs := []struct {
+		text              string
+		contact           *flows.Contact
+		expectedTriggerID models.TriggerID
+	}{
+		// Should match the newer trigger since both have same score
+		{"hello", cathy, newerTriggerID},
+		{"HELLO", cathy, newerTriggerID},
+		{"hello world", cathy, newerTriggerID},
+	}
+
+	for _, tc := range tcs {
+		trigger := models.FindMatchingMsgTrigger(oa, tc.contact, tc.text)
+		assertTrigger(t, tc.expectedTriggerID, trigger,
+			"trigger mismatch for %s sending '%s' - expected newer trigger with same score",
+			tc.contact.Name(), tc.text)
+	}
+
+	// Get the created triggers to verify their dates
+	var olderCreatedOn, newerCreatedOn time.Time
+	err = db.Get(&olderCreatedOn, `SELECT created_on FROM triggers_trigger WHERE id = $1`, olderTriggerID)
+	require.NoError(t, err)
+	err = db.Get(&newerCreatedOn, `SELECT created_on FROM triggers_trigger WHERE id = $1`, newerTriggerID)
+	require.NoError(t, err)
+
+	// Verify that the triggers have different creation dates
+	assert.True(t, olderCreatedOn.Before(newerCreatedOn),
+		"expected first trigger (%s) to be created before second trigger (%s)",
+		olderCreatedOn, newerCreatedOn)
 }
 
 func assertTrigger(t *testing.T, expected models.TriggerID, actual *models.Trigger, msgAndArgs ...interface{}) {
