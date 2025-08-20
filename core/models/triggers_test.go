@@ -361,9 +361,14 @@ func TestTriggerMatchingWithSameScore(t *testing.T) {
 	oa, err := models.GetOrgAssetsWithRefresh(ctx, rt, testdata.Org1.ID, models.RefreshTriggers)
 	require.NoError(t, err)
 
+	// Remove Bob from doctors group if he's already there
+	db.MustExec(`DELETE FROM contacts_contactgroup_contacts WHERE contact_id = $1 AND contactgroup_id = $2`,
+		testdata.Bob.ID, testdata.DoctorsGroup.ID)
+
 	// Add test contact to doctors group
-	testdata.DoctorsGroup.Add(db, testdata.Cathy)
-	_, cathy := testdata.Cathy.Load(db, oa)
+	testdata.DoctorsGroup.Add(db, testdata.Bob)
+
+	_, bob := testdata.Bob.Load(db, oa)
 
 	// Test cases
 	tcs := []struct {
@@ -372,9 +377,9 @@ func TestTriggerMatchingWithSameScore(t *testing.T) {
 		expectedTriggerID models.TriggerID
 	}{
 		// Should match the newer trigger since both have same score
-		{"hello", cathy, newerTriggerID},
-		{"HELLO", cathy, newerTriggerID},
-		{"hello world", cathy, newerTriggerID},
+		{"hello", bob, newerTriggerID},
+		{"HELLO", bob, newerTriggerID},
+		{"hello world", bob, newerTriggerID},
 	}
 
 	for _, tc := range tcs {
