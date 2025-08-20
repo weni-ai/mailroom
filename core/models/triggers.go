@@ -59,6 +59,7 @@ type Trigger struct {
 		IncludeGroupIDs []GroupID   `json:"include_group_ids"`
 		ExcludeGroupIDs []GroupID   `json:"exclude_group_ids"`
 		ContactIDs      []ContactID `json:"contact_ids,omitempty"`
+		CreatedOn       time.Time   `json:"created_on"`
 	}
 }
 
@@ -74,6 +75,7 @@ func (t *Trigger) ReferrerID() string         { return t.t.ReferrerID }
 func (t *Trigger) IncludeGroupIDs() []GroupID { return t.t.IncludeGroupIDs }
 func (t *Trigger) ExcludeGroupIDs() []GroupID { return t.t.ExcludeGroupIDs }
 func (t *Trigger) ContactIDs() []ContactID    { return t.t.ContactIDs }
+func (t *Trigger) CreatedOn() time.Time       { return t.t.CreatedOn }
 func (t *Trigger) KeywordMatchType() triggers.KeywordMatchType {
 	if t.t.MatchType == MatchFirst {
 		return triggers.KeywordMatchTypeFirstWord
@@ -221,7 +223,6 @@ type triggerMatch struct {
 // include (2) + exclude (1) = 3
 // include (2) = 2
 // exclude (1) = 1
-//
 const triggerScoreByChannel = 4
 const triggerScoreByInclusion = 2
 const triggerScoreByExclusion = 1
@@ -251,7 +252,13 @@ func findBestTriggerMatch(candidates []*Trigger, channel *Channel, contact *flow
 	}
 
 	// sort the matches to get them in descending order of score
-	sort.SliceStable(matches, func(i, j int) bool { return matches[i].score > matches[j].score })
+	// if scores are equal, use the most recent created_on date
+	sort.SliceStable(matches, func(i, j int) bool {
+		if matches[i].score == matches[j].score {
+			return matches[i].trigger.CreatedOn().After(matches[j].trigger.CreatedOn())
+		}
+		return matches[i].score > matches[j].score
+	})
 
 	return matches[0].trigger
 }
@@ -305,6 +312,7 @@ SELECT ROW_TO_JSON(r) FROM (SELECT
 	t.match_type as match_type,
 	t.channel_id as channel_id,
 	COALESCE(t.referrer_id, '') as referrer_id,
+	t.created_on as created_on,
 	ARRAY_REMOVE(ARRAY_AGG(DISTINCT ig.contactgroup_id), NULL) as include_group_ids,
 	ARRAY_REMOVE(ARRAY_AGG(DISTINCT eg.contactgroup_id), NULL) as exclude_group_ids
 FROM 
@@ -317,7 +325,8 @@ WHERE
 	t.is_archived = FALSE AND
 	t.trigger_type != 'S'
 GROUP BY 
-	t.id
+	t.id,
+	t.created_on
 ) r;
 `
 
