@@ -1,3 +1,8 @@
+1.68.0
+----------
+ * Add is_bulk_send field to broadcast table
+ * Use created_on as a check field in triggers
+
 1.67.0
 ----------
  * Update goflow version to v1.14.1
