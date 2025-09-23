@@ -81,8 +81,8 @@ func InsertBroadcast(db *sqlx.DB, org *Org, baseLanguage envs.Language, text map
 
 	var id models.BroadcastID
 	must(db.Get(&id,
-		`INSERT INTO msgs_broadcast(org_id, base_language, text, schedule_id, broadcast_type, status, send_all, created_on, modified_on, created_by_id, modified_by_id)
-		VALUES($1, $2, $3, $4, $5, 'P', TRUE, NOW(), NOW(), 1, 1) RETURNING id`, org.ID, baseLanguage, hstore.Hstore{Map: textMap}, schedID, broadcastType,
+		`INSERT INTO msgs_broadcast(org_id, base_language, text, schedule_id, broadcast_type, status, send_all, is_bulk_send, created_on, modified_on, created_by_id, modified_by_id)
+		VALUES($1, $2, $3, $4, $5, 'P', TRUE, FALSE, NOW(), NOW(), 1, 1) RETURNING id`, org.ID, baseLanguage, hstore.Hstore{Map: textMap}, schedID, broadcastType,
 	))
 
 	for _, contact := range contacts {
