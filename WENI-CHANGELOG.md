@@ -1,3 +1,8 @@
+1.69.0
+----------
+ * Update goflow version to v1.15.0
+ * Refactor contact loading to use LoadContacts method across multiple handlers
+
 1.68.0
 ----------
  * Add is_bulk_send field to broadcast table
