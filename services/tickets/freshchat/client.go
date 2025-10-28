@@ -80,6 +80,10 @@ func (c *baseClient) post(endpoint string, payload interface{}, response interfa
 	return c.request("POST", endpoint, payload, response)
 }
 
+func (c *baseClient) put(endpoint string, payload interface{}, response interface{}) (*httpx.Trace, error) {
+	return c.request("PUT", endpoint, payload, response)
+}
+
 type Client struct {
 	baseClient
 }
@@ -120,16 +124,37 @@ func (c *Client) GetChannels() ([]*Channel, *httpx.Trace, error) {
 	return response, trace, nil
 }
 
+func (c *Client) CreateMessage(message *Message) (*Message, *httpx.Trace, error) {
+	endpoint := fmt.Sprintf("/v2/%s/messages", message.ConversationID)
+	response := &Message{}
+	trace, err := c.post(endpoint, message, response)
+	if err != nil {
+		return nil, trace, err
+	}
+	return response, trace, nil
+}
+
+func (c *Client) UpdateConversation(conversation *Conversation) (*httpx.Trace, error) {
+	endpoint := fmt.Sprintf("/v2/conversations/%s", string(conversation.ConversationID))
+	response := &Conversation{}
+	trace, err := c.put(endpoint, conversation, response)
+	if err != nil {
+		return trace, err
+	}
+	return trace, err
+}
+
 type Conversation struct {
-	Status             string                   `json:"status"`
-	ChannelID          string                   `json:"channel_id"`
-	AssignedAgentID    string                   `json:"assigned_agent_id"`
-	AssignedOrgAgentID string                   `json:"assigned_org_agent_id"`
-	AssignedGroupID    string                   `json:"assigned_group_id"`
-	AssignedOrgGroupID string                   `json:"assigned_org_group_id"`
-	Messages           []Message                `json:"messages"`
-	Properties         []map[string]interface{} `json:"properties"` //Array of custom properties
-	Users              []User                   `json:"users"`
+	ConversationID     string     `json:"conversation_id"`
+	Status             string     `json:"status"`
+	ChannelID          string     `json:"channel_id"`
+	AssignedAgentID    string     `json:"assigned_agent_id"`
+	AssignedOrgAgentID string     `json:"assigned_org_agent_id"`
+	AssignedGroupID    string     `json:"assigned_group_id"`
+	AssignedOrgGroupID string     `json:"assigned_org_group_id"`
+	Messages           []Message  `json:"messages"`
+	Properties         []Property `json:"properties"` //Array of custom properties
+	Users              []User     `json:"users"`
 }
 
 type Message struct {
@@ -254,15 +279,15 @@ type Channel struct {
 	ID          string `json:"id"`
 	Name        string `json:"name"`
 	UpdatedTime string `json:"updated_time"`
-	Icon struct {
+	Icon        struct {
 		URL string `json:"url"`
 	}
-	Enabled bool `json:"enabled"`
-	Public bool `json:"public"`
-	Tags []string `json:"tags"`
-	WelcomeMessage struct{
+	Enabled        bool     `json:"enabled"`
+	Public         bool     `json:"public"`
+	Tags           []string `json:"tags"`
+	WelcomeMessage struct {
 		MessageParts []MessagesPart `json:"message_parts"`
-		MessageType string `json:"message_type"`
+		MessageType  string         `json:"message_type"`
 	} `json:"welcome_message"`
 	Locale string `json:"locale"`
 }

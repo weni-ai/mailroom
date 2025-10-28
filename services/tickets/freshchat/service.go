@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/nyaruka/gocommon/httpx"
+	"github.com/nyaruka/gocommon/jsonx"
 	"github.com/nyaruka/gocommon/urns"
 	"github.com/nyaruka/goflow/flows"
 	"github.com/nyaruka/goflow/utils"
@@ -46,12 +47,12 @@ func NewService(rtCfg *runtime.Config, httpClient *http.Client, httpRetries *htt
 
 func (s *service) Open(session flows.Session, topic *flows.Topic, body string, assignee *flows.User, logHTTP flows.HTTPLogCallback) (*flows.Ticket, error) {
 	ticket := flows.OpenTicket(s.ticketer, topic, body, assignee)
-	// contactDisplay := session.Contact().Format(session.Environment())
-	// contactUUID := string(session.Contact().UUID())
+	contactDisplay := session.Contact().Format(session.Environment())
+	contactUUID := string(session.Contact().UUID())
 	channelID := ""
 	userID := ""
 
-	splitName := strings.Split(session.Contact().Name(), " ")
+	splitName := strings.Split(contactDisplay, " ")
 	firstName := ""
 	lastName := ""
 	if len(splitName) > 0 {
@@ -73,7 +74,7 @@ func (s *service) Open(session flows.Session, topic *flows.Topic, body string, a
 		LastName:  lastName,
 		Phone:     phone,
 		Properties: []Property{
-			{Name: "external_id", Value: session.Contact().UUID()},
+			{Name: "external_id", Value: contactUUID},
 		},
 	}
 
@@ -87,23 +88,10 @@ func (s *service) Open(session flows.Session, topic *flows.Topic, body string, a
 
 	userID = string(resultsUser.ID)
 
-	channels, trace, err := s.restClient.GetChannels()
-	if trace != nil {
-		logHTTP(flows.NewHTTPLog(trace, flows.HTTPStatusFromCode, s.redactor))
-	}
-	if err != nil {
-		return nil, errors.Wrap(err, "failed to get channels")
-	}
-	if len(channels) == 0 {
-		return nil, errors.New("no freshchat channels found")
-	}
+	bodyMap := Conversation{} // properties and message parts will be in this map
 
-	channelID = channels[0].ID
-
-	// todo: implement custom fields part
-	msg := &Conversation{
-		ChannelID: channelID,
-		Messages: []Message{
+	if !strings.HasPrefix(body, "{") {
+		bodyMap.Messages = []Message{
 			{
 				MessagesPart: []MessagesPart{
 					{
@@ -113,11 +101,52 @@ func (s *service) Open(session flows.Session, topic *flows.Topic, body string, a
 					},
 				},
 			},
+		}
+	} else {
+		err = jsonx.Unmarshal([]byte(body), bodyMap)
+		if err != nil {
+			logHTTP(flows.NewHTTPLog(trace, flows.HTTPStatusFromCode, s.redactor))
+		}
+	}
+
+	if bodyMap.ChannelID != "" {
+		channelID = bodyMap.ChannelID
+	} else {
+		channels, trace, err := s.restClient.GetChannels()
+		if trace != nil {
+			logHTTP(flows.NewHTTPLog(trace, flows.HTTPStatusFromCode, s.redactor))
+		}
+		if err != nil {
+			return nil, errors.Wrap(err, "failed to get channels")
+		}
+		if len(channels) == 0 {
+			return nil, errors.New("no freshchat channels found")
+		}
+		// the default channel id is the first one
+		channelID = channels[0].ID
+	}
+
+	msg := &Conversation{
+		ChannelID: channelID,
+		Messages: []Message{
+			{
+				MessagesPart: []MessagesPart{
+					{
+						Text: &Text{
+							Content: bodyMap.Messages[0].MessagesPart[0].Text.Content,
+						},
+					},
+				},
+			},
 		},
 		Status: "new",
 		Users: []User{
 			{ID: string(userID)},
 		},
+	}
+
+	if bodyMap.Properties != nil {
+		msg.Properties = bodyMap.Properties
 	}
 
 	resultsConversation, trace, err := s.restClient.CreateConversation(msg)
@@ -135,14 +164,102 @@ func (s *service) Open(session flows.Session, topic *flows.Topic, body string, a
 }
 
 func (s *service) Forward(ticket *models.Ticket, msgUUID flows.MsgUUID, text string, attachments []utils.Attachment, metadata json.RawMessage, msgExternalID null.String, logHTTP flows.HTTPLogCallback) error {
+	conversationID := string(ticket.ExternalID())
+
+	msg := &Message{
+		ConversationID: conversationID,
+		MessagesPart: []MessagesPart{
+			{
+				Text: &Text{
+					Content: text,
+				},
+			},
+		},
+	}
+
+	for _, attachment := range attachments {
+		if attachment.ContentType() == "image/jpeg" || attachment.ContentType() == "image/png" || attachment.ContentType() == "image/gif" || attachment.ContentType() == "image/webp" {
+			msg.MessagesPart = append(msg.MessagesPart, MessagesPart{
+				Image: &Image{
+					URL: attachment.URL(),
+				},
+			})
+		} else if attachment.ContentType() == "video/mp4" || attachment.ContentType() == "video/quicktime" || attachment.ContentType() == "video/webm" {
+			msg.MessagesPart = append(msg.MessagesPart, MessagesPart{
+				Video: &Video{
+					URL: attachment.URL(),
+				},
+			})
+		} else {
+			msg.MessagesPart = append(msg.MessagesPart, MessagesPart{
+				File: &File{
+					URL: attachment.URL(),
+				},
+			})
+		}
+	}
+
+	channelID := ticket.Config("channel_id")
+	if channelID == "" {
+		return errors.New("channel_id is not set")
+	}
+
+	channels, trace, _ := s.restClient.GetChannels()
+	if trace != nil {
+		logHTTP(flows.NewHTTPLog(trace, flows.HTTPStatusFromCode, s.redactor))
+	}
+
+	if len(channels) == 0 {
+		return errors.New("no freshchat channels found")
+	}
+
+	channel := channels[0]
+	msg.ChannelID = channel.ID
+
+	msg.ActorType = "user"
+	msg.ActorID = ticket.Config("user_id")
+
+	_, trace, err := s.restClient.CreateMessage(msg)
+	if trace != nil {
+		logHTTP(flows.NewHTTPLog(trace, flows.HTTPStatusFromCode, s.redactor))
+	}
+	if err != nil {
+		return errors.Wrap(err, "failed to create message")
+	}
 	return nil
 }
 
 func (s *service) Close(tickets []*models.Ticket, logHTTP flows.HTTPLogCallback) error {
+	for _, ticket := range tickets {
+		conversation := &Conversation{
+			ConversationID: string(ticket.ExternalID()),
+			Status:         "closed",
+		}
+		trace, err := s.restClient.UpdateConversation(conversation)
+		if trace != nil {
+			logHTTP(flows.NewHTTPLog(trace, flows.HTTPStatusFromCode, s.redactor))
+		}
+		if err != nil {
+			return errors.Wrap(err, "failed to close conversation")
+		}
+	}
 	return nil
 }
 
 func (s *service) Reopen(tickets []*models.Ticket, logHTTP flows.HTTPLogCallback) error {
+	for _, ticket := range tickets {
+		conversation := &Conversation{
+			ConversationID: string(ticket.ExternalID()),
+			Status:         "open",
+		}
+		trace, err := s.restClient.UpdateConversation(conversation)
+		if trace != nil {
+			logHTTP(flows.NewHTTPLog(trace, flows.HTTPStatusFromCode, s.redactor))
+		}
+		if err != nil {
+			return errors.Wrap(err, "failed to reopen conversation")
+		}
+	}
 	return nil
 }
 
