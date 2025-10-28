@@ -73,7 +73,7 @@ func (s *service) Open(session flows.Session, topic *flows.Topic, body string, a
 		FirstName: firstName,
 		LastName:  lastName,
 		Phone:     phone,
-		Properties: []Property{
+		Properties: []UserProperty{
 			{Name: "external_id", Value: contactUUID},
 		},
 	}

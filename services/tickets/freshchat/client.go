@@ -145,16 +145,16 @@ func (c *Client) UpdateConversation(conversation *Conversation) (*httpx.Trace, e
 }
 
 type Conversation struct {
-	ConversationID     string     `json:"conversation_id"`
-	Status             string     `json:"status"`
-	ChannelID          string     `json:"channel_id"`
-	AssignedAgentID    string     `json:"assigned_agent_id"`
-	AssignedOrgAgentID string     `json:"assigned_org_agent_id"`
-	AssignedGroupID    string     `json:"assigned_group_id"`
-	AssignedOrgGroupID string     `json:"assigned_org_group_id"`
-	Messages           []Message  `json:"messages"`
-	Properties         []Property `json:"properties"` //Array of custom properties
-	Users              []User     `json:"users"`
+	ConversationID     string                   `json:"conversation_id"`
+	Status             string                   `json:"status"`
+	ChannelID          string                   `json:"channel_id"`
+	AssignedAgentID    string                   `json:"assigned_agent_id"`
+	AssignedOrgAgentID string                   `json:"assigned_org_agent_id"`
+	AssignedGroupID    string                   `json:"assigned_group_id"`
+	AssignedOrgGroupID string                   `json:"assigned_org_group_id"`
+	Messages           []Message                `json:"messages"`
+	Properties         []map[string]interface{} `json:"properties"` //Array of custom properties
+	Users              []User                   `json:"users"`
 }
 
 type Message struct {
@@ -259,18 +259,18 @@ type Choice struct {
 }
 
 type User struct {
-	ID          string     `json:"id"`
-	Email       string     `json:"email"`
-	FirstName   string     `json:"first_name"`
-	LastName    string     `json:"last_name"`
-	Phone       string     `json:"phone"`
-	CreatedTime string     `json:"created_time"`
-	UpdatedTime string     `json:"updated_time"`
-	ReferenceID string     `json:"reference_id"`
-	Properties  []Property `json:"properties"`
+	ID          string         `json:"id"`
+	Email       string         `json:"email"`
+	FirstName   string         `json:"first_name"`
+	LastName    string         `json:"last_name"`
+	Phone       string         `json:"phone"`
+	CreatedTime string         `json:"created_time"`
+	UpdatedTime string         `json:"updated_time"`
+	ReferenceID string         `json:"reference_id"`
+	Properties  []UserProperty `json:"properties"`
 }
 
-type Property struct {
+type UserProperty struct {
 	Name  string      `json:"name"`
 	Value interface{} `json:"value"`
 }
