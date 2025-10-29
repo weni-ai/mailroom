@@ -97,7 +97,7 @@ func (s *service) Open(session flows.Session, topic *flows.Topic, body string, a
 	interactionWebhook, trace, err := s.restClient.CreateInteractionScopedWebhook(s.instanceSid, &CreateInteractionWebhookRequest{
 		Type:          "interaction",
 		WebhookEvents: []string{"onInteractionUpdate"},
-		WebhookUrl:    fmt.Sprintf("https://%s/mr/tickets/types/twilioflex2/event_callback/%s/%s", s.rtConfig.Domain, s.ticketer.UUID(), ticket.UUID()),
+		WebhookUrl:    fmt.Sprintf("https://%s/mr/tickets/types/twilioflex2/interaction_callback/%s/%s", s.rtConfig.Domain, s.ticketer.UUID(), ticket.UUID()),
 		WebhookMethod: "POST",
 	})
 	if trace != nil {
@@ -141,7 +141,7 @@ func (s *service) Open(session flows.Session, topic *flows.Topic, body string, a
 
 	_, trace, err = s.restClient.CreateConversationScopedWebhook(conversationSid, &CreateConversationWebhookRequest{
 		Target:               "webhook",
-		ConfigurationUrl:     fmt.Sprintf("https://%s/mr/tickets/types/twilioflex2/event_callback/%s/%s", s.rtConfig.Domain, s.ticketer.UUID(), ticket.UUID()),
+		ConfigurationUrl:     fmt.Sprintf("https://%s/mr/tickets/types/twilioflex2/conversation_callback/%s/%s", s.rtConfig.Domain, s.ticketer.UUID(), ticket.UUID()),
 		ConfigurationMethod:  "POST",
 		ConfigurationFilters: []string{"onMessageAdded"},
 	})
