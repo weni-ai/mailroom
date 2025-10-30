@@ -4,6 +4,7 @@ import (
 	"github.com/gomodule/redigo/redis"
 	"github.com/jmoiron/sqlx"
 	"github.com/nyaruka/gocommon/storage"
+	"github.com/nyaruka/mailroom/runtime/rmq"
 	"github.com/olivere/elastic/v7"
 )
 
@@ -18,4 +19,5 @@ type Runtime struct {
 	SessionStorage storage.Storage
 	Config         *Config
 	IRP            *redis.Pool
+	Rabbitmq       *rmq.Client
 }

@@ -27,7 +27,13 @@ jobs:
         postgis version: ${{ env.postgis-version }}
         postgresql password: temba
         postgresql arguments: postgres -N 300
-
+    
+    - name: Install Rabbitmq
+      uses: namoshek/rabbitmq-github-action@v1
+      with:
+        version: '3.9.7'
+        ports: '5672:5672'
+  
     - name: Install Linux packages
       run: sudo apt install -y --no-install-recommends postgresql-client
 

@@ -73,6 +73,7 @@ require (
 	github.com/beorn7/perks v1.0.1 // indirect
 	github.com/cespare/xxhash/v2 v2.1.2 // indirect
 	github.com/prometheus/procfs v0.8.0 // indirect
+	github.com/rabbitmq/amqp091-go v1.10.0 // indirect
 )
 
 go 1.23

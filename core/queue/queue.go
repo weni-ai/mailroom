@@ -79,6 +79,9 @@ const (
 
 	// SendHistory is our task for sending history to a ticket integration
 	SendHistory = "send_history"
+
+	// RabbitmqPublish is our task type for publishing a message to RabbitMQ
+	RabbitmqPublish = "rabbitmq_publish"
 )
 
 // Size returns the number of tasks for the passed in queue

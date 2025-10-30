@@ -84,6 +84,7 @@ func (e *TicketEvent) Note() null.String          { return e.e.Note }
 func (e *TicketEvent) TopicID() TopicID           { return e.e.TopicID }
 func (e *TicketEvent) AssigneeID() UserID         { return e.e.AssigneeID }
 func (e *TicketEvent) CreatedByID() UserID        { return e.e.CreatedByID }
+func (e *TicketEvent) CreatedOn() time.Time       { return e.e.CreatedOn }
 
 // MarshalJSON is our custom marshaller so that our inner struct get output
 func (e *TicketEvent) MarshalJSON() ([]byte, error) {
