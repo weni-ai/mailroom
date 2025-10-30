@@ -2,10 +2,14 @@ package freshchat
 
 import (
 	"bytes"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
+	"mime/multipart"
 	"net/http"
+	"net/url"
+	"strings"
 
 	"github.com/nyaruka/gocommon/httpx"
 	"github.com/nyaruka/gocommon/jsonx"
@@ -142,6 +146,119 @@ func (c *Client) UpdateConversation(conversation *Conversation) (*httpx.Trace, e
 		return trace, err
 	}
 	return trace, err
+}
+
+func (c *Client) UploadImage(imageURL string) (string, error) {
+	resp, err := http.Get(imageURL)
+	if err != nil {
+		return "", err
+	}
+	defer resp.Body.Close()
+
+	fileName := strings.Split(imageURL, ".")[len(strings.Split(imageURL, "."))-1]
+	if u, err := url.Parse(imageURL); err == nil {
+		parts := strings.Split(u.Path, "/")
+		if len(parts) > 0 && parts[len(parts)-1] != "" {
+			fileName = parts[len(parts)-1]
+		}
+	}
+
+	var buf bytes.Buffer
+	writer := multipart.NewWriter(&buf)
+	part, err := writer.CreateFormFile("image", fileName)
+	if err != nil {
+		return "", err
+	}
+	_, err = io.Copy(part, resp.Body)
+	if err != nil {
+		return "", err
+	}
+	writer.Close()
+
+	endpoint := c.baseURL + "/v2/images/upload"
+	req, err := http.NewRequest("POST", endpoint, &buf)
+	if err != nil {
+		return "", err
+	}
+	req.Header.Set("Authorization", "Bearer "+c.authToken)
+	req.Header.Set("Content-Type", writer.FormDataContentType())
+	req.Header.Set("accept", "application/json")
+
+	trace, err := httpx.DoTrace(c.httpClient, req, c.httpRetries, nil, -1)
+	if err != nil {
+		return "", err
+	}
+	defer trace.Response.Body.Close()
+
+	var imgResp Image
+	if err := json.NewDecoder(trace.Response.Body).Decode(&imgResp); err != nil {
+		return "", err
+	}
+	return imgResp.URL, nil
+}
+
+func (c *Client) UploadFile(fileURL string) (*File, error) {
+	resp, err := http.Get(fileURL)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	fileName := strings.Split(fileURL, ".")[len(strings.Split(fileURL, "."))-1]
+	if u, err := url.Parse(fileURL); err == nil {
+		parts := strings.Split(u.Path, "/")
+		if len(parts) > 0 && parts[len(parts)-1] != "" {
+			fileName = parts[len(parts)-1]
+		}
+	}
+
+	var buf bytes.Buffer
+	writer := multipart.NewWriter(&buf)
+	part, err := writer.CreateFormFile("file", fileName)
+	if err != nil {
+		return nil, err
+	}
+	_, err = io.Copy(part, resp.Body)
+	if err != nil {
+		return nil, err
+	}
+	writer.Close()
+
+	endpoint := c.baseURL + "/v2/files/upload"
+	req, err := http.NewRequest("POST", endpoint, &buf)
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set("Authorization", "Bearer "+c.authToken)
+	req.Header.Set("Content-Type", writer.FormDataContentType())
+	req.Header.Set("accept", "application/json")
+
+	trace, err := httpx.DoTrace(c.httpClient, req, c.httpRetries, nil, -1)
+	if err != nil {
+		return nil, err
+	}
+	defer trace.Response.Body.Close()
+
+	// Parse the JSON response into a struct for the raw response.
+	var fr struct {
+		FileName         string `json:"file_name"`
+		FileSize         int64  `json:"file_size"`
+		FileContentType  string `json:"file_content_type"`
+		FileExtension    string `json:"file_extension_type"`
+		FileHash         string `json:"file_hash"`
+		FileSecurityStat string `json:"file_security_status"`
+	}
+	if err := json.NewDecoder(trace.Response.Body).Decode(&fr); err != nil {
+		return nil, err
+	}
+	fileResp := File{
+		Name:            fr.FileName,
+		FileSizeInBytes: int(fr.FileSize),
+		ContentType:     fr.FileContentType,
+		FileExtension:   fr.FileExtension,
+		FileHash:        fr.FileHash,
+	}
+	return &fileResp, nil
 }
 
 type Conversation struct {

@@ -181,22 +181,29 @@ func (s *service) Forward(ticket *models.Ticket, msgUUID flows.MsgUUID, text str
 
 	for _, attachment := range attachments {
 		if attachment.ContentType() == "image/jpeg" || attachment.ContentType() == "image/png" || attachment.ContentType() == "image/gif" || attachment.ContentType() == "image/webp" {
+			imageURL, err := s.restClient.UploadImage(attachment.URL())
+			if err != nil {
+				imageURL = attachment.URL()
+			}
 			msg.MessagesPart = append(msg.MessagesPart, MessagesPart{
 				Image: &Image{
-					URL: attachment.URL(),
+					URL: imageURL,
 				},
 			})
 		} else if attachment.ContentType() == "video/mp4" || attachment.ContentType() == "video/quicktime" || attachment.ContentType() == "video/webm" {
 			msg.MessagesPart = append(msg.MessagesPart, MessagesPart{
 				Video: &Video{
-					URL: attachment.URL(),
+					URL:         attachment.URL(),
+					ContentType: attachment.ContentType(),
 				},
 			})
 		} else {
+			file, err := s.restClient.UploadFile(attachment.URL())
+			if err != nil {
+				file.URL = attachment.URL()
+			}
 			msg.MessagesPart = append(msg.MessagesPart, MessagesPart{
-				File: &File{
-					URL: attachment.URL(),
-				},
+				File: file,
 			})
 		}
 	}
