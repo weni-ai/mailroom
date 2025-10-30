@@ -11,6 +11,7 @@ import (
 	"github.com/nyaruka/goflow/flows"
 	"github.com/nyaruka/goflow/utils"
 	"github.com/nyaruka/mailroom/core/models"
+	"github.com/nyaruka/mailroom/core/tasks/rabbitmq/publishers"
 	"github.com/nyaruka/mailroom/core/tasks/tickets"
 	"github.com/nyaruka/mailroom/runtime"
 	"github.com/nyaruka/mailroom/web"
@@ -112,6 +113,15 @@ func handleOpen(ctx context.Context, rt *runtime.Runtime, r *http.Request, l *mo
 	if err != nil {
 		return nil, 500, errors.Wrap(err, "error committing transaction")
 	}
+
+	// send to rmq
+	publishers.PublishTicketCreated(rt, oa.OrgID(), publishers.TicketRMQMessage{
+		UUID:         newTicket.UUID(),
+		ContactUUID:  contact.UUID(),
+		ProjectUUID:  oa.Org().ProjectUUID(),
+		TicketerType: string(ticketer.Type()),
+		CreatedOn:    evt.CreatedOn(),
+	})
 
 	rc := rt.RP.Get()
 	defer rc.Close()
