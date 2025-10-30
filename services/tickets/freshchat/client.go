@@ -155,6 +155,7 @@ type Conversation struct {
 	Messages           []Message                `json:"messages"`
 	Properties         []map[string]interface{} `json:"properties"` //Array of custom properties
 	Users              []User                   `json:"users"`
+	UserID             string                   `json:"user_id"`
 }
 
 type Message struct {

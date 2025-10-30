@@ -160,6 +160,8 @@ func (s *service) Open(session flows.Session, topic *flows.Topic, body string, a
 		return nil, errors.Wrap(err, "error creating conversation")
 	}
 
+	ticket.SetExternalID(string(resultsConversation.ConversationID))
+
 	return ticket, nil
 }
 
