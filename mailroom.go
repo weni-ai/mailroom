@@ -12,6 +12,7 @@ import (
 	"github.com/nyaruka/goflow/flows/routers"
 	"github.com/nyaruka/mailroom/core/queue"
 	"github.com/nyaruka/mailroom/runtime"
+	"github.com/nyaruka/mailroom/runtime/rmq"
 	"github.com/nyaruka/mailroom/web"
 	"github.com/pkg/errors"
 
@@ -57,6 +58,7 @@ type Mailroom struct {
 	wppBroadcastForeman              *Foreman
 	templateBatchForeman             *Foreman
 	templateNotificationBatchForeman *Foreman
+	rabbitmqForeman                  *Foreman
 
 	webserver *web.Server
 }
@@ -75,6 +77,7 @@ func NewMailroom(config *runtime.Config) *Mailroom {
 	mr.wppBroadcastForeman = NewForeman(mr.rt, mr.wg, queue.WppBroadcastBatchQueue, config.WppBroadcastBatchWorkers)
 	mr.templateBatchForeman = NewForeman(mr.rt, mr.wg, queue.TemplateBatchQueue, config.TemplateBatchWorkers)
 	mr.templateNotificationBatchForeman = NewForeman(mr.rt, mr.wg, queue.TemplateNotificationBatchQueue, config.TemplateNotificationBatchWorkers)
+	mr.rabbitmqForeman = NewForeman(mr.rt, mr.wg, queue.RabbitmqPublish, config.RabbitmqPublishWorkers)
 
 	// set authentication token for zeroshot requests in goflow
 	routers.SetZeroshotToken(mr.rt.Config.ZeroshotAPIToken)
@@ -172,6 +175,14 @@ func (mr *Mailroom) Start() error {
 		log.Info("elastic ok")
 	}
 
+	// initialize rabbitmq client
+	mr.rt.Rabbitmq, err = rmq.New(c.RabbitmqURL)
+	if err != nil {
+		log.WithError(err).Error("rabbitmq not available")
+	} else {
+		log.Info("rabbitmq ok")
+	}
+
 	for _, initFunc := range initFunctions {
 		initFunc(mr.rt, mr.wg, mr.quit)
 	}
@@ -189,6 +200,7 @@ func (mr *Mailroom) Start() error {
 	mr.wppBroadcastForeman.Start()
 	mr.templateBatchForeman.Start()
 	mr.templateNotificationBatchForeman.Start()
+	mr.rabbitmqForeman.Start()
 
 	// start our web server
 	mr.webserver = web.NewServer(mr.ctx, mr.rt, mr.wg)
@@ -208,6 +220,7 @@ func (mr *Mailroom) Stop() error {
 	mr.wppBroadcastForeman.Stop()
 	mr.templateBatchForeman.Stop()
 	mr.templateNotificationBatchForeman.Stop()
+	mr.rabbitmqForeman.Stop()
 	close(mr.quit)
 	mr.cancel()
 
@@ -219,6 +232,9 @@ func (mr *Mailroom) Stop() error {
 
 	mr.wg.Wait()
 	mr.rt.ES.Stop()
+	if mr.rt.Rabbitmq != nil {
+		mr.rt.Rabbitmq.Close()
+	}
 	logrus.Info("mailroom stopped")
 	return nil
 }

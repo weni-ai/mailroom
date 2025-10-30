@@ -1,3 +1,17 @@
+1.69.0
+----------
+ * Update goflow version to v1.15.0
+ * Refactor contact loading to use LoadContacts method across multiple handlers
+
+1.68.0
+----------
+ * Add is_bulk_send field to broadcast table
+ * Use created_on as a check field in triggers
+
+1.67.0
+----------
+ * Update goflow version to v1.14.1
+
 1.66.0
 ----------
  * Add WPP broadcast and template batch support to Mailroom in specific queues

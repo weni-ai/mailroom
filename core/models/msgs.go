@@ -1079,6 +1079,7 @@ type Broadcast struct {
 		ParentID      BroadcastID                             `json:"parent_id,omitempty"    db:"parent_id"`
 		TicketID      TicketID                                `json:"ticket_id,omitempty"    db:"ticket_id"`
 		BroadcastType events.BroadcastType                    `json:"broadcast_type"         db:"broadcast_type"`
+		IsBulkSend    bool                                    `json:"is_bulk_send"           db:"is_bulk_send"`
 	}
 }
 
@@ -1092,6 +1093,7 @@ func (b *Broadcast) Translations() map[envs.Language]*BroadcastTranslation { ret
 func (b *Broadcast) TemplateState() TemplateState                          { return b.b.TemplateState }
 func (b *Broadcast) TicketID() TicketID                                    { return b.b.TicketID }
 func (b *Broadcast) BroadcastType() events.BroadcastType                   { return b.b.BroadcastType }
+func (b *Broadcast) IsBulkSend() bool                                      { return b.b.IsBulkSend }
 
 func (b *Broadcast) MarshalJSON() ([]byte, error)    { return json.Marshal(b.b) }
 func (b *Broadcast) UnmarshalJSON(data []byte) error { return json.Unmarshal(data, &b.b) }
@@ -1132,6 +1134,10 @@ func InsertChildBroadcast(ctx context.Context, db Queryer, parent *Broadcast) (*
 	)
 	// populate our parent id
 	child.b.ParentID = parent.ID()
+
+	if parent.b.IsBulkSend {
+		child.b.IsBulkSend = true
+	}
 
 	// populate text from our translations
 	child.b.Text.Map = make(map[string]sql.NullString)
@@ -1217,8 +1223,8 @@ type broadcastGroup struct {
 
 const insertBroadcastSQL = `
 INSERT INTO
-	msgs_broadcast( org_id,  parent_id,  ticket_id, created_on, modified_on, status,  text,  base_language, send_all, broadcast_type)
-			VALUES(:org_id, :parent_id, :ticket_id, NOW()     , NOW(),       'Q',    :text, :base_language, FALSE, :broadcast_type)
+	msgs_broadcast( org_id,  parent_id,  ticket_id, created_on, modified_on, status,  text,  base_language, send_all, broadcast_type, is_bulk_send)
+			VALUES(:org_id, :parent_id, :ticket_id, NOW()     , NOW(),       'Q',    :text, :base_language, FALSE, :broadcast_type, :is_bulk_send)
 RETURNING
 	id
 `

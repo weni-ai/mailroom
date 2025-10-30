@@ -37,6 +37,7 @@ type Config struct {
 	WppBroadcastBatchWorkers         int `help:"the number of go routines that will be used to handle wpp broadcast batch events"`
 	TemplateBatchWorkers             int `help:"the number of go routines that will be used to handle template batch events"`
 	TemplateNotificationBatchWorkers int `help:"the number of go routines that will be used to handle template notification batch events"`
+	RabbitmqPublishWorkers           int `help:"the number of go routines that will be used to publish to RabbitMQ asynchronously"`
 
 	RetryPendingMessages bool `help:"whether to requeue pending messages older than five minutes to retry"`
 
@@ -106,6 +107,13 @@ type Config struct {
 	OidcRpClientID      string `help:"OIDC RP Client ID"`
 	OidcRpClientSecret  string `help:"OIDC RP Client Secret"`
 	OidcOpTokenEndpoint string `help:"OIDC OP Token Endpoint"`
+
+	RabbitmqURL               string `help:"rabbitmq url"`
+	RabbitmqTicketsExchange   string `help:"rabbitmq exchange name for ticket messages"`
+	RabbitmqTicketsRoutingKey string `help:"rabbitmq routing key for ticket messages"`
+
+	RabbitmqPublishMaxAttempts     int `help:"max attempts for async RabbitMQ publish tasks"`
+	RabbitmqPublishDelayIntervalMs int `help:"fixed delay in ms between async RabbitMQ publish retries"`
 }
 
 // NewDefaultConfig returns a new default configuration object
@@ -128,6 +136,7 @@ func NewDefaultConfig() *Config {
 		WppBroadcastBatchWorkers:         4,
 		TemplateBatchWorkers:             4,
 		TemplateNotificationBatchWorkers: 4,
+		RabbitmqPublishWorkers:           2,
 		RetryPendingMessages:             true,
 
 		WebhooksTimeout:              15000,
@@ -182,6 +191,14 @@ func NewDefaultConfig() *Config {
 		OidcRpClientID:      "1234567890",
 		OidcRpClientSecret:  "1234567890",
 		OidcOpTokenEndpoint: "https://auth.weni.ai/oauth/token",
+
+		RabbitmqURL:               "amqp://guest:guest@localhost:5672/",
+		RabbitmqTicketsExchange:   "tickets.topic",
+		RabbitmqTicketsRoutingKey: "create",
+
+		// Retry every 2 seconds up to 2 hours by default (3600 attempts)
+		RabbitmqPublishMaxAttempts:     3600,
+		RabbitmqPublishDelayIntervalMs: 2000,
 	}
 }
 
