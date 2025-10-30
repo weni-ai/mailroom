@@ -96,7 +96,7 @@ func (s *service) Open(session flows.Session, topic *flows.Topic, body string, a
 
 	interactionWebhook, trace, err := s.restClient.CreateInteractionScopedWebhook(s.instanceSid, &CreateInteractionWebhookRequest{
 		Type:          "interaction",
-		WebhookEvents: []string{"onInteractionUpdate"},
+		WebhookEvents: []string{"onChannelStatusUpdated"},
 		WebhookUrl:    fmt.Sprintf("https://%s/mr/tickets/types/twilioflex2/interaction_callback/%s/%s", s.rtConfig.Domain, s.ticketer.UUID(), ticket.UUID()),
 		WebhookMethod: "POST",
 	})

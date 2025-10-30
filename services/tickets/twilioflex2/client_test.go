@@ -29,7 +29,7 @@ func TestCreateInteractionScopedWebhook(t *testing.T) {
 				"type": "interaction",
 				"webhook_url": "https://your-app.com/webhook",
 				"webhook_method": "POST",
-				"webhook_events": ["onInteractionUpdate"],
+				"webhook_events": ["onChannelStatusUpdated"],
 				"url": "https://your-app.com/webhook"
 			}`),
 		},
@@ -40,6 +40,7 @@ func TestCreateInteractionScopedWebhook(t *testing.T) {
 		Type:          "interaction",
 		WebhookUrl:    "https://your-app.com/webhook",
 		WebhookMethod: "POST",
+		WebhookEvents: []string{"onChannelStatusUpdated"},
 	}
 
 	_, _, err := client.CreateInteractionScopedWebhook(instanceSid, params)
@@ -51,7 +52,7 @@ func TestCreateInteractionScopedWebhook(t *testing.T) {
 	webhook, trace, err := client.CreateInteractionScopedWebhook(instanceSid, params)
 	assert.NoError(t, err)
 	assert.Equal(t, "WH12345678901234567890123456789012", webhook.Ttid)
-	assert.Equal(t, []string{"onInteractionUpdate"}, webhook.WebhookEvents)
+	assert.Equal(t, []string{"onChannelStatusUpdated"}, webhook.WebhookEvents)
 	assert.Equal(t, "interaction", webhook.Type)
 	assert.Equal(t, "https://your-app.com/webhook", webhook.WebhookUrl)
 	assert.Equal(t, "HTTP/1.0 201 Created\r\nContent-Length: 368\r\n\r\n", string(trace.ResponseTrace))
