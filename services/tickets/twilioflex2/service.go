@@ -22,6 +22,7 @@ import (
 	"github.com/nyaruka/mailroom/runtime"
 	"github.com/nyaruka/null"
 	"github.com/pkg/errors"
+	"github.com/sirupsen/logrus"
 )
 
 const (
@@ -139,9 +140,11 @@ func (s *service) Open(session flows.Session, topic *flows.Topic, body string, a
 		logHTTP(flows.NewHTTPLog(trace, flows.HTTPStatusFromCode, s.redactor))
 	}
 	if err != nil {
+		logrus.Debugf("error: %+v", err)
 		return nil, errors.Wrap(err, "failed to create interaction")
 	}
 
+	logrus.Debugf("interaction: %+v", interaction)
 	if interaction.Routing.Properties.Attributes["conversationSid"] == nil {
 		return nil, errors.New("conversationSid is not found in interaction routing properties")
 	}
@@ -158,9 +161,11 @@ func (s *service) Open(session flows.Session, topic *flows.Topic, body string, a
 		logHTTP(flows.NewHTTPLog(trace, flows.HTTPStatusFromCode, s.redactor))
 	}
 	if err != nil {
+		logrus.Debugf("error: %+v", err)
 		return nil, errors.Wrap(err, "failed to create conversation webhook")
 	}
 
+	logrus.Debugf("ticket: %+v", ticket)
 	return ticket, nil
 }
 

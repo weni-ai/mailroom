@@ -144,14 +144,18 @@ func (c *Client) CreateInteraction(interaction *CreateInteractionRequest) (*Crea
 
 // CreateConversationScopedWebhook creates a webhook for a specific conversation.
 func (c *Client) CreateConversationScopedWebhook(conversationSid string, webhook *CreateConversationWebhookRequest) (*CreateConversationWebhookResponse, *httpx.Trace, error) {
-	url := fmt.Sprintf("https://conversations.twilio.com/v1/Conversations/%s/Webhooks", conversationSid)
+	endpoint := fmt.Sprintf("https://conversations.twilio.com/v1/Conversations/%s/Webhooks", conversationSid)
 	response := &CreateConversationWebhookResponse{}
-	data, err := query.Values(webhook)
-	if err != nil {
-		return nil, nil, err
+	form := url.Values{}
+	form.Set("Target", webhook.Target)
+	form.Set("Configuration.Url", webhook.ConfigurationUrl)
+	form.Set("Configuration.Method", webhook.ConfigurationMethod)
+	if len(webhook.ConfigurationFilters) > 0 {
+		for _, filter := range webhook.ConfigurationFilters {
+			form.Add("Configuration.Filters", filter)
+		}
 	}
-	data = removeEmpties(data)
-	trace, err := c.post(url, data, response, nil)
+	trace, err := c.post(endpoint, form, response, nil)
 	if err != nil {
 		return nil, trace, err
 	}
