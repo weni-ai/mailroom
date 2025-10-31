@@ -112,7 +112,7 @@ func (c *Client) CreateInteractionScopedWebhook(instanceSid string, webhook *Cre
 
 // CreateInteraction creates a new interaction.
 func (c *Client) CreateInteraction(interaction *CreateInteractionRequest) (*CreateInteractionResponse, *httpx.Trace, error) {
-	url := "https://flex-api.twilio.com/v2/Interactions"
+	url := "https://flex-api.twilio.com/v1/Interactions"
 	response := &CreateInteractionResponse{}
 	data, err := query.Values(interaction)
 	if err != nil {
