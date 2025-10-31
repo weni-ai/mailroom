@@ -1,9 +1,13 @@
 package twilioflex2
 
 import (
+	"bytes"
 	"errors"
 	"fmt"
+	"io"
+	"mime/multipart"
 	"net/http"
+	"net/textproto"
 	"net/url"
 	"strings"
 	"time"
@@ -170,6 +174,69 @@ func (c *Client) UpdateInteractionChannel(interactionSid, channelSid string, cha
 	return response, trace, nil
 }
 
+// CreateMedia creates a new media resource for conversations.
+func (c *Client) CreateMedia(serviceSid string, media *CreateMediaParams) (*Media, *httpx.Trace, error) {
+	url := fmt.Sprintf("https://mcs.us1.twilio.com/v1/Services/%s/Media", serviceSid)
+	response := &Media{}
+
+	body := &bytes.Buffer{}
+	writer := multipart.NewWriter(body)
+	h := make(textproto.MIMEHeader)
+	h.Set(
+		"Content-Disposition",
+		fmt.Sprintf(
+			`form-data; name="%s"; filename="%s"`,
+			"Media", media.FileName,
+		),
+	)
+	h.Set("Content-Type", media.ContentType)
+	mediaPart, err := writer.CreatePart(h)
+	if err != nil {
+		return nil, nil, err
+	}
+	mediaReader := bytes.NewReader(media.Media)
+	io.Copy(mediaPart, mediaReader)
+
+	writer.Close()
+
+	req, err := httpx.NewRequest("POST", url, body, map[string]string{})
+	if err != nil {
+		return nil, nil, err
+	}
+	req.SetBasicAuth(c.accountSid, c.authToken)
+	req.Header.Add("Content-Type", writer.FormDataContentType())
+
+	trace, err := httpx.DoTrace(c.httpClient, req, c.httpRetries, nil, -1)
+	if err != nil {
+		return nil, trace, err
+	}
+
+	if trace.Response.StatusCode >= 400 {
+		response := &errorResponse{}
+		jsonx.Unmarshal(trace.ResponseBody, response)
+		return nil, trace, errors.New(response.Message)
+	}
+
+	err = jsonx.Unmarshal(trace.ResponseBody, response)
+	if err != nil {
+		return nil, trace, err
+	}
+
+	return response, trace, nil
+}
+
+// FetchMedia fetches a media resource by its SID.
+func (c *Client) FetchMedia(serviceSid, mediaSid string) (*Media, *httpx.Trace, error) {
+	fetchUrl := fmt.Sprintf("https://mcs.us1.twilio.com/v1/Services/%s/Media/%s", serviceSid, mediaSid)
+	response := &Media{}
+	data := url.Values{}
+	trace, err := c.get(fetchUrl, data, response, nil)
+	if err != nil {
+		return nil, trace, err
+	}
+	return response, trace, nil
+}
+
 // CreateInteractionWebhookRequest parameters for creating an interaction webhook
 // https://www.twilio.com/docs/flex/developer/conversations/register-interactions-webhooks
 type CreateInteractionWebhookRequest struct {
@@ -294,6 +361,38 @@ type UpdateInteractionChannelResponse struct {
 	DateCreated    *time.Time       `json:"date_created,omitempty"`
 	DateUpdated    *time.Time       `json:"date_updated,omitempty"`
 	Url            string           `json:"url,omitempty"`
+}
+
+// CreateMediaParams parameters for creating media
+// https://www.twilio.com/docs/chat/rest/media
+type CreateMediaParams struct {
+	FileName    string `json:"FileName,omitempty"`
+	Media       []byte `json:"Media,omitempty"`
+	Author      string `json:"Author,omitempty"`
+	ContentType string `json:"ContentType"`
+}
+
+// Media represents a media resource
+// https://www.twilio.com/docs/chat/rest/media
+type Media struct {
+	Sid               string `json:"sid"`
+	ServiceSid        string `json:"service_sid"`
+	DateCreated       string `json:"date_created"`
+	DateUploadUpdated string `json:"date_upload_updated"`
+	DateUpdated       string `json:"date_updated"`
+	Links             struct {
+		Content                string `json:"content"`
+		ContentDirectTemporary string `json:"content_direct_temporary"`
+	} `json:"links"`
+	Size                int         `json:"size"`
+	ContentType         string      `json:"content_type"`
+	Filename            string      `json:"filename"`
+	Author              string      `json:"author"`
+	Category            string      `json:"category"`
+	MessageSid          interface{} `json:"message_sid"`
+	ChannelSid          interface{} `json:"channel_sid"`
+	URL                 string      `json:"url"`
+	IsMultipartUpstream bool        `json:"is_multipart_upstream"`
 }
 
 // removeEmpties remove empty values from url.Values

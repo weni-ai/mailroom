@@ -16,6 +16,7 @@ import (
 	"github.com/nyaruka/mailroom/services/tickets"
 	"github.com/nyaruka/mailroom/web"
 	"github.com/pkg/errors"
+	"github.com/sirupsen/logrus"
 )
 
 func init() {
@@ -43,6 +44,7 @@ type conversationCallbackRequest struct {
 	Author          string      `json:"Author,omitempty"`
 	Body            string      `json:"Body,omitempty"`
 	ParticipantSid  string      `json:"ParticipantSid,omitempty"`
+	MessageSid      string      `json:"MessageSid,omitempty"`
 	Media           []mediaData `json:"Media,omitempty"`
 	Attributes      string      `json:"Attributes,omitempty"`
 	DateCreated     *time.Time  `json:"DateCreated,omitempty"`
@@ -163,23 +165,33 @@ func handleMessageAdded(ctx context.Context, rt *runtime.Runtime, ticket *models
 		return nil
 	}
 
-	// Process media attachments if present
-	// var files []*tickets.File
-	// if len(request.Media) > 0 {
-	// 	for _, media := range request.Media {
-	// 		// Create media fetch URL - in real implementation you'd use the actual media content URL
-	// 		mediaURL := fmt.Sprintf("https://conversations.twilio.com/v1/Conversations/%s/Messages/%s/Media/%s",
-	// 			request.ConversationSid, request.MessageSid, media.Sid)
+	if len(request.Media) > 0 {
+		for _, media := range request.Media {
+			config := ticketer.Config
+			authToken := config(configurationAuthToken)
+			accountSid := config(configurationAccountSid)
+			conversationServiceSid := config(configurationConversationServiceSid)
 
-	// 		file, err := tickets.FetchFile(mediaURL, nil)
-	// 		if err != nil {
-	// 			// Log error but continue processing the message
-	// 			continue
-	// 		}
-	// 		file.ContentType = media.ContentType
-	// 		files = append(files, file)
-	// 	}
-	// }
+			client := NewClient(http.DefaultClient, nil, authToken, accountSid)
+
+			mediaContent, _, err := client.FetchMedia(conversationServiceSid, media.Sid)
+			if err != nil {
+				logrus.WithError(err).Warnf("error fetching media file %s", media.Sid)
+				continue
+			}
+			file, err := tickets.FetchFile(mediaContent.Links.ContentDirectTemporary, nil)
+			if err != nil {
+				logrus.WithError(err).Warnf("error fetching media file %s", mediaContent.Links.ContentDirectTemporary)
+				continue
+			}
+			file.ContentType = mediaContent.ContentType
+			_, err = tickets.SendReply(ctx, rt, ticket, request.Body, []*tickets.File{file}, nil)
+			if err != nil {
+				logrus.WithError(err).Warnf("error sending reply with media file %s", media.Sid)
+				continue
+			}
+		}
+	}
 
 	// Send the reply to the ticket
 	_, err := tickets.SendReply(ctx, rt, ticket, request.Body, []*tickets.File{}, nil)

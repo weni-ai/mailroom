@@ -5,12 +5,15 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"net/url"
+	"path"
 	"sort"
 	"strings"
 	"sync"
 	"time"
 
 	"github.com/buger/jsonparser"
+	"github.com/gabriel-vasile/mimetype"
 	"github.com/jmoiron/sqlx"
 	"github.com/nyaruka/gocommon/httpx"
 	"github.com/nyaruka/goflow/flows"
@@ -22,12 +25,13 @@ import (
 )
 
 const (
-	typeTwiliioFlex2          = "twilioflex2"
-	configurationAuthToken    = "auth_token"
-	configurationAccountSid   = "account_sid"
-	configurationInstanceSid  = "instance_sid"
-	configurationWorkspaceSid = "workspace_sid"
-	configurationWorkflowSid  = "workflow_sid"
+	typeTwiliioFlex2                    = "twilioflex2"
+	configurationAuthToken              = "auth_token"
+	configurationAccountSid             = "account_sid"
+	configurationInstanceSid            = "instance_sid"
+	configurationWorkspaceSid           = "workspace_sid"
+	configurationWorkflowSid            = "workflow_sid"
+	configurationConversationServiceSid = "conversation_service_sid"
 )
 
 var db *sqlx.DB
@@ -56,13 +60,14 @@ func init() {
 }
 
 type service struct {
-	rtConfig     *runtime.Config
-	restClient   *Client
-	ticketer     *flows.Ticketer
-	redactor     utils.Redactor
-	instanceSid  string
-	workspaceSid string
-	workflowSid  string
+	rtConfig               *runtime.Config
+	restClient             *Client
+	ticketer               *flows.Ticketer
+	redactor               utils.Redactor
+	instanceSid            string
+	workspaceSid           string
+	workflowSid            string
+	conversationServiceSid string
 }
 
 func NewService(rtConfig *runtime.Config, httpClient *http.Client, httpRetries *httpx.RetryConfig, ticketer *flows.Ticketer, config map[string]string) (models.TicketService, error) {
@@ -71,18 +76,20 @@ func NewService(rtConfig *runtime.Config, httpClient *http.Client, httpRetries *
 	instanceSid := config[configurationInstanceSid]
 	workspaceSid := config[configurationWorkspaceSid]
 	workflowSid := config[configurationWorkflowSid]
-	if authToken != "" && accountSid != "" && instanceSid != "" && workspaceSid != "" && workflowSid != "" {
+	conversationServiceSid := config[configurationConversationServiceSid]
+	if authToken != "" && accountSid != "" && instanceSid != "" && workspaceSid != "" && workflowSid != "" && conversationServiceSid != "" {
 		if err := initDB(rtConfig.DB); err != nil {
 			return nil, err
 		}
 		return &service{
-			rtConfig:     rtConfig,
-			restClient:   NewClient(httpClient, httpRetries, authToken, accountSid),
-			ticketer:     ticketer,
-			redactor:     utils.NewRedactor(flows.RedactionMask, authToken),
-			instanceSid:  instanceSid,
-			workspaceSid: workspaceSid,
-			workflowSid:  workflowSid,
+			rtConfig:               rtConfig,
+			restClient:             NewClient(httpClient, httpRetries, authToken, accountSid),
+			ticketer:               ticketer,
+			redactor:               utils.NewRedactor(flows.RedactionMask, authToken),
+			instanceSid:            instanceSid,
+			workspaceSid:           workspaceSid,
+			workflowSid:            workflowSid,
+			conversationServiceSid: conversationServiceSid,
 		}, nil
 	}
 	return nil, nil
@@ -119,8 +126,9 @@ func (s *service) Open(session flows.Session, topic *flows.Topic, body string, a
 				WorkflowSid:           s.workflowSid,
 				TaskChannelUniqueName: "chat",
 				Attributes: map[string]any{
-					"channelType": "web",
-					"customerId":  userIdentity,
+					"channelType":       "web",
+					"customerId":        userIdentity,
+					"custom_attributes": body,
 				},
 			},
 		},
@@ -159,7 +167,58 @@ func (s *service) Forward(ticket *models.Ticket, msgUUID flows.MsgUUID, text str
 	identity := fmt.Sprintf("%d_%s", ticket.ContactID(), ticket.UUID())
 
 	if len(attachments) > 0 {
-		// TODO: implement media attachments
+		mediaAttachments := []CreateMediaParams{}
+		for _, attachment := range attachments {
+			attUrl := attachment.URL()
+			req, err := http.NewRequest("GET", attUrl, nil)
+			if err != nil {
+				return err
+			}
+			resp, err := httpx.DoTrace(s.restClient.httpClient, req, s.restClient.httpRetries, nil, -1)
+			if err != nil {
+				return err
+			}
+
+			parsedURL, err := url.Parse(attUrl)
+			if err != nil {
+				return err
+			}
+			filename := path.Base(parsedURL.Path)
+
+			mimeType := mimetype.Detect(resp.ResponseBody)
+
+			media := CreateMediaParams{
+				FileName:    filename,
+				Media:       resp.ResponseBody,
+				Author:      identity,
+				ContentType: mimeType.String(),
+			}
+
+			mediaAttachments = append(mediaAttachments, media)
+		}
+
+		for _, mediaParams := range mediaAttachments {
+			media, trace, err := s.restClient.CreateMedia(s.conversationServiceSid, &mediaParams)
+			if trace != nil {
+				logHTTP(flows.NewHTTPLog(trace, flows.HTTPStatusFromCode, s.redactor))
+			}
+			if err != nil {
+				return err
+			}
+
+			msg := &CreateConversationMessageRequest{
+				Author: identity,
+				Body:   text,
+			}
+			msg.MediaSid = media.Sid
+			_, trace, err = s.restClient.SendCustomerMessage(string(ticket.ExternalID()), msg)
+			if trace != nil {
+				logHTTP(flows.NewHTTPLog(trace, flows.HTTPStatusFromCode, s.redactor))
+			}
+			if err != nil {
+				return err
+			}
+		}
 	}
 
 	if strings.TrimSpace(text) != "" {
