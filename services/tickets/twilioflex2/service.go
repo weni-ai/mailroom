@@ -28,9 +28,9 @@ const (
 	typeTwiliioFlex2                    = "twilioflex2"
 	configurationAuthToken              = "auth_token"
 	configurationAccountSid             = "account_sid"
-	configurationInstanceSid            = "instance_sid"
-	configurationWorkspaceSid           = "workspace_sid"
-	configurationWorkflowSid            = "workflow_sid"
+	configurationInstanceSid            = "flex_instance_sid"
+	configurationWorkspaceSid           = "flex_workspace_sid"
+	configurationWorkflowSid            = "flex_workflow_sid"
 	configurationConversationServiceSid = "conversation_service_sid"
 )
 
@@ -77,6 +77,7 @@ func NewService(rtConfig *runtime.Config, httpClient *http.Client, httpRetries *
 	workspaceSid := config[configurationWorkspaceSid]
 	workflowSid := config[configurationWorkflowSid]
 	conversationServiceSid := config[configurationConversationServiceSid]
+
 	if authToken != "" && accountSid != "" && instanceSid != "" && workspaceSid != "" && workflowSid != "" && conversationServiceSid != "" {
 		if err := initDB(rtConfig.DB); err != nil {
 			return nil, err
@@ -92,7 +93,7 @@ func NewService(rtConfig *runtime.Config, httpClient *http.Client, httpRetries *
 			conversationServiceSid: conversationServiceSid,
 		}, nil
 	}
-	return nil, nil
+	return nil, errors.New("missing auth_token or account_sid or flex_instance_sid or flex_workspace_sid or flex_workflow_sid or conversation_service_sid in twilio flex2 config")
 }
 
 func (s *service) Open(session flows.Session, topic *flows.Topic, body string, assignee *flows.User, logHTTP flows.HTTPLogCallback) (*flows.Ticket, error) {
