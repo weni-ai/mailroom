@@ -2,6 +2,7 @@ package twilioflex2
 
 import (
 	"bytes"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -112,14 +113,29 @@ func (c *Client) CreateInteractionScopedWebhook(instanceSid string, webhook *Cre
 
 // CreateInteraction creates a new interaction.
 func (c *Client) CreateInteraction(interaction *CreateInteractionRequest) (*CreateInteractionResponse, *httpx.Trace, error) {
-	url := "https://flex-api.twilio.com/v1/Interactions"
+	endpoint := "https://flex-api.twilio.com/v1/Interactions"
 	response := &CreateInteractionResponse{}
-	data, err := query.Values(interaction)
-	if err != nil {
-		return nil, nil, err
+	channelPayload := map[string]any{
+		"type":         interaction.Channel.Type,
+		"initiated_by": interaction.Channel.InitiatedBy,
+		"properties":   interaction.Channel.Properties,
 	}
-	data = removeEmpties(data)
-	trace, err := c.post(url, data, response, nil)
+	routingPayload := map[string]any{
+		"type":       interaction.Routing.Type,
+		"properties": interaction.Routing.Properties,
+	}
+
+	chJSON, _ := json.Marshal(channelPayload)
+	routingJSON, _ := json.Marshal(routingPayload)
+
+	data := url.Values{}
+	data.Set("Channel", string(chJSON))
+	data.Set("Routing", string(routingJSON))
+	if strings.TrimSpace(interaction.WebhookTtid) != "" {
+		data.Set("WebhookTtid", interaction.WebhookTtid)
+	}
+
+	trace, err := c.post(endpoint, data, response, nil)
 	if err != nil {
 		return nil, trace, err
 	}
@@ -128,14 +144,18 @@ func (c *Client) CreateInteraction(interaction *CreateInteractionRequest) (*Crea
 
 // CreateConversationScopedWebhook creates a webhook for a specific conversation.
 func (c *Client) CreateConversationScopedWebhook(conversationSid string, webhook *CreateConversationWebhookRequest) (*CreateConversationWebhookResponse, *httpx.Trace, error) {
-	url := fmt.Sprintf("https://conversations.twilio.com/v1/Conversations/%s/Webhooks", conversationSid)
+	endpoint := fmt.Sprintf("https://conversations.twilio.com/v1/Conversations/%s/Webhooks", conversationSid)
 	response := &CreateConversationWebhookResponse{}
-	data, err := query.Values(webhook)
-	if err != nil {
-		return nil, nil, err
+	form := url.Values{}
+	form.Set("Target", webhook.Target)
+	form.Set("Configuration.Url", webhook.ConfigurationUrl)
+	form.Set("Configuration.Method", webhook.ConfigurationMethod)
+	if len(webhook.ConfigurationFilters) > 0 {
+		for _, filter := range webhook.ConfigurationFilters {
+			form.Add("Configuration.Filters", filter)
+		}
 	}
-	data = removeEmpties(data)
-	trace, err := c.post(url, data, response, nil)
+	trace, err := c.post(endpoint, form, response, nil)
 	if err != nil {
 		return nil, trace, err
 	}
@@ -160,7 +180,7 @@ func (c *Client) SendCustomerMessage(conversationSid string, message *CreateConv
 
 // UpdateInteractionChannel updates a channel within an interaction.
 func (c *Client) UpdateInteractionChannel(interactionSid, channelSid string, channel *UpdateInteractionChannelRequest) (*UpdateInteractionChannelResponse, *httpx.Trace, error) {
-	url := fmt.Sprintf("https://flex-api.twilio.com/v2/Interactions/%s/Channels/%s", interactionSid, channelSid)
+	url := fmt.Sprintf("https://flex-api.twilio.com/v1/Interactions/%s/Channels/%s", interactionSid, channelSid)
 	response := &UpdateInteractionChannelResponse{}
 	data, err := query.Values(channel)
 	if err != nil {
@@ -284,18 +304,29 @@ type InteractionRoutingProperties struct {
 	Attributes            map[string]any `json:"attributes,omitempty"`
 }
 
+type InteractionRoutingPropertiesResponse struct {
+	WorkspaceSid          string `json:"workspace_sid,omitempty"`
+	WorkflowSid           string `json:"workflow_sid,omitempty"`
+	TaskChannelUniqueName string `json:"task_channel_unique_name,omitempty"`
+	Attributes            string `json:"attributes,omitempty"`
+}
+
 // // https://www.twilio.com/docs/flex/developer/conversations/interactions-api/interactions#interaction-properties
 type CreateInteractionResponse struct {
-	Sid                   string             `json:"sid,omitempty"`
-	Channel               map[string]any     `json:"channel,omitempty"`
-	Routing               InteractionRouting `json:"routing,omitempty"`
-	InteractionContextSid string             `json:"interaction_context_sid,omitempty"`
-	WebhookTtid           string             `json:"webhook_ttid,omitempty"`
-	URL                   string             `json:"url,omitempty"`
+	Sid                   string                     `json:"sid,omitempty"`
+	Channel               map[string]any             `json:"channel,omitempty"`
+	Routing               InteractionRoutingResponse `json:"routing,omitempty"`
+	InteractionContextSid string                     `json:"interaction_context_sid,omitempty"`
+	WebhookTtid           string                     `json:"webhook_ttid,omitempty"`
+	URL                   string                     `json:"url,omitempty"`
 }
 
 type InteractionRouting struct {
 	Properties InteractionRoutingProperties `json:"properties,omitempty"`
+}
+
+type InteractionRoutingResponse struct {
+	Properties InteractionRoutingPropertiesResponse `json:"properties,omitempty"`
 }
 
 // CreateConversationWebhookRequest parameters for creating a conversation webhook

@@ -22,6 +22,7 @@ import (
 	"github.com/nyaruka/mailroom/runtime"
 	"github.com/nyaruka/null"
 	"github.com/pkg/errors"
+	"github.com/sirupsen/logrus"
 )
 
 const (
@@ -139,13 +140,16 @@ func (s *service) Open(session flows.Session, topic *flows.Topic, body string, a
 		logHTTP(flows.NewHTTPLog(trace, flows.HTTPStatusFromCode, s.redactor))
 	}
 	if err != nil {
+		logrus.Debugf("error: %+v", err)
 		return nil, errors.Wrap(err, "failed to create interaction")
 	}
 
-	if interaction.Routing.Properties.Attributes["conversationSid"] == nil {
+	logrus.Debugf("interaction: %+v", interaction)
+	attributes := interaction.Routing.Properties.Attributes
+	conversationSid, _ := jsonparser.GetString([]byte(attributes), "conversationSid")
+	if conversationSid == "" {
 		return nil, errors.New("conversationSid is not found in interaction routing properties")
 	}
-	conversationSid := interaction.Routing.Properties.Attributes["conversationSid"].(string)
 	ticket.SetExternalID(conversationSid)
 
 	_, trace, err = s.restClient.CreateConversationScopedWebhook(conversationSid, &CreateConversationWebhookRequest{
@@ -158,9 +162,11 @@ func (s *service) Open(session flows.Session, topic *flows.Topic, body string, a
 		logHTTP(flows.NewHTTPLog(trace, flows.HTTPStatusFromCode, s.redactor))
 	}
 	if err != nil {
+		logrus.Debugf("error: %+v", err)
 		return nil, errors.Wrap(err, "failed to create conversation webhook")
 	}
 
+	logrus.Debugf("ticket: %+v", ticket)
 	return ticket, nil
 }
 
