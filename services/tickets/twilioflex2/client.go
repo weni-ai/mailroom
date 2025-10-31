@@ -56,7 +56,6 @@ func (c *baseClient) request(method, url string, payload url.Values, response an
 	}
 
 	req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
-	// req.Header.Add("Content-Length", strconv.Itoa(len(payload.Encode())))
 
 	trace, err := httpx.DoTrace(c.httpClient, req, c.httpRetries, nil, -1)
 	if err != nil {
