@@ -55,13 +55,13 @@ func TestCreateInteractionScopedWebhook(t *testing.T) {
 	assert.Equal(t, []string{"onChannelStatusUpdated"}, webhook.WebhookEvents)
 	assert.Equal(t, "interaction", webhook.Type)
 	assert.Equal(t, "https://your-app.com/webhook", webhook.WebhookUrl)
-	assert.Equal(t, "HTTP/1.0 201 Created\r\nContent-Length: 368\r\n\r\n", string(trace.ResponseTrace))
+	assert.Equal(t, "HTTP/1.0 201 Created\r\nContent-Length: 371\r\n\r\n", string(trace.ResponseTrace))
 }
 
 func TestCreateInteraction(t *testing.T) {
 	defer httpx.SetRequestor(httpx.DefaultRequestor)
 	httpx.SetRequestor(httpx.NewMockRequestor(map[string][]httpx.MockResponse{
-		"https://flex-api.twilio.com/v2/Interactions": {
+		"https://flex-api.twilio.com/v1/Interactions": {
 			httpx.MockConnectionError,
 			httpx.NewMockResponse(400, nil, `{"message": "Something went wrong", "detail": "Unknown", "code": 1234, "more_info": "https://www.twilio.com/docs/errors/1234"}`),
 			httpx.NewMockResponse(201, nil, `{
@@ -75,7 +75,7 @@ func TestCreateInteraction(t *testing.T) {
 				},
 				"interaction_context_sid": "IC12345678901234567890123456789012",
 				"webhook_ttid": "WH12345678901234567890123456789012",
-				"url": "https://flex-api.twilio.com/v2/Interactions/KD12345678901234567890123456789012"
+				"url": "https://flex-api.twilio.com/v1/Interactions/KD12345678901234567890123456789012"
 			}`),
 		},
 	}))
@@ -206,7 +206,7 @@ func TestUpdateInteractionChannel(t *testing.T) {
 	channelSid := "UO45678901234567890123456789012345"
 	defer httpx.SetRequestor(httpx.DefaultRequestor)
 	httpx.SetRequestor(httpx.NewMockRequestor(map[string][]httpx.MockResponse{
-		fmt.Sprintf("https://flex-api.twilio.com/v2/Interactions/%s/Channels/%s", interactionSid, channelSid): {
+		fmt.Sprintf("https://flex-api.twilio.com/v1/Interactions/%s/Channels/%s", interactionSid, channelSid): {
 			httpx.MockConnectionError,
 			httpx.NewMockResponse(400, nil, `{"message": "Something went wrong", "detail": "Unknown", "code": 1234, "more_info": "https://www.twilio.com/docs/errors/1234"}`),
 			httpx.NewMockResponse(200, nil, `{
@@ -229,7 +229,7 @@ func TestUpdateInteractionChannel(t *testing.T) {
 				],
 				"date_created": "2024-01-01T00:00:00Z",
 				"date_updated": "2024-01-01T00:00:00Z",
-				"url": "https://flex-api.twilio.com/v2/Interactions/KD12345678901234567890123456789012/Channels/UO45678901234567890123456789012345"
+				"url": "https://flex-api.twilio.com/v1/Interactions/KD12345678901234567890123456789012/Channels/UO45678901234567890123456789012345"
 			}`),
 		},
 	}))
