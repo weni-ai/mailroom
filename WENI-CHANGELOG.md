@@ -1,3 +1,7 @@
+1.70.0
+----------
+ * Add Twilio Flex for flex UI 2.x integration
+
 1.69.1
 ----------
  * Fix whatsapp URN variation generation to handle only 13 and 12 digit numbers
