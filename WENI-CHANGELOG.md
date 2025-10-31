@@ -1,3 +1,7 @@
+1.69.1
+----------
+ * Fix whatsapp URN variation generation to handle only 13 and 12 digit numbers
+
 1.69.0
 ----------
  * Update goflow version to v1.15.0
