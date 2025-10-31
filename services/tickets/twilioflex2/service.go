@@ -145,10 +145,11 @@ func (s *service) Open(session flows.Session, topic *flows.Topic, body string, a
 	}
 
 	logrus.Debugf("interaction: %+v", interaction)
-	if interaction.Routing.Properties.Attributes["conversationSid"] == nil {
+	attributes := interaction.Routing.Properties.Attributes
+	conversationSid, _ := jsonparser.GetString([]byte(attributes), "conversationSid")
+	if conversationSid == "" {
 		return nil, errors.New("conversationSid is not found in interaction routing properties")
 	}
-	conversationSid := interaction.Routing.Properties.Attributes["conversationSid"].(string)
 	ticket.SetExternalID(conversationSid)
 
 	_, trace, err = s.restClient.CreateConversationScopedWebhook(conversationSid, &CreateConversationWebhookRequest{

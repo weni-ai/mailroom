@@ -304,18 +304,29 @@ type InteractionRoutingProperties struct {
 	Attributes            map[string]any `json:"attributes,omitempty"`
 }
 
+type InteractionRoutingPropertiesResponse struct {
+	WorkspaceSid          string `json:"workspace_sid,omitempty"`
+	WorkflowSid           string `json:"workflow_sid,omitempty"`
+	TaskChannelUniqueName string `json:"task_channel_unique_name,omitempty"`
+	Attributes            string `json:"attributes,omitempty"`
+}
+
 // // https://www.twilio.com/docs/flex/developer/conversations/interactions-api/interactions#interaction-properties
 type CreateInteractionResponse struct {
-	Sid                   string             `json:"sid,omitempty"`
-	Channel               map[string]any     `json:"channel,omitempty"`
-	Routing               InteractionRouting `json:"routing,omitempty"`
-	InteractionContextSid string             `json:"interaction_context_sid,omitempty"`
-	WebhookTtid           string             `json:"webhook_ttid,omitempty"`
-	URL                   string             `json:"url,omitempty"`
+	Sid                   string                     `json:"sid,omitempty"`
+	Channel               map[string]any             `json:"channel,omitempty"`
+	Routing               InteractionRoutingResponse `json:"routing,omitempty"`
+	InteractionContextSid string                     `json:"interaction_context_sid,omitempty"`
+	WebhookTtid           string                     `json:"webhook_ttid,omitempty"`
+	URL                   string                     `json:"url,omitempty"`
 }
 
 type InteractionRouting struct {
 	Properties InteractionRoutingProperties `json:"properties,omitempty"`
+}
+
+type InteractionRoutingResponse struct {
+	Properties InteractionRoutingPropertiesResponse `json:"properties,omitempty"`
 }
 
 // CreateConversationWebhookRequest parameters for creating a conversation webhook

@@ -140,9 +140,7 @@ func TestOpen(t *testing.T) {
 						"workspace_sid": "WS12345678901234567890123456789012",
 						"workflow_sid": "WW12345678901234567890123456789012",
 						"task_channel_unique_name": "chat",
-						"attributes": {
-							"conversationSid": "CH12345678901234567890123456789012"
-						}
+						"attributes": "{\"conversationSid\":\"CH12345678901234567890123456789012\"}"
 					}
 				},
 				"webhook_ttid": "WH12345678901234567890123456789012"
@@ -240,7 +238,7 @@ func TestOpenWithMissingConversationSid(t *testing.T) {
 						"workspace_sid": "WS12345678901234567890123456789012",
 						"workflow_sid": "WW12345678901234567890123456789012",
 						"task_channel_unique_name": "chat",
-						"attributes": {}
+						"attributes": ""
 					}
 				},
 				"webhook_ttid": "WH12345678901234567890123456789012"

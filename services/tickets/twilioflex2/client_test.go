@@ -65,17 +65,50 @@ func TestCreateInteraction(t *testing.T) {
 			httpx.MockConnectionError,
 			httpx.NewMockResponse(400, nil, `{"message": "Something went wrong", "detail": "Unknown", "code": 1234, "more_info": "https://www.twilio.com/docs/errors/1234"}`),
 			httpx.NewMockResponse(201, nil, `{
-				"sid": "KD12345678901234567890123456789012",
 				"channel": {
-					"type": "whatsapp",
-					"initiated_by": "customer"
-				},
-				"routing": {
-					"type": "studio"
+					"sid": "UOxx123456789012345678901234567890",
+					"type": "web"
 				},
 				"interaction_context_sid": "IC12345678901234567890123456789012",
-				"webhook_ttid": "WH12345678901234567890123456789012",
-				"url": "https://flex-api.twilio.com/v1/Interactions/KD12345678901234567890123456789012"
+				"links": {
+					"channels": "https://flex-api.twilio.com/v1/Interactions/KDfbcc36df16d504c234b2c46db61a3464/Channels"
+				},
+				"routing": {
+					"properties": {
+						"account_sid": "ACxx123456789012345678901234567890",
+						"addons": "{}",
+						"age": 0,
+						"age_in_queue": 0,
+						"assignmentCounter": 0,
+						"assignment_status": "pending",
+						"attributes": "{\"flexChannelInviteSid\":\"KG991456db3f867c9506ba9597e88afac7\",\"customerId\":\"100_4996b4a0-6b9e-4b9d-8316-9a4a2095f445\",\"channelType\":\"web\",\"conversationSid\":\"CH54dcbcf4e6b24cf28ff55ecd4556015f\",\"customers\":{},\"taskCreateSource\":\"interaction\",\"conversations\":{\"initiated_by\":\"API\",\"conversation_id\":\"KDfbcc36df16d504c234b2c46db61a3464\",\"media\":[{\"type\":\"ChatTranscript\",\"sid\":\"CH54dcbcf4e6b24cf28ff55ecd4556015f\"}]},\"initiatedBy\":\"api\",\"flexInteractionChannelSid\":\"UOad4bf4740fdd394f145e049e183460c5\",\"flexInteractionSid\":\"KDfbcc36df16d504c234b2c46db61a3464\",\"custom_attributes\":\"\",\"direction\":\"inbound\"}",
+						"custom_context": null,
+						"date_created": 1761934290,
+						"date_updated": 1761934290,
+						"ignore_capacity": false,
+						"priority": 0,
+						"queue_name": "Everyone",
+						"queue_sid": "WQab27293ea5d899e465b513b6cca00717",
+						"reason": "",
+						"required_attention": null,
+						"routing_target": null,
+						"sid": "WTb7a01b7bc8a8a38c1ac16f6bd412ee07",
+						"task_channel_sid": "TC2fe62df21997126abe4abb680751b738",
+						"task_channel_unique_name": "chat",
+						"task_queue_entered_date": 1761934290,
+						"timeout": 86400,
+						"twilio_context": null,
+						"version": 0,
+						"virtual_start_time": 1761934290,
+						"workflow_name": "Assign to Anyone",
+						"workflow_sid": "WWe73e5e5c644cf2b887a1ad3d39c755a6",
+						"workspace_sid": "WS2df090d8808b181baf01b5640ecf014c"
+					},
+					"reservation": null
+				},
+				"sid": "KDfbcc36df16d504c234b2c46db61a3464",
+				"url": "https://flex-api.twilio.com/v1/Interactions/KDfbcc36df16d504c234b2c46db61a3464",
+				"webhook_ttid": "flex_interactionwebhook_01k8xqfbaxfh5tpnqm2psh6238"
 			}`),
 		},
 	}))
@@ -107,10 +140,10 @@ func TestCreateInteraction(t *testing.T) {
 
 	interaction, trace, err := client.CreateInteraction(params)
 	assert.NoError(t, err)
-	assert.Equal(t, "KD12345678901234567890123456789012", interaction.Sid)
-	assert.Equal(t, "WH12345678901234567890123456789012", interaction.WebhookTtid)
+	assert.Equal(t, "KDfbcc36df16d504c234b2c46db61a3464", interaction.Sid)
+	assert.Equal(t, "flex_interactionwebhook_01k8xqfbaxfh5tpnqm2psh6238", interaction.WebhookTtid)
 	assert.Equal(t, "IC12345678901234567890123456789012", interaction.InteractionContextSid)
-	assert.Equal(t, "HTTP/1.0 201 Created\r\nContent-Length: 401\r\n\r\n", string(trace.ResponseTrace))
+	assert.Equal(t, "HTTP/1.0 201 Created\r\nContent-Length: 2270\r\n\r\n", string(trace.ResponseTrace))
 }
 
 func TestCreateConversationScopedWebhook(t *testing.T) {
