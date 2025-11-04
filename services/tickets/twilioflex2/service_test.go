@@ -35,15 +35,6 @@ const (
 	testConversationServiceSid = "CS12345678901234567890123456789012"
 )
 
-// mockFlowRun implements the CreatedOn method needed by getHistoryAfter
-type mockFlowRun struct {
-	createdOn time.Time
-}
-
-func (m *mockFlowRun) CreatedOn() time.Time {
-	return m.createdOn
-}
-
 func TestNewService(t *testing.T) {
 	_, rt, _, _ := testsuite.Get()
 	defer testsuite.Reset(testsuite.ResetAll)

@@ -117,8 +117,12 @@ func (c *Client) CreateInteraction(interaction *CreateInteractionRequest) (*Crea
 	channelPayload := map[string]any{
 		"type":         interaction.Channel.Type,
 		"initiated_by": interaction.Channel.InitiatedBy,
-		"properties":   interaction.Channel.Properties,
 	}
+
+	if len(interaction.Channel.Properties) > 0 {
+		channelPayload["properties"] = interaction.Channel.Properties
+	}
+
 	routingPayload := map[string]any{
 		"type":       interaction.Routing.Type,
 		"properties": interaction.Routing.Properties,

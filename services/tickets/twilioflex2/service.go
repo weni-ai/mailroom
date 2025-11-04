@@ -116,7 +116,10 @@ func (s *service) Open(session flows.Session, topic *flows.Topic, body string, a
 		return nil, errors.Wrap(err, "failed to create interaction webhook")
 	}
 
-	interaction, trace, err := s.restClient.CreateInteraction(&CreateInteractionRequest{
+	bodyMap := map[string]any{}
+	json.Unmarshal([]byte(body), &bodyMap)
+
+	interactionRequest := &CreateInteractionRequest{
 		Channel: InteractionChannelParam{
 			Type:        "web",
 			InitiatedBy: "api",
@@ -135,7 +138,13 @@ func (s *service) Open(session flows.Session, topic *flows.Topic, body string, a
 			},
 		},
 		WebhookTtid: interactionWebhook.Ttid,
-	})
+	}
+
+	for key, value := range bodyMap {
+		interactionRequest.Routing.Properties.Attributes[key] = value
+	}
+
+	interactionResponse, trace, err := s.restClient.CreateInteraction(interactionRequest)
 	if trace != nil {
 		logHTTP(flows.NewHTTPLog(trace, flows.HTTPStatusFromCode, s.redactor))
 	}
@@ -144,8 +153,8 @@ func (s *service) Open(session flows.Session, topic *flows.Topic, body string, a
 		return nil, errors.Wrap(err, "failed to create interaction")
 	}
 
-	logrus.Debugf("interaction: %+v", interaction)
-	attributes := interaction.Routing.Properties.Attributes
+	logrus.Debugf("interaction: %+v", interactionResponse)
+	attributes := interactionResponse.Routing.Properties.Attributes
 	conversationSid, _ := jsonparser.GetString([]byte(attributes), "conversationSid")
 	if conversationSid == "" {
 		return nil, errors.New("conversationSid is not found in interaction routing properties")
