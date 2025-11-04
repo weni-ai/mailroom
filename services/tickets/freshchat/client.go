@@ -69,7 +69,6 @@ func (c *baseClient) request(method, endpoint string, payload interface{}, respo
 		}
 		return trace, errors.New(response.Error)
 	}
-
 	if response != nil {
 		return trace, jsonx.Unmarshal(trace.ResponseBody, response)
 	}
@@ -99,7 +98,7 @@ func NewClient(httpClient *http.Client, httpRetries *httpx.RetryConfig, baseURL,
 }
 
 func (c *Client) CreateConversation(conversation *Conversation) (*Conversation, *httpx.Trace, error) {
-	endpoint := "/v2/conversations"
+	endpoint := "v2/conversations"
 	response := &Conversation{}
 	trace, err := c.post(endpoint, conversation, response)
 	if err != nil {
@@ -109,7 +108,7 @@ func (c *Client) CreateConversation(conversation *Conversation) (*Conversation, 
 }
 
 func (c *Client) CreateUser(user *User) (*User, *httpx.Trace, error) {
-	endpoint := "/v2/users"
+	endpoint := "v2/users"
 	response := &User{}
 	trace, err := c.post(endpoint, user, response)
 	if err != nil {
@@ -118,18 +117,20 @@ func (c *Client) CreateUser(user *User) (*User, *httpx.Trace, error) {
 	return response, trace, nil
 }
 
-func (c *Client) GetChannels() ([]*Channel, *httpx.Trace, error) {
-	endpoint := "/v2/channels"
-	response := []*Channel{}
-	trace, err := c.get(endpoint, nil, response)
+func (c *Client) GetChannels() ([]Channel, *httpx.Trace, error) {
+	endpoint := "v2/channels"
+	var response struct {
+		Channels []Channel `json:"channels"`
+	}
+	trace, err := c.get(endpoint, nil, &response)
 	if err != nil {
 		return nil, trace, err
 	}
-	return response, trace, nil
+	return response.Channels, trace, nil
 }
 
 func (c *Client) CreateMessage(message *Message) (*Message, *httpx.Trace, error) {
-	endpoint := fmt.Sprintf("/v2/%s/messages", message.ConversationID)
+	endpoint := fmt.Sprintf("v2/conversations/%s/messages", message.ConversationID)
 	response := &Message{}
 	trace, err := c.post(endpoint, message, response)
 	if err != nil {
@@ -139,7 +140,7 @@ func (c *Client) CreateMessage(message *Message) (*Message, *httpx.Trace, error)
 }
 
 func (c *Client) UpdateConversation(conversation *Conversation) (*httpx.Trace, error) {
-	endpoint := fmt.Sprintf("/v2/conversations/%s", string(conversation.ConversationID))
+	endpoint := fmt.Sprintf("v2/conversations/%s", string(conversation.ConversationID))
 	response := &Conversation{}
 	trace, err := c.put(endpoint, conversation, response)
 	if err != nil {
@@ -149,11 +150,19 @@ func (c *Client) UpdateConversation(conversation *Conversation) (*httpx.Trace, e
 }
 
 func (c *Client) UploadImage(imageURL string) (string, error) {
-	resp, err := http.Get(imageURL)
+	getReq, err := httpx.NewRequest("GET", imageURL, nil, nil)
 	if err != nil {
 		return "", err
 	}
-	defer resp.Body.Close()
+
+	getTrace, err := httpx.DoTrace(c.httpClient, getReq, c.httpRetries, nil, -1)
+	if err != nil {
+		return "", err
+	}
+
+	if getTrace.Response.StatusCode >= 400 {
+		return "", fmt.Errorf("failed to download image: %d", getTrace.Response.StatusCode)
+	}
 
 	fileName := strings.Split(imageURL, ".")[len(strings.Split(imageURL, "."))-1]
 	if u, err := url.Parse(imageURL); err == nil {
@@ -169,40 +178,56 @@ func (c *Client) UploadImage(imageURL string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	_, err = io.Copy(part, resp.Body)
+	_, err = io.Copy(part, bytes.NewReader(getTrace.ResponseBody))
 	if err != nil {
 		return "", err
 	}
 	writer.Close()
 
 	endpoint := c.baseURL + "/v2/images/upload"
-	req, err := http.NewRequest("POST", endpoint, &buf)
+	postReq, err := http.NewRequest("POST", endpoint, &buf)
 	if err != nil {
 		return "", err
 	}
-	req.Header.Set("Authorization", "Bearer "+c.authToken)
-	req.Header.Set("Content-Type", writer.FormDataContentType())
-	req.Header.Set("accept", "application/json")
+	postReq.Header.Set("Authorization", "Bearer "+c.authToken)
+	postReq.Header.Set("Content-Type", writer.FormDataContentType())
+	postReq.Header.Set("accept", "application/json")
 
-	trace, err := httpx.DoTrace(c.httpClient, req, c.httpRetries, nil, -1)
+	postTrace, err := httpx.DoTrace(c.httpClient, postReq, c.httpRetries, nil, -1)
 	if err != nil {
 		return "", err
 	}
-	defer trace.Response.Body.Close()
+
+	if postTrace.Response.StatusCode >= 400 {
+		response := &errorResponse{}
+		err := json.Unmarshal(postTrace.ResponseBody, response)
+		if err != nil {
+			return "", err
+		}
+		return "", errors.New(response.Error)
+	}
 
 	var imgResp Image
-	if err := json.NewDecoder(trace.Response.Body).Decode(&imgResp); err != nil {
+	if err := json.Unmarshal(postTrace.ResponseBody, &imgResp); err != nil {
 		return "", err
 	}
 	return imgResp.URL, nil
 }
 
 func (c *Client) UploadFile(fileURL string) (*File, error) {
-	resp, err := http.Get(fileURL)
+	getReq, err := httpx.NewRequest("GET", fileURL, nil, nil)
 	if err != nil {
 		return nil, err
 	}
-	defer resp.Body.Close()
+
+	getTrace, err := httpx.DoTrace(c.httpClient, getReq, c.httpRetries, nil, -1)
+	if err != nil {
+		return nil, err
+	}
+
+	if getTrace.Response.StatusCode >= 400 {
+		return nil, fmt.Errorf("failed to download file: %d", getTrace.Response.StatusCode)
+	}
 
 	fileName := strings.Split(fileURL, ".")[len(strings.Split(fileURL, "."))-1]
 	if u, err := url.Parse(fileURL); err == nil {
@@ -218,26 +243,34 @@ func (c *Client) UploadFile(fileURL string) (*File, error) {
 	if err != nil {
 		return nil, err
 	}
-	_, err = io.Copy(part, resp.Body)
+	_, err = io.Copy(part, bytes.NewReader(getTrace.ResponseBody))
 	if err != nil {
 		return nil, err
 	}
 	writer.Close()
 
 	endpoint := c.baseURL + "/v2/files/upload"
-	req, err := http.NewRequest("POST", endpoint, &buf)
+	postReq, err := http.NewRequest("POST", endpoint, &buf)
 	if err != nil {
 		return nil, err
 	}
-	req.Header.Set("Authorization", "Bearer "+c.authToken)
-	req.Header.Set("Content-Type", writer.FormDataContentType())
-	req.Header.Set("accept", "application/json")
+	postReq.Header.Set("Authorization", "Bearer "+c.authToken)
+	postReq.Header.Set("Content-Type", writer.FormDataContentType())
+	postReq.Header.Set("accept", "application/json")
 
-	trace, err := httpx.DoTrace(c.httpClient, req, c.httpRetries, nil, -1)
+	postTrace, err := httpx.DoTrace(c.httpClient, postReq, c.httpRetries, nil, -1)
 	if err != nil {
 		return nil, err
 	}
-	defer trace.Response.Body.Close()
+
+	if postTrace.Response.StatusCode >= 400 {
+		response := &errorResponse{}
+		err := json.Unmarshal(postTrace.ResponseBody, response)
+		if err != nil {
+			return nil, err
+		}
+		return nil, errors.New(response.Error)
+	}
 
 	// Parse the JSON response into a struct for the raw response.
 	var fr struct {
@@ -248,7 +281,7 @@ func (c *Client) UploadFile(fileURL string) (*File, error) {
 		FileHash         string `json:"file_hash"`
 		FileSecurityStat string `json:"file_security_status"`
 	}
-	if err := json.NewDecoder(trace.Response.Body).Decode(&fr); err != nil {
+	if err := json.Unmarshal(postTrace.ResponseBody, &fr); err != nil {
 		return nil, err
 	}
 	fileResp := File{

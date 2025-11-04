@@ -1,0 +1,194 @@
+[
+    {
+        "label": "error response if no such ticketer",
+        "method": "POST",
+        "path": "/mr/tickets/types/freshchat/event_callback/00000000-0000-0000-0000-000000000000",
+        "body": {
+            "request_id": "123",
+            "action": "message_created",
+            "action_time": "2023-01-01T00:00:00Z",
+            "actor": {
+                "actor_type": "agent",
+                "actor_id": "123"
+            },
+            "data": {
+                "message": {
+                    "conversation_id": "1234567890",
+                    "messages_part": [
+                        {
+                            "text": {
+                                "content": "we can help"
+                            }
+                        }
+                    ]
+                }
+            }
+        },
+        "status": 404,
+        "response": {
+            "error": "no such ticketer 00000000-0000-0000-0000-000000000000"
+        }
+    },
+    {
+        "label": "ignored response if no such ticket",
+        "method": "POST",
+        "path": "/mr/tickets/types/freshchat/event_callback/12345678-1234-1234-1234-123456789012",
+        "body": {
+            "request_id": "123",
+            "action": "message_created",
+            "action_time": "2023-01-01T00:00:00Z",
+            "actor": {
+                "actor_type": "agent",
+                "actor_id": "123"
+            },
+            "data": {
+                "message": {
+                    "conversation_id": "9999999999",
+                    "messages_part": [
+                        {
+                            "text": {
+                                "content": "we can help"
+                            }
+                        }
+                    ]
+                }
+            }
+        },
+        "status": 200,
+        "response": {
+            "status": "ignored"
+        }
+    },
+    {
+        "label": "error response if invalid event type",
+        "method": "POST",
+        "path": "/mr/tickets/types/freshchat/event_callback/12345678-1234-1234-1234-123456789012",
+        "body": {
+            "request_id": "123",
+            "action": "invalid_action",
+            "action_time": "2023-01-01T00:00:00Z",
+            "actor": {
+                "actor_type": "agent",
+                "actor_id": "123"
+            },
+            "data": {}
+        },
+        "status": 400,
+        "response": {
+            "error": "invalid event type"
+        }
+    },
+    {
+        "label": "create message if everything is correct",
+        "method": "POST",
+        "path": "/mr/tickets/types/freshchat/event_callback/12345678-1234-1234-1234-123456789012",
+        "body": {
+            "request_id": "123",
+            "action": "message_created",
+            "action_time": "2023-01-01T00:00:00Z",
+            "actor": {
+                "actor_type": "agent",
+                "actor_id": "123"
+            },
+            "data": {
+                "message": {
+                    "conversation_id": "1234567890",
+                    "messages_part": [
+                        {
+                            "text": {
+                                "content": "1234"
+                            }
+                        }
+                    ]
+                }
+            }
+        },
+        "status": 200,
+        "response": {
+            "status": "handled"
+        },
+        "db_assertions": [
+            {
+                "query": "select count(*) from msgs_msg where direction = 'O'",
+                "count": 1
+            },
+            {
+                "query": "select count(*) from tickets_ticket where status = 'O'",
+                "count": 1
+            }
+        ]
+    },
+    {
+        "label": "close ticket on conversation_resolution",
+        "method": "POST",
+        "path": "/mr/tickets/types/freshchat/event_callback/12345678-1234-1234-1234-123456789012",
+        "body": {
+            "request_id": "123",
+            "action": "conversation_resolution",
+            "action_time": "2023-01-01T00:00:00Z",
+            "actor": {
+                "actor_type": "agent",
+                "actor_id": "123"
+            },
+            "data": {
+                "resolve": {
+                    "resolver": "agent",
+                    "conversation": {
+                        "conversation_id": "1234567890"
+                    },
+                    "users": {
+                        "id": "123"
+                    },
+                    "interaction_id": "456"
+                }
+            }
+        },
+        "status": 200,
+        "response": {
+            "status": "handled"
+        },
+        "db_assertions": [
+            {
+                "query": "select count(*) from tickets_ticket where status = 'C'",
+                "count": 1
+            }
+        ]
+    },
+    {
+        "label": "reopen ticket on conversation_reopen",
+        "method": "POST",
+        "path": "/mr/tickets/types/freshchat/event_callback/12345678-1234-1234-1234-123456789012",
+        "body": {
+            "request_id": "123",
+            "action": "conversation_reopen",
+            "action_time": "2023-01-01T00:00:00Z",
+            "actor": {
+                "actor_type": "agent",
+                "actor_id": "123"
+            },
+            "data": {
+                "reopen": {
+                    "reopener": "agent",
+                    "reopener_id": "123",
+                    "conversation": {
+                        "conversation_id": "1234567890"
+                    },
+                    "users": {
+                        "id": "123"
+                    },
+                    "interaction_id": "456"
+                }
+            }
+        },
+        "status": 200,
+        "response": {
+            "status": "handled"
+        },
+        "db_assertions": [
+            {
+                "query": "select count(*) from tickets_ticket where status = 'O'",
+                "count": 1
+            }
+        ]
+    }
+]

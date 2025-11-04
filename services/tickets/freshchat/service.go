@@ -128,7 +128,14 @@ func (s *service) Open(session flows.Session, topic *flows.Topic, body string, a
 
 	msg := &Conversation{
 		ChannelID: channelID,
-		Messages: []Message{
+		Status:    "new",
+		Users: []User{
+			{ID: string(userID)},
+		},
+	}
+
+	if len(bodyMap.Messages) > 0 && len(bodyMap.Messages[0].MessagesPart) > 0 && bodyMap.Messages[0].MessagesPart[0].Text != nil {
+		msg.Messages = []Message{
 			{
 				MessagesPart: []MessagesPart{
 					{
@@ -138,11 +145,20 @@ func (s *service) Open(session flows.Session, topic *flows.Topic, body string, a
 					},
 				},
 			},
-		},
-		Status: "new",
-		Users: []User{
-			{ID: string(userID)},
-		},
+		}
+	} else {
+		// Fallback to simple text message
+		msg.Messages = []Message{
+			{
+				MessagesPart: []MessagesPart{
+					{
+						Text: &Text{
+							Content: body,
+						},
+					},
+				},
+			},
+		}
 	}
 
 	if bodyMap.Properties != nil {
@@ -153,7 +169,7 @@ func (s *service) Open(session flows.Session, topic *flows.Topic, body string, a
 	if trace != nil {
 		logHTTP(flows.NewHTTPLog(trace, flows.HTTPStatusFromCode, s.redactor))
 	}
-	if err != nil || resultsConversation.Messages[0].ErrorMessage != "" {
+	if err != nil || (len(resultsConversation.Messages) > 0 && resultsConversation.Messages[0].ErrorMessage != "") {
 		if err == nil {
 			err = errors.New(resultsConversation.Messages[0].ErrorMessage)
 		}

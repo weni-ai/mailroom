@@ -65,14 +65,26 @@ func handleEventCallback(ctx context.Context, rt *runtime.Runtime, r *http.Reque
 		return err, http.StatusBadRequest, nil
 	}
 
+	// validate action type first
+	action := strings.ToLower(request.Action)
+	if action != "conversation_resolution" && action != "conversation_reopen" && action != "message_created" {
+		return map[string]string{"error": "invalid event type"}, http.StatusBadRequest, nil
+	}
+
 	externalID := ""
 	switch request.Action {
 	case "conversation_resolution":
-		externalID = request.Data.Resolve.Conversation.ConversationID
+		if request.Data.Resolve != nil && request.Data.Resolve.Conversation != nil {
+			externalID = request.Data.Resolve.Conversation.ConversationID
+		}
 	case "conversation_reopen":
-		externalID = request.Data.Reopen.Conversation.ConversationID
-	default:
-		externalID = request.Data.Message.ConversationID
+		if request.Data.Reopen != nil && request.Data.Reopen.Conversation != nil {
+			externalID = request.Data.Reopen.Conversation.ConversationID
+		}
+	case "message_created":
+		if request.Data.Message != nil {
+			externalID = request.Data.Message.ConversationID
+		}
 	}
 
 	// lookup ticket
@@ -88,8 +100,11 @@ func handleEventCallback(ctx context.Context, rt *runtime.Runtime, r *http.Reque
 	}
 
 	requestJSON, err := json.Marshal(request)
+	if err != nil {
+		return errors.Wrap(err, "error marshalling request"), http.StatusBadRequest, nil
+	}
 
-	switch strings.ToLower(request.Action) {
+	switch action {
 	case "conversation_resolution":
 		err = tickets.Close(ctx, rt, oa, ticket, false, l, string(requestJSON))
 	case "conversation_reopen":
@@ -140,8 +155,6 @@ func handleEventCallback(ctx context.Context, rt *runtime.Runtime, r *http.Reque
 		} else {
 			return map[string]string{"status": "ignored"}, http.StatusOK, nil
 		}
-	default:
-		return errors.New("invalid event type"), http.StatusBadRequest, nil
 	}
 
 	if err != nil {
