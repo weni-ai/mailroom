@@ -1,3 +1,7 @@
+1.70.1
+----------
+ * Twilio Flex 2 interaction task attributes handling
+
 1.70.0
 ----------
  * Add Twilio Flex for flex UI 2.x integration
