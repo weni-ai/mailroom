@@ -29,29 +29,29 @@ import (
 func TestNewService(t *testing.T) {
 	ticketer := flows.NewTicketer(static.NewTicketer(assets.TicketerUUID(uuids.New()), "Support", "freshchat"))
 
-	// Test missing base_url
+	// Test missing freshchat_domain
 	_, err := freshchat.NewService(
 		&runtime.Config{},
 		http.DefaultClient,
 		nil,
 		ticketer,
 		map[string]string{
-			"auth_token": apiKey,
+			"oauth_token": apiKey,
 		},
 	)
-	assert.EqualError(t, err, "missing base_url or auth_token in freshchat config")
+	assert.EqualError(t, err, "missing freshchat_domain or oauth_token in freshchat config")
 
-	// Test missing auth_token
+	// Test missing oauth_token
 	_, err = freshchat.NewService(
 		&runtime.Config{},
 		http.DefaultClient,
 		nil,
 		ticketer,
 		map[string]string{
-			"base_url": baseURL,
+			"freshchat_domain": baseURL,
 		},
 	)
-	assert.EqualError(t, err, "missing base_url or auth_token in freshchat config")
+	assert.EqualError(t, err, "missing freshchat_domain or oauth_token in freshchat config")
 
 	// Test valid config
 	svc, err := freshchat.NewService(
@@ -60,8 +60,8 @@ func TestNewService(t *testing.T) {
 		nil,
 		ticketer,
 		map[string]string{
-			"base_url":   baseURL,
-			"auth_token": apiKey,
+			"freshchat_domain": baseURL,
+			"oauth_token":      apiKey,
 		},
 	)
 	assert.NoError(t, err)
@@ -148,8 +148,8 @@ func TestOpen(t *testing.T) {
 		nil,
 		ticketer,
 		map[string]string{
-			"base_url":   baseURL,
-			"auth_token": apiKey,
+			"freshchat_domain": baseURL,
+			"oauth_token":      apiKey,
 		},
 	)
 	require.NoError(t, err)
@@ -236,8 +236,8 @@ func TestOpenWithChannelID(t *testing.T) {
 		nil,
 		ticketer,
 		map[string]string{
-			"base_url":   baseURL,
-			"auth_token": apiKey,
+			"freshchat_domain": baseURL,
+			"oauth_token":      apiKey,
 		},
 	)
 	require.NoError(t, err)
@@ -339,8 +339,8 @@ func TestForward(t *testing.T) {
 		nil,
 		ticketer,
 		map[string]string{
-			"base_url":   baseURL,
-			"auth_token": apiKey,
+			"freshchat_domain": baseURL,
+			"oauth_token":      apiKey,
 		},
 	)
 	require.NoError(t, err)
@@ -394,8 +394,8 @@ func TestForwardWithoutChannelID(t *testing.T) {
 		nil,
 		ticketer,
 		map[string]string{
-			"base_url":   baseURL,
-			"auth_token": apiKey,
+			"freshchat_domain": baseURL,
+			"oauth_token":      apiKey,
 		},
 	)
 	require.NoError(t, err)
@@ -437,8 +437,8 @@ func TestForwardWithoutChannels(t *testing.T) {
 		nil,
 		ticketer,
 		map[string]string{
-			"base_url":   baseURL,
-			"auth_token": apiKey,
+			"freshchat_domain": baseURL,
+			"oauth_token":      apiKey,
 		},
 	)
 	require.NoError(t, err)
@@ -492,8 +492,8 @@ func TestClose(t *testing.T) {
 		nil,
 		ticketer,
 		map[string]string{
-			"base_url":   baseURL,
-			"auth_token": apiKey,
+			"freshchat_domain": baseURL,
+			"oauth_token":      apiKey,
 		},
 	)
 	require.NoError(t, err)
@@ -557,8 +557,8 @@ func TestReopen(t *testing.T) {
 		nil,
 		ticketer,
 		map[string]string{
-			"base_url":   baseURL,
-			"auth_token": apiKey,
+			"freshchat_domain": baseURL,
+			"oauth_token":      apiKey,
 		},
 	)
 	require.NoError(t, err)

@@ -32,10 +32,10 @@ type service struct {
 }
 
 func NewService(rtCfg *runtime.Config, httpClient *http.Client, httpRetries *httpx.RetryConfig, ticketer *flows.Ticketer, config map[string]string) (models.TicketService, error) {
-	baseURL := config["base_url"]
-	authToken := config["auth_token"]
+	baseURL := config["freshchat_domain"]
+	authToken := config["oauth_token"]
 	if baseURL == "" || authToken == "" {
-		return nil, errors.New("missing base_url or auth_token in freshchat config")
+		return nil, errors.New("missing freshchat_domain or oauth_token in freshchat config")
 	}
 	return &service{
 		rtConfig:   rtCfg,
