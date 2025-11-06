@@ -79,13 +79,6 @@ func (s *service) Open(session flows.Session, topic *flows.Topic, body string, a
 		phone := ""
 		email := ""
 
-		for key, field := range session.Contact().Fields() {
-			if key == "email" {
-				email = field.Text.String()
-				break
-			}
-		}
-
 		for _, urn := range session.Contact().URNs() {
 			if urn.URN().Scheme() == urns.WhatsAppScheme || urn.URN().Scheme() == urns.TelScheme {
 				phone = urn.URN().Path()
