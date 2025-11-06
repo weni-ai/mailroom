@@ -117,6 +117,21 @@ func (c *Client) CreateUser(user *User) (*User, *httpx.Trace, error) {
 	return response, trace, nil
 }
 
+func (c *Client) GetUser(userID string) (*User, *httpx.Trace, error) {
+	endpoint := fmt.Sprintf("v2/users?reference_id=%s", userID)
+	response := &struct {
+		Users []User `json:"users"`
+	}{}
+	trace, err := c.get(endpoint, nil, response)
+	if err != nil {
+		return nil, trace, err
+	}
+	if len(response.Users) == 0 || response.Users[0].ReferenceID != userID {
+		return nil, trace, fmt.Errorf("user not found")
+	}
+	return &response.Users[0], trace, nil
+}
+
 func (c *Client) GetChannels() ([]Channel, *httpx.Trace, error) {
 	endpoint := "v2/channels"
 	var response struct {

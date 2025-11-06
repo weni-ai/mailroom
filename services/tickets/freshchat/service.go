@@ -62,31 +62,54 @@ func (s *service) Open(session flows.Session, topic *flows.Topic, body string, a
 		lastName = splitName[len(splitName)-1]
 	}
 
-	phone := ""
-	for _, urn := range session.Contact().URNs() {
-		if urn.URN().Scheme() == urns.WhatsAppScheme || urn.URN().Scheme() == urns.TelegramScheme || urn.URN().Scheme() == urns.TelScheme {
-			phone = urn.URN().Path()
-		}
-	}
-
-	user := &User{
-		FirstName: firstName,
-		LastName:  lastName,
-		Phone:     phone,
-		Properties: []UserProperty{
-			{Name: "external_id", Value: contactUUID},
-		},
-	}
-
-	resultsUser, trace, err := s.restClient.CreateUser(user)
+	// try to get user by reference id
+	resultsUser, trace, err := s.restClient.GetUser(contactUUID)
 	if trace != nil {
 		logHTTP(flows.NewHTTPLog(trace, flows.HTTPStatusFromCode, s.redactor))
 	}
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to create user")
+		logHTTP(flows.NewHTTPLog(trace, flows.HTTPStatusFromCode, s.redactor))
+	}
+	if resultsUser != nil {
+		userID = resultsUser.ID
 	}
 
-	userID = string(resultsUser.ID)
+	// if user not found, create new user
+	if userID == "" {
+		phone := ""
+		email := ""
+
+		for key, field := range session.Contact().Fields() {
+			if key == "email" {
+				email = field.Text.String()
+				break
+			}
+		}
+
+		for _, urn := range session.Contact().URNs() {
+			if urn.URN().Scheme() == urns.WhatsAppScheme || urn.URN().Scheme() == urns.TelScheme {
+				phone = urn.URN().Path()
+			}
+		}
+
+		user := &User{
+			FirstName:   firstName,
+			LastName:    lastName,
+			Phone:       phone,
+			Email:       email,
+			ReferenceID: contactUUID,
+		}
+
+		resultsUser, trace, err := s.restClient.CreateUser(user)
+		if trace != nil {
+			logHTTP(flows.NewHTTPLog(trace, flows.HTTPStatusFromCode, s.redactor))
+		}
+		if err != nil {
+			return nil, errors.Wrap(err, "failed to create user")
+		}
+
+		userID = string(resultsUser.ID)
+	}
 
 	bodyMap := Conversation{} // properties and message parts will be in this map
 
