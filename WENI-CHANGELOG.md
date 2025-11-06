@@ -1,3 +1,7 @@
+1.70.2
+----------
+ * Fix Twilio Flex 2 receive media
+
 1.70.1
 ----------
  * Twilio Flex 2 interaction task attributes handling
