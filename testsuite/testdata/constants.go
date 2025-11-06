@@ -71,6 +71,7 @@ var Mailgun = &Ticketer{2, "f9c9447f-a291-4f3c-8c79-c089bbd4e713"}
 var Zendesk = &Ticketer{3, "4ee6d4f3-f92b-439b-9718-8da90c05490b"}
 var RocketChat = &Ticketer{4, "6c50665f-b4ff-4e37-9625-bc464fe6a999"}
 var Twilioflex = &Ticketer{6, "12cc5dcf-44c2-4b25-9781-27275873e0df"}
+var Twilioflex2 = &Ticketer{8, "37bfe0b8-f5d4-4763-bc4d-770ecb144f71"}
 var Wenichats = &Ticketer{7, "006d224e-107f-4e18-afb2-f41fe302abdc"}
 
 var Luis = &Classifier{1, "097e026c-ae79-4740-af67-656dbedf0263"}

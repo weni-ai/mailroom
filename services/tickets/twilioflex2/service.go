@@ -121,7 +121,7 @@ func (s *service) Open(session flows.Session, topic *flows.Topic, body string, a
 
 	interactionRequest := &CreateInteractionRequest{
 		Channel: InteractionChannelParam{
-			Type:        "web",
+			Type:        "whatsapp",
 			InitiatedBy: "api",
 		},
 		Routing: InteractionRoutingParam{
@@ -131,7 +131,7 @@ func (s *service) Open(session flows.Session, topic *flows.Topic, body string, a
 				WorkflowSid:           s.workflowSid,
 				TaskChannelUniqueName: "chat",
 				Attributes: map[string]any{
-					"channelType":       "web",
+					"channelType":       "whatsapp",
 					"customerId":        userIdentity,
 					"custom_attributes": body,
 				},

@@ -2,6 +2,7 @@ package twilioflex2
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"strings"
@@ -38,20 +39,20 @@ type interactionCallbackRequest struct {
 
 // conversationCallbackRequest represents incoming conversation webhook events
 type conversationCallbackRequest struct {
-	AccountSid      string      `json:"AccountSid,omitempty"`
-	EventType       string      `json:"EventType,omitempty"`
-	ConversationSid string      `json:"ConversationSid,omitempty"`
-	Author          string      `json:"Author,omitempty"`
-	Body            string      `json:"Body,omitempty"`
-	ParticipantSid  string      `json:"ParticipantSid,omitempty"`
-	MessageSid      string      `json:"MessageSid,omitempty"`
-	Media           []mediaData `json:"Media,omitempty"`
-	Attributes      string      `json:"Attributes,omitempty"`
-	DateCreated     *time.Time  `json:"DateCreated,omitempty"`
-	Index           int         `json:"Index,omitempty"`
-	Source          string      `json:"Source,omitempty"`
-	WebhookSid      string      `json:"WebhookSid,omitempty"`
-	ChatServiceSid  string      `json:"ChatServiceSid,omitempty"`
+	AccountSid      string     `json:"AccountSid,omitempty"`
+	EventType       string     `json:"EventType,omitempty"`
+	ConversationSid string     `json:"ConversationSid,omitempty"`
+	Author          string     `json:"Author,omitempty"`
+	Body            string     `json:"Body,omitempty"`
+	ParticipantSid  string     `json:"ParticipantSid,omitempty"`
+	MessageSid      string     `json:"MessageSid,omitempty"`
+	Media           string     `json:"Media,omitempty"`
+	Attributes      string     `json:"Attributes,omitempty"`
+	DateCreated     *time.Time `json:"DateCreated,omitempty"`
+	Index           int        `json:"Index,omitempty"`
+	Source          string     `json:"Source,omitempty"`
+	WebhookSid      string     `json:"WebhookSid,omitempty"`
+	ChatServiceSid  string     `json:"ChatServiceSid,omitempty"`
 }
 
 // participantData represents participant information in an interaction
@@ -64,7 +65,6 @@ type participantData struct {
 // mediaData represents media attachments in a message
 type mediaData struct {
 	Sid         string `json:"Sid,omitempty"`
-	Size        string `json:"Size,omitempty"`
 	ContentType string `json:"ContentType,omitempty"`
 	Filename    string `json:"Filename,omitempty"`
 }
@@ -165,8 +165,13 @@ func handleMessageAdded(ctx context.Context, rt *runtime.Runtime, ticket *models
 		return nil
 	}
 
-	if len(request.Media) > 0 {
-		for _, media := range request.Media {
+	if request.Media != "" {
+		mData := []mediaData{}
+		err := json.Unmarshal([]byte(request.Media), &mData)
+		if err != nil {
+			return errors.Wrapf(err, "error unmarshalling media data")
+		}
+		for _, media := range mData {
 			config := ticketer.Config
 			authToken := config(configurationAuthToken)
 			accountSid := config(configurationAccountSid)
@@ -194,6 +199,9 @@ func handleMessageAdded(ctx context.Context, rt *runtime.Runtime, ticket *models
 	}
 
 	// Send the reply to the ticket
-	_, err := tickets.SendReply(ctx, rt, ticket, request.Body, []*tickets.File{}, nil)
-	return err
+	if request.Body != "" {
+		_, err := tickets.SendReply(ctx, rt, ticket, request.Body, []*tickets.File{}, nil)
+		return err
+	}
+	return nil
 }
