@@ -82,6 +82,43 @@ func TestOpen(t *testing.T) {
 
 	uuids.SetGenerator(uuids.NewSeededGenerator(12345))
 	httpx.SetRequestor(httpx.NewMockRequestor(map[string][]httpx.MockResponse{
+		fmt.Sprintf("%s/v2/users?reference_id=5d76d86b-3bb9-4d5a-b822-c9d86f5d8e4f", baseURL): {
+			httpx.NewMockResponse(200, nil, `{
+				"users": [
+					{}
+				]
+			}`),
+			httpx.NewMockResponse(200, nil, `{
+				"users": [
+					{}
+				]
+			}`),
+			httpx.NewMockResponse(200, nil, `{
+				"users": [
+					{}
+				]
+			}`),
+			httpx.NewMockResponse(200, nil, `{
+				"users": [
+					{}
+				]
+			}`),
+			httpx.NewMockResponse(200, nil, `{
+				"users": [
+					{}
+				]
+			}`),
+			httpx.NewMockResponse(200, nil, `{
+				"users": [
+					{}
+				]
+			}`),
+			httpx.NewMockResponse(200, nil, `{
+				"users": [
+					{}
+				]
+			}`),
+		},
 		fmt.Sprintf("%s/v2/users", baseURL): {
 			httpx.MockConnectionError,
 			httpx.NewMockResponse(400, nil, `{"error": "Something went wrong"}`),
@@ -189,7 +226,7 @@ func TestOpen(t *testing.T) {
 	assert.Equal(t, "General", ticket.Topic().Name())
 	assert.Equal(t, "Where are my cookies?", ticket.Body())
 	assert.Equal(t, "conv123", ticket.ExternalID())
-	assert.Equal(t, 3, len(logger.Logs))
+	assert.Equal(t, 5, len(logger.Logs))
 }
 
 func TestOpenWithChannelID(t *testing.T) {
@@ -206,6 +243,19 @@ func TestOpenWithChannelID(t *testing.T) {
 
 	uuids.SetGenerator(uuids.NewSeededGenerator(12345))
 	httpx.SetRequestor(httpx.NewMockRequestor(map[string][]httpx.MockResponse{
+		fmt.Sprintf("%s/v2/users?reference_id=5d76d86b-3bb9-4d5a-b822-c9d86f5d8e4f", baseURL): {
+			httpx.NewMockResponse(200, nil, `{
+				"users": [
+					{}
+				]
+			}`),
+			httpx.NewMockResponse(200, nil, `{
+				"users": [
+					{}
+				]
+			}`),
+		},
+
 		fmt.Sprintf("%s/v2/users", baseURL): {
 			httpx.NewMockResponse(201, nil, `{
 				"id": "user123"

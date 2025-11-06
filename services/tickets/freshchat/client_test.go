@@ -116,6 +116,41 @@ func TestCreateUser(t *testing.T) {
 	assert.Equal(t, "HTTP/1.0 201 Created\r\nContent-Length: 344\r\n\r\n", string(trace.ResponseTrace))
 }
 
+func TestGetUser(t *testing.T) {
+	defer httpx.SetRequestor(httpx.DefaultRequestor)
+	httpx.SetRequestor(httpx.NewMockRequestor(map[string][]httpx.MockResponse{
+		fmt.Sprintf("%s/v2/users?reference_id=5d76d86b-3bb9-4d5a-b822-c9d86f5d8e4f", baseURL): {
+			httpx.MockConnectionError,
+			httpx.NewMockResponse(400, nil, `{"error": "Something went wrong", "detail": "Unknown", "code": 1234, "more_info": "https://www.freshchat.com/docs/errors/1234"}`),
+			httpx.NewMockResponse(200, nil, `{
+				"users": [
+					{
+						"id": "1234567890",
+						"email": "test@test.com",
+						"first_name": "Test",
+						"last_name": "Test",
+						"phone": "1234567890",
+						"created_time": "2022-03-08T22:38:30Z",
+						"updated_time": "2022-03-08T22:38:30Z",
+						"reference_id": "5d76d86b-3bb9-4d5a-b822-c9d86f5d8e4f"
+					}
+				]
+			}`),
+		},
+	}))
+	client := freshchat.NewClient(http.DefaultClient, nil, baseURL, apiKey)
+	_, _, err := client.GetUser("5d76d86b-3bb9-4d5a-b822-c9d86f5d8e4f")
+	assert.EqualError(t, err, "unable to connect to server")
+
+	_, _, err = client.GetUser("5d76d86b-3bb9-4d5a-b822-c9d86f5d8e4f")
+	assert.EqualError(t, err, "Something went wrong")
+
+	user, trace, err := client.GetUser("5d76d86b-3bb9-4d5a-b822-c9d86f5d8e4f")
+	assert.NoError(t, err)
+	assert.Equal(t, "5d76d86b-3bb9-4d5a-b822-c9d86f5d8e4f", user.ReferenceID)
+	assert.Equal(t, "HTTP/1.0 200 OK\r\nContent-Length: 336\r\n\r\n", string(trace.ResponseTrace))
+}
+
 func TestGetChannels(t *testing.T) {
 	defer httpx.SetRequestor(httpx.DefaultRequestor)
 	httpx.SetRequestor(httpx.NewMockRequestor(map[string][]httpx.MockResponse{
