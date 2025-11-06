@@ -56,17 +56,29 @@ func (c *baseClient) request(method, endpoint string, payload interface{}, respo
 		return nil, err
 	}
 
+	// Debug: print request and response for tracing
+	fmt.Printf("[Freshchat Debug] Request: %s %s\n", req.Method, req.URL.String())
+	if body != nil {
+		b, _ := io.ReadAll(body)
+		fmt.Printf("[Freshchat Debug] Request Body: %s\n", string(b))
+	}
 	trace, err := httpx.DoTrace(c.httpClient, req, c.httpRetries, nil, -1)
 	if err != nil {
+		fmt.Printf("[Freshchat Debug] Error: %v\n", err)
 		return trace, err
 	}
+
+	fmt.Printf("[Freshchat Debug] Response Status: %d\n", trace.Response.StatusCode)
+	fmt.Printf("[Freshchat Debug] Response Body: %s\n", string(trace.ResponseBody))
 
 	if trace.Response.StatusCode >= 400 {
 		response := &errorResponse{}
 		err := jsonx.Unmarshal(trace.ResponseBody, response)
 		if err != nil {
+			fmt.Printf("[Freshchat Debug] Unmarshal Error: %v\n", err)
 			return trace, err
 		}
+		fmt.Printf("[Freshchat Debug] API Error: %s\n", response.Error)
 		return trace, errors.New(response.Error)
 	}
 	if response != nil {
