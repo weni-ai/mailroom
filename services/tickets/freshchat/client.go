@@ -42,13 +42,15 @@ func (c *baseClient) request(method, endpoint string, payload interface{}, respo
 		"Content-Type":  "application/json",
 	}
 	var body io.Reader
+	var bodyData []byte
 
 	if payload != nil {
 		data, err := jsonx.Marshal(payload)
 		if err != nil {
 			return nil, err
 		}
-		body = bytes.NewReader(data)
+		bodyData = data
+		body = bytes.NewReader(bodyData)
 	}
 
 	req, err := httpx.NewRequest(method, url, body, headers)
@@ -58,9 +60,8 @@ func (c *baseClient) request(method, endpoint string, payload interface{}, respo
 
 	// Debug: print request and response for tracing
 	fmt.Printf("[Freshchat Debug] Request: %s %s\n", req.Method, req.URL.String())
-	if body != nil {
-		b, _ := io.ReadAll(body)
-		fmt.Printf("[Freshchat Debug] Request Body: %s\n", string(b))
+	if len(bodyData) > 0 {
+		fmt.Printf("[Freshchat Debug] Request Body: %s\n", string(bodyData))
 	}
 	trace, err := httpx.DoTrace(c.httpClient, req, c.httpRetries, nil, -1)
 	if err != nil {
