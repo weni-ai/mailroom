@@ -312,6 +312,40 @@ func TestForward(t *testing.T) {
 	defer httpx.SetRequestor(httpx.DefaultRequestor)
 
 	httpx.SetRequestor(httpx.NewMockRequestor(map[string][]httpx.MockResponse{
+		fmt.Sprintf("%s/v2/users?reference_id=6393abc0-283d-4c9b-a1b3-641a035c34bf", baseURL): {
+			httpx.NewMockResponse(200, nil, `{
+				"users": [
+					{
+						"id": "user123",
+						"reference_id": "6393abc0-283d-4c9b-a1b3-641a035c34bf"
+					}
+				]
+			}`),
+			httpx.NewMockResponse(200, nil, `{
+				"users": [
+					{
+						"id": "user123",
+						"reference_id": "6393abc0-283d-4c9b-a1b3-641a035c34bf"
+					}
+				]
+			}`),
+			httpx.NewMockResponse(200, nil, `{
+				"users": [
+					{
+						"id": "user123",
+						"reference_id": "6393abc0-283d-4c9b-a1b3-641a035c34bf"
+					}
+				]
+			}`),
+			httpx.NewMockResponse(200, nil, `{
+				"users": [
+					{
+						"id": "user123",
+						"reference_id": "6393abc0-283d-4c9b-a1b3-641a035c34bf"
+					}
+				]
+			}`),
+		},
 		fmt.Sprintf("%s/v2/channels", baseURL): {
 			httpx.NewMockResponse(200, nil, `{
 				"channels": [
@@ -405,8 +439,7 @@ func TestForward(t *testing.T) {
 		"Where my cookies?",
 		models.NilUserID,
 		map[string]interface{}{
-			"channel_id": "channel123",
-			"user_id":    "user123",
+			"contact-uuid": string(testdata.Cathy.UUID),
 		},
 	)
 
@@ -432,85 +465,6 @@ func TestForward(t *testing.T) {
 	logger = &flows.HTTPLogger{}
 	err = svc.Forward(ticket, flows.MsgUUID("4fa340ae-1fb0-4666-98db-2177fe9bf31c"), "It's urgent", attachments, nil, null.NullString, logger.Log)
 	require.NoError(t, err)
-}
-
-func TestForwardWithoutChannelID(t *testing.T) {
-	_, rt, _, _ := testsuite.Get()
-
-	ticketer := flows.NewTicketer(static.NewTicketer(assets.TicketerUUID(uuids.New()), "Support", "freshchat"))
-	svc, err := freshchat.NewService(
-		rt.Config,
-		http.DefaultClient,
-		nil,
-		ticketer,
-		map[string]string{
-			"freshchat_domain": baseURL,
-			"oauth_token":      apiKey,
-		},
-	)
-	require.NoError(t, err)
-
-	ticket := models.NewTicket(
-		flows.TicketUUID("88bfa1dc-be33-45c2-b469-294ecb0eba90"),
-		testdata.Org1.ID,
-		testdata.Cathy.ID,
-		testdata.Freshchats.ID,
-		"conv123",
-		testdata.DefaultTopic.ID,
-		"Where my cookies?",
-		models.NilUserID,
-		map[string]interface{}{},
-	)
-
-	logger := &flows.HTTPLogger{}
-	err = svc.Forward(ticket, flows.MsgUUID("4fa340ae-1fb0-4666-98db-2177fe9bf31c"), "It's urgent", nil, nil, null.NullString, logger.Log)
-	assert.EqualError(t, err, "channel_id is not set")
-}
-
-func TestForwardWithoutChannels(t *testing.T) {
-	_, rt, _, _ := testsuite.Get()
-
-	defer httpx.SetRequestor(httpx.DefaultRequestor)
-
-	httpx.SetRequestor(httpx.NewMockRequestor(map[string][]httpx.MockResponse{
-		fmt.Sprintf("%s/v2/channels", baseURL): {
-			httpx.NewMockResponse(200, nil, `{
-				"channels": []
-			}`),
-		},
-	}))
-
-	ticketer := flows.NewTicketer(static.NewTicketer(assets.TicketerUUID(uuids.New()), "Support", "freshchat"))
-	svc, err := freshchat.NewService(
-		rt.Config,
-		http.DefaultClient,
-		nil,
-		ticketer,
-		map[string]string{
-			"freshchat_domain": baseURL,
-			"oauth_token":      apiKey,
-		},
-	)
-	require.NoError(t, err)
-
-	ticket := models.NewTicket(
-		flows.TicketUUID("88bfa1dc-be33-45c2-b469-294ecb0eba90"),
-		testdata.Org1.ID,
-		testdata.Cathy.ID,
-		testdata.Freshchats.ID,
-		"conv123",
-		testdata.DefaultTopic.ID,
-		"Where my cookies?",
-		models.NilUserID,
-		map[string]interface{}{
-			"channel_id": "channel123",
-			"user_id":    "user123",
-		},
-	)
-
-	logger := &flows.HTTPLogger{}
-	err = svc.Forward(ticket, flows.MsgUUID("4fa340ae-1fb0-4666-98db-2177fe9bf31c"), "It's urgent", nil, nil, null.NullString, logger.Log)
-	assert.EqualError(t, err, "no freshchat channels found")
 }
 
 func TestClose(t *testing.T) {
