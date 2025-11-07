@@ -19,7 +19,7 @@ import (
 func init() {
 	base := "/mr/tickets/types/freshchat"
 
-	web.RegisterJSONRoute(http.MethodPost, base+`/event_callback/{ticketer:[a-f0-9\-]+}`, web.WithHTTPLogs(handleEventCallback))
+	web.RegisterJSONRoute(http.MethodPost, base+`/webhook/{ticketer:[a-f0-9\-]+}`, web.WithHTTPLogs(handleEventCallback))
 }
 
 type webhookRequest struct {

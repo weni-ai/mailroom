@@ -2,7 +2,7 @@
     {
         "label": "error response if no such ticketer",
         "method": "POST",
-        "path": "/mr/tickets/types/freshchat/event_callback/00000000-0000-0000-0000-000000000000",
+        "path": "/mr/tickets/types/freshchat/webhook/00000000-0000-0000-0000-000000000000",
         "body": {
             "request_id": "123",
             "action": "message_created",
@@ -32,7 +32,7 @@
     {
         "label": "ignored response if no such ticket",
         "method": "POST",
-        "path": "/mr/tickets/types/freshchat/event_callback/12345678-1234-1234-1234-123456789012",
+        "path": "/mr/tickets/types/freshchat/webhook/12345678-1234-1234-1234-123456789012",
         "body": {
             "request_id": "123",
             "action": "message_created",
@@ -62,7 +62,7 @@
     {
         "label": "error response if invalid event type",
         "method": "POST",
-        "path": "/mr/tickets/types/freshchat/event_callback/12345678-1234-1234-1234-123456789012",
+        "path": "/mr/tickets/types/freshchat/webhook/12345678-1234-1234-1234-123456789012",
         "body": {
             "request_id": "123",
             "action": "invalid_action",
@@ -81,7 +81,7 @@
     {
         "label": "create message if everything is correct",
         "method": "POST",
-        "path": "/mr/tickets/types/freshchat/event_callback/12345678-1234-1234-1234-123456789012",
+        "path": "/mr/tickets/types/freshchat/webhook/12345678-1234-1234-1234-123456789012",
         "body": {
             "request_id": "123",
             "action": "message_created",
@@ -121,7 +121,7 @@
     {
         "label": "close ticket on conversation_resolution",
         "method": "POST",
-        "path": "/mr/tickets/types/freshchat/event_callback/12345678-1234-1234-1234-123456789012",
+        "path": "/mr/tickets/types/freshchat/webhook/12345678-1234-1234-1234-123456789012",
         "body": {
             "request_id": "123",
             "action": "conversation_resolution",
@@ -157,7 +157,7 @@
     {
         "label": "reopen ticket on conversation_reopen",
         "method": "POST",
-        "path": "/mr/tickets/types/freshchat/event_callback/12345678-1234-1234-1234-123456789012",
+        "path": "/mr/tickets/types/freshchat/webhook/12345678-1234-1234-1234-123456789012",
         "body": {
             "request_id": "123",
             "action": "conversation_reopen",
