@@ -297,7 +297,7 @@ func TestOpenWithChannelID(t *testing.T) {
 	defaultTopic := oa.SessionAssets().Topics().FindByName("General")
 
 	// Test with channel_id in body (JSON format)
-	body := `{"channel_id": "custom_channel", "messages": [{"messages_part": [{"text": {"content": "Where are my cookies?"}}]}]}`
+	body := `{"channel_id": "custom_channel", "messages": [{"message_parts": [{"text": {"content": "Where are my cookies?"}}]}]}`
 	logger := &flows.HTTPLogger{}
 	ticket, err := svc.Open(session, defaultTopic, body, nil, logger.Log)
 	require.NoError(t, err)
@@ -340,7 +340,7 @@ func TestForward(t *testing.T) {
 			httpx.NewMockResponse(201, nil, `{
 				"channel_id": "channel123",
 				"conversation_id": "conv123",
-				"messages_part": [{
+				"message_parts": [{
 					"text": {
 						"content": "Message sent"
 					}
@@ -349,7 +349,7 @@ func TestForward(t *testing.T) {
 			httpx.NewMockResponse(201, nil, `{
 				"channel_id": "channel123",
 				"conversation_id": "conv123",
-				"messages_part": [{
+				"message_parts": [{
 					"text": {
 						"content": "Message sent"
 					}
