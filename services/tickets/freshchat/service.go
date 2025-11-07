@@ -110,7 +110,7 @@ func (s *service) Open(session flows.Session, topic *flows.Topic, body string, a
 	if !strings.HasPrefix(body, "{") {
 		bodyMap.Messages = []Message{
 			{
-				MessagesPart: []MessagesPart{
+				MessageParts: []MessageParts{
 					{
 						Text: &Text{
 							Content: body,
@@ -151,13 +151,13 @@ func (s *service) Open(session flows.Session, topic *flows.Topic, body string, a
 		},
 	}
 
-	if len(bodyMap.Messages) > 0 && len(bodyMap.Messages[0].MessagesPart) > 0 && bodyMap.Messages[0].MessagesPart[0].Text != nil {
+	if len(bodyMap.Messages) > 0 && len(bodyMap.Messages[0].MessageParts) > 0 && bodyMap.Messages[0].MessageParts[0].Text != nil {
 		msg.Messages = []Message{
 			{
-				MessagesPart: []MessagesPart{
+				MessageParts: []MessageParts{
 					{
 						Text: &Text{
-							Content: bodyMap.Messages[0].MessagesPart[0].Text.Content,
+							Content: bodyMap.Messages[0].MessageParts[0].Text.Content,
 						},
 					},
 				},
@@ -171,7 +171,7 @@ func (s *service) Open(session flows.Session, topic *flows.Topic, body string, a
 		// Fallback to simple text message
 		msg.Messages = []Message{
 			{
-				MessagesPart: []MessagesPart{
+				MessageParts: []MessageParts{
 					{
 						Text: &Text{
 							Content: body,
@@ -211,7 +211,7 @@ func (s *service) Forward(ticket *models.Ticket, msgUUID flows.MsgUUID, text str
 
 	msg := &Message{
 		ConversationID: conversationID,
-		MessagesPart: []MessagesPart{
+		MessageParts: []MessageParts{
 			{
 				Text: &Text{
 					Content: text,
@@ -226,13 +226,13 @@ func (s *service) Forward(ticket *models.Ticket, msgUUID flows.MsgUUID, text str
 			if err != nil {
 				imageURL = attachment.URL()
 			}
-			msg.MessagesPart = append(msg.MessagesPart, MessagesPart{
+			msg.MessageParts = append(msg.MessageParts, MessageParts{
 				Image: &Image{
 					URL: imageURL,
 				},
 			})
 		} else if attachment.ContentType() == "video/mp4" || attachment.ContentType() == "video/quicktime" || attachment.ContentType() == "video/webm" {
-			msg.MessagesPart = append(msg.MessagesPart, MessagesPart{
+			msg.MessageParts = append(msg.MessageParts, MessageParts{
 				Video: &Video{
 					URL:         attachment.URL(),
 					ContentType: attachment.ContentType(),
@@ -243,7 +243,7 @@ func (s *service) Forward(ticket *models.Ticket, msgUUID flows.MsgUUID, text str
 			if err != nil {
 				file.URL = attachment.URL()
 			}
-			msg.MessagesPart = append(msg.MessagesPart, MessagesPart{
+			msg.MessageParts = append(msg.MessageParts, MessageParts{
 				File: file,
 			})
 		}

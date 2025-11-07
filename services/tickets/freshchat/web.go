@@ -110,11 +110,11 @@ func handleEventCallback(ctx context.Context, rt *runtime.Runtime, r *http.Reque
 	case "conversation_reopen":
 		err = tickets.Reopen(ctx, rt, oa, ticket, false, l)
 	case "message_created":
-		if len(request.Data.Message.MessagesPart) > 0 && request.Actor.ActorType == "agent" { //only process messages from agents
+		if len(request.Data.Message.MessageParts) > 0 && request.Actor.ActorType == "agent" { //only process messages from agents
 			var textMsg string
 			var files []*tickets.File
 
-			for _, part := range request.Data.Message.MessagesPart {
+			for _, part := range request.Data.Message.MessageParts {
 				if part.Text != nil {
 					if strings.TrimSpace(part.Text.Content) != "" {
 						if textMsg != "" {
