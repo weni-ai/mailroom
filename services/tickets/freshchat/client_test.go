@@ -39,9 +39,11 @@ func TestCreateConversation(t *testing.T) {
 				ID: "1234567890",
 			},
 		},
-		Properties: []map[string]interface{}{
-			{
-				"key": "value",
+		Properties: freshchat.Properties{
+			Value: []map[string]interface{}{
+				{
+					"key": "value",
+				},
 			},
 		},
 		Users: []freshchat.User{
@@ -190,7 +192,7 @@ func TestCreateMessage(t *testing.T) {
 			httpx.NewMockResponse(200, nil, `{
 				"channel_id": "1234567890123",
 				"conversation_id": "1234567890",
-				"messages_part": [
+				"message_parts": [
 					{
 						"text": {
 							"content": "Hello, world!"

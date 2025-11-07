@@ -309,42 +309,87 @@ func (c *Client) UploadFile(fileURL string) (*File, error) {
 	return &fileResp, nil
 }
 
+// Properties can be either an object (map) or an array of objects
+type Properties struct {
+	Value []map[string]interface{}
+}
+
+func (p *Properties) UnmarshalJSON(data []byte) error {
+	// Try to unmarshal as array first
+	var arr []map[string]interface{}
+	if err := json.Unmarshal(data, &arr); err == nil {
+		p.Value = arr
+		return nil
+	}
+	// If that fails, try to unmarshal as object
+	var obj map[string]interface{}
+	if err := json.Unmarshal(data, &obj); err == nil {
+		p.Value = []map[string]interface{}{obj}
+		return nil
+	}
+	// If both fail, return the error
+	return json.Unmarshal(data, &arr)
+}
+
+func (p Properties) MarshalJSON() ([]byte, error) {
+	// If empty, return null (omitempty will handle it)
+	if len(p.Value) == 0 {
+		return []byte("null"), nil
+	}
+	// If only one element, serialize as object (not array)
+	if len(p.Value) == 1 {
+		return json.Marshal(p.Value[0])
+	}
+	// If multiple elements, serialize as array
+	return json.Marshal(p.Value)
+}
+
 type Conversation struct {
-	ConversationID     string                   `json:"conversation_id,omitempty"`
-	Status             string                   `json:"status,omitempty"`
-	ChannelID          string                   `json:"channel_id,omitempty"`
-	AssignedAgentID    string                   `json:"assigned_agent_id,omitempty"`
-	AssignedOrgAgentID string                   `json:"assigned_org_agent_id,omitempty"`
-	AssignedGroupID    string                   `json:"assigned_group_id,omitempty"`
-	AssignedOrgGroupID string                   `json:"assigned_org_group_id,omitempty"`
-	Messages           []Message                `json:"messages,omitempty"`
-	Properties         []map[string]interface{} `json:"properties,omitempty"` //Array of custom properties
-	Users              []User                   `json:"users,omitempty"`
-	UserID             string                   `json:"user_id,omitempty"`
+	ConversationID         string     `json:"conversation_id,omitempty"`
+	ConversationInternalID int64      `json:"conversation_internal_id,omitempty"`
+	Status                 string     `json:"status,omitempty"`
+	ChannelID              string     `json:"channel_id,omitempty"`
+	AssignedAgentID        string     `json:"assigned_agent_id,omitempty"`
+	AssignedOrgAgentID     string     `json:"assigned_org_agent_id,omitempty"`
+	AssignedGroupID        string     `json:"assigned_group_id,omitempty"`
+	AssignedOrgGroupID     string     `json:"assigned_org_group_id,omitempty"`
+	Messages               []Message  `json:"messages,omitempty"`
+	Properties             Properties `json:"properties,omitempty"` //Can be object or array of custom properties
+	Users                  []User     `json:"users,omitempty"`
+	UserID                 string     `json:"user_id,omitempty"`
+	AppID                  string     `json:"app_id,omitempty"`
+	SkillID                int        `json:"skill_id,omitempty"`
+	URL                    string     `json:"url,omitempty"`
+	OrgContactID           string     `json:"org_contact_id,omitempty"`
+	CreatedTime            string     `json:"created_time,omitempty"`
+	UpdatedTime            string     `json:"updated_time,omitempty"`
 }
 
 type Message struct {
-	ID               string                 `json:"id,omitempty"`
-	CreatedTime      string                 `json:"created_time,omitempty"`
-	MessageParts     []MessageParts         `json:"message_parts,omitempty"`
-	ReplyParts       []MessageParts         `json:"reply_parts,omitempty"`
-	AppID            string                 `json:"app_id,omitempty"`
-	ActorType        string                 `json:"actor_type,omitempty"`
-	ActorID          string                 `json:"actor_id,omitempty"`
-	OrgActorID       string                 `json:"org_actor_id,omitempty"`
-	ChannelID        string                 `json:"channel_id,omitempty"`
-	ConversationID   string                 `json:"conversation_id,omitempty"`
-	InterationID     string                 `json:"interation_id,omitempty"`
-	MessageType      string                 `json:"message_type,omitempty"`
-	UserID           string                 `json:"user_id,omitempty"`
-	MetaData         map[string]interface{} `json:"meta_data,omitempty"`
-	InReplyTo        map[string]interface{} `json:"in_reply_to,omitempty"`
-	ErrorCode        int                    `json:"error_code,omitempty"`
-	Status           string                 `json:"status,omitempty"`
-	ErrorMessage     string                 `json:"error_message,omitempty"`
-	ErrorCategory    string                 `json:"error_category,omitempty"`
-	RestrictResponse bool                   `json:"restrict_response,omitempty"`
-	BotsPrivateNote  bool                   `json:"bots_private_note,omitempty"`
+	ID                      string                 `json:"id,omitempty"`
+	CreatedTime             string                 `json:"created_time,omitempty"`
+	MessageParts            []MessageParts         `json:"message_parts,omitempty"`
+	ReplyParts              []MessageParts         `json:"reply_parts,omitempty"`
+	AppID                   string                 `json:"app_id,omitempty"`
+	ActorType               string                 `json:"actor_type,omitempty"`
+	ActorID                 string                 `json:"actor_id,omitempty"`
+	OrgActorID              string                 `json:"org_actor_id,omitempty"`
+	ChannelID               string                 `json:"channel_id,omitempty"`
+	ConversationID          string                 `json:"conversation_id,omitempty"`
+	InterationID            string                 `json:"interation_id,omitempty"`
+	MessageType             string                 `json:"message_type,omitempty"`
+	UserID                  string                 `json:"user_id,omitempty"`
+	MetaData                map[string]interface{} `json:"meta_data,omitempty"`
+	InReplyTo               map[string]interface{} `json:"in_reply_to,omitempty"`
+	ErrorCode               int                    `json:"error_code,omitempty"`
+	Status                  string                 `json:"status,omitempty"`
+	ErrorMessage            string                 `json:"error_message,omitempty"`
+	ErrorCategory           string                 `json:"error_category,omitempty"`
+	RestrictResponse        bool                   `json:"restrictResponse,omitempty"`
+	BotsPrivateNote         bool                   `json:"botsPrivateNote,omitempty"`
+	IsBotsInput             bool                   `json:"isBotsInput,omitempty"`
+	FreshchatConversationID string                 `json:"freshchat_conversation_id,omitempty"`
+	FreshchatChannelID      string                 `json:"freshchat_channel_id,omitempty"`
 }
 
 type MessageParts struct {
