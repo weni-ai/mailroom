@@ -208,6 +208,7 @@ func (s *service) Open(session flows.Session, topic *flows.Topic, body string, a
 
 func (s *service) Forward(ticket *models.Ticket, msgUUID flows.MsgUUID, text string, attachments []utils.Attachment, metadata json.RawMessage, msgExternalID null.String, logHTTP flows.HTTPLogCallback) error {
 	conversationID := string(ticket.ExternalID())
+	contactUUID := ticket.Config("contact-uuid")
 
 	msg := &Message{
 		ConversationID: conversationID,
@@ -249,27 +250,22 @@ func (s *service) Forward(ticket *models.Ticket, msgUUID flows.MsgUUID, text str
 		}
 	}
 
-	channelID := ticket.Config("channel_id")
-	if channelID == "" {
-		return errors.New("channel_id is not set")
-	}
-
-	channels, trace, _ := s.restClient.GetChannels()
+	// Get user from Freshchat using reference_id (contact UUID)
+	user, trace, err := s.restClient.GetUser(contactUUID)
 	if trace != nil {
 		logHTTP(flows.NewHTTPLog(trace, flows.HTTPStatusFromCode, s.redactor))
 	}
-
-	if len(channels) == 0 {
-		return errors.New("no freshchat channels found")
+	if err != nil {
+		return errors.Wrap(err, "failed to get user from Freshchat")
+	}
+	if user == nil {
+		return errors.New("user not found in Freshchat")
 	}
 
-	channel := channels[0]
-	msg.ChannelID = channel.ID
-
 	msg.ActorType = "user"
-	msg.ActorID = ticket.Config("user_id")
+	msg.ActorID = user.ID
 
-	_, trace, err := s.restClient.CreateMessage(msg)
+	_, trace, err = s.restClient.CreateMessage(msg)
 	if trace != nil {
 		logHTTP(flows.NewHTTPLog(trace, flows.HTTPStatusFromCode, s.redactor))
 	}
@@ -283,7 +279,7 @@ func (s *service) Close(tickets []*models.Ticket, logHTTP flows.HTTPLogCallback)
 	for _, ticket := range tickets {
 		conversation := &Conversation{
 			ConversationID: string(ticket.ExternalID()),
-			Status:         "closed",
+			Status:         "resolved",
 		}
 		trace, err := s.restClient.UpdateConversation(conversation)
 		if trace != nil {
