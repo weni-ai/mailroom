@@ -206,7 +206,7 @@ func TestCreateMessage(t *testing.T) {
 	client := freshchat.NewClient(http.DefaultClient, nil, baseURL, apiKey)
 	message := &freshchat.Message{
 		ConversationID: "1234567890",
-		MessagesPart: []freshchat.MessagesPart{
+		MessageParts: []freshchat.MessageParts{
 			{
 				Text: &freshchat.Text{
 					Content: "Hello, world!",
@@ -223,7 +223,7 @@ func TestCreateMessage(t *testing.T) {
 	message, trace, err := client.CreateMessage(message)
 	assert.NoError(t, err)
 	assert.Equal(t, "123id", message.ID)
-	assert.Equal(t, "Hello, world!", message.MessagesPart[0].Text.Content)
+	assert.Equal(t, "Hello, world!", message.MessageParts[0].Text.Content)
 	assert.Equal(t, "HTTP/1.0 200 OK\r\nContent-Length: 256\r\n\r\n", string(trace.ResponseTrace))
 }
 

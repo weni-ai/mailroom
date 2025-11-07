@@ -326,8 +326,8 @@ type Conversation struct {
 type Message struct {
 	ID               string                 `json:"id,omitempty"`
 	CreatedTime      string                 `json:"created_time,omitempty"`
-	MessagesPart     []MessagesPart         `json:"messages_part,omitempty"`
-	ReplyParts       []MessagesPart         `json:"reply_parts,omitempty"`
+	MessageParts     []MessageParts         `json:"message_parts,omitempty"`
+	ReplyParts       []MessageParts         `json:"reply_parts,omitempty"`
 	AppID            string                 `json:"app_id,omitempty"`
 	ActorType        string                 `json:"actor_type,omitempty"`
 	ActorID          string                 `json:"actor_id,omitempty"`
@@ -347,7 +347,7 @@ type Message struct {
 	BotsPrivateNote  bool                   `json:"bots_private_note,omitempty"`
 }
 
-type MessagesPart struct {
+type MessageParts struct {
 	File             *File             `json:"file,omitempty"`
 	Text             *Text             `json:"text,omitempty"`
 	Image            *Image            `json:"image,omitempty"`
@@ -387,7 +387,7 @@ type Video struct {
 }
 
 type Collection struct {
-	SubParts []MessagesPart `json:"sub_parts,omitempty"`
+	SubParts []MessageParts `json:"sub_parts,omitempty"`
 }
 
 type URLButton struct {
@@ -411,7 +411,7 @@ type TemplateContent struct {
 
 type Section struct {
 	Name  string         `json:"name,omitempty"`
-	Parts []MessagesPart `json:"parts,omitempty"`
+	Parts []MessageParts `json:"parts,omitempty"`
 }
 
 type Callback struct {
@@ -452,7 +452,7 @@ type Channel struct {
 	Public         bool     `json:"public,omitempty"`
 	Tags           []string `json:"tags,omitempty"`
 	WelcomeMessage struct {
-		MessageParts []MessagesPart `json:"message_parts,omitempty"`
+		MessageParts []MessageParts `json:"message_parts,omitempty"`
 		MessageType  string         `json:"message_type,omitempty"`
 	} `json:"welcome_message,omitempty"`
 	Locale string `json:"locale,omitempty"`
