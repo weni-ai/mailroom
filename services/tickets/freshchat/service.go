@@ -186,7 +186,7 @@ func (s *service) Open(session flows.Session, topic *flows.Topic, body string, a
 		}
 	}
 
-	if bodyMap.Properties != nil {
+	if len(bodyMap.Properties.Value) > 0 {
 		msg.Properties = bodyMap.Properties
 	}
 

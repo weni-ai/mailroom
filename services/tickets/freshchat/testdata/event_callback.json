@@ -14,7 +14,7 @@
             "data": {
                 "message": {
                     "conversation_id": "1234567890",
-                    "messages_part": [
+                    "message_parts": [
                         {
                             "text": {
                                 "content": "we can help"
@@ -44,7 +44,7 @@
             "data": {
                 "message": {
                     "conversation_id": "9999999999",
-                    "messages_part": [
+                    "message_parts": [
                         {
                             "text": {
                                 "content": "we can help"
@@ -93,7 +93,7 @@
             "data": {
                 "message": {
                     "conversation_id": "1234567890",
-                    "messages_part": [
+                    "message_parts": [
                         {
                             "text": {
                                 "content": "1234"
