@@ -310,53 +310,53 @@ func (c *Client) UploadFile(fileURL string) (*File, error) {
 }
 
 type Conversation struct {
-	ConversationID     string                   `json:"conversation_id"`
-	Status             string                   `json:"status"`
-	ChannelID          string                   `json:"channel_id"`
-	AssignedAgentID    string                   `json:"assigned_agent_id"`
-	AssignedOrgAgentID string                   `json:"assigned_org_agent_id"`
-	AssignedGroupID    string                   `json:"assigned_group_id"`
-	AssignedOrgGroupID string                   `json:"assigned_org_group_id"`
-	Messages           []Message                `json:"messages"`
-	Properties         []map[string]interface{} `json:"properties"` //Array of custom properties
-	Users              []User                   `json:"users"`
-	UserID             string                   `json:"user_id"`
+	ConversationID     string                   `json:"conversation_id,omitempty"`
+	Status             string                   `json:"status,omitempty"`
+	ChannelID          string                   `json:"channel_id,omitempty"`
+	AssignedAgentID    string                   `json:"assigned_agent_id,omitempty"`
+	AssignedOrgAgentID string                   `json:"assigned_org_agent_id,omitempty"`
+	AssignedGroupID    string                   `json:"assigned_group_id,omitempty"`
+	AssignedOrgGroupID string                   `json:"assigned_org_group_id,omitempty"`
+	Messages           []Message                `json:"messages,omitempty"`
+	Properties         []map[string]interface{} `json:"properties,omitempty"` //Array of custom properties
+	Users              []User                   `json:"users,omitempty"`
+	UserID             string                   `json:"user_id,omitempty"`
 }
 
 type Message struct {
-	ID               string                 `json:"id"`
-	CreatedTime      string                 `json:"created_time"`
-	MessagesPart     []MessagesPart         `json:"messages_part"`
-	ReplyParts       []MessagesPart         `json:"reply_parts"`
-	AppID            string                 `json:"app_id"`
-	ActorType        string                 `json:"actor_type"`
-	ActorID          string                 `json:"actor_id"`
-	OrgActorID       string                 `json:"org_actor_id"`
-	ChannelID        string                 `json:"channel_id"`
-	ConversationID   string                 `json:"conversation_id"`
-	InterationID     string                 `json:"interation_id"`
-	MessageType      string                 `json:"message_type"`
-	UserID           string                 `json:"user_id"`
-	MetaData         map[string]interface{} `json:"meta_data"`
-	InReplyTo        map[string]interface{} `json:"in_reply_to"`
-	ErrorCode        int                    `json:"error_code"`
-	Status           string                 `json:"status"`
-	ErrorMessage     string                 `json:"error_message"`
-	ErrorCategory    string                 `json:"error_category"`
-	RestrictResponse bool                   `json:"restrict_response"`
-	BotsPrivateNote  bool                   `json:"bots_private_note"`
+	ID               string                 `json:"id,omitempty"`
+	CreatedTime      string                 `json:"created_time,omitempty"`
+	MessagesPart     []MessagesPart         `json:"messages_part,omitempty"`
+	ReplyParts       []MessagesPart         `json:"reply_parts,omitempty"`
+	AppID            string                 `json:"app_id,omitempty"`
+	ActorType        string                 `json:"actor_type,omitempty"`
+	ActorID          string                 `json:"actor_id,omitempty"`
+	OrgActorID       string                 `json:"org_actor_id,omitempty"`
+	ChannelID        string                 `json:"channel_id,omitempty"`
+	ConversationID   string                 `json:"conversation_id,omitempty"`
+	InterationID     string                 `json:"interation_id,omitempty"`
+	MessageType      string                 `json:"message_type,omitempty"`
+	UserID           string                 `json:"user_id,omitempty"`
+	MetaData         map[string]interface{} `json:"meta_data,omitempty"`
+	InReplyTo        map[string]interface{} `json:"in_reply_to,omitempty"`
+	ErrorCode        int                    `json:"error_code,omitempty"`
+	Status           string                 `json:"status,omitempty"`
+	ErrorMessage     string                 `json:"error_message,omitempty"`
+	ErrorCategory    string                 `json:"error_category,omitempty"`
+	RestrictResponse bool                   `json:"restrict_response,omitempty"`
+	BotsPrivateNote  bool                   `json:"bots_private_note,omitempty"`
 }
 
 type MessagesPart struct {
-	File             *File             `json:"file"`
-	Text             *Text             `json:"text"`
-	Image            *Image            `json:"image"`
-	Video            *Video            `json:"video"`
-	Collection       *Collection       `json:"collection"`
-	URLButton        *URLButton        `json:"url_button"`
-	QuickReplyButton *QuickReplyButton `json:"quick_reply_button"`
-	TemplateContent  *TemplateContent  `json:"template_content"`
-	Callback         *Callback         `json:"callback"`
+	File             *File             `json:"file,omitempty"`
+	Text             *Text             `json:"text,omitempty"`
+	Image            *Image            `json:"image,omitempty"`
+	Video            *Video            `json:"video,omitempty"`
+	Collection       *Collection       `json:"collection,omitempty"`
+	URLButton        *URLButton        `json:"url_button,omitempty"`
+	QuickReplyButton *QuickReplyButton `json:"quick_reply_button,omitempty"`
+	TemplateContent  *TemplateContent  `json:"template_content,omitempty"`
+	Callback         *Callback         `json:"callback,omitempty"`
 	// AttachmentInput *AttachmentInput `json:"attachment_input"`
 	// Reference *Reference `json:"reference"`
 	// TextInput *TextInput `json:"text_input"`
@@ -364,96 +364,96 @@ type MessagesPart struct {
 }
 
 type File struct {
-	FileHash        string `json:"fileHash"`
-	FileSource      string `json:"fileSource"` //Possible values: FRESHCHAT, FRESHBOTS
-	Name            string `json:"name"`
-	URL             string `json:"url"`
-	FileSizeInBytes int    `json:"file_size_in_bytes"`
-	ContentType     string `json:"content_type"`
-	FileExtension   string `json:"file_extension"`
+	FileHash        string `json:"fileHash,omitempty"`
+	FileSource      string `json:"fileSource,omitempty"` //Possible values: FRESHCHAT, FRESHBOTS
+	Name            string `json:"name,omitempty"`
+	URL             string `json:"url,omitempty"`
+	FileSizeInBytes int    `json:"file_size_in_bytes,omitempty"`
+	ContentType     string `json:"content_type,omitempty"`
+	FileExtension   string `json:"file_extension,omitempty"`
 }
 
 type Text struct {
-	Content string `json:"content"`
+	Content string `json:"content,omitempty"`
 }
 
 type Image struct {
-	URL string `json:"url"`
+	URL string `json:"url,omitempty"`
 }
 
 type Video struct {
-	URL         string `json:"url"`
-	ContentType string `json:"content_type"`
+	URL         string `json:"url,omitempty"`
+	ContentType string `json:"content_type,omitempty"`
 }
 
 type Collection struct {
-	SubParts []MessagesPart `json:"sub_parts"`
+	SubParts []MessagesPart `json:"sub_parts,omitempty"`
 }
 
 type URLButton struct {
-	URL    string `json:"url"`
-	Label  string `json:"label"`
-	Target string `json:"target"` //Possible values:_self, _blank | By default, _blank is the value of url_button.target.
+	URL    string `json:"url,omitempty"`
+	Label  string `json:"label,omitempty"`
+	Target string `json:"target,omitempty"` //Possible values:_self, _blank | By default, _blank is the value of url_button.target.
 }
 
 type QuickReplyButton struct {
-	CustomReplyText string `json:"custom_reply_text"`
-	Label           string `json:"label"`
-	Payload         string `json:"payload"`
-	DisplayOrder    string `json:"display_order"`
-	Type            string `json:"type"` //Possible value: RESEND_OTP
+	CustomReplyText string `json:"custom_reply_text,omitempty"`
+	Label           string `json:"label,omitempty"`
+	Payload         string `json:"payload,omitempty"`
+	DisplayOrder    string `json:"display_order,omitempty"`
+	Type            string `json:"type,omitempty"` //Possible value: RESEND_OTP
 }
 
 type TemplateContent struct {
-	Type     string    `json:"type"` //Possible value: carousel, carousel_card_default, quick_reply_dropdown
-	Sections []Section `json:"sections"`
+	Type     string    `json:"type,omitempty"` //Possible value: carousel, carousel_card_default, quick_reply_dropdown
+	Sections []Section `json:"sections,omitempty"`
 }
 
 type Section struct {
-	Name  string         `json:"name"`
-	Parts []MessagesPart `json:"parts"`
+	Name  string         `json:"name,omitempty"`
+	Parts []MessagesPart `json:"parts,omitempty"`
 }
 
 type Callback struct {
-	Payload string `json:"payload"`
-	Label   string `json:"label"`
+	Payload string `json:"payload,omitempty"`
+	Label   string `json:"label,omitempty"`
 }
 
 type Choice struct {
-	ID    string `json:"id"`
-	Value string `json:"value"`
+	ID    string `json:"id,omitempty"`
+	Value string `json:"value,omitempty"`
 }
 
 type User struct {
-	ID          string         `json:"id"`
-	Email       string         `json:"email"`
-	FirstName   string         `json:"first_name"`
-	LastName    string         `json:"last_name"`
-	Phone       string         `json:"phone"`
-	CreatedTime string         `json:"created_time"`
-	UpdatedTime string         `json:"updated_time"`
-	ReferenceID string         `json:"reference_id"`
-	Properties  []UserProperty `json:"properties"`
+	ID          string         `json:"id,omitempty"`
+	Email       string         `json:"email,omitempty"`
+	FirstName   string         `json:"first_name,omitempty"`
+	LastName    string         `json:"last_name,omitempty"`
+	Phone       string         `json:"phone,omitempty"`
+	CreatedTime string         `json:"created_time,omitempty"`
+	UpdatedTime string         `json:"updated_time,omitempty"`
+	ReferenceID string         `json:"reference_id,omitempty"`
+	Properties  []UserProperty `json:"properties,omitempty"`
 }
 
 type UserProperty struct {
-	Name  string      `json:"name"`
-	Value interface{} `json:"value"`
+	Name  string      `json:"name,omitempty"`
+	Value interface{} `json:"value,omitempty"`
 }
 
 type Channel struct {
-	ID          string `json:"id"`
-	Name        string `json:"name"`
-	UpdatedTime string `json:"updated_time"`
+	ID          string `json:"id,omitempty"`
+	Name        string `json:"name,omitempty"`
+	UpdatedTime string `json:"updated_time,omitempty"`
 	Icon        struct {
-		URL string `json:"url"`
-	}
-	Enabled        bool     `json:"enabled"`
-	Public         bool     `json:"public"`
-	Tags           []string `json:"tags"`
+		URL string `json:"url,omitempty"`
+	} `json:"icon,omitempty"`
+	Enabled        bool     `json:"enabled,omitempty"`
+	Public         bool     `json:"public,omitempty"`
+	Tags           []string `json:"tags,omitempty"`
 	WelcomeMessage struct {
-		MessageParts []MessagesPart `json:"message_parts"`
-		MessageType  string         `json:"message_type"`
-	} `json:"welcome_message"`
-	Locale string `json:"locale"`
+		MessageParts []MessagesPart `json:"message_parts,omitempty"`
+		MessageType  string         `json:"message_type,omitempty"`
+	} `json:"welcome_message,omitempty"`
+	Locale string `json:"locale,omitempty"`
 }
