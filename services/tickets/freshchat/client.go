@@ -65,6 +65,7 @@ func (c *baseClient) request(method, endpoint string, payload interface{}, respo
 	trace, err := httpx.DoTrace(c.httpClient, req, c.httpRetries, nil, -1)
 	if err != nil {
 		fmt.Printf("[Freshchat Debug] Error: %v\n", err)
+		fmt.Printf("[Freshchat Debug] Response Body: %s\n", string(trace.ResponseBody))
 		return trace, err
 	}
 
@@ -78,7 +79,7 @@ func (c *baseClient) request(method, endpoint string, payload interface{}, respo
 			fmt.Printf("[Freshchat Debug] Unmarshal Error: %v\n", err)
 			return trace, err
 		}
-		fmt.Printf("[Freshchat Debug] API Error: %s\n", response.Error)
+		fmt.Printf("[Freshchat Debug] API Error: %v\n", response)
 		return trace, errors.New(response.Error)
 	}
 	if response != nil {
