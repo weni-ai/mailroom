@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"strings"
+	"time"
 
 	"github.com/nyaruka/gocommon/httpx"
 	"github.com/nyaruka/gocommon/jsonx"
@@ -160,6 +161,10 @@ func (s *service) Open(session flows.Session, topic *flows.Topic, body string, a
 						},
 					},
 				},
+				ActorType:   "user",
+				ActorID:     string(userID),
+				UserID:      string(userID),
+				CreatedTime: time.Now().Format(time.RFC3339),
 			},
 		}
 	} else {
@@ -173,6 +178,10 @@ func (s *service) Open(session flows.Session, topic *flows.Topic, body string, a
 						},
 					},
 				},
+				ActorType:   "user",
+				ActorID:     string(userID),
+				UserID:      string(userID),
+				CreatedTime: time.Now().Format(time.RFC3339),
 			},
 		}
 	}
