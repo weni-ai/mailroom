@@ -209,13 +209,16 @@ func (s *service) Forward(ticket *models.Ticket, msgUUID flows.MsgUUID, text str
 
 	msg := &Message{
 		ConversationID: conversationID,
-		MessageParts: []MessageParts{
+	}
+
+	if text != "" {
+		msg.MessageParts = []MessageParts{
 			{
 				Text: &Text{
 					Content: text,
 				},
 			},
-		},
+		}
 	}
 
 	for _, attachment := range attachments {
