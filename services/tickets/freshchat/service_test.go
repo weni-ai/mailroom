@@ -197,11 +197,11 @@ func TestOpen(t *testing.T) {
 
 	logger := &flows.HTTPLogger{}
 	_, err = svc.Open(session, defaultTopic, "Where are my cookies?", nil, logger.Log)
-	assert.EqualError(t, err, "failed to create user: unable to connect to server")
+	assert.EqualError(t, err, "failed to get or create user for ticket")
 
 	logger = &flows.HTTPLogger{}
 	_, err = svc.Open(session, defaultTopic, "Where are my cookies?", nil, logger.Log)
-	assert.EqualError(t, err, "failed to create user: Something went wrong")
+	assert.EqualError(t, err, "failed to get or create user for ticket")
 
 	logger = &flows.HTTPLogger{}
 	_, err = svc.Open(session, defaultTopic, "Where are my cookies?", nil, logger.Log)
