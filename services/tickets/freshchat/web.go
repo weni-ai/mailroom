@@ -72,7 +72,8 @@ func handleEventCallback(ctx context.Context, rt *runtime.Runtime, r *http.Reque
 	}
 
 	externalID := ""
-	switch request.Action {
+	// Use action (lowercase) consistently
+	switch action {
 	case "conversation_resolution":
 		if request.Data.Resolve != nil && request.Data.Resolve.Conversation != nil {
 			externalID = request.Data.Resolve.Conversation.ConversationID
@@ -85,6 +86,11 @@ func handleEventCallback(ctx context.Context, rt *runtime.Runtime, r *http.Reque
 		if request.Data.Message != nil {
 			externalID = request.Data.Message.ConversationID
 		}
+	}
+
+	if externalID == "" {
+		// we don't return an error here, because ticket might just belong to a different ticketer
+		return map[string]string{"status": "ignored"}, http.StatusOK, nil
 	}
 
 	// lookup ticket
@@ -104,6 +110,7 @@ func handleEventCallback(ctx context.Context, rt *runtime.Runtime, r *http.Reque
 		return errors.Wrap(err, "error marshalling request"), http.StatusBadRequest, nil
 	}
 
+	err = nil // Reset err before switch
 	switch action {
 	case "conversation_resolution":
 		err = tickets.Close(ctx, rt, oa, ticket, false, l, string(requestJSON))
@@ -115,13 +122,11 @@ func handleEventCallback(ctx context.Context, rt *runtime.Runtime, r *http.Reque
 			var files []*tickets.File
 
 			for _, part := range request.Data.Message.MessageParts {
-				if part.Text != nil {
-					if strings.TrimSpace(part.Text.Content) != "" {
-						if textMsg != "" {
-							textMsg += "\n"
-						}
-						textMsg += part.Text.Content
+				if part.Text != nil && part.Text.Content != "" {
+					if textMsg != "" {
+						textMsg += "\n"
 					}
+					textMsg += part.Text.Content
 				} else if part.Image != nil {
 					file, err := tickets.FetchFileWithMaxSize(part.Image.URL, nil, 100*1024*1024)
 					if err != nil {
@@ -147,10 +152,14 @@ func handleEventCallback(ctx context.Context, rt *runtime.Runtime, r *http.Reque
 			}
 
 			if textMsg != "" || len(files) > 0 {
-				_, err := tickets.SendReply(ctx, rt, ticket, textMsg, files, nil)
+				_, err = tickets.SendReply(ctx, rt, ticket, textMsg, files, nil)
 				if err != nil {
 					return errors.Wrap(err, "error on send ticket reply"), http.StatusBadRequest, nil
 				}
+			} else {
+				// No text or files to send, but we still processed the message
+				// This shouldn't happen if MessageParts has content, but handle it gracefully
+				return map[string]string{"status": "ignored"}, http.StatusOK, nil
 			}
 		} else {
 			return map[string]string{"status": "ignored"}, http.StatusOK, nil
