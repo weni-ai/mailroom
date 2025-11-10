@@ -5,7 +5,7 @@
         "path": "/mr/tickets/types/freshchat/webhook/00000000-0000-0000-0000-000000000000",
         "body": {
             "request_id": "123",
-            "action": "message_created",
+            "action": "message_create",
             "action_time": "2023-01-01T00:00:00Z",
             "actor": {
                 "actor_type": "agent",
@@ -35,7 +35,7 @@
         "path": "/mr/tickets/types/freshchat/webhook/12345678-1234-1234-1234-123456789012",
         "body": {
             "request_id": "123",
-            "action": "message_created",
+            "action": "message_create",
             "action_time": "2023-01-01T00:00:00Z",
             "actor": {
                 "actor_type": "agent",
@@ -84,7 +84,7 @@
         "path": "/mr/tickets/types/freshchat/webhook/12345678-1234-1234-1234-123456789012",
         "body": {
             "request_id": "123",
-            "action": "message_created",
+            "action": "message_create",
             "action_time": "2023-01-01T00:00:00Z",
             "actor": {
                 "actor_type": "agent",

@@ -67,7 +67,7 @@ func handleEventCallback(ctx context.Context, rt *runtime.Runtime, r *http.Reque
 
 	// validate action type first
 	action := strings.ToLower(request.Action)
-	if action != "conversation_resolution" && action != "conversation_reopen" && action != "message_created" {
+	if action != "conversation_resolution" && action != "conversation_reopen" && action != "message_create" {
 		return map[string]string{"error": "invalid event type"}, http.StatusBadRequest, nil
 	}
 
@@ -81,7 +81,7 @@ func handleEventCallback(ctx context.Context, rt *runtime.Runtime, r *http.Reque
 		if request.Data.Reopen != nil && request.Data.Reopen.Conversation != nil {
 			externalID = request.Data.Reopen.Conversation.ConversationID
 		}
-	case "message_created":
+	case "message_create":
 		if request.Data.Message != nil {
 			externalID = request.Data.Message.ConversationID
 		}
@@ -109,7 +109,7 @@ func handleEventCallback(ctx context.Context, rt *runtime.Runtime, r *http.Reque
 		err = tickets.Close(ctx, rt, oa, ticket, false, l, string(requestJSON))
 	case "conversation_reopen":
 		err = tickets.Reopen(ctx, rt, oa, ticket, false, l)
-	case "message_created":
+	case "message_create":
 		if len(request.Data.Message.MessageParts) > 0 && request.Actor.ActorType == "agent" { //only process messages from agents
 			var textMsg string
 			var files []*tickets.File
