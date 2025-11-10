@@ -50,149 +50,25 @@ func (s *service) Open(session flows.Session, topic *flows.Topic, body string, a
 	ticket := flows.OpenTicket(s.ticketer, topic, body, assignee)
 	contactDisplay := session.Contact().Format(session.Environment())
 	contactUUID := string(session.Contact().UUID())
-	channelID := ""
-	userID := ""
 
-	splitName := strings.Split(contactDisplay, " ")
-	firstName := ""
-	lastName := ""
-	if len(splitName) > 0 {
-		firstName = splitName[0]
-	}
-	if len(splitName) > 1 {
-		lastName = splitName[len(splitName)-1]
-	}
+	firstName, lastName := getNames(contactDisplay)
 
-	// try to get user by reference id
-	resultsUser, trace, err := s.restClient.GetUser(contactUUID)
-	if trace != nil {
-		logHTTP(flows.NewHTTPLog(trace, flows.HTTPStatusFromCode, s.redactor))
-	}
-	if err != nil {
-		logHTTP(flows.NewHTTPLog(trace, flows.HTTPStatusFromCode, s.redactor))
-	}
-	if resultsUser != nil {
-		userID = resultsUser.ID
-	}
-
-	// if user not found, create new user
+	userID, trace := s.tryGetOrCreateUser(contactUUID, firstName, lastName, session, logHTTP)
 	if userID == "" {
-		phone := ""
-		email := ""
-
-		for _, urn := range session.Contact().URNs() {
-			if urn.URN().Scheme() == urns.WhatsAppScheme || urn.URN().Scheme() == urns.TelScheme {
-				phone = urn.URN().Path()
-			}
-		}
-
-		user := &User{
-			FirstName:   firstName,
-			LastName:    lastName,
-			Phone:       phone,
-			Email:       email,
-			ReferenceID: contactUUID,
-		}
-
-		resultsUser, trace, err := s.restClient.CreateUser(user)
-		if trace != nil {
-			logHTTP(flows.NewHTTPLog(trace, flows.HTTPStatusFromCode, s.redactor))
-		}
-		if err != nil {
-			return nil, errors.Wrap(err, "failed to create user")
-		}
-
-		userID = string(resultsUser.ID)
+		return nil, errors.New("failed to get or create user for ticket")
 	}
 
-	bodyMap := Conversation{} // properties and message parts will be in this map
-
-	if !strings.HasPrefix(body, "{") {
-		bodyMap.Messages = []Message{
-			{
-				MessageParts: []MessageParts{
-					{
-						Text: &Text{
-							Content: body,
-						},
-					},
-				},
-			},
-		}
-	} else {
-		err = jsonx.Unmarshal([]byte(body), bodyMap)
-		if err != nil {
-			logHTTP(flows.NewHTTPLog(trace, flows.HTTPStatusFromCode, s.redactor))
-		}
+	bodyMap, _ := parseBodyMap(body, logHTTP, trace, s.redactor)
+	channelID, _, err := s.resolveChannelID(bodyMap.ChannelID, s.restClient, logHTTP, s.redactor)
+	if err != nil {
+		return nil, err
 	}
 
-	if bodyMap.ChannelID != "" {
-		channelID = bodyMap.ChannelID
-	} else {
-		channels, trace, err := s.restClient.GetChannels()
-		if trace != nil {
-			logHTTP(flows.NewHTTPLog(trace, flows.HTTPStatusFromCode, s.redactor))
-		}
-		if err != nil {
-			return nil, errors.Wrap(err, "failed to get channels")
-		}
-		if len(channels) == 0 {
-			return nil, errors.New("no freshchat channels found")
-		}
-		// the default channel id is the first one
-		channelID = channels[0].ID
-	}
+	msg := buildConversation(userID, channelID, bodyMap.Message, bodyMap.CustomFields)
 
-	msg := &Conversation{
-		ChannelID: channelID,
-		Status:    "new",
-		Users: []User{
-			{ID: string(userID)},
-		},
-	}
-
-	if len(bodyMap.Messages) > 0 && len(bodyMap.Messages[0].MessageParts) > 0 && bodyMap.Messages[0].MessageParts[0].Text != nil {
-		msg.Messages = []Message{
-			{
-				MessageParts: []MessageParts{
-					{
-						Text: &Text{
-							Content: bodyMap.Messages[0].MessageParts[0].Text.Content,
-						},
-					},
-				},
-				ActorType:   "user",
-				ActorID:     string(userID),
-				UserID:      string(userID),
-				CreatedTime: time.Now().Format(time.RFC3339),
-			},
-		}
-	} else {
-		// Fallback to simple text message
-		msg.Messages = []Message{
-			{
-				MessageParts: []MessageParts{
-					{
-						Text: &Text{
-							Content: body,
-						},
-					},
-				},
-				ActorType:   "user",
-				ActorID:     string(userID),
-				UserID:      string(userID),
-				CreatedTime: time.Now().Format(time.RFC3339),
-			},
-		}
-	}
-
-	if len(bodyMap.Properties.Value) > 0 {
-		msg.Properties = bodyMap.Properties
-	}
-
-	resultsConversation, trace, err := s.restClient.CreateConversation(msg)
-	if trace != nil {
-		logHTTP(flows.NewHTTPLog(trace, flows.HTTPStatusFromCode, s.redactor))
+	resultsConversation, createTrace, err := s.restClient.CreateConversation(msg)
+	if createTrace != nil {
+		logHTTP(flows.NewHTTPLog(createTrace, flows.HTTPStatusFromCode, s.redactor))
 	}
 	if err != nil || (len(resultsConversation.Messages) > 0 && resultsConversation.Messages[0].ErrorMessage != "") {
 		if err == nil {
@@ -202,8 +78,129 @@ func (s *service) Open(session flows.Session, topic *flows.Topic, body string, a
 	}
 
 	ticket.SetExternalID(string(resultsConversation.ConversationID))
-
 	return ticket, nil
+}
+
+// Helper: parse name into first/last
+func getNames(contactDisplay string) (string, string) {
+	splitName := strings.Split(contactDisplay, " ")
+	firstName, lastName := "", ""
+	if len(splitName) > 0 {
+		firstName = splitName[0]
+	}
+	if len(splitName) > 1 {
+		lastName = splitName[len(splitName)-1]
+	}
+	return firstName, lastName
+}
+
+func (s *service) tryGetOrCreateUser(contactUUID, firstName, lastName string, session flows.Session, logHTTP flows.HTTPLogCallback) (string, *httpx.Trace) {
+	resultsUser, trace, err := s.restClient.GetUser(contactUUID)
+	if trace != nil {
+		logHTTP(flows.NewHTTPLog(trace, flows.HTTPStatusFromCode, s.redactor))
+	}
+	if err != nil {
+		logHTTP(flows.NewHTTPLog(trace, flows.HTTPStatusFromCode, s.redactor))
+	}
+	if resultsUser != nil {
+		return resultsUser.ID, trace
+	}
+
+	var phone, email string
+	for _, urn := range session.Contact().URNs() {
+		if urn.URN().Scheme() == urns.WhatsAppScheme || urn.URN().Scheme() == urns.TelScheme {
+			phone = urn.URN().Path()
+		}
+	}
+	user := &User{
+		FirstName:   firstName,
+		LastName:    lastName,
+		Phone:       phone,
+		Email:       email,
+		ReferenceID: contactUUID,
+	}
+	resultsUser, createTrace, err := s.restClient.CreateUser(user)
+	if createTrace != nil {
+		logHTTP(flows.NewHTTPLog(createTrace, flows.HTTPStatusFromCode, s.redactor))
+	}
+	if err != nil {
+		return "", createTrace
+	}
+	return string(resultsUser.ID), createTrace
+}
+
+type bodyFields struct {
+	Message      string                 `json:"message,omitempty"`
+	CustomFields map[string]interface{} `json:"custom_fields,omitempty"`
+	ChannelID    string                 `json:"channel_id,omitempty"`
+}
+
+func parseBodyMap(body string, logHTTP flows.HTTPLogCallback, trace *httpx.Trace, redactor utils.Redactor) (*bodyFields, *httpx.Trace) {
+	bodyMap := &bodyFields{}
+	if !strings.HasPrefix(body, "{") {
+		bodyMap.Message = body
+	} else {
+		err := jsonx.Unmarshal([]byte(body), bodyMap)
+		if err != nil {
+			logHTTP(flows.NewHTTPLog(trace, flows.HTTPStatusFromCode, redactor))
+		}
+	}
+	return bodyMap, trace
+}
+
+func (s *service) resolveChannelID(bodyMapChannelID string, client *Client, logHTTP flows.HTTPLogCallback, redactor utils.Redactor) (string, *httpx.Trace, error) {
+	if bodyMapChannelID != "" {
+		return bodyMapChannelID, nil, nil
+	}
+	channels, trace, err := client.GetChannels()
+	if trace != nil {
+		logHTTP(flows.NewHTTPLog(trace, flows.HTTPStatusFromCode, redactor))
+	}
+	if err != nil {
+		return "", trace, errors.Wrap(err, "failed to get channels")
+	}
+	if len(channels) == 0 {
+		return "", trace, errors.New("no freshchat channels found")
+	}
+	return channels[0].ID, trace, nil
+}
+
+func buildConversation(userID, channelID, message string, customFields map[string]interface{}) *Conversation {
+	text := message
+	if text == "" {
+		text = "New ticket"
+	}
+	msg := &Conversation{
+		ChannelID: channelID,
+		Status:    "new",
+		Users: []User{
+			{ID: userID},
+		},
+		Messages: []Message{
+			{
+				MessageParts: []MessageParts{
+					{
+						Text: &Text{
+							Content: text,
+						},
+					},
+				},
+				ActorType:   "user",
+				ActorID:     userID,
+				UserID:      userID,
+				CreatedTime: time.Now().Format(time.RFC3339),
+			},
+		},
+		Properties: Properties{
+			Value: []map[string]interface{}{},
+		},
+	}
+	if len(customFields) > 0 {
+		msg.Properties = Properties{
+			Value: []map[string]interface{}{customFields},
+		}
+	}
+	return msg
 }
 
 func (s *service) Forward(ticket *models.Ticket, msgUUID flows.MsgUUID, text string, attachments []utils.Attachment, metadata json.RawMessage, msgExternalID null.String, logHTTP flows.HTTPLogCallback) error {
