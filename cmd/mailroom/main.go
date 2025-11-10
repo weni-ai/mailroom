@@ -36,6 +36,7 @@ import (
 	_ "github.com/nyaruka/mailroom/services/tickets/mailgun"
 	_ "github.com/nyaruka/mailroom/services/tickets/rocketchat"
 	_ "github.com/nyaruka/mailroom/services/tickets/twilioflex"
+	_ "github.com/nyaruka/mailroom/services/tickets/twilioflex2"
 	_ "github.com/nyaruka/mailroom/services/tickets/wenichats"
 	_ "github.com/nyaruka/mailroom/services/tickets/zendesk"
 	_ "github.com/nyaruka/mailroom/web/contact"
