@@ -1,3 +1,7 @@
+1.71.0
+----------
+ * Add Freshchat client and service implementation
+
 1.70.2
 ----------
  * Fix Twilio Flex 2 receive media
