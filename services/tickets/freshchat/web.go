@@ -80,7 +80,7 @@ func handleEventCallback(ctx context.Context, rt *runtime.Runtime, r *http.Reque
 
 	// validate action type first
 	action := strings.ToLower(request.Action)
-	if action != "conversation_resolution" && action != "conversation_reopen" && action != "message_created" {
+	if action != "conversation_resolution" && action != "conversation_reopen" && action != "message_create" {
 		fmt.Printf("[Freshchat Debug] ERROR: Invalid event type: %s\n", action)
 		return map[string]string{"error": "invalid event type"}, http.StatusBadRequest, nil
 	}
@@ -99,7 +99,7 @@ func handleEventCallback(ctx context.Context, rt *runtime.Runtime, r *http.Reque
 		} else {
 			fmt.Printf("[Freshchat Debug] WARN: Reopen data or conversation is nil for action: %s\n", request.Action)
 		}
-	case "message_created":
+	case "message_create":
 		if request.Data.Message != nil {
 			externalID = request.Data.Message.ConversationID
 		} else {
@@ -143,8 +143,8 @@ func handleEventCallback(ctx context.Context, rt *runtime.Runtime, r *http.Reque
 		if err != nil {
 			fmt.Printf("[Freshchat Debug] ERROR: Failed to reopen ticket: %v\n", err)
 		}
-	case "message_created":
-		fmt.Printf("[Freshchat Debug] Processing message_created - message_parts_count: %d, actor_type: %s\n", len(request.Data.Message.MessageParts), request.Actor.ActorType)
+	case "message_create":
+		fmt.Printf("[Freshchat Debug] Processing message_create - message_parts_count: %d, actor_type: %s\n", len(request.Data.Message.MessageParts), request.Actor.ActorType)
 		if len(request.Data.Message.MessageParts) > 0 && request.Actor.ActorType == "agent" { //only process messages from agents
 			var textMsg string
 			var files []*tickets.File
