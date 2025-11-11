@@ -73,6 +73,7 @@ var RocketChat = &Ticketer{4, "6c50665f-b4ff-4e37-9625-bc464fe6a999"}
 var Twilioflex = &Ticketer{6, "12cc5dcf-44c2-4b25-9781-27275873e0df"}
 var Twilioflex2 = &Ticketer{8, "37bfe0b8-f5d4-4763-bc4d-770ecb144f71"}
 var Wenichats = &Ticketer{7, "006d224e-107f-4e18-afb2-f41fe302abdc"}
+var Freshchats = &Ticketer{9, "12345678-1234-1234-1234-123456789012"}
 
 var Luis = &Classifier{1, "097e026c-ae79-4740-af67-656dbedf0263"}
 var Wit = &Classifier{2, "ff2a817c-040a-4eb2-8404-7d92e8b79dd0"}
