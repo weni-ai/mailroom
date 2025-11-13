@@ -56,7 +56,6 @@ func (c *baseClient) request(method, url string, payload url.Values, response an
 	}
 
 	req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
-	// req.Header.Add("Content-Length", strconv.Itoa(len(payload.Encode())))
 
 	trace, err := httpx.DoTrace(c.httpClient, req, c.httpRetries, nil, -1)
 	if err != nil {
@@ -118,8 +117,12 @@ func (c *Client) CreateInteraction(interaction *CreateInteractionRequest) (*Crea
 	channelPayload := map[string]any{
 		"type":         interaction.Channel.Type,
 		"initiated_by": interaction.Channel.InitiatedBy,
-		"properties":   interaction.Channel.Properties,
 	}
+
+	if len(interaction.Channel.Properties) > 0 {
+		channelPayload["properties"] = interaction.Channel.Properties
+	}
+
 	routingPayload := map[string]any{
 		"type":       interaction.Routing.Type,
 		"properties": interaction.Routing.Properties,

@@ -1,3 +1,23 @@
+1.71.0
+----------
+ * Add Freshchat client and service implementation
+
+1.70.2
+----------
+ * Fix Twilio Flex 2 receive media
+
+1.70.1
+----------
+ * Twilio Flex 2 interaction task attributes handling
+
+1.70.0
+----------
+ * Add Twilio Flex for flex UI 2.x integration
+
+1.69.1
+----------
+ * Fix whatsapp URN variation generation to handle only 13 and 12 digit numbers
+
 1.69.0
 ----------
  * Update goflow version to v1.15.0

@@ -288,3 +288,108 @@ func TestUpdateInteractionChannel(t *testing.T) {
 	assert.Len(t, channel.Participants, 2)
 	assert.Equal(t, "HTTP/1.0 200 OK\r\nContent-Length: 706\r\n\r\n", string(trace.ResponseTrace))
 }
+
+func TestCreateMedia(t *testing.T) {
+	serviceSid := "IS12345678901234567890123456789012"
+	defer httpx.SetRequestor(httpx.DefaultRequestor)
+	httpx.SetRequestor(httpx.NewMockRequestor(map[string][]httpx.MockResponse{
+		fmt.Sprintf("https://mcs.us1.twilio.com/v1/Services/%s/Media", serviceSid): {
+			httpx.MockConnectionError,
+			httpx.NewMockResponse(400, nil, `{"message": "Something went wrong", "detail": "Unknown", "code": 1234, "more_info": "https://www.twilio.com/docs/errors/1234"}`),
+			httpx.NewMockResponse(201, nil, `{
+				"sid": "ME34567890123456789012345678901234",
+				"service_sid": "IS12345678901234567890123456789012",
+				"date_created": "2024-01-01T00:00:00Z",
+				"date_upload_updated": "2024-01-01T00:00:00Z",
+				"date_updated": "2024-01-01T00:00:00Z",
+				"links": {
+					"content": "https://mcs.us1.twilio.com/v1/Services/IS12345678901234567890123456789012/Media/ME34567890123456789012345678901234/Content",
+					"content_direct_temporary": "https://mcs.us1.twilio.com/v1/Services/IS12345678901234567890123456789012/Media/ME34567890123456789012345678901234/Content?Temp=true"
+				},
+				"size": 1024,
+				"content_type": "image/jpeg",
+				"filename": "test.jpg",
+				"author": "customer",
+				"category": "media",
+				"message_sid": null,
+				"channel_sid": null,
+				"url": "https://mcs.us1.twilio.com/v1/Services/IS12345678901234567890123456789012/Media/ME34567890123456789012345678901234",
+				"is_multipart_upstream": false
+			}`),
+		},
+	}))
+
+	client := twilioflex2.NewClient(http.DefaultClient, nil, authToken, accountSid)
+	params := &twilioflex2.CreateMediaParams{
+		FileName:    "test.jpg",
+		Media:       []byte("fake image content"),
+		Author:      "customer",
+		ContentType: "image/jpeg",
+	}
+
+	_, _, err := client.CreateMedia(serviceSid, params)
+	assert.EqualError(t, err, "unable to connect to server")
+
+	_, _, err = client.CreateMedia(serviceSid, params)
+	assert.EqualError(t, err, "Something went wrong")
+
+	media, trace, err := client.CreateMedia(serviceSid, params)
+	assert.NoError(t, err)
+	assert.Equal(t, "ME34567890123456789012345678901234", media.Sid)
+	assert.Equal(t, serviceSid, media.ServiceSid)
+	assert.Equal(t, "image/jpeg", media.ContentType)
+	assert.Equal(t, "test.jpg", media.Filename)
+	assert.Equal(t, "customer", media.Author)
+	assert.Equal(t, 1024, media.Size)
+	assert.Equal(t, "HTTP/1.0 201 Created\r\nContent-Length: 928\r\n\r\n", string(trace.ResponseTrace))
+}
+
+func TestFetchMedia(t *testing.T) {
+	serviceSid := "IS12345678901234567890123456789012"
+	mediaSid := "ME34567890123456789012345678901234"
+	defer httpx.SetRequestor(httpx.DefaultRequestor)
+	httpx.SetRequestor(httpx.NewMockRequestor(map[string][]httpx.MockResponse{
+		fmt.Sprintf("https://mcs.us1.twilio.com/v1/Services/%s/Media/%s", serviceSid, mediaSid): {
+			httpx.MockConnectionError,
+			httpx.NewMockResponse(404, nil, `{"message": "Media resource not found", "detail": "Unknown", "code": 20404, "more_info": "https://www.twilio.com/docs/errors/20404"}`),
+			httpx.NewMockResponse(200, nil, `{
+				"sid": "ME34567890123456789012345678901234",
+				"service_sid": "IS12345678901234567890123456789012",
+				"date_created": "2024-01-01T00:00:00Z",
+				"date_upload_updated": "2024-01-01T00:00:00Z",
+				"date_updated": "2024-01-01T00:00:00Z",
+				"links": {
+					"content": "https://mcs.us1.twilio.com/v1/Services/IS12345678901234567890123456789012/Media/ME34567890123456789012345678901234/Content",
+					"content_direct_temporary": "https://mcs.us1.twilio.com/v1/Services/IS12345678901234567890123456789012/Media/ME34567890123456789012345678901234/Content?Temp=true"
+				},
+				"size": 1024,
+				"content_type": "image/jpeg",
+				"filename": "test.jpg",
+				"author": "customer",
+				"category": "media",
+				"message_sid": null,
+				"channel_sid": null,
+				"url": "https://mcs.us1.twilio.com/v1/Services/IS12345678901234567890123456789012/Media/ME34567890123456789012345678901234",
+				"is_multipart_upstream": false
+			}`),
+		},
+	}))
+
+	client := twilioflex2.NewClient(http.DefaultClient, nil, authToken, accountSid)
+
+	_, _, err := client.FetchMedia(serviceSid, mediaSid)
+	assert.EqualError(t, err, "unable to connect to server")
+
+	_, _, err = client.FetchMedia(serviceSid, mediaSid)
+	assert.EqualError(t, err, "Media resource not found")
+
+	media, trace, err := client.FetchMedia(serviceSid, mediaSid)
+	assert.NoError(t, err)
+	assert.Equal(t, mediaSid, media.Sid)
+	assert.Equal(t, serviceSid, media.ServiceSid)
+	assert.Equal(t, "image/jpeg", media.ContentType)
+	assert.Equal(t, "test.jpg", media.Filename)
+	assert.Equal(t, "customer", media.Author)
+	assert.Equal(t, 1024, media.Size)
+	assert.Equal(t, "HTTP/1.0 200 OK\r\nContent-Length: 928\r\n\r\n", string(trace.ResponseTrace))
+}

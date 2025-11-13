@@ -891,7 +891,7 @@ func generateWhatsAppURNVariation(urn urns.URN) urns.URN {
 		if len(path) == 13 && string(path[4]) == "9" {
 			// Generate without digit 9
 			pathVariation = path[:4] + path[5:]
-		} else {
+		} else if len(path) == 12 {
 			// Generate with digit 9
 			pathVariation = path[:4] + "9" + path[4:]
 		}

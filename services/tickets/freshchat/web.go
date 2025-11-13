@@ -86,7 +86,8 @@ func handleEventCallback(ctx context.Context, rt *runtime.Runtime, r *http.Reque
 	}
 
 	externalID := ""
-	switch request.Action {
+	// Use action (lowercase) consistently
+	switch action {
 	case "conversation_resolution":
 		if request.Data.Resolve != nil && request.Data.Resolve.Conversation != nil {
 			externalID = request.Data.Resolve.Conversation.ConversationID
@@ -107,6 +108,11 @@ func handleEventCallback(ctx context.Context, rt *runtime.Runtime, r *http.Reque
 		}
 	}
 	fmt.Printf("[Freshchat Debug] Extracted external_id: %s\n", externalID)
+
+	if externalID == "" {
+		// we don't return an error here, because ticket might just belong to a different ticketer
+		return map[string]string{"status": "ignored"}, http.StatusOK, nil
+	}
 
 	// lookup ticket
 	ticket, err := models.LookupTicketByExternalID(ctx, rt.DB, ticketer.ID(), externalID)
@@ -130,6 +136,7 @@ func handleEventCallback(ctx context.Context, rt *runtime.Runtime, r *http.Reque
 	}
 
 	fmt.Printf("[Freshchat Debug] Processing webhook action: %s\n", action)
+	err = nil // Reset err before switch
 	switch action {
 	case "conversation_resolution":
 		fmt.Printf("[Freshchat Debug] Closing ticket\n")
@@ -150,13 +157,11 @@ func handleEventCallback(ctx context.Context, rt *runtime.Runtime, r *http.Reque
 			var files []*tickets.File
 
 			for _, part := range request.Data.Message.MessageParts {
-				if part.Text != nil {
-					if strings.TrimSpace(part.Text.Content) != "" {
-						if textMsg != "" {
-							textMsg += "\n"
-						}
-						textMsg += part.Text.Content
+				if part.Text != nil && part.Text.Content != "" {
+					if textMsg != "" {
+						textMsg += "\n"
 					}
+					textMsg += part.Text.Content
 				} else if part.Image != nil {
 					file, err := tickets.FetchFileWithMaxSize(part.Image.URL, nil, 100*1024*1024)
 					if err != nil {
