@@ -1,3 +1,7 @@
+1.72.0
+----------
+ * Ticket open rabbitmq event
+
 1.71.0
 ----------
  * Add Freshchat client and service implementation
