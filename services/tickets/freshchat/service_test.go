@@ -6,6 +6,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/DATA-DOG/go-sqlmock"
+	"github.com/jmoiron/sqlx"
 	"github.com/nyaruka/gocommon/dates"
 	"github.com/nyaruka/gocommon/httpx"
 	"github.com/nyaruka/gocommon/uuids"
@@ -590,4 +592,118 @@ func TestReopen(t *testing.T) {
 	logger = &flows.HTTPLogger{}
 	err = svc.Reopen([]*models.Ticket{ticket}, logger.Log)
 	require.NoError(t, err)
+}
+
+func TestSendHistory(t *testing.T) {
+	_, rt, _, _ := testsuite.Get()
+
+	defer httpx.SetRequestor(httpx.DefaultRequestor)
+
+	conversationID := "conv123"
+	contactUUID := string(testdata.Cathy.UUID)
+
+	httpx.SetRequestor(httpx.NewMockRequestor(map[string][]httpx.MockResponse{
+		fmt.Sprintf("%s/v2/users?reference_id=%s", baseURL, contactUUID): {
+			httpx.MockConnectionError,
+			httpx.NewMockResponse(200, nil, `{
+				"users": [
+					{
+						"id": "user123",
+						"reference_id": "`+contactUUID+`"
+					}
+				]
+			}`),
+			httpx.NewMockResponse(200, nil, `{
+				"users": [
+					{
+						"id": "user123",
+						"reference_id": "`+contactUUID+`"
+					}
+				]
+			}`),
+		},
+		fmt.Sprintf("%s/v2/conversations/%s/messages", baseURL, conversationID): {
+			httpx.MockConnectionError,
+			httpx.NewMockResponse(201, nil, `{
+				"channel_id": "channel123",
+				"conversation_id": "`+conversationID+`",
+				"message_parts": [{
+					"text": {
+						"content": "Hello"
+					}
+				}]
+			}`),
+			httpx.NewMockResponse(201, nil, `{
+				"channel_id": "channel123",
+				"conversation_id": "`+conversationID+`",
+				"message_parts": [{
+					"text": {
+						"content": "Hello"
+					}
+				}]
+			}`),
+		},
+	}))
+
+	ticketer := flows.NewTicketer(static.NewTicketer(assets.TicketerUUID(uuids.New()), "Support", "freshchat"))
+	svc, err := freshchat.NewService(
+		rt.Config,
+		http.DefaultClient,
+		nil,
+		ticketer,
+		map[string]string{
+			"freshchat_domain": baseURL,
+			"oauth_token":      apiKey,
+		},
+	)
+	require.NoError(t, err)
+
+	ticket := models.NewTicket(
+		flows.TicketUUID("88bfa1dc-be33-45c2-b469-294ecb0eba90"),
+		testdata.Org1.ID,
+		testdata.Cathy.ID,
+		testdata.Freshchats.ID,
+		conversationID,
+		testdata.DefaultTopic.ID,
+		`{"history_after": "2019-10-07 15:21:29"}`,
+		models.NilUserID,
+		map[string]interface{}{
+			"contact-uuid": contactUUID,
+		},
+	)
+
+	logger := &flows.HTTPLogger{}
+
+	mockDB, mock, _ := sqlmock.New()
+	defer mockDB.Close()
+	sqlxDB := sqlx.NewDb(mockDB, "sqlmock")
+	freshchat.SetDB(sqlxDB)
+
+	// Test 1: Error getting user (connection error) - no DB mock needed
+	err = svc.SendHistory(ticket, models.ContactID(testdata.Cathy.ID), nil, logger.Log)
+	assert.Error(t, err)
+
+	// Test 2: Error creating message (connection error)
+	rows := sqlmock.NewRows([]string{
+		"id", "broadcast_id", "uuid", "text", "created_on", "direction", "status", "visibility", "msg_count", "error_count", "next_attempt", "external_id", "attachments", "metadata", "channel_id", "contact_id", "contact_urn_id", "org_id", "topup_id",
+	})
+	msgTime, _ := time.Parse(time.RFC3339, "2019-10-07T15:21:30Z")
+	rows.AddRow(464, nil, "eb234953-38e7-491f-8a50-b03056a7d002", "Hello", msgTime, "I", "H", "V", 1, 0, msgTime, "1026", nil, nil, 3, 10000, 1, 1, 1)
+
+	after, _ := time.Parse("2006-01-02 15:04:05", "2019-10-07 15:21:29")
+
+	mock.ExpectQuery("SELECT").
+		WithArgs(10000, after).
+		WillReturnRows(rows)
+
+	err = svc.SendHistory(ticket, models.ContactID(testdata.Cathy.ID), nil, logger.Log)
+	assert.Error(t, err)
+
+	// Test 3: Success
+	mock.ExpectQuery("SELECT").
+		WithArgs(10000, after).
+		WillReturnRows(rows)
+
+	err = svc.SendHistory(ticket, models.ContactID(testdata.Cathy.ID), nil, logger.Log)
+	assert.NoError(t, err)
 }
