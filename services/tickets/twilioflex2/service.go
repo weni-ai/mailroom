@@ -280,21 +280,84 @@ func (s *service) SendHistory(ticket *models.Ticket, contactID models.ContactID,
 	})
 
 	for _, msg := range msgs {
-		m := &CreateConversationMessageRequest{
-			Author: userIdentity,
-			Body:   msg.Text(),
+
+		// send media attachments
+		if len(msg.Attachments()) > 0 {
+			mediaAttachments := []CreateMediaParams{}
+			for _, attachment := range msg.Attachments() {
+				attUrl := attachment.URL()
+				req, err := http.NewRequest("GET", attUrl, nil)
+				if err != nil {
+					return err
+				}
+				resp, err := httpx.DoTrace(s.restClient.httpClient, req, s.restClient.httpRetries, nil, -1)
+				if err != nil {
+					return err
+				}
+
+				parsedURL, err := url.Parse(attUrl)
+				if err != nil {
+					return err
+				}
+				filename := path.Base(parsedURL.Path)
+
+				mimeType := mimetype.Detect(resp.ResponseBody)
+
+				media := CreateMediaParams{
+					FileName:    filename,
+					Media:       resp.ResponseBody,
+					Author:      userIdentity,
+					ContentType: mimeType.String(),
+				}
+
+				mediaAttachments = append(mediaAttachments, media)
+			}
+
+			for _, mediaParams := range mediaAttachments {
+				media, trace, err := s.restClient.CreateMedia(s.conversationServiceSid, &mediaParams)
+				if trace != nil {
+					logHTTP(flows.NewHTTPLog(trace, flows.HTTPStatusFromCode, s.redactor))
+				}
+				if err != nil {
+					return err
+				}
+				m := &CreateConversationMessageRequest{
+					Author: userIdentity,
+				}
+				if msg.Direction() == "I" {
+					m.Author = userIdentity
+				} else {
+					m.Author = "Bot"
+				}
+				m.MediaSid = media.Sid
+				_, trace, err = s.restClient.SendCustomerMessage(string(ticket.ExternalID()), m)
+				if trace != nil {
+					logHTTP(flows.NewHTTPLog(trace, flows.HTTPStatusFromCode, s.redactor))
+				}
+				if err != nil {
+					return errors.Wrap(err, "error calling Twilio conversations API to send message from history with media")
+				}
+			}
 		}
-		if msg.Direction() == "I" {
-			m.Author = userIdentity
-		} else {
-			m.Author = "Bot"
-		}
-		_, trace, err := s.restClient.SendCustomerMessage(string(ticket.ExternalID()), m)
-		if trace != nil {
-			logHTTP(flows.NewHTTPLog(trace, flows.HTTPStatusFromCode, s.redactor))
-		}
-		if err != nil {
-			return errors.Wrap(err, "error calling Twilio conversations API to send message from history")
+
+		// send text message
+		if strings.TrimSpace(msg.Text()) != "" {
+			m := &CreateConversationMessageRequest{
+				Author: userIdentity,
+				Body:   msg.Text(),
+			}
+			if msg.Direction() == "I" {
+				m.Author = userIdentity
+			} else {
+				m.Author = "Bot"
+			}
+			_, trace, err := s.restClient.SendCustomerMessage(string(ticket.ExternalID()), m)
+			if trace != nil {
+				logHTTP(flows.NewHTTPLog(trace, flows.HTTPStatusFromCode, s.redactor))
+			}
+			if err != nil {
+				return errors.Wrap(err, "error calling Twilio conversations API to send message from history")
+			}
 		}
 	}
 	return nil
