@@ -7,6 +7,7 @@ import (
 	"github.com/nyaruka/goflow/flows/events"
 	"github.com/nyaruka/mailroom/core/hooks"
 	"github.com/nyaruka/mailroom/core/models"
+	"github.com/nyaruka/mailroom/core/tasks/rabbitmq/publishers"
 	"github.com/nyaruka/mailroom/runtime"
 	"github.com/nyaruka/mailroom/services/tickets"
 
@@ -63,6 +64,14 @@ func handleTicketOpened(ctx context.Context, rt *runtime.Runtime, tx *sqlx.Tx, o
 
 	scene.AppendToEventPreCommitHook(hooks.InsertTicketsHook, ticket)
 	scene.AppendToEventPostCommitHook(hooks.SendTicketsHistoryHook, ticket)
+
+	publishers.PublishTicketCreated(rt, oa.OrgID(), publishers.TicketRMQMessage{
+		UUID:         ticket.UUID(),
+		ContactUUID:  scene.ContactUUID(),
+		ProjectUUID:  oa.Org().ProjectUUID(),
+		TicketerType: string(ticketer.Type()),
+		CreatedOn:    event.CreatedOn(),
+	})
 
 	logrus.WithFields(logrus.Fields{
 		"contact_uuid":  scene.ContactUUID(),
