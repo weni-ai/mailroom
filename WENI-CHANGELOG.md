@@ -1,5 +1,9 @@
-1.72.0
+1.73.0
 ----------
+ * Update goflow version to v1.16.0
+
+1.72.0
+---------- 
  * Ticket open rabbitmq event
 
 1.71.0
