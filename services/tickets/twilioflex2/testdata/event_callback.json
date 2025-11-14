@@ -1,0 +1,51 @@
+[
+  {
+    "label": "create message with attachments if everything is correct",
+    "method": "POST",
+    "path": "/mr/tickets/types/twilioflex2/conversation_callback/37bfe0b8-f5d4-4763-bc4d-770ecb144f71/$cathy_ticket_uuid$",
+    "body": "MessagingServiceSid=MG0a5f9b71f82def9eb810ce529fd1fbbc&EventType=onMessageAdded&Attributes=%7B%7D&Media=%5B%7B%22Sid%22%3A%22ME0b41ffffbbeb2188f660de4653d66555%22%2C%22Filename%22%3A%22batata.png%22%2C%22ContentType%22%3A%22image%2Fpng%22%2C%22Size%22%3A254586%7D%5D&DateCreated=2025-11-05T22%3A03%3A29.597Z&Index=2&ChatServiceSid=IS38067ec392f1486bb6e4de4610f26fb3&MessageSid=IM20333b09a52e4d1a81e8b900dc34418f&AccountSid=AC81d44315e19372138bdaffcc13cf3b94&Source=SDK&ClientIdentity=atendimento2_2Erafa&RetryCount=0&WebhookType=webhook&Author=atendimento2_2Erafa&ParticipantSid=MBfd4b1ca57616499897bb15b9179fd86b&WebhookSid=WH3f32b440bbb34292ae0ae4c830e86d24&ConversationSid=CH8dccb45b337e4c6fbf5a3499dabd2f86",
+    "http_mocks": {
+      "https://mcs.us1.twilio.com/v1/Services/IS38067ec392f1486bb6e4de4610f26fb3/Media/ME0b41ffffbbeb2188f660de4653d66555": [
+        {
+          "status": 200,
+          "body": {
+            "sid": "ME0b41ffffbbeb2188f660de4653d66555",
+            "service_sid": "IS38067ec392f1486bb6e4de4610f26fb3",
+            "date_created": "2022-03-14T13:10:38.897143-07:00",
+            "date_upload_updated": "2022-03-14T13:10:38.906058-07:00",
+            "date_updated": "2022-03-14T13:10:38.897143-07:00",
+            "links": {
+              "content": "/v1/Services/IS38067ec392f1486bb6e4de4610f26fb3/Media/ME0b41ffffbbeb2188f660de4653d66555/Content",
+              "content_direct_temporary": "https://media.us1.twilio.com/ME0b41ffffbbeb2188f660de4653d66555?Expires=1647355356&Signature=n05WWrmDwS4yQ521cNeL9LSH7g1RZg3gpmZ83TAy6eHHuW8KqAGn~wl0p5KGlTJYIhGmfTKhYS8o~zSr1L2iDmFyZDawiueHXqeebFNJiM~tviKn5Inna0mgI~nKSl6iV6F6sKUPnkeAc~AVb7Z3qfDaiyf87ucjyBKRTYkKT7a85c2hhBy4z8DOOeVBWNCEZxA08x-iZDsKYwPtIp~jJIwXrHA5nn3GE62jomjLkfd7RoFVggQhPjmrQQsF9Ock-piPiTb-J3o1risNaHux2rycKCO~U4hndnyo26FEeS71iemIK71hxV7MHtfFEubx04eRYijYRfaUEoWc6IXdxQ__&Key-Pair-Id=APKAJWF6YVTMIIYOF3AA"
+            },
+            "size": 153611,
+            "content_type": "image/jpeg",
+            "filename": "dummy_image.jpg",
+            "author": "system",
+            "category": "media",
+            "message_sid": "IM8c57eaf105f34905883b1192e9499641",
+            "channel_sid": "CH1880a9cde40c4dbb88dd97fc3aedac08",
+            "url": "/v1/Services/IS38067ec392f1486bb6e4de4610f26fb3/Media/ME0b41ffffbbeb2188f660de4653d66555",
+            "is_multipart_upstream": false
+          }
+        }
+      ],
+      "https://media.us1.twilio.com/ME0b41ffffbbeb2188f660de4653d66555?Expires=1647355356&Signature=n05WWrmDwS4yQ521cNeL9LSH7g1RZg3gpmZ83TAy6eHHuW8KqAGn~wl0p5KGlTJYIhGmfTKhYS8o~zSr1L2iDmFyZDawiueHXqeebFNJiM~tviKn5Inna0mgI~nKSl6iV6F6sKUPnkeAc~AVb7Z3qfDaiyf87ucjyBKRTYkKT7a85c2hhBy4z8DOOeVBWNCEZxA08x-iZDsKYwPtIp~jJIwXrHA5nn3GE62jomjLkfd7RoFVggQhPjmrQQsF9Ock-piPiTb-J3o1risNaHux2rycKCO~U4hndnyo26FEeS71iemIK71hxV7MHtfFEubx04eRYijYRfaUEoWc6IXdxQ__&Key-Pair-Id=APKAJWF6YVTMIIYOF3AA": [
+        {
+          "status": 200,
+          "body": "IMAGE"
+        }
+      ]
+    },
+    "status": 200,
+    "response": {
+      "status": "handled"
+    },
+    "db_assertions": [
+      {
+        "query": "select count(*) from msgs_msg where direction = 'O' and attachments = '{image/jpeg:https:///_test_media_storage/media/1/d2f8/52ec/d2f852ec-7b4e-457f-ae7f-f8b243c49ff5}'",
+        "count": 1
+      }
+    ]
+  }
+]
