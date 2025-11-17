@@ -444,9 +444,8 @@ func (s *service) getHistoryMessages(session flows.Session, contactID flows.Cont
 			freshchatMsg.ActorID = userID
 			freshchatMsg.UserID = userID
 		} else {
-			// Outgoing message from agent/bot
-			freshchatMsg.ActorType = "agent"
-			// ActorID can be empty for bot messages
+			// Outgoing message from bot (no agent ID available)
+			freshchatMsg.ActorType = "bot"
 		}
 
 		// Add text content
@@ -570,9 +569,8 @@ func SendHistory(session flows.Session, contactID flows.ContactID, ticketUUID st
 			freshchatMsg.ActorID = user.ID
 			freshchatMsg.UserID = user.ID
 		} else {
-			// Outgoing message from agent/bot
-			freshchatMsg.ActorType = "agent"
-			// ActorID can be empty for bot messages
+			// Outgoing message from bot (no agent ID available)
+			freshchatMsg.ActorType = "bot"
 		}
 
 		// Add text content
