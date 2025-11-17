@@ -262,9 +262,10 @@ func (s *service) Reopen(tickets []*models.Ticket, logHTTP flows.HTTPLogCallback
 
 func (s *service) SendHistory(ticket *models.Ticket, contactID models.ContactID, runs []*models.FlowRun, logHTTP flows.HTTPLogCallback) error {
 	userIdentity := fmt.Sprintf("%d_%s", contactID, ticket.UUID())
+	defaultHistoryWindow := time.Now().Add(-time.Hour * 24)
 	after, err := getHistoryAfter(ticket, contactID, runs)
 	if err != nil {
-		return errors.Wrap(err, "failed to get history after")
+		after = defaultHistoryWindow
 	}
 
 	cx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
@@ -372,12 +373,14 @@ func getHistoryAfter(ticket *models.Ticket, contactID models.ContactID, runs []*
 		if err != nil {
 			return time.Time{}, err
 		}
+		return after, nil
 	} else if len(runs) > 0 {
 		// get messages for history, based on first session run start time
 		startMargin := -time.Second * 1
 		after = runs[0].CreatedOn().Add(startMargin)
+		return after, nil
 	}
-	return after, nil
+	return time.Time{}, fmt.Errorf("history after could not be determined")
 }
 
 func parseTime(historyAfter string) (time.Time, error) {
