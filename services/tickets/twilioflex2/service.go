@@ -123,6 +123,12 @@ func (s *service) Open(session flows.Session, topic *flows.Topic, body string, a
 		Channel: InteractionChannelParam{
 			Type:        "whatsapp",
 			InitiatedBy: "api",
+			Participants: []InteractionChannelParticipant{
+				{
+					Identity: userIdentity,
+					Name:     contact.Name(),
+				},
+			},
 		},
 		Routing: InteractionRoutingParam{
 			Type: "TaskRouter",
