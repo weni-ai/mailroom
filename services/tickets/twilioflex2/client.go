@@ -117,6 +117,7 @@ func (c *Client) CreateInteraction(interaction *CreateInteractionRequest) (*Crea
 	channelPayload := map[string]any{
 		"type":         interaction.Channel.Type,
 		"initiated_by": interaction.Channel.InitiatedBy,
+		"participants": interaction.Channel.Participants,
 	}
 
 	if len(interaction.Channel.Properties) > 0 {

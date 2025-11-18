@@ -67,7 +67,8 @@ func TestCreateInteraction(t *testing.T) {
 			httpx.NewMockResponse(201, nil, `{
 				"channel": {
 					"sid": "UOxx123456789012345678901234567890",
-					"type": "web"
+					"type": "web",
+					"participants": [{"identity": "100_4996b4a0-6b9e-4b9d-8316-9a4a2095f445", "name": "John Doe"}]
 				},
 				"interaction_context_sid": "IC12345678901234567890123456789012",
 				"links": {
@@ -143,7 +144,7 @@ func TestCreateInteraction(t *testing.T) {
 	assert.Equal(t, "KDfbcc36df16d504c234b2c46db61a3464", interaction.Sid)
 	assert.Equal(t, "flex_interactionwebhook_01k8xqfbaxfh5tpnqm2psh6238", interaction.WebhookTtid)
 	assert.Equal(t, "IC12345678901234567890123456789012", interaction.InteractionContextSid)
-	assert.Equal(t, "HTTP/1.0 201 Created\r\nContent-Length: 2270\r\n\r\n", string(trace.ResponseTrace))
+	assert.Equal(t, "HTTP/1.0 201 Created\r\nContent-Length: 2371\r\n\r\n", string(trace.ResponseTrace))
 }
 
 func TestCreateConversationScopedWebhook(t *testing.T) {
