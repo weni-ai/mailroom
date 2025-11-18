@@ -119,10 +119,25 @@ func (s *service) Open(session flows.Session, topic *flows.Topic, body string, a
 	bodyMap := map[string]any{}
 	json.Unmarshal([]byte(body), &bodyMap)
 
+	channelType := "web"
+
+	if session.Contact().PreferredURN() != nil {
+		urnScheme := string(session.Contact().PreferredURN().URN().Scheme())
+		if urnScheme == "whatsapp" {
+			channelType = "whatsapp"
+		}
+	}
+
 	interactionRequest := &CreateInteractionRequest{
 		Channel: InteractionChannelParam{
-			Type:        "whatsapp",
+			Type:        channelType,
 			InitiatedBy: "api",
+			Participants: []InteractionChannelParticipant{
+				{
+					Identity: userIdentity,
+					Name:     contact.Name(),
+				},
+			},
 		},
 		Routing: InteractionRoutingParam{
 			Type: "TaskRouter",
@@ -131,7 +146,7 @@ func (s *service) Open(session flows.Session, topic *flows.Topic, body string, a
 				WorkflowSid:           s.workflowSid,
 				TaskChannelUniqueName: "chat",
 				Attributes: map[string]any{
-					"channelType":       "whatsapp",
+					"channelType":       channelType,
 					"customerId":        userIdentity,
 					"custom_attributes": body,
 				},
@@ -262,9 +277,10 @@ func (s *service) Reopen(tickets []*models.Ticket, logHTTP flows.HTTPLogCallback
 
 func (s *service) SendHistory(ticket *models.Ticket, contactID models.ContactID, runs []*models.FlowRun, logHTTP flows.HTTPLogCallback) error {
 	userIdentity := fmt.Sprintf("%d_%s", contactID, ticket.UUID())
+	defaultHistoryWindow := time.Now().Add(-time.Hour * 24)
 	after, err := getHistoryAfter(ticket, contactID, runs)
 	if err != nil {
-		return errors.Wrap(err, "failed to get history after")
+		after = defaultHistoryWindow
 	}
 
 	cx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
@@ -280,21 +296,84 @@ func (s *service) SendHistory(ticket *models.Ticket, contactID models.ContactID,
 	})
 
 	for _, msg := range msgs {
-		m := &CreateConversationMessageRequest{
-			Author: userIdentity,
-			Body:   msg.Text(),
+
+		// send media attachments
+		if len(msg.Attachments()) > 0 {
+			mediaAttachments := []CreateMediaParams{}
+			for _, attachment := range msg.Attachments() {
+				attUrl := attachment.URL()
+				req, err := http.NewRequest("GET", attUrl, nil)
+				if err != nil {
+					return err
+				}
+				resp, err := httpx.DoTrace(s.restClient.httpClient, req, s.restClient.httpRetries, nil, -1)
+				if err != nil {
+					return err
+				}
+
+				parsedURL, err := url.Parse(attUrl)
+				if err != nil {
+					return err
+				}
+				filename := path.Base(parsedURL.Path)
+
+				mimeType := mimetype.Detect(resp.ResponseBody)
+
+				media := CreateMediaParams{
+					FileName:    filename,
+					Media:       resp.ResponseBody,
+					Author:      userIdentity,
+					ContentType: mimeType.String(),
+				}
+
+				mediaAttachments = append(mediaAttachments, media)
+			}
+
+			for _, mediaParams := range mediaAttachments {
+				media, trace, err := s.restClient.CreateMedia(s.conversationServiceSid, &mediaParams)
+				if trace != nil {
+					logHTTP(flows.NewHTTPLog(trace, flows.HTTPStatusFromCode, s.redactor))
+				}
+				if err != nil {
+					return err
+				}
+				m := &CreateConversationMessageRequest{
+					Author: userIdentity,
+				}
+				if msg.Direction() == "I" {
+					m.Author = userIdentity
+				} else {
+					m.Author = "Bot"
+				}
+				m.MediaSid = media.Sid
+				_, trace, err = s.restClient.SendCustomerMessage(string(ticket.ExternalID()), m)
+				if trace != nil {
+					logHTTP(flows.NewHTTPLog(trace, flows.HTTPStatusFromCode, s.redactor))
+				}
+				if err != nil {
+					return errors.Wrap(err, "error calling Twilio conversations API to send message from history with media")
+				}
+			}
 		}
-		if msg.Direction() == "I" {
-			m.Author = userIdentity
-		} else {
-			m.Author = "Bot"
-		}
-		_, trace, err := s.restClient.SendCustomerMessage(string(ticket.ExternalID()), m)
-		if trace != nil {
-			logHTTP(flows.NewHTTPLog(trace, flows.HTTPStatusFromCode, s.redactor))
-		}
-		if err != nil {
-			return errors.Wrap(err, "error calling Twilio conversations API to send message from history")
+
+		// send text message
+		if strings.TrimSpace(msg.Text()) != "" {
+			m := &CreateConversationMessageRequest{
+				Author: userIdentity,
+				Body:   msg.Text(),
+			}
+			if msg.Direction() == "I" {
+				m.Author = userIdentity
+			} else {
+				m.Author = "Bot"
+			}
+			_, trace, err := s.restClient.SendCustomerMessage(string(ticket.ExternalID()), m)
+			if trace != nil {
+				logHTTP(flows.NewHTTPLog(trace, flows.HTTPStatusFromCode, s.redactor))
+			}
+			if err != nil {
+				return errors.Wrap(err, "error calling Twilio conversations API to send message from history")
+			}
 		}
 	}
 	return nil
@@ -309,12 +388,14 @@ func getHistoryAfter(ticket *models.Ticket, contactID models.ContactID, runs []*
 		if err != nil {
 			return time.Time{}, err
 		}
+		return after, nil
 	} else if len(runs) > 0 {
 		// get messages for history, based on first session run start time
 		startMargin := -time.Second * 1
 		after = runs[0].CreatedOn().Add(startMargin)
+		return after, nil
 	}
-	return after, nil
+	return time.Time{}, fmt.Errorf("history after could not be determined")
 }
 
 func parseTime(historyAfter string) (time.Time, error) {

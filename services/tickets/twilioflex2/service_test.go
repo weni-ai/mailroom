@@ -9,6 +9,7 @@ import (
 	"github.com/DATA-DOG/go-sqlmock"
 	"github.com/buger/jsonparser"
 	"github.com/jmoiron/sqlx"
+	"github.com/lib/pq"
 	"github.com/nyaruka/gocommon/httpx"
 	"github.com/nyaruka/gocommon/uuids"
 	"github.com/nyaruka/goflow/assets"
@@ -583,6 +584,109 @@ func TestSendHistoryWithHistoryAfter(t *testing.T) {
 	assert.Equal(t, 1, len(logger.Logs))
 
 	// Verify all expectations were met
+	assert.NoError(t, mock.ExpectationsWereMet())
+}
+
+func TestSendHistoryWithAttachments(t *testing.T) {
+	_, rt, _, _ := testsuite.Get()
+	defer testsuite.Reset(testsuite.ResetAll)
+
+	defer httpx.SetRequestor(httpx.DefaultRequestor)
+
+	// Create mock database connection
+	mockDB, mock, err := sqlmock.New()
+	require.NoError(t, err)
+	defer mockDB.Close()
+
+	sqlxDB := sqlx.NewDb(mockDB, "postgres")
+	twilioflex2.SetDB(sqlxDB)
+
+	ticketer := flows.NewTicketer(static.NewTicketer(assets.TicketerUUID(uuids.New()), "TwilioFlex2", "twilioflex2"))
+
+	config := map[string]string{
+		"auth_token":               testAuthToken,
+		"account_sid":              testAccountSid,
+		"flex_instance_sid":        testInstanceSid,
+		"flex_workspace_sid":       testWorkspaceSid,
+		"flex_workflow_sid":        testWorkflowSid,
+		"conversation_service_sid": testConversationServiceSid,
+	}
+
+	svc, err := twilioflex2.NewService(rt.Config, http.DefaultClient, nil, ticketer, config)
+	require.NoError(t, err)
+
+	// Test data
+	contactID := models.ContactID(123)
+	ticketUUID := "550e8400-e29b-41d4-a716-446655440000"
+	historyAfter := "2023-01-01T10:00:00Z"
+
+	conversationSid := "CH12345678901234567890123456789012"
+	ticket := models.NewTicket(
+		flows.TicketUUID(ticketUUID),
+		testdata.Org1.ID,
+		contactID,
+		testdata.Internal.ID,
+		conversationSid,
+		testdata.DefaultTopic.ID,
+		fmt.Sprintf(`{"subject": "Need help", "history_after": "%s"}`, historyAfter),
+		models.NilUserID,
+		nil,
+	)
+
+	expectedTime, _ := time.Parse("2006-01-02T15:04:05Z", historyAfter)
+
+	// Mock DB messages with one attachment and non-empty text
+	mock.ExpectQuery(`SELECT (.+) FROM msgs_msg`).
+		WithArgs(123, expectedTime).
+		WillReturnRows(sqlmock.NewRows([]string{"id", "text", "direction", "created_on", "attachments"}).
+			AddRow(1, "Here is the photo", "I", expectedTime.Add(time.Minute), pq.StringArray{"image/jpeg:https://example.com/test.jpg"}))
+
+	messageUrl := fmt.Sprintf("https://conversations.twilio.com/v1/Conversations/%s/Messages", conversationSid)
+	mediaUrl := fmt.Sprintf("https://mcs.us1.twilio.com/v1/Services/%s/Media", testConversationServiceSid)
+
+	// Mock HTTP interactions: download attachment, create media, send media msg, send text msg
+	httpx.SetRequestor(httpx.NewMockRequestor(map[string][]httpx.MockResponse{
+		"https://example.com/test.jpg": {
+			httpx.NewMockResponse(200, nil, "fake image content"),
+		},
+		mediaUrl: {
+			httpx.NewMockResponse(201, nil, `{
+				"sid": "ME34567890123456789012345678901234",
+				"account_sid": "AC81d44315e19372138bdaffcc13cf3b94",
+				"service_sid": "CS12345678901234567890123456789012",
+				"filename": "test.jpg",
+				"content_type": "image/jpeg",
+				"size": 1024
+			}`),
+		},
+		messageUrl: {
+			// first send is for media
+			httpx.NewMockResponse(201, nil, `{
+				"sid": "IM34567890123456789012345678901234",
+				"account_sid": "AC81d44315e19372138bdaffcc13cf3b94",
+				"conversation_sid": "CH12345678901234567890123456789012",
+				"author": "123_550e8400-e29b-41d4-a716-446655440000",
+				"index": 1
+			}`),
+			// second send is for text body
+			httpx.NewMockResponse(201, nil, `{
+				"sid": "IM34567890123456789012345678901235",
+				"account_sid": "AC81d44315e19372138bdaffcc13cf3b94",
+				"conversation_sid": "CH12345678901234567890123456789012",
+				"body": "Here is the photo",
+				"author": "123_550e8400-e29b-41d4-a716-446655440000",
+				"index": 2
+			}`),
+		},
+	}))
+
+	logger := &flows.HTTPLogger{}
+	err = svc.SendHistory(ticket, contactID, nil, logger.Log)
+	assert.NoError(t, err)
+	// media creation + send media msg + send text msg
+	assert.Equal(t, 3, len(logger.Logs))
+
+	// Verify DB expectations
 	assert.NoError(t, mock.ExpectationsWereMet())
 }
 

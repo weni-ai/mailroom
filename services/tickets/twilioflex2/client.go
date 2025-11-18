@@ -290,9 +290,15 @@ type CreateInteractionRequest struct {
 }
 
 type InteractionChannelParam struct {
-	Type        string         `json:"type,omitempty"`
-	InitiatedBy string         `json:"initiated_by,omitempty"`
-	Properties  map[string]any `json:"properties,omitempty"`
+	Type         string                          `json:"type,omitempty"`
+	InitiatedBy  string                          `json:"initiated_by,omitempty"`
+	Properties   map[string]any                  `json:"properties,omitempty"`
+	Participants []InteractionChannelParticipant `json:"participants,omitempty"`
+}
+
+type InteractionChannelParticipant struct {
+	Identity string `json:"identity,omitempty"`
+	Name     string `json:"name,omitempty"`
 }
 
 type InteractionRoutingParam struct {
