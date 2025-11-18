@@ -119,9 +119,18 @@ func (s *service) Open(session flows.Session, topic *flows.Topic, body string, a
 	bodyMap := map[string]any{}
 	json.Unmarshal([]byte(body), &bodyMap)
 
+	channelType := "web"
+
+	if session.Contact().PreferredURN() != nil {
+		urnScheme := string(session.Contact().PreferredURN().URN().Scheme())
+		if urnScheme == "whatsapp" {
+			channelType = "whatsapp"
+		}
+	}
+
 	interactionRequest := &CreateInteractionRequest{
 		Channel: InteractionChannelParam{
-			Type:        "whatsapp",
+			Type:        channelType,
 			InitiatedBy: "api",
 			Participants: []InteractionChannelParticipant{
 				{
@@ -137,7 +146,7 @@ func (s *service) Open(session flows.Session, topic *flows.Topic, body string, a
 				WorkflowSid:           s.workflowSid,
 				TaskChannelUniqueName: "chat",
 				Attributes: map[string]any{
-					"channelType":       "whatsapp",
+					"channelType":       channelType,
 					"customerId":        userIdentity,
 					"custom_attributes": body,
 				},
