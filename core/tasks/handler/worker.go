@@ -949,6 +949,7 @@ func requestToRouter(event *MsgEvent, rtConfig *runtime.Config, contact *flows.C
 		MsgEvent      MsgEvent               `json:"msg_event"`
 		ContactFields map[string]interface{} `json:"contact_fields"`
 		ChannelUUID   assets.ChannelUUID     `json:"channel_uuid"`
+		ChannelType   string                 `json:"channel_type"`
 		ContactName   string                 `json:"contact_name"`
 	}{
 		ProjectUUID:   projectUUID,
@@ -959,6 +960,7 @@ func requestToRouter(event *MsgEvent, rtConfig *runtime.Config, contact *flows.C
 		MsgEvent:      *event,
 		ContactFields: mapContactFields(contact),
 		ChannelUUID:   channel.UUID(),
+		ChannelType:   string(channel.Type()),
 		ContactName:   contact.Name(),
 	}
 
