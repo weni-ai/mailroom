@@ -509,17 +509,14 @@ func SendHistory(session flows.Session, contactID flows.ContactID, ticketUUID st
 			return
 		}
 	} else if len(session.Runs()) > 0 {
-		// get messages for history, based on first session run start time
 		after = session.Runs()[0].CreatedOn().Add(time.Second * -1)
 	} else {
-		// No history_after and no runs, nothing to send
 		return
 	}
 
 	cx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 	defer cancel()
 
-	// get messages for history
 	msgs, err := models.SelectContactMessages(cx, db, int(contactID), after)
 	if err != nil {
 		logrus.Error(errors.Wrap(err, "failed to get history messages"))
@@ -530,12 +527,10 @@ func SendHistory(session flows.Session, contactID flows.ContactID, ticketUUID st
 		return
 	}
 
-	// sort messages by CreatedOn()
 	sort.SliceStable(msgs, func(i, j int) bool {
 		return msgs[i].CreatedOn().Before(msgs[j].CreatedOn())
 	})
 
-	// Get contact UUID - use provided or try to get from session
 	if contactUUID == "" {
 		contactUUID = string(session.Contact().UUID())
 	}
@@ -544,7 +539,6 @@ func SendHistory(session flows.Session, contactID flows.ContactID, ticketUUID st
 		return
 	}
 
-	// Get Freshchat user ID
 	user, trace, err := restClient.GetUser(contactUUID)
 	if trace != nil {
 		logHTTP(flows.NewHTTPLog(trace, flows.HTTPStatusFromCode, redactor))
@@ -555,7 +549,6 @@ func SendHistory(session flows.Session, contactID flows.ContactID, ticketUUID st
 	}
 
 	var trace2 *httpx.Trace
-	// send history
 	for _, msg := range msgs {
 		freshchatMsg := &Message{
 			ConversationID: conversationID,
@@ -573,7 +566,6 @@ func SendHistory(session flows.Session, contactID flows.ContactID, ticketUUID st
 			freshchatMsg.ActorType = "bot"
 		}
 
-		// Add text content
 		text := msg.Text()
 		if text != "" {
 			freshchatMsg.MessageParts = []MessageParts{
@@ -620,7 +612,6 @@ func SendHistory(session flows.Session, contactID flows.ContactID, ticketUUID st
 			}
 		}
 
-		// Skip if no content
 		if len(freshchatMsg.MessageParts) == 0 {
 			continue
 		}
