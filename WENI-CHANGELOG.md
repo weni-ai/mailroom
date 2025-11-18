@@ -1,3 +1,9 @@
+1.73.1
+----------
+ * Twilioflex2 history media support
+ * Twilioflex2 dynamic channel type between whatsapp and web
+ * Add Twilioflex2 interaction customer participant to enable pause
+
 1.73.0
 ----------
  * Update goflow version to v1.16.0
