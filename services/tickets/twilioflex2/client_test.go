@@ -206,7 +206,7 @@ func TestSendCustomerMessage(t *testing.T) {
 				"conversation_sid": "CH12345678901234567890123456789012",
 				"body": "Hello, I need help with my order",
 				"author": "customer",
-				"media": null,
+				"media": [{"sid": "ME34567890123456789012345678901234","content_type": "image/jpeg","filename": "test.jpg", "size": 1024}],
 				"participant_sid": "MB45678901234567890123456789012345",
 				"index": 1
 			}`),
@@ -215,8 +215,9 @@ func TestSendCustomerMessage(t *testing.T) {
 
 	client := twilioflex2.NewClient(http.DefaultClient, nil, authToken, accountSid)
 	params := &twilioflex2.CreateConversationMessageRequest{
-		Author: "customer",
-		Body:   "Hello, I need help with my order",
+		Author:   "customer",
+		Body:     "Hello, I need help with my order",
+		MediaSid: "ME34567890123456789012345678901234",
 	}
 
 	_, _, err := client.SendCustomerMessage(conversationSid, params)
@@ -231,8 +232,12 @@ func TestSendCustomerMessage(t *testing.T) {
 	assert.Equal(t, conversationSid, message.ConversationSid)
 	assert.Equal(t, "customer", message.Author)
 	assert.Equal(t, "Hello, I need help with my order", message.Body)
+	assert.Equal(t, "ME34567890123456789012345678901234", message.Media[0]["sid"])
+	assert.Equal(t, "image/jpeg", message.Media[0]["content_type"])
+	assert.Equal(t, "test.jpg", message.Media[0]["filename"])
+	assert.Equal(t, float64(1024), message.Media[0]["size"])
 	assert.Equal(t, 1, message.Index)
-	assert.Equal(t, "HTTP/1.0 201 Created\r\nContent-Length: 343\r\n\r\n", string(trace.ResponseTrace))
+	assert.Equal(t, "HTTP/1.0 201 Created\r\nContent-Length: 452\r\n\r\n", string(trace.ResponseTrace))
 }
 
 func TestUpdateInteractionChannel(t *testing.T) {

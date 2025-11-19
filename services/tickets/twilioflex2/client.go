@@ -374,14 +374,14 @@ type CreateConversationMessageRequest struct {
 // ConversationMessage represents a message in a conversation
 // https://www.twilio.com/docs/conversations/api/conversation-message-resource#message-properties
 type CreateConversationMessageResponse struct {
-	Sid             string         `json:"sid,omitempty"`
-	AccountSid      string         `json:"account_sid,omitempty"`
-	ConversationSid string         `json:"conversation_sid,omitempty"`
-	Body            string         `json:"body,omitempty"`
-	Author          string         `json:"author,omitempty"`
-	Media           map[string]any `json:"media,omitempty"`
-	ParticipantSid  string         `json:"participant_sid,omitempty"`
-	Index           int            `json:"index,omitempty"`
+	Sid             string           `json:"sid,omitempty"`
+	AccountSid      string           `json:"account_sid,omitempty"`
+	ConversationSid string           `json:"conversation_sid,omitempty"`
+	Body            string           `json:"body,omitempty"`
+	Author          string           `json:"author,omitempty"`
+	Media           []map[string]any `json:"media,omitempty"`
+	ParticipantSid  string           `json:"participant_sid,omitempty"`
+	Index           int              `json:"index,omitempty"`
 }
 
 // UpdateInteractionChannelRequest parameters for updating an interaction channel
