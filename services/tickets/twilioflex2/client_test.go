@@ -67,7 +67,8 @@ func TestCreateInteraction(t *testing.T) {
 			httpx.NewMockResponse(201, nil, `{
 				"channel": {
 					"sid": "UOxx123456789012345678901234567890",
-					"type": "web"
+					"type": "web",
+					"participants": [{"identity": "100_4996b4a0-6b9e-4b9d-8316-9a4a2095f445", "name": "John Doe"}]
 				},
 				"interaction_context_sid": "IC12345678901234567890123456789012",
 				"links": {
@@ -143,7 +144,7 @@ func TestCreateInteraction(t *testing.T) {
 	assert.Equal(t, "KDfbcc36df16d504c234b2c46db61a3464", interaction.Sid)
 	assert.Equal(t, "flex_interactionwebhook_01k8xqfbaxfh5tpnqm2psh6238", interaction.WebhookTtid)
 	assert.Equal(t, "IC12345678901234567890123456789012", interaction.InteractionContextSid)
-	assert.Equal(t, "HTTP/1.0 201 Created\r\nContent-Length: 2270\r\n\r\n", string(trace.ResponseTrace))
+	assert.Equal(t, "HTTP/1.0 201 Created\r\nContent-Length: 2371\r\n\r\n", string(trace.ResponseTrace))
 }
 
 func TestCreateConversationScopedWebhook(t *testing.T) {
@@ -205,7 +206,7 @@ func TestSendCustomerMessage(t *testing.T) {
 				"conversation_sid": "CH12345678901234567890123456789012",
 				"body": "Hello, I need help with my order",
 				"author": "customer",
-				"media": null,
+				"media": [{"sid": "ME34567890123456789012345678901234","content_type": "image/jpeg","filename": "test.jpg", "size": 1024}],
 				"participant_sid": "MB45678901234567890123456789012345",
 				"index": 1
 			}`),
@@ -214,8 +215,9 @@ func TestSendCustomerMessage(t *testing.T) {
 
 	client := twilioflex2.NewClient(http.DefaultClient, nil, authToken, accountSid)
 	params := &twilioflex2.CreateConversationMessageRequest{
-		Author: "customer",
-		Body:   "Hello, I need help with my order",
+		Author:   "customer",
+		Body:     "Hello, I need help with my order",
+		MediaSid: "ME34567890123456789012345678901234",
 	}
 
 	_, _, err := client.SendCustomerMessage(conversationSid, params)
@@ -230,8 +232,12 @@ func TestSendCustomerMessage(t *testing.T) {
 	assert.Equal(t, conversationSid, message.ConversationSid)
 	assert.Equal(t, "customer", message.Author)
 	assert.Equal(t, "Hello, I need help with my order", message.Body)
+	assert.Equal(t, "ME34567890123456789012345678901234", message.Media[0]["sid"])
+	assert.Equal(t, "image/jpeg", message.Media[0]["content_type"])
+	assert.Equal(t, "test.jpg", message.Media[0]["filename"])
+	assert.Equal(t, float64(1024), message.Media[0]["size"])
 	assert.Equal(t, 1, message.Index)
-	assert.Equal(t, "HTTP/1.0 201 Created\r\nContent-Length: 343\r\n\r\n", string(trace.ResponseTrace))
+	assert.Equal(t, "HTTP/1.0 201 Created\r\nContent-Length: 452\r\n\r\n", string(trace.ResponseTrace))
 }
 
 func TestUpdateInteractionChannel(t *testing.T) {

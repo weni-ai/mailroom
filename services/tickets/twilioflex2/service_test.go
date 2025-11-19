@@ -393,9 +393,7 @@ func TestForwardWithAttachments(t *testing.T) {
 				"conversation_sid": "CH12345678901234567890123456789012",
 				"body": "Message with attachment",
 				"author": "customer",
-				"media": {
-					"sid": "ME34567890123456789012345678901234"
-				},
+				"media": [{"sid": "ME34567890123456789012345678901234"}],
 				"index": 1
 			}`),
 			httpx.NewMockResponse(201, nil, `{
@@ -404,9 +402,7 @@ func TestForwardWithAttachments(t *testing.T) {
 				"conversation_sid": "CH12345678901234567890123456789012",
 				"body": "Message with attachment",
 				"author": "customer",
-				"media": {
-					"sid": "ME34567890123456789012345678901234"
-				},
+				"media": [{"sid": "ME34567890123456789012345678901234"}],
 				"index": 2
 			}`),
 		},
