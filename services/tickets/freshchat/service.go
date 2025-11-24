@@ -162,7 +162,15 @@ func (s *service) resolveChannelID(bodyMapChannelID string, client *Client, logH
 	if len(channels) == 0 {
 		return "", trace, errors.New("no freshchat channels found")
 	}
-	return channels[0].ID, trace, nil
+
+	for _, channel := range channels {
+		channelSource := strings.ToLower(channel.Source)
+		if channelSource == typeFreshchat {
+			return channel.ID, trace, nil
+		}
+	}
+
+	return "", trace, errors.New("no freshchat channel found with source='freshchat'")
 }
 
 func buildConversation(userID, channelID, message string, customFields map[string]interface{}) *Conversation {
