@@ -501,4 +501,5 @@ type Channel struct {
 		MessageType  string         `json:"message_type,omitempty"`
 	} `json:"welcome_message,omitempty"`
 	Locale string `json:"locale,omitempty"`
+	Source string `json:"source,omitempty"`
 }
