@@ -344,23 +344,21 @@ func historyMsgFromMsg(msg *models.Msg) HistoryMessage {
 
 func (s *service) SendHistory(ticket *models.Ticket, contactID models.ContactID, runs []*models.FlowRun, logHTTP flows.HTTPLogCallback) error {
 	historyAfter, _ := jsonparser.GetString([]byte(ticket.Body()), "history_after")
-	var after time.Time
-	var err error
+	since := time.Now().Add(-time.Hour * 24)
 	if historyAfter != "" {
-		after, err = parseTime(historyAfter)
-		if err != nil {
-			return err
+		if parsedTime, err := parseTime(historyAfter); err == nil {
+			since = parsedTime
 		}
 	} else if len(runs) > 0 {
 		// get messages for history, based on first session run start time
 		startMargin := -time.Second * 1
-		after = runs[0].CreatedOn().Add(startMargin)
+		since = runs[0].CreatedOn().Add(startMargin)
 	}
 
 	cx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 	defer cancel()
 
-	msgs, selectErr := models.SelectContactMessages(cx, db, int(contactID), after)
+	msgs, selectErr := models.SelectContactMessages(cx, db, int(contactID), since)
 	if selectErr != nil {
 		return errors.Wrap(selectErr, "failed to get history messages")
 	}
