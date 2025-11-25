@@ -1,3 +1,8 @@
+1.73.2
+----------
+ * Fix twilioflex2 interaction customer participant client parameter
+ * Fix Twilioflex2 media response parameter 
+
 1.73.1
 ----------
  * Twilioflex2 history media support
