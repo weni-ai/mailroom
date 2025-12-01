@@ -1,3 +1,7 @@
+1.73.3
+----------
+ * Add source field to Channel struct and update tests
+
 1.73.2
 ----------
  * Fix twilioflex2 interaction customer participant client parameter
