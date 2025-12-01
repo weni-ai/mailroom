@@ -151,17 +151,17 @@ func TestOpen(t *testing.T) {
 			}`),
 			httpx.NewMockResponse(200, nil, `{
 				"channels": [
-					{"id": "channel123", "name": "Support"}
+					{"id": "channel123", "name": "Support", "source": "FRESHCHAT"}
 				]
 			}`),
 			httpx.NewMockResponse(200, nil, `{
 				"channels": [
-					{"id": "channel123", "name": "Support"}
+					{"id": "channel123", "name": "Support", "source": "FRESHCHAT"}
 				]
 			}`),
 			httpx.NewMockResponse(200, nil, `{
 				"channels": [
-					{"id": "channel123", "name": "Support"}
+					{"id": "channel123", "name": "Support", "source": "FRESHCHAT"}
 				]
 			}`),
 		},
@@ -264,7 +264,7 @@ func TestOpenWithChannelID(t *testing.T) {
 		fmt.Sprintf("%s/v2/channels", baseURL): {
 			httpx.NewMockResponse(200, nil, `{
 				"channels": [
-					{"id": "channel123", "name": "Support"}
+					{"id": "channel123", "name": "Support", "source": "FRESHCHAT"}
 				]
 			}`),
 		},
@@ -302,8 +302,101 @@ func TestOpenWithChannelID(t *testing.T) {
 	ticket, err := svc.Open(session, defaultTopic, body, nil, logger.Log)
 	require.NoError(t, err)
 	assert.Equal(t, "conv123", ticket.ExternalID())
-	// Should have CreateUser, GetChannels (if channel_id not parsed correctly), and CreateConversation
 	assert.GreaterOrEqual(t, len(logger.Logs), 2)
+}
+
+func TestOpenWithoutChannelID(t *testing.T) {
+	ctx, rt, _, _ := testsuite.Get()
+
+	defer dates.SetNowSource(dates.DefaultNowSource)
+	dates.SetNowSource(dates.NewSequentialNowSource(time.Date(2019, 10, 7, 15, 21, 30, 0, time.UTC)))
+
+	session, _, err := test.CreateTestSession("", envs.RedactionPolicyNone)
+	require.NoError(t, err)
+
+	defer uuids.SetGenerator(uuids.DefaultGenerator)
+	defer httpx.SetRequestor(httpx.DefaultRequestor)
+
+	uuids.SetGenerator(uuids.NewSeededGenerator(12345))
+	httpx.SetRequestor(httpx.NewMockRequestor(map[string][]httpx.MockResponse{
+		fmt.Sprintf("%s/v2/users?reference_id=5d76d86b-3bb9-4d5a-b822-c9d86f5d8e4f", baseURL): {
+			httpx.NewMockResponse(200, nil, `{
+				"users": [
+					{}
+				]
+			}`),
+			httpx.NewMockResponse(200, nil, `{
+				"users": [
+					{}
+				]
+			}`),
+			httpx.NewMockResponse(200, nil, `{
+				"users": [
+					{}
+				]
+			}`),
+		},
+
+		fmt.Sprintf("%s/v2/users", baseURL): {
+			httpx.NewMockResponse(201, nil, `{
+				"id": "user123"
+			}`),
+			httpx.NewMockResponse(201, nil, `{
+				"id": "user123"
+			}`),
+		},
+		fmt.Sprintf("%s/v2/channels", baseURL): {
+			httpx.NewMockResponse(200, nil, `{
+				"channels": [
+					{"id": "channel1", "name": "Support", "source": "EMAIL"},
+					{"id": "channel2", "name": "Support", "source": "FRESHCHAT"}
+				]
+			}`),
+			httpx.NewMockResponse(200, nil, `{
+				"channels": [
+					{"id": "channel1", "name": "Support", "source": "EMAIL"},
+					{"id": "channel2", "name": "Support", "source": "WEB"}
+				]
+			}`),
+		},
+		fmt.Sprintf("%s/v2/conversations", baseURL): {
+			httpx.NewMockResponse(201, nil, `{
+				"conversation_id": "conv123",
+				"status": "new",
+				"channel_id": "channel123",
+				"messages": [{}]
+			}`),
+		},
+	}))
+
+	ticketer := flows.NewTicketer(static.NewTicketer(assets.TicketerUUID(uuids.New()), "Support", "freshchat"))
+
+	svc, err := freshchat.NewService(
+		rt.Config,
+		http.DefaultClient,
+		nil,
+		ticketer,
+		map[string]string{
+			"freshchat_domain": baseURL,
+			"oauth_token":      apiKey,
+		},
+	)
+	require.NoError(t, err)
+
+	oa, err := models.GetOrgAssets(ctx, rt, testdata.Org1.ID)
+	require.NoError(t, err)
+	defaultTopic := oa.SessionAssets().Topics().FindByName("General")
+
+	body := `{"messages": [{"message_parts": [{"text": {"content": "Where are my cookies?"}}]}]}`
+	logger := &flows.HTTPLogger{}
+	ticket, err := svc.Open(session, defaultTopic, body, nil, logger.Log)
+	require.NoError(t, err)
+	assert.Equal(t, "conv123", ticket.ExternalID())
+	assert.GreaterOrEqual(t, len(logger.Logs), 2)
+
+	logger = &flows.HTTPLogger{}
+	_, err = svc.Open(session, defaultTopic, body, nil, logger.Log)
+	assert.EqualError(t, err, "no freshchat channel found with source='freshchat'")
 }
 
 func TestForward(t *testing.T) {
@@ -349,22 +442,22 @@ func TestForward(t *testing.T) {
 		fmt.Sprintf("%s/v2/channels", baseURL): {
 			httpx.NewMockResponse(200, nil, `{
 				"channels": [
-					{"id": "channel123", "name": "Support"}
+					{"id": "channel123", "name": "Support", "source": "FRESHCHAT"}
 				]
 			}`),
 			httpx.NewMockResponse(200, nil, `{
 				"channels": [
-					{"id": "channel123", "name": "Support"}
+					{"id": "channel123", "name": "Support", "source": "FRESHCHAT"}
 				]
 			}`),
 			httpx.NewMockResponse(200, nil, `{
 				"channels": [
-					{"id": "channel123", "name": "Support"}
+					{"id": "channel123", "name": "Support", "source": "FRESHCHAT"}
 				]
 			}`),
 			httpx.NewMockResponse(200, nil, `{
 				"channels": [
-					{"id": "channel123", "name": "Support"}
+					{"id": "channel123", "name": "Support", "source": "FRESHCHAT"}
 				]
 			}`),
 		},
