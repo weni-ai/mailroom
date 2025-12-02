@@ -103,6 +103,7 @@ func RemoveContactsFromGroups(ctx context.Context, tx Queryer, removals []*Group
 	for i := range removals {
 		is[i] = removals[i]
 	}
+	logrus.Info("init removing contacts from groups", removals)
 	return BulkQuery(ctx, "removing contacts from groups", tx, removeContactsFromGroupsSQL, is)
 }
 
@@ -139,6 +140,7 @@ func AddContactsToGroups(ctx context.Context, tx Queryer, adds []*GroupAdd) erro
 	for i := range adds {
 		is[i] = adds[i]
 	}
+	logrus.Info("init adding contacts to groups", adds)
 	return BulkQuery(ctx, "adding contacts to groups", tx, addContactsToGroupsSQL, is)
 }
 

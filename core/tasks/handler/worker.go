@@ -497,6 +497,22 @@ func handleMsgEvent(ctx context.Context, rt *runtime.Runtime, event *MsgEvent) e
 		return errors.Wrapf(err, "error loading org")
 	}
 
+	metadataJSON, _ := json.Marshal(event.Metadata)
+
+	logrus.WithFields(logrus.Fields{
+		"contact_id":     event.ContactID,
+		"org_id":         event.OrgID,
+		"channel_id":     event.ChannelID,
+		"msg_id":         event.MsgID,
+		"msg_uuid":       event.MsgUUID,
+		"urn":            event.URN,
+		"urn_id":         event.URNID,
+		"is_new_contact": event.NewContact,
+		"text":           event.Text,
+		"created_on":     event.CreatedOn,
+		"metadata":       string(metadataJSON),
+	}).Info("init handleMsgEvent")
+
 	// allocate a topup for this message if org uses topups
 	topupID, err := models.AllocateTopups(ctx, rt.DB, rt.RP, oa.Org(), 1)
 	if err != nil {
