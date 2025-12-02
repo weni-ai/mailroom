@@ -5,6 +5,7 @@ import (
 
 	"github.com/nyaruka/mailroom/core/models"
 	"github.com/nyaruka/mailroom/runtime"
+	"github.com/sirupsen/logrus"
 
 	"github.com/jmoiron/sqlx"
 	"github.com/pkg/errors"
@@ -51,6 +52,10 @@ func (h *commitGroupChangesHook) Apply(ctx context.Context, rt *runtime.Runtime,
 	}
 
 	// do our updates
+	logrus.Info("adding contacts to groups from commit group changes hook", len(adds))
+	for _, add := range adds {
+		logrus.Info("add", add.ContactID, add.GroupID)
+	}
 	err := models.AddContactsToGroups(ctx, tx, adds)
 	if err != nil {
 		return errors.Wrapf(err, "error adding contacts to groups")

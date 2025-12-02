@@ -1125,6 +1125,10 @@ func URNForID(ctx context.Context, db Queryer, org *OrgAssets, urnID URNID) (urn
 // CalculateDynamicGroups recalculates all the dynamic groups for the passed in contact, recalculating
 // campaigns as necessary based on those group changes.
 func CalculateDynamicGroups(ctx context.Context, db Queryer, org *OrgAssets, contacts []*flows.Contact) error {
+	logrus.Info("starting calculate dynamic groups")
+	for _, contact := range contacts {
+		logrus.Info("contact", contact.ID())
+	}
 	contactIDs := make([]ContactID, len(contacts))
 	groupAdds := make([]*GroupAdd, 0, 2*len(contacts))
 	groupRemoves := make([]*GroupRemove, 0, 2*len(contacts))
