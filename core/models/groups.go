@@ -140,6 +140,11 @@ func AddContactsToGroups(ctx context.Context, tx Queryer, adds []*GroupAdd) erro
 	for i := range adds {
 		is[i] = adds[i]
 	}
+
+	for _, add := range adds {
+		logrus.Info("add contact to group", add.ContactID, add.GroupID)
+	}
+
 	logrus.Info("init adding contacts to groups", adds)
 	return BulkQuery(ctx, "adding contacts to groups", tx, addContactsToGroupsSQL, is)
 }

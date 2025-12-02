@@ -313,6 +313,8 @@ func HandleChannelEvent(ctx context.Context, rt *runtime.Runtime, eventType mode
 		return nil, errors.Wrapf(err, "error loading org")
 	}
 
+	logrus.Info("handle channel event", eventType, event.ContactID(), event.ChannelID(), event.URNID(), event.IsNewContact())
+
 	// load the channel for this event
 	channel := oa.ChannelByID(event.ChannelID())
 	if channel == nil {
@@ -575,6 +577,7 @@ func handleMsgEvent(ctx context.Context, rt *runtime.Runtime, event *MsgEvent) e
 
 	// if this is a new contact, we need to calculate dynamic groups and campaigns
 	if newContact {
+		logrus.Info("starting calculating dynamic groups")
 		err = models.CalculateDynamicGroups(ctx, rt.DB, oa, []*flows.Contact{contact})
 		if err != nil {
 			return errors.Wrapf(err, "unable to initialize new contact")
