@@ -78,7 +78,7 @@ jobs:
         cp ./docs/en-us/*.* docs/
 
     - name: Install Go
-      uses: actions/setup-go@v1
+      uses: actions/setup-go@v6
       with:
         go-version: ${{ env.go-version }}
 
