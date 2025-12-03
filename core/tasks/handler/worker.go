@@ -685,6 +685,11 @@ func handleMsgEvent(ctx context.Context, rt *runtime.Runtime, event *MsgEvent) e
 	isBrain := false
 	if oa.Org().BrainOn() && !isIGComment {
 		isBrain = true
+
+		err = models.CalculateDynamicGroups(ctx, rt.DB, oa, []*flows.Contact{contact})
+		if err != nil {
+			return errors.Wrapf(err, "unable to initialize new contact")
+		}
 	}
 
 	// we found a trigger and their session is nil or doesn't ignore keywords
