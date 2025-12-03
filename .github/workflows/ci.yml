@@ -46,7 +46,7 @@ jobs:
         psql -h localhost -U postgres --no-password -c "CREATE DATABASE mailroom_test;"
 
     - name: Install Go
-      uses: actions/setup-go@v1
+      uses: actions/setup-go@v6
       with:
         go-version: ${{ env.go-version }}
 
