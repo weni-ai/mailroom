@@ -9,6 +9,8 @@ import (
 	"github.com/nyaruka/gocommon/httpx"
 	"github.com/nyaruka/gocommon/urns"
 	"github.com/nyaruka/gocommon/uuids"
+	"github.com/nyaruka/goflow/assets"
+	"github.com/nyaruka/goflow/envs"
 	"github.com/nyaruka/goflow/flows"
 	_ "github.com/nyaruka/mailroom/core/handlers"
 	"github.com/nyaruka/mailroom/core/models"
@@ -244,6 +246,78 @@ func TestMsgEvents(t *testing.T) {
 
 	testsuite.AssertQuery(t, db, `SELECT count(*) FROM msgs_msg WHERE contact_id = $1 AND direction = 'O' AND created_on > $2`, testdata.Org2Contact.ID, previous).Returns(0)
 
+}
+
+func TestBrainOnMsgEventCalculatesDynamicGroups(t *testing.T) {
+	ctx, rt, db, rp := testsuite.Get()
+	rc := rp.Get()
+	defer rc.Close()
+
+	defer testsuite.Reset(testsuite.ResetAll)
+
+	db.MustExec(`CREATE TABLE IF NOT EXISTS internal_project (
+		id SERIAL PRIMARY KEY,
+		project_uuid UUID NOT NULL,
+		org_ptr_id INTEGER NOT NULL
+	)`)
+	db.MustExec(`INSERT INTO internal_project (project_uuid, org_ptr_id) VALUES ($1, $2)`, uuids.New(), testdata.Org1.ID)
+
+	db.MustExec(`UPDATE orgs_org SET brain_on = TRUE WHERE id = $1`, testdata.Org1.ID)
+
+	group := testdata.InsertContactGroup(db, testdata.Org1, assets.GroupUUID(uuids.New()), "BrainLangEng", "language = eng")
+
+	channel := testdata.InsertChannel(db, testdata.Org1, "TW", "Brain Channel", []string{"tel"}, "SR", map[string]interface{}{})
+
+	contact := testdata.InsertContact(db, testdata.Org1, flows.ContactUUID(uuids.New()), "Brain Contact", envs.Language(`eng`))
+	urn := urns.URN("tel:+250700000010")
+	urnID := testdata.InsertContactURN(db, testdata.Org1, contact, urn, 1000)
+
+	models.FlushCache()
+
+	dbMsg := testdata.InsertIncomingMsg(db, testdata.Org1, channel, contact, "brain_on dynamic groups", models.MsgStatusPending)
+
+	httpx.SetRequestor(httpx.NewMockRequestor(map[string][]httpx.MockResponse{
+		"https://nexus.stg.cloud.weni.ai/messages?token=": {
+			httpx.NewMockResponse(200, nil, ``),
+		},
+	}))
+
+	event := &handler.MsgEvent{
+		ContactID: contact.ID,
+		OrgID:     testdata.Org1.ID,
+		ChannelID: channel.ID,
+		MsgID:     dbMsg.ID(),
+		MsgUUID:   dbMsg.UUID(),
+		URN:       urn,
+		URNID:     urnID,
+		Text:      "brain_on dynamic groups",
+	}
+
+	eventJSON, err := json.Marshal(event)
+	require.NoError(t, err)
+
+	task := &queue.Task{
+		Type:  handler.MsgEventType,
+		OrgID: int(testdata.Org1.ID),
+		Task:  eventJSON,
+	}
+
+	err = handler.QueueHandleTask(rc, contact.ID, task)
+	require.NoError(t, err, "error adding task")
+
+	task, err = queue.PopNextTask(rc, queue.HandlerQueue)
+	require.NoError(t, err, "error popping next task")
+
+	err = handler.HandleEvent(ctx, rt, task)
+	require.NoError(t, err, "error when handling event")
+
+	// message should be marked as handled inbox by brain path
+	testsuite.AssertQuery(t, db, `SELECT msg_type, status FROM msgs_msg WHERE id = $1`, dbMsg.ID()).
+		Columns(map[string]interface{}{"msg_type": string(models.MsgTypeInbox), "status": "H"})
+
+	// dynamic group should have been (re)calculated for this contact
+	testsuite.AssertQuery(t, db, `SELECT count(*) FROM contacts_contactgroup_contacts WHERE contactgroup_id = $1 AND contact_id = $2`, group.ID, contact.ID).
+		Returns(1)
 }
 
 func TestChannelEvents(t *testing.T) {

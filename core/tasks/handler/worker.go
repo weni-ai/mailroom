@@ -745,6 +745,11 @@ func handleMsgEvent(ctx context.Context, rt *runtime.Runtime, event *MsgEvent) e
 			return errors.Wrapf(err, "error marking message as handled")
 		}
 
+		err = models.CalculateDynamicGroups(ctx, rt.DB, oa, []*flows.Contact{contact})
+		if err != nil {
+			logrus.WithError(err).Error("error calculating dynamic groups")
+		}
+
 	}
 
 	// this message didn't trigger and new sessions or resume any existing ones, so handle as inbox
