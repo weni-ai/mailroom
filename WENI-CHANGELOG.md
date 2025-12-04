@@ -1,3 +1,7 @@
+1.73.4
+----------
+ * fix dynamic groups calculation for message events if brain on
+
 1.73.3
 ----------
  * Add source field to Channel struct and update tests
