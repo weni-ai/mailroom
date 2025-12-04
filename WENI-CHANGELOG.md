@@ -1,6 +1,10 @@
+1.73.5
+----------
+ * Now wenichats send default history as recent 24 hours msgs
+
 1.73.4
 ----------
- * fix dynamic groups calculation for message events if brain on
+ * Fix dynamic groups calculation for message events if brain on
 
 1.73.3
 ----------
