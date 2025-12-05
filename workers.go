@@ -228,7 +228,8 @@ func (w *Worker) handleTask(task *queue.Task) {
 	{
 		if task.Type == queue.SendHistory {
 			rc := w.foreman.rt.RP.Get()
-			key, err := queue.BeginProcessing(rc, w.foreman.queue, task.OrgID, task, 2*time.Minute)
+			processingTTL := time.Duration(w.foreman.rt.Config.ProcessingTTL) * time.Second
+			key, err := queue.BeginProcessing(rc, w.foreman.queue, task.OrgID, task, processingTTL)
 			rc.Close()
 			if err == nil {
 				taskKey = key
