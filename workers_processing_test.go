@@ -10,22 +10,14 @@ import (
 	"github.com/gomodule/redigo/redis"
 	"github.com/nyaruka/mailroom/core/queue"
 	"github.com/nyaruka/mailroom/runtime"
+	"github.com/nyaruka/mailroom/testsuite"
 	"github.com/stretchr/testify/assert"
 )
 
 // Test that only send_history tasks are recorded in processing by the worker
 func TestWorkerProcessingOnlyForSendHistory(t *testing.T) {
-	// Redis pool for tests
-	pool := &redis.Pool{
-		Wait:      true,
-		MaxActive: 4,
-		MaxIdle:   2,
-		Dial: func() (redis.Conn, error) {
-			return redis.Dial("tcp", "localhost:6379")
-		},
-		IdleTimeout: 30 * time.Second,
-	}
-	rc := pool.Get()
+	_, rt, _, _ := testsuite.Get()
+	rc := rt.RP.Get()
 	defer rc.Close()
 
 	q := "unitq"
@@ -38,7 +30,6 @@ func TestWorkerProcessingOnlyForSendHistory(t *testing.T) {
 	}
 
 	// runtime with our pool
-	rt := &runtime.Runtime{RP: pool}
 
 	// register a blocking test task for a non send_history type
 	const nonType = "unit_test_task"
