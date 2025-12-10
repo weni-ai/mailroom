@@ -124,10 +124,12 @@ func handleSignals(mr *mailroom.Mailroom) {
 		case syscall.SIGQUIT:
 			buf := make([]byte, 1<<20)
 			stacklen := goruntime.Stack(buf, true)
-			logrus.WithField("comp", "main").WithField("signal", sig).Info("received quit signal, dumping stack")
+			logrus.WithField("comp", "main").WithField("signal", sig).Info("received quit signal, dumping stack and pending tasks")
+			mr.LogPendingTasks()
 			logrus.Printf("\n%s", buf[:stacklen])
 		case syscall.SIGINT, syscall.SIGTERM:
-			logrus.WithField("comp", "main").WithField("signal", sig).Info("received exit signal, exiting")
+			logrus.WithField("comp", "main").WithField("signal", sig).Info("received exit signal, logging pending tasks and exiting")
+			mr.LogPendingTasks()
 			mr.Stop()
 			return
 		}
