@@ -50,6 +50,29 @@ func (f *Foreman) Start() {
 		worker.Start()
 	}
 	go f.Assign()
+
+	// start a background reaper to requeue expired processing tasks
+	if f.queue == queue.HandlerQueue {
+		go func() {
+			ticker := time.NewTicker(10 * time.Second)
+			defer ticker.Stop()
+			log := logrus.WithField("comp", "foreman_reaper").WithField("queue", f.queue)
+			for {
+				select {
+				case <-f.quit:
+					log.WithField("state", "stopped").Info("reaper stopped")
+					return
+				case <-ticker.C:
+					rc := f.rt.RP.Get()
+					_, err := queue.RequeueExpired(rc, f.queue, time.Now())
+					rc.Close()
+					if err != nil {
+						log.WithError(err).Error("error requeuing expired tasks")
+					}
+				}
+			}
+		}()
+	}
 }
 
 // Stop stops the foreman and all its workers, the wait group of the worker can be used to track progress
@@ -178,6 +201,9 @@ func (w *Worker) Stop() {
 func (w *Worker) handleTask(task *queue.Task) {
 	log := logrus.WithField("queue", w.foreman.queue).WithField("worker_id", w.id).WithField("task_type", task.Type).WithField("org_id", task.OrgID)
 
+	// register taskKey in outer scope so our defer can access it
+	var taskKey string
+
 	defer func() {
 		// catch any panics and recover
 		panicLog := recover()
@@ -188,12 +214,30 @@ func (w *Worker) handleTask(task *queue.Task) {
 
 		// mark our task as complete
 		rc := w.foreman.rt.RP.Get()
+		if task.Type == queue.SendHistory && taskKey != "" {
+			_ = queue.EndProcessing(rc, w.foreman.queue, task.OrgID, taskKey)
+		}
 		err := queue.MarkTaskComplete(rc, w.foreman.queue, task.OrgID)
 		if err != nil {
 			log.WithError(err)
 		}
 		rc.Close()
 	}()
+
+	// register task as processing with a deadline
+	{
+		if task.Type == queue.SendHistory {
+			rc := w.foreman.rt.RP.Get()
+			processingTTL := time.Duration(w.foreman.rt.Config.ProcessingTTL) * time.Second
+			key, err := queue.BeginProcessing(rc, w.foreman.queue, task.OrgID, task, processingTTL)
+			rc.Close()
+			if err == nil {
+				taskKey = key
+			} else {
+				log.WithError(err).Warn("unable to register task as processing")
+			}
+		}
+	}
 
 	log.Info("starting handling of task")
 	start := time.Now()

@@ -1,6 +1,8 @@
 package queue
 
 import (
+	"crypto/sha1"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"strconv"
@@ -200,4 +202,121 @@ var markComplete = redis.NewScript(2, `-- KEYS: [QueueName] [TaskGroup]
 func MarkTaskComplete(rc redis.Conn, queue string, orgID int) error {
 	_, err := markComplete.Do(rc, queue, strconv.FormatInt(int64(orgID), 10))
 	return err
+}
+
+// processingZSet returns the processing zset name for an org in a queue
+func processingZSet(queue string, orgID int) string {
+	return fmt.Sprintf("%s:%d:processing", queue, orgID)
+}
+
+// payloadKey returns the key to store a processing task payload
+func payloadKey(queue string, taskKey string) string {
+	return fmt.Sprintf("%s:payload:%s", queue, taskKey)
+}
+
+// taskFingerprint generates a deterministic fingerprint for a task payload
+func taskFingerprint(t *Task) string {
+	h := sha1.New()
+	h.Write([]byte(t.Type))
+	h.Write([]byte{0})
+	h.Write([]byte(fmt.Sprintf("%d", t.OrgID)))
+	h.Write([]byte{0})
+	h.Write([]byte(t.Task))
+	return hex.EncodeToString(h.Sum(nil))
+}
+
+// BeginProcessing registers a task as being processed with a deadline and stores its payload
+func BeginProcessing(rc redis.Conn, queue string, orgID int, task *Task, ttl time.Duration) (string, error) {
+	taskKey := taskFingerprint(task)
+	deadline := time.Now().Add(ttl).UnixMilli()
+
+	payload, err := json.Marshal(task)
+	if err != nil {
+		return "", err
+	}
+
+	_, err = rc.Do("zadd", processingZSet(queue, orgID), "NX", deadline, taskKey)
+	if err != nil {
+		return "", err
+	}
+	_, err = rc.Do("set", payloadKey(queue, taskKey), payload)
+	if err != nil {
+		rc.Do("zrem", processingZSet(queue, orgID), taskKey)
+		return "", err
+	}
+	return taskKey, nil
+}
+
+// EndProcessing removes a task from processing and deletes its stored payload
+func EndProcessing(rc redis.Conn, queue string, orgID int, taskKey string) error {
+	if taskKey == "" {
+		return nil
+	}
+	rc.Send("zrem", processingZSet(queue, orgID), taskKey)
+	rc.Send("del", payloadKey(queue, taskKey))
+	_, err := rc.Do("")
+	return err
+}
+
+// AddTaskAt adds a task back to a queue with an explicit scheduled time
+func AddTaskAt(rc redis.Conn, queue string, orgID int, payload *Task, at time.Time, priority Priority) error {
+	score := fmt.Sprintf("%.6f", float64(at.UnixNano()/int64(time.Microsecond))/float64(1000000)+float64(priority))
+	jsonPayload, err := json.Marshal(payload)
+	if err != nil {
+		return err
+	}
+	rc.Send("zadd", fmt.Sprintf(queuePattern, queue, orgID), score, jsonPayload)
+	rc.Send("zincrby", fmt.Sprintf(activePattern, queue), 0, orgID)
+	_, err = rc.Do("")
+	return err
+}
+
+// RequeueExpired looks for processing tasks past deadline and requeues them with backoff
+func RequeueExpired(rc redis.Conn, queue string, now time.Time) (int, error) {
+	orgIDs, err := redis.Ints(rc.Do("zrange", fmt.Sprintf(activePattern, queue), 0, -1))
+	if err != nil {
+		return 0, err
+	}
+
+	requeued := 0
+	for _, orgID := range orgIDs {
+		expiredKeys, err := redis.Strings(rc.Do("zrangebyscore", processingZSet(queue, orgID), "-inf", now.UnixMilli()))
+		if err != nil {
+			return requeued, err
+		}
+		for _, key := range expiredKeys {
+			payloadJSON, err := redis.Bytes(rc.Do("get", payloadKey(queue, key)))
+			if err != nil || len(payloadJSON) == 0 {
+				rc.Do("zrem", processingZSet(queue, orgID), key)
+				rc.Do("del", payloadKey(queue, key))
+				continue
+			}
+
+			var t Task
+			if err := json.Unmarshal(payloadJSON, &t); err != nil {
+				rc.Do("zrem", processingZSet(queue, orgID), key)
+				rc.Do("del", payloadKey(queue, key))
+				continue
+			}
+
+			t.ErrorCount++
+			base := time.Second
+			max := 5 * time.Minute
+			delay := base * time.Duration(1<<uint(t.ErrorCount-1))
+			if delay > max {
+				delay = max
+			}
+
+			when := now.Add(delay)
+			if err := AddTaskAt(rc, queue, t.OrgID, &t, when, DefaultPriority); err == nil {
+				requeued++
+			}
+
+			rc.Do("zincrby", fmt.Sprintf(activePattern, queue), -1, orgID)
+			rc.Do("zrem", processingZSet(queue, orgID), key)
+			rc.Do("del", payloadKey(queue, key))
+		}
+	}
+
+	return requeued, nil
 }

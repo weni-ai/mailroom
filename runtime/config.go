@@ -114,6 +114,8 @@ type Config struct {
 
 	RabbitmqPublishMaxAttempts     int `help:"max attempts for async RabbitMQ publish tasks"`
 	RabbitmqPublishDelayIntervalMs int `help:"fixed delay in ms between async RabbitMQ publish retries"`
+
+	ProcessingTTL int `help:"base processing task TTL in seconds"`
 }
 
 // NewDefaultConfig returns a new default configuration object
@@ -199,6 +201,8 @@ func NewDefaultConfig() *Config {
 		// Retry every 2 seconds up to 2 hours by default (3600 attempts)
 		RabbitmqPublishMaxAttempts:     3600,
 		RabbitmqPublishDelayIntervalMs: 2000,
+
+		ProcessingTTL: 120,
 	}
 }
 

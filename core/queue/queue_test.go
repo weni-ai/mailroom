@@ -3,6 +3,8 @@ package queue
 import (
 	"encoding/json"
 	"testing"
+	"time"
+	"strconv"
 
 	"github.com/gomodule/redigo/redis"
 	"github.com/stretchr/testify/assert"
@@ -74,4 +76,68 @@ func TestQueues(t *testing.T) {
 		assert.NoError(t, err)
 		assert.Equal(t, tc.Size, size, "%d: mismatch", i)
 	}
+}
+
+func TestProcessingAndRequeueSendHistory(t *testing.T) {
+	rc, err := redis.Dial("tcp", "localhost:6379")
+	assert.NoError(t, err)
+	defer rc.Close()
+
+	// use isolated queue and org
+	q := "qproc"
+	org := 1234
+	// cleanup keys
+	rc.Do("del", q+":active", q+":payload:*", q+":*")
+
+	// mark org as active to be discovered by RequeueExpired
+	_, err = rc.Do("zincrby", q+":active", 1, org)
+	assert.NoError(t, err)
+
+	// create a send_history task
+	task := &Task{
+		Type:  SendHistory,
+		OrgID: org,
+		Task:  json.RawMessage(`{"ticket_uuid":"u","contact_id":1}`),
+	}
+
+	// begin processing with already expired TTL
+	taskKey, err := BeginProcessing(rc, q, org, task, -1*time.Second)
+	assert.NoError(t, err)
+	assert.NotEmpty(t, taskKey)
+
+	// ensure it's in processing
+	count, err := redis.Int(rc.Do("zcard", q+":"+strconvI(org)+":processing"))
+	assert.NoError(t, err)
+	assert.Equal(t, 1, count)
+
+	// run requeue
+	n, err := RequeueExpired(rc, q, time.Now())
+	assert.NoError(t, err)
+	assert.Equal(t, 1, n)
+
+	// verify moved back to main queue with ErrorCount incremented
+	values, err := redis.ByteSlices(rc.Do("zrange", q+":"+strconvI(org), 0, -1))
+	assert.NoError(t, err)
+	assert.Equal(t, 1, len(values))
+
+	var t2 Task
+	assert.NoError(t, json.Unmarshal(values[0], &t2))
+	assert.Equal(t, SendHistory, t2.Type)
+	assert.Equal(t, org, t2.OrgID)
+	assert.Equal(t, 1, t2.ErrorCount)
+
+	// processing set empty and payload deleted
+	count, err = redis.Int(rc.Do("zcard", q+":"+strconvI(org)+":processing"))
+	assert.NoError(t, err)
+	assert.Equal(t, 0, count)
+
+	// active reset to 0 for org
+	score, err := redis.Float64(rc.Do("zscore", q+":active", org))
+	assert.NoError(t, err)
+	assert.Equal(t, 0.0, score)
+}
+
+// helper to format int consistently for redis commands that accept interface{}
+func strconvI(i int) string {
+	return strconv.Itoa(i)
 }
