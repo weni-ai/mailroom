@@ -1,3 +1,7 @@
+1.75.0
+----------
+ * Log pending tasks on exit
+
 1.74.0
 ----------
  * Task send_history has status processing for retry task if the instance closes abruptly before completion
