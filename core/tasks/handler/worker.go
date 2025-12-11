@@ -21,6 +21,7 @@ import (
 	"github.com/nyaruka/goflow/excellent/types"
 	"github.com/nyaruka/goflow/flows"
 	"github.com/nyaruka/goflow/flows/events"
+	"github.com/nyaruka/goflow/flows/modifiers"
 	"github.com/nyaruka/goflow/flows/resumes"
 	"github.com/nyaruka/goflow/flows/triggers"
 	"github.com/nyaruka/goflow/utils"
@@ -546,6 +547,57 @@ func handleMsgEvent(ctx context.Context, rt *runtime.Runtime, event *MsgEvent) e
 		return nil
 	}
 
+	// track if we need to recalculate dynamic groups (due to field changes or new contact)
+	recalculateDynamicGroups := false
+
+	// if we have new contact fields, create the contact field update modifiers and apply them
+	if event.NewContactFields != nil {
+
+		// create our field modifiers
+		fieldModifiers := make([]flows.Modifier, 0, len(event.NewContactFields))
+		for key, value := range event.NewContactFields {
+			field := oa.SessionAssets().Fields().Get(key)
+			if field == nil {
+				logrus.WithField("key", key).Error("unknown contact field")
+				continue
+			}
+			fieldModifiers = append(fieldModifiers, modifiers.NewField(field, value))
+		}
+
+		// apply our field modifiers
+		if len(fieldModifiers) > 0 {
+			modifiersByContact := map[*flows.Contact][]flows.Modifier{contact: fieldModifiers}
+			_, err = models.ApplyModifiers(ctx, rt, oa, modifiersByContact)
+			if err != nil {
+				return errors.Wrapf(err, "error applying contact field modifiers")
+			}
+
+			// field changes may affect dynamic group membership
+			recalculateDynamicGroups = true
+		}
+
+		// reload our contact from write DB to ensure we see the changes we just made
+		contacts, err = models.LoadContacts(ctx, rt.DB, oa, []models.ContactID{event.ContactID})
+		if err != nil {
+			return errors.Wrapf(err, "error loading contact after updating fields")
+		}
+
+		// contact has been deleted, ignore this message but mark it as handled
+		if len(contacts) == 0 {
+			err := models.UpdateMessage(ctx, rt.DB, event.MsgID, models.MsgStatusHandled, models.VisibilityArchived, models.MsgTypeInbox, topupID)
+			if err != nil {
+				return errors.Wrapf(err, "error updating message for deleted contact after updating fields")
+			}
+			return nil
+		}
+
+		modelContact = contacts[0]
+		contact, err = modelContact.FlowContact(oa)
+		if err != nil {
+			return errors.Wrapf(err, "error creating flow contact after updating fields")
+		}
+	}
+
 	// stopped contact? they are unstopped if they send us an incoming message
 	newContact := event.NewContact
 	if modelContact.Status() == models.ContactStatusStopped {
@@ -557,11 +609,11 @@ func handleMsgEvent(ctx context.Context, rt *runtime.Runtime, event *MsgEvent) e
 		newContact = true
 	}
 
-	// if this is a new contact, we need to calculate dynamic groups and campaigns
-	if newContact {
+	// if this is a new contact or fields were updated, we need to calculate dynamic groups
+	if newContact || recalculateDynamicGroups {
 		err = models.CalculateDynamicGroups(ctx, rt.DB, oa, []*flows.Contact{contact})
 		if err != nil {
-			return errors.Wrapf(err, "unable to initialize new contact")
+			return errors.Wrapf(err, "unable to calculate dynamic groups")
 		}
 	}
 
@@ -921,19 +973,20 @@ type TimedEvent struct {
 }
 
 type MsgEvent struct {
-	ContactID     models.ContactID   `json:"contact_id"`
-	OrgID         models.OrgID       `json:"org_id"`
-	ChannelID     models.ChannelID   `json:"channel_id"`
-	MsgID         flows.MsgID        `json:"msg_id"`
-	MsgUUID       flows.MsgUUID      `json:"msg_uuid"`
-	MsgExternalID null.String        `json:"msg_external_id"`
-	URN           urns.URN           `json:"urn"`
-	URNID         models.URNID       `json:"urn_id"`
-	Text          string             `json:"text"`
-	Attachments   []utils.Attachment `json:"attachments"`
-	NewContact    bool               `json:"new_contact"`
-	CreatedOn     time.Time          `json:"created_on"`
-	Metadata      json.RawMessage    `json:"metadata"`
+	ContactID        models.ContactID   `json:"contact_id"`
+	OrgID            models.OrgID       `json:"org_id"`
+	ChannelID        models.ChannelID   `json:"channel_id"`
+	MsgID            flows.MsgID        `json:"msg_id"`
+	MsgUUID          flows.MsgUUID      `json:"msg_uuid"`
+	MsgExternalID    null.String        `json:"msg_external_id"`
+	URN              urns.URN           `json:"urn"`
+	URNID            models.URNID       `json:"urn_id"`
+	Text             string             `json:"text"`
+	Attachments      []utils.Attachment `json:"attachments"`
+	NewContact       bool               `json:"new_contact"`
+	CreatedOn        time.Time          `json:"created_on"`
+	Metadata         json.RawMessage    `json:"metadata"`
+	NewContactFields map[string]string  `json:"new_contact_fields"`
 }
 
 type StopEvent struct {
