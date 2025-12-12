@@ -177,75 +177,29 @@ func (s *service) Open(session flows.Session, topic *flows.Topic, body string, a
 	ticket.SetExternalID(conversationSid)
 
 	if name := strings.TrimSpace(contact.Name()); name != "" {
-		// Resolve user SID by identity, then update friendly name by SID; if not found, create user.
 		var userSid string
-		if user, trace, errFind := s.restClient.FindConversationUserByIdentity(userIdentity); errFind == nil {
+		if participant, trace, errFind := s.restClient.FindConversationUserByIdentity(conversationSid, userIdentity); errFind == nil {
 			if trace != nil {
 				logHTTP(flows.NewHTTPLog(trace, flows.HTTPStatusFromCode, s.redactor))
 			}
-			if user != nil {
-				userSid = user.Sid
+			if participant != nil {
+				userSid = participant.Sid
 			}
 		} else {
 			logrus.Debugf("failed to find conversation user by identity: %+v", errFind)
 		}
 
 		if userSid != "" {
-			if _, trace, err := s.restClient.UpdateConversationUser(userSid, &UpdateConversationUserRequest{FriendlyName: name}); err != nil {
-				if trace != nil {
-					logHTTP(flows.NewHTTPLog(trace, flows.HTTPStatusFromCode, s.redactor))
-				}
-				logrus.Debugf("failed to update conversation user friendly name: %+v", err)
-			} else if trace != nil {
-				logHTTP(flows.NewHTTPLog(trace, flows.HTTPStatusFromCode, s.redactor))
-			}
-		} else {
-			if _, trace, err := s.restClient.CreateConversationUser(&CreateConversationUserRequest{
-				Identity:     userIdentity,
+			if _, trace, err := s.restClient.UpdateChatUser(s.conversationServiceSid, userSid, &UpdateChatUserRequest{
 				FriendlyName: name,
 			}); trace != nil {
 				logHTTP(flows.NewHTTPLog(trace, flows.HTTPStatusFromCode, s.redactor))
+				if err != nil {
+					logrus.Debugf("failed to update chat user friendly name: %+v", err)
+				}
 			} else if err != nil {
-				logrus.Debugf("failed to create conversation user: %+v", err)
+				logrus.Debugf("failed to update chat user friendly name: %+v", err)
 			}
-		}
-
-		participants, trace, errList := s.restClient.ListConversationParticipants(conversationSid)
-		if trace != nil {
-			logHTTP(flows.NewHTTPLog(trace, flows.HTTPStatusFromCode, s.redactor))
-		}
-		if errList == nil {
-			var participantSid string
-			for _, p := range participants {
-				if p.Identity == userIdentity {
-					participantSid = p.Sid
-					break
-				}
-			}
-			if participantSid != "" {
-				_, trace, err = s.restClient.UpdateConversationParticipant(conversationSid, participantSid, &UpdateConversationParticipantRequest{
-					FriendlyName: name,
-				})
-				if trace != nil {
-					logHTTP(flows.NewHTTPLog(trace, flows.HTTPStatusFromCode, s.redactor))
-				}
-				if err != nil {
-					logrus.Debugf("failed to update participant friendly name: %+v", err)
-				}
-			} else {
-				_, trace, err = s.restClient.CreateConversationParticipant(conversationSid, &CreateConversationParticipantRequest{
-					Identity:     userIdentity,
-					FriendlyName: name,
-				})
-				if trace != nil {
-					logHTTP(flows.NewHTTPLog(trace, flows.HTTPStatusFromCode, s.redactor))
-				}
-				if err != nil {
-					logrus.Debugf("failed to set participant friendly name: %+v", err)
-				}
-			}
-		} else {
-			logrus.Debugf("failed to list participants to set friendly name: %+v", errList)
 		}
 	}
 
