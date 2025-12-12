@@ -23,6 +23,14 @@ type Foreman struct {
 	quit             chan bool
 }
 
+// PendingTaskInfo describes a task that is currently being processed by a worker
+type PendingTaskInfo struct {
+	Queue    string
+	WorkerID int
+	TaskType string
+	OrgID    int
+}
+
 // NewForeman creates a new Foreman for the passed in server with the number of max workers
 func NewForeman(rt *runtime.Runtime, wg *sync.WaitGroup, queue string, maxWorkers int) *Foreman {
 	foreman := &Foreman{
@@ -50,6 +58,29 @@ func (f *Foreman) Start() {
 		worker.Start()
 	}
 	go f.Assign()
+
+	// start a background reaper to requeue expired processing tasks
+	if f.queue == queue.HandlerQueue {
+		go func() {
+			ticker := time.NewTicker(10 * time.Second)
+			defer ticker.Stop()
+			log := logrus.WithField("comp", "foreman_reaper").WithField("queue", f.queue)
+			for {
+				select {
+				case <-f.quit:
+					log.WithField("state", "stopped").Info("reaper stopped")
+					return
+				case <-ticker.C:
+					rc := f.rt.RP.Get()
+					_, err := queue.RequeueExpired(rc, f.queue, time.Now())
+					rc.Close()
+					if err != nil {
+						log.WithError(err).Error("error requeuing expired tasks")
+					}
+				}
+			}
+		}()
+	}
 }
 
 // Stop stops the foreman and all its workers, the wait group of the worker can be used to track progress
@@ -125,11 +156,33 @@ func (f *Foreman) RecordWorkerMetrics() {
 	}
 }
 
+// PendingTasks returns a snapshot of all tasks that are currently being processed by this foreman's workers.
+// This is intended for debugging and observability (for example, when handling shutdown signals).
+func (f *Foreman) PendingTasks() []PendingTaskInfo {
+	pending := make([]PendingTaskInfo, 0)
+
+	for _, w := range f.workers {
+		if task, ok := w.snapshotCurrentTask(); ok && task != nil {
+			pending = append(pending, PendingTaskInfo{
+				Queue:    f.queue,
+				WorkerID: w.id,
+				TaskType: task.Type,
+				OrgID:    task.OrgID,
+			})
+		}
+	}
+
+	return pending
+}
+
 // Worker is our type for a single goroutine that is handling queued events
 type Worker struct {
 	id      int
 	foreman *Foreman
 	job     chan *queue.Task
+
+	mu          sync.RWMutex
+	currentTask *queue.Task
 }
 
 // NewWorker creates a new worker responsible for working on events
@@ -161,10 +214,12 @@ func (w *Worker) Start() {
 
 			// exit if we were stopped
 			if task == nil {
+				w.clearCurrentTask()
 				log.Debug("stopped")
 				return
 			}
 
+			w.setCurrentTask(task)
 			w.handleTask(task)
 		}
 	}()
@@ -178,6 +233,9 @@ func (w *Worker) Stop() {
 func (w *Worker) handleTask(task *queue.Task) {
 	log := logrus.WithField("queue", w.foreman.queue).WithField("worker_id", w.id).WithField("task_type", task.Type).WithField("org_id", task.OrgID)
 
+	// register taskKey in outer scope so our defer can access it
+	var taskKey string
+
 	defer func() {
 		// catch any panics and recover
 		panicLog := recover()
@@ -186,14 +244,35 @@ func (w *Worker) handleTask(task *queue.Task) {
 			log.WithField("task", string(task.Task)).WithField("task_type", task.Type).WithField("org_id", task.OrgID).Errorf("panic handling task: %s", panicLog)
 		}
 
+		// clear our current task snapshot
+		w.clearCurrentTask()
+
 		// mark our task as complete
 		rc := w.foreman.rt.RP.Get()
+		if task.Type == queue.SendHistory && taskKey != "" {
+			_ = queue.EndProcessing(rc, w.foreman.queue, task.OrgID, taskKey)
+		}
 		err := queue.MarkTaskComplete(rc, w.foreman.queue, task.OrgID)
 		if err != nil {
 			log.WithError(err)
 		}
 		rc.Close()
 	}()
+
+	// register task as processing with a deadline
+	{
+		if task.Type == queue.SendHistory {
+			rc := w.foreman.rt.RP.Get()
+			processingTTL := time.Duration(w.foreman.rt.Config.ProcessingTTL) * time.Second
+			key, err := queue.BeginProcessing(rc, w.foreman.queue, task.OrgID, task, processingTTL)
+			rc.Close()
+			if err == nil {
+				taskKey = key
+			} else {
+				log.WithError(err).Warn("unable to register task as processing")
+			}
+		}
+	}
 
 	log.Info("starting handling of task")
 	start := time.Now()
@@ -216,4 +295,28 @@ func (w *Worker) handleTask(task *queue.Task) {
 	if elapsed > time.Minute {
 		log.WithField("task", string(task.Task)).WithField("elapsed", elapsed).Warn("long running task")
 	}
+}
+
+// setCurrentTask records the task currently being processed by this worker.
+func (w *Worker) setCurrentTask(task *queue.Task) {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	w.currentTask = task
+}
+
+// clearCurrentTask clears any record of a task being processed by this worker.
+func (w *Worker) clearCurrentTask() {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	w.currentTask = nil
+}
+
+// snapshotCurrentTask returns a snapshot of the current task, if any, for observability.
+func (w *Worker) snapshotCurrentTask() (*queue.Task, bool) {
+	w.mu.RLock()
+	defer w.mu.RUnlock()
+	if w.currentTask == nil {
+		return nil, false
+	}
+	return w.currentTask, true
 }

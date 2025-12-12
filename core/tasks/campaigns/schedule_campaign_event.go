@@ -10,6 +10,7 @@ import (
 	"github.com/nyaruka/mailroom/runtime"
 	"github.com/nyaruka/redisx"
 	"github.com/pkg/errors"
+	"github.com/sirupsen/logrus"
 )
 
 // TypeScheduleCampaignEvent is the type of the schedule event task
@@ -42,6 +43,10 @@ func (t *ScheduleCampaignEventTask) Perform(ctx context.Context, rt *runtime.Run
 
 	err = models.ScheduleCampaignEvent(ctx, rt, orgID, t.CampaignEventID)
 	if err != nil {
+		logrus.WithError(err).
+			WithField("org_id", orgID).
+			WithField("campaign_event_id", t.CampaignEventID).
+			Error("error scheduling campaign event")
 		return errors.Wrapf(err, "error scheduling campaign event %d", t.CampaignEventID)
 	}
 

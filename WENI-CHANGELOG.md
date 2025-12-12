@@ -1,3 +1,11 @@
+1.75.0
+----------
+ * Log pending tasks on exit
+
+1.74.0
+----------
+ * Task send_history has status processing for retry task if the instance closes abruptly before completion
+
 1.73.5
 ----------
  * Now wenichats send default history as recent 24 hours msgs
