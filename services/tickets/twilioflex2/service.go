@@ -176,6 +176,33 @@ func (s *service) Open(session flows.Session, topic *flows.Topic, body string, a
 	}
 	ticket.SetExternalID(conversationSid)
 
+	if name := strings.TrimSpace(contact.Name()); name != "" {
+		var userSid string
+		if participant, trace, errFind := s.restClient.FindConversationUserByIdentity(conversationSid, userIdentity); errFind == nil {
+			if trace != nil {
+				logHTTP(flows.NewHTTPLog(trace, flows.HTTPStatusFromCode, s.redactor))
+			}
+			if participant != nil {
+				userSid = participant.Sid
+			}
+		} else {
+			logrus.Debugf("failed to find conversation user by identity: %+v", errFind)
+		}
+
+		if userSid != "" {
+			if _, trace, err := s.restClient.UpdateChatUser(s.conversationServiceSid, userSid, &UpdateChatUserRequest{
+				FriendlyName: name,
+			}); trace != nil {
+				logHTTP(flows.NewHTTPLog(trace, flows.HTTPStatusFromCode, s.redactor))
+				if err != nil {
+					logrus.Debugf("failed to update chat user friendly name: %+v", err)
+				}
+			} else if err != nil {
+				logrus.Debugf("failed to update chat user friendly name: %+v", err)
+			}
+		}
+	}
+
 	_, trace, err = s.restClient.CreateConversationScopedWebhook(conversationSid, &CreateConversationWebhookRequest{
 		Target:               "webhook",
 		ConfigurationUrl:     fmt.Sprintf("https://%s/mr/tickets/types/twilioflex2/conversation_callback/%s/%s", s.rtConfig.Domain, s.ticketer.UUID(), ticket.UUID()),
