@@ -570,6 +570,8 @@ func handleMsgEvent(ctx context.Context, rt *runtime.Runtime, event *MsgEvent) e
 
 	// if we have new contact fields, create the contact field update modifiers and apply them
 	if event.NewContactFields != nil {
+		fmt.Printf("[new_contact_fields] msg event %+v\n", event)
+		fmt.Printf("[new_contact_fields] new contact fields %+v\n", event.NewContactFields)
 
 		// create our field modifiers
 		fieldModifiers := make([]flows.Modifier, 0, len(event.NewContactFields))
@@ -581,6 +583,7 @@ func handleMsgEvent(ctx context.Context, rt *runtime.Runtime, event *MsgEvent) e
 			}
 			fieldModifiers = append(fieldModifiers, modifiers.NewField(field, value))
 		}
+		fmt.Printf("[new_contact_fields] fieldModifiers %+v\n", fieldModifiers)
 
 		// apply our field modifiers
 		if len(fieldModifiers) > 0 {
@@ -593,12 +596,15 @@ func handleMsgEvent(ctx context.Context, rt *runtime.Runtime, event *MsgEvent) e
 			// field changes may affect dynamic group membership
 			recalculateDynamicGroups = true
 		}
+		fmt.Printf("[new_contact_fields] applied field modifiers, recalculateDynamicGroups: %+v\n", recalculateDynamicGroups)
 
 		// reload our contact from write DB to ensure we see the changes we just made
 		contacts, err = models.LoadContacts(ctx, rt.DB, oa, []models.ContactID{event.ContactID})
 		if err != nil {
 			return errors.Wrapf(err, "error loading contact after updating fields")
 		}
+
+		fmt.Printf("[new_contact_fields] loaded contacts %+v\n", contacts)
 
 		// contact has been deleted, ignore this message but mark it as handled
 		if len(contacts) == 0 {
@@ -609,11 +615,15 @@ func handleMsgEvent(ctx context.Context, rt *runtime.Runtime, event *MsgEvent) e
 			return nil
 		}
 
+		fmt.Printf("[new_contact_fields] contacts %+v\n", contacts)
+
 		modelContact = contacts[0]
 		contact, err = modelContact.FlowContact(oa)
 		if err != nil {
 			return errors.Wrapf(err, "error creating flow contact after updating fields")
 		}
+
+		fmt.Printf("[new_contact_fields] contact %+v\n", contact)
 	}
 
 	// stopped contact? they are unstopped if they send us an incoming message
@@ -629,6 +639,9 @@ func handleMsgEvent(ctx context.Context, rt *runtime.Runtime, event *MsgEvent) e
 
 	// if this is a new contact or fields were updated, we need to calculate dynamic groups
 	if newContact || recalculateDynamicGroups {
+		if recalculateDynamicGroups {
+			fmt.Println("[new_contact_fields] recalculating dynamic groups")
+		}
 		err = models.CalculateDynamicGroups(ctx, rt.DB, oa, []*flows.Contact{contact})
 		if err != nil {
 			return errors.Wrapf(err, "unable to calculate dynamic groups")
