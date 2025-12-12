@@ -309,6 +309,56 @@ func (c *Client) ListConversationParticipants(conversationSid string) ([]Convers
 	return resp.Participants, trace, nil
 }
 
+// UpdateConversationUser updates a Conversations User by SID.
+func (c *Client) UpdateConversationUser(userSid string, user *UpdateConversationUserRequest) (*ConversationUser, *httpx.Trace, error) {
+	endpoint := fmt.Sprintf("https://conversations.twilio.com/v1/Users/%s", userSid)
+	resp := &ConversationUser{}
+	data, err := query.Values(user)
+	if err != nil {
+		return nil, nil, err
+	}
+	data = removeEmpties(data)
+	trace, err := c.post(endpoint, data, resp, nil)
+	if err != nil {
+		return nil, trace, err
+	}
+	return resp, trace, nil
+}
+
+// CreateConversationUser creates a Conversations User (used as fallback when none exists for identity).
+func (c *Client) CreateConversationUser(user *CreateConversationUserRequest) (*ConversationUser, *httpx.Trace, error) {
+	endpoint := "https://conversations.twilio.com/v1/Users"
+	resp := &ConversationUser{}
+	data, err := query.Values(user)
+	if err != nil {
+		return nil, nil, err
+	}
+	data = removeEmpties(data)
+	trace, err := c.post(endpoint, data, resp, nil)
+	if err != nil {
+		return nil, trace, err
+	}
+	return resp, trace, nil
+}
+
+// FindConversationUserByIdentity searches users filtered by Identity and returns the first match.
+func (c *Client) FindConversationUserByIdentity(identity string) (*ConversationUser, *httpx.Trace, error) {
+	endpoint := "https://conversations.twilio.com/v1/Users"
+	resp := &ListConversationUsersResponse{}
+	data := url.Values{}
+	data.Set("Identity", identity)
+	trace, err := c.get(endpoint, data, resp, nil)
+	if err != nil {
+		return nil, trace, err
+	}
+	for _, u := range resp.Users {
+		if u.Identity == identity {
+			return &u, trace, nil
+		}
+	}
+	return nil, trace, nil
+}
+
 // CreateInteractionWebhookRequest parameters for creating an interaction webhook
 // https://www.twilio.com/docs/flex/developer/conversations/register-interactions-webhooks
 type CreateInteractionWebhookRequest struct {
@@ -472,6 +522,30 @@ type ConversationParticipant struct {
 type ListConversationParticipantsResponse struct {
 	Participants []ConversationParticipant `json:"participants,omitempty"`
 	Meta         map[string]any            `json:"meta,omitempty"`
+}
+
+// CreateConversationUserRequest represents the payload to create a user
+type CreateConversationUserRequest struct {
+	Identity     string `json:"Identity,omitempty" url:"Identity,omitempty"`
+	FriendlyName string `json:"FriendlyName,omitempty" url:"FriendlyName,omitempty"`
+}
+
+// UpdateConversationUserRequest represents the payload to update a user
+type UpdateConversationUserRequest struct {
+	FriendlyName string `json:"FriendlyName,omitempty" url:"FriendlyName,omitempty"`
+}
+
+// ConversationUser represents a user resource
+type ConversationUser struct {
+	Sid          string `json:"sid,omitempty"`
+	Identity     string `json:"identity,omitempty"`
+	FriendlyName string `json:"friendly_name,omitempty"`
+}
+
+// ListConversationUsersResponse represents a page of users
+type ListConversationUsersResponse struct {
+	Users []ConversationUser `json:"users,omitempty"`
+	Meta  map[string]any     `json:"meta,omitempty"`
 }
 
 // UpdateInteractionChannelRequest parameters for updating an interaction channel
