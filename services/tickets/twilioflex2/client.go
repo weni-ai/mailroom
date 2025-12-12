@@ -414,14 +414,6 @@ type CreateConversationMessageResponse struct {
 	Index           int              `json:"index,omitempty"`
 }
 
-// CreateConversationParticipantRequest parameters for creating a conversation participant
-// https://www.twilio.com/docs/conversations/api/conversation-participant-resource#create-a-participant-resource
-type CreateConversationParticipantRequest struct {
-	Identity     string `json:"Identity,omitempty" url:"Identity,omitempty"`
-	FriendlyName string `json:"FriendlyName,omitempty" url:"FriendlyName,omitempty"`
-	Attributes   string `json:"Attributes,omitempty" url:"Attributes,omitempty"`
-}
-
 // CreateConversationParticipantResponse represents a participant
 // https://www.twilio.com/docs/conversations/api/conversation-participant-resource
 type CreateConversationParticipantResponse struct {
