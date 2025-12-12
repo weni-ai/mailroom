@@ -261,6 +261,54 @@ func (c *Client) FetchMedia(serviceSid, mediaSid string) (*Media, *httpx.Trace, 
 	return response, trace, nil
 }
 
+// CreateConversationParticipant adds a participant to a conversation (idempotent on identity; 409 conflicts are ignored).
+func (c *Client) CreateConversationParticipant(conversationSid string, participant *CreateConversationParticipantRequest) (*CreateConversationParticipantResponse, *httpx.Trace, error) {
+	endpoint := fmt.Sprintf("https://conversations.twilio.com/v1/Conversations/%s/Participants", conversationSid)
+	response := &CreateConversationParticipantResponse{}
+	data, err := query.Values(participant)
+	if err != nil {
+		return nil, nil, err
+	}
+	data = removeEmpties(data)
+	trace, err := c.post(endpoint, data, response, nil)
+	if err != nil {
+		// If participant already exists, Twilio returns 409; we can safely ignore.
+		if trace != nil && trace.Response != nil && trace.Response.StatusCode == http.StatusConflict {
+			return response, trace, nil
+		}
+		return nil, trace, err
+	}
+	return response, trace, nil
+}
+
+// UpdateConversationParticipant updates a participant using its SID.
+func (c *Client) UpdateConversationParticipant(conversationSid, participantSid string, participant *UpdateConversationParticipantRequest) (*CreateConversationParticipantResponse, *httpx.Trace, error) {
+	endpoint := fmt.Sprintf("https://conversations.twilio.com/v1/Conversations/%s/Participants/%s", conversationSid, participantSid)
+	response := &CreateConversationParticipantResponse{}
+	data, err := query.Values(participant)
+	if err != nil {
+		return nil, nil, err
+	}
+	data = removeEmpties(data)
+	trace, err := c.post(endpoint, data, response, nil)
+	if err != nil {
+		return nil, trace, err
+	}
+	return response, trace, nil
+}
+
+// ListConversationParticipants fetches participants for a conversation (single page).
+func (c *Client) ListConversationParticipants(conversationSid string) ([]ConversationParticipant, *httpx.Trace, error) {
+	endpoint := fmt.Sprintf("https://conversations.twilio.com/v1/Conversations/%s/Participants", conversationSid)
+	resp := &ListConversationParticipantsResponse{}
+	data := url.Values{}
+	trace, err := c.get(endpoint, data, resp, nil)
+	if err != nil {
+		return nil, trace, err
+	}
+	return resp.Participants, trace, nil
+}
+
 // CreateInteractionWebhookRequest parameters for creating an interaction webhook
 // https://www.twilio.com/docs/flex/developer/conversations/register-interactions-webhooks
 type CreateInteractionWebhookRequest struct {
@@ -382,6 +430,48 @@ type CreateConversationMessageResponse struct {
 	Media           []map[string]any `json:"media,omitempty"`
 	ParticipantSid  string           `json:"participant_sid,omitempty"`
 	Index           int              `json:"index,omitempty"`
+}
+
+// CreateConversationParticipantRequest parameters for creating a conversation participant
+// https://www.twilio.com/docs/conversations/api/conversation-participant-resource#create-a-participant-resource
+type CreateConversationParticipantRequest struct {
+	Identity     string `json:"Identity,omitempty" url:"Identity,omitempty"`
+	FriendlyName string `json:"FriendlyName,omitempty" url:"FriendlyName,omitempty"`
+	Attributes   string `json:"Attributes,omitempty" url:"Attributes,omitempty"`
+}
+
+// CreateConversationParticipantResponse represents a participant
+// https://www.twilio.com/docs/conversations/api/conversation-participant-resource
+type CreateConversationParticipantResponse struct {
+	Sid             string `json:"sid,omitempty"`
+	AccountSid      string `json:"account_sid,omitempty"`
+	ConversationSid string `json:"conversation_sid,omitempty"`
+	Identity        string `json:"identity,omitempty"`
+	FriendlyName    string `json:"friendly_name,omitempty"`
+	Attributes      string `json:"attributes,omitempty"`
+	DateCreated     string `json:"date_created,omitempty"`
+	DateUpdated     string `json:"date_updated,omitempty"`
+	URL             string `json:"url,omitempty"`
+}
+
+// UpdateConversationParticipantRequest updates an existing participant
+// https://www.twilio.com/docs/conversations/api/conversation-participant-resource#update-a-participant-resource
+type UpdateConversationParticipantRequest struct {
+	FriendlyName string `json:"FriendlyName,omitempty" url:"FriendlyName,omitempty"`
+	Attributes   string `json:"Attributes,omitempty" url:"Attributes,omitempty"`
+}
+
+// ConversationParticipant represents a participant entry returned by list endpoints
+type ConversationParticipant struct {
+	Sid          string `json:"sid,omitempty"`
+	Identity     string `json:"identity,omitempty"`
+	FriendlyName string `json:"friendly_name,omitempty"`
+}
+
+// ListConversationParticipantsResponse represents a page of participants
+type ListConversationParticipantsResponse struct {
+	Participants []ConversationParticipant `json:"participants,omitempty"`
+	Meta         map[string]any            `json:"meta,omitempty"`
 }
 
 // UpdateInteractionChannelRequest parameters for updating an interaction channel
