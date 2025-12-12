@@ -323,24 +323,6 @@ func (c *Client) CreateConversationUser(user *CreateConversationUserRequest) (*C
 	return resp, trace, nil
 }
 
-// FindConversationUserByIdentity searches users filtered by Identity and returns the first match.
-func (c *Client) FindConversationUserByIdentity(identity string) (*ConversationUser, *httpx.Trace, error) {
-	endpoint := "https://conversations.twilio.com/v1/Users"
-	resp := &ListConversationUsersResponse{}
-	data := url.Values{}
-	data.Set("Identity", identity)
-	trace, err := c.get(endpoint, data, resp, nil)
-	if err != nil {
-		return nil, trace, err
-	}
-	for _, u := range resp.Users {
-		if u.Identity == identity {
-			return &u, trace, nil
-		}
-	}
-	return nil, trace, nil
-}
-
 // CreateInteractionWebhookRequest parameters for creating an interaction webhook
 // https://www.twilio.com/docs/flex/developer/conversations/register-interactions-webhooks
 type CreateInteractionWebhookRequest struct {
