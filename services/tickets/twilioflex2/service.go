@@ -176,6 +176,46 @@ func (s *service) Open(session flows.Session, topic *flows.Topic, body string, a
 	}
 	ticket.SetExternalID(conversationSid)
 
+	if name := strings.TrimSpace(contact.Name()); name != "" {
+		participants, trace, errList := s.restClient.ListConversationParticipants(conversationSid)
+		if trace != nil {
+			logHTTP(flows.NewHTTPLog(trace, flows.HTTPStatusFromCode, s.redactor))
+		}
+		if errList == nil {
+			var participantSid string
+			for _, p := range participants {
+				if p.Identity == userIdentity {
+					participantSid = p.Sid
+					break
+				}
+			}
+			if participantSid != "" {
+				_, trace, err = s.restClient.UpdateConversationParticipant(conversationSid, participantSid, &UpdateConversationParticipantRequest{
+					FriendlyName: name,
+				})
+				if trace != nil {
+					logHTTP(flows.NewHTTPLog(trace, flows.HTTPStatusFromCode, s.redactor))
+				}
+				if err != nil {
+					logrus.Debugf("failed to update participant friendly name: %+v", err)
+				}
+			} else {
+				_, trace, err = s.restClient.CreateConversationParticipant(conversationSid, &CreateConversationParticipantRequest{
+					Identity:     userIdentity,
+					FriendlyName: name,
+				})
+				if trace != nil {
+					logHTTP(flows.NewHTTPLog(trace, flows.HTTPStatusFromCode, s.redactor))
+				}
+				if err != nil {
+					logrus.Debugf("failed to set participant friendly name: %+v", err)
+				}
+			}
+		} else {
+			logrus.Debugf("failed to list participants to set friendly name: %+v", errList)
+		}
+	}
+
 	_, trace, err = s.restClient.CreateConversationScopedWebhook(conversationSid, &CreateConversationWebhookRequest{
 		Target:               "webhook",
 		ConfigurationUrl:     fmt.Sprintf("https://%s/mr/tickets/types/twilioflex2/conversation_callback/%s/%s", s.rtConfig.Domain, s.ticketer.UUID(), ticket.UUID()),
