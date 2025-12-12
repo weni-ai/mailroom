@@ -9,6 +9,8 @@ import (
 	"github.com/nyaruka/gocommon/httpx"
 	"github.com/nyaruka/gocommon/urns"
 	"github.com/nyaruka/gocommon/uuids"
+	"github.com/nyaruka/goflow/assets"
+	"github.com/nyaruka/goflow/envs"
 	"github.com/nyaruka/goflow/flows"
 	_ "github.com/nyaruka/mailroom/core/handlers"
 	"github.com/nyaruka/mailroom/core/models"
@@ -246,6 +248,78 @@ func TestMsgEvents(t *testing.T) {
 
 }
 
+func TestBrainOnMsgEventCalculatesDynamicGroups(t *testing.T) {
+	ctx, rt, db, rp := testsuite.Get()
+	rc := rp.Get()
+	defer rc.Close()
+
+	defer testsuite.Reset(testsuite.ResetAll)
+
+	db.MustExec(`CREATE TABLE IF NOT EXISTS internal_project (
+		id SERIAL PRIMARY KEY,
+		project_uuid UUID NOT NULL,
+		org_ptr_id INTEGER NOT NULL
+	)`)
+	db.MustExec(`INSERT INTO internal_project (project_uuid, org_ptr_id) VALUES ($1, $2)`, uuids.New(), testdata.Org1.ID)
+
+	db.MustExec(`UPDATE orgs_org SET brain_on = TRUE WHERE id = $1`, testdata.Org1.ID)
+
+	group := testdata.InsertContactGroup(db, testdata.Org1, assets.GroupUUID(uuids.New()), "BrainLangEng", "language = eng")
+
+	channel := testdata.InsertChannel(db, testdata.Org1, "TW", "Brain Channel", []string{"tel"}, "SR", map[string]interface{}{})
+
+	contact := testdata.InsertContact(db, testdata.Org1, flows.ContactUUID(uuids.New()), "Brain Contact", envs.Language(`eng`))
+	urn := urns.URN("tel:+250700000010")
+	urnID := testdata.InsertContactURN(db, testdata.Org1, contact, urn, 1000)
+
+	models.FlushCache()
+
+	dbMsg := testdata.InsertIncomingMsg(db, testdata.Org1, channel, contact, "brain_on dynamic groups", models.MsgStatusPending)
+
+	httpx.SetRequestor(httpx.NewMockRequestor(map[string][]httpx.MockResponse{
+		"https://nexus.stg.cloud.weni.ai/messages?token=": {
+			httpx.NewMockResponse(200, nil, ``),
+		},
+	}))
+
+	event := &handler.MsgEvent{
+		ContactID: contact.ID,
+		OrgID:     testdata.Org1.ID,
+		ChannelID: channel.ID,
+		MsgID:     dbMsg.ID(),
+		MsgUUID:   dbMsg.UUID(),
+		URN:       urn,
+		URNID:     urnID,
+		Text:      "brain_on dynamic groups",
+	}
+
+	eventJSON, err := json.Marshal(event)
+	require.NoError(t, err)
+
+	task := &queue.Task{
+		Type:  handler.MsgEventType,
+		OrgID: int(testdata.Org1.ID),
+		Task:  eventJSON,
+	}
+
+	err = handler.QueueHandleTask(rc, contact.ID, task)
+	require.NoError(t, err, "error adding task")
+
+	task, err = queue.PopNextTask(rc, queue.HandlerQueue)
+	require.NoError(t, err, "error popping next task")
+
+	err = handler.HandleEvent(ctx, rt, task)
+	require.NoError(t, err, "error when handling event")
+
+	// message should be marked as handled inbox by brain path
+	testsuite.AssertQuery(t, db, `SELECT msg_type, status FROM msgs_msg WHERE id = $1`, dbMsg.ID()).
+		Columns(map[string]interface{}{"msg_type": string(models.MsgTypeInbox), "status": "H"})
+
+	// dynamic group should have been (re)calculated for this contact
+	testsuite.AssertQuery(t, db, `SELECT count(*) FROM contacts_contactgroup_contacts WHERE contactgroup_id = $1 AND contact_id = $2`, group.ID, contact.ID).
+		Returns(1)
+}
+
 func TestChannelEvents(t *testing.T) {
 	ctx, rt, db, rp := testsuite.Get()
 	rc := rp.Get()
@@ -385,6 +459,184 @@ func TestStopEvent(t *testing.T) {
 	// and has no upcoming events
 	testsuite.AssertQuery(t, db, `SELECT count(*) FROM campaigns_eventfire WHERE contact_id = $1`, testdata.Cathy.ID).Returns(0)
 	testsuite.AssertQuery(t, db, `SELECT count(*) FROM campaigns_eventfire WHERE contact_id = $1`, testdata.George.ID).Returns(1)
+}
+
+func TestMsgEventWithNewContactFields(t *testing.T) {
+	ctx, rt, db, rp := testsuite.Get()
+	rc := rp.Get()
+	defer rc.Close()
+
+	defer testsuite.Reset(testsuite.ResetAll)
+
+	models.FlushCache()
+
+	// insert a dummy message into the database
+	dbMsg := testdata.InsertIncomingMsg(db, testdata.Org1, testdata.TwilioChannel, testdata.Cathy, "test fields", models.MsgStatusPending)
+
+	// create a MsgEvent with NewContactFields
+	event := &handler.MsgEvent{
+		ContactID:        testdata.Cathy.ID,
+		OrgID:            testdata.Org1.ID,
+		ChannelID:        testdata.TwilioChannel.ID,
+		MsgID:            dbMsg.ID(),
+		MsgUUID:          dbMsg.UUID(),
+		URN:              testdata.Cathy.URN,
+		URNID:            testdata.Cathy.URNID,
+		Text:             "test fields",
+		NewContactFields: map[string]string{"gender": "Male", "age": "30"},
+	}
+
+	eventJSON, err := json.Marshal(event)
+	require.NoError(t, err)
+
+	task := &queue.Task{
+		Type:  handler.MsgEventType,
+		OrgID: int(testdata.Org1.ID),
+		Task:  eventJSON,
+	}
+
+	err = handler.QueueHandleTask(rc, testdata.Cathy.ID, task)
+	require.NoError(t, err, "error adding task")
+
+	task, err = queue.PopNextTask(rc, queue.HandlerQueue)
+	require.NoError(t, err, "error popping next task")
+
+	err = handler.HandleEvent(ctx, rt, task)
+	require.NoError(t, err, "error when handling event")
+
+	// message should be marked as handled
+	testsuite.AssertQuery(t, db, `SELECT status FROM msgs_msg WHERE id = $1`, dbMsg.ID()).
+		Returns("H")
+
+	// contact fields should have been updated
+	testsuite.AssertQuery(t, db, `SELECT count(*) FROM contacts_contact WHERE id = $1 AND fields->$2 = '{"text":"Male"}'::jsonb`, testdata.Cathy.ID, testdata.GenderField.UUID).
+		Returns(1)
+	testsuite.AssertQuery(t, db, `SELECT count(*) FROM contacts_contact WHERE id = $1 AND fields->$2 = '{"text":"30", "number": 30}'::jsonb`, testdata.Cathy.ID, testdata.AgeField.UUID).
+		Returns(1)
+}
+
+func TestMsgEventBlockedContactFieldsNotModified(t *testing.T) {
+	ctx, rt, db, rp := testsuite.Get()
+	rc := rp.Get()
+	defer rc.Close()
+
+	defer testsuite.Reset(testsuite.ResetAll)
+
+	// block George
+	db.MustExec(`UPDATE contacts_contact SET status = 'B' WHERE id = $1`, testdata.George.ID)
+
+	// clear George's fields first
+	db.MustExec(`UPDATE contacts_contact SET fields = '{}' WHERE id = $1`, testdata.George.ID)
+
+	models.FlushCache()
+
+	// insert a dummy message into the database
+	dbMsg := testdata.InsertIncomingMsg(db, testdata.Org1, testdata.TwilioChannel, testdata.George, "blocked test", models.MsgStatusPending)
+
+	// create a MsgEvent with NewContactFields for a blocked contact
+	event := &handler.MsgEvent{
+		ContactID:        testdata.George.ID,
+		OrgID:            testdata.Org1.ID,
+		ChannelID:        testdata.TwilioChannel.ID,
+		MsgID:            dbMsg.ID(),
+		MsgUUID:          dbMsg.UUID(),
+		URN:              testdata.George.URN,
+		URNID:            testdata.George.URNID,
+		Text:             "blocked test",
+		NewContactFields: map[string]string{"gender": "Male"},
+	}
+
+	eventJSON, err := json.Marshal(event)
+	require.NoError(t, err)
+
+	task := &queue.Task{
+		Type:  handler.MsgEventType,
+		OrgID: int(testdata.Org1.ID),
+		Task:  eventJSON,
+	}
+
+	err = handler.QueueHandleTask(rc, testdata.George.ID, task)
+	require.NoError(t, err, "error adding task")
+
+	task, err = queue.PopNextTask(rc, queue.HandlerQueue)
+	require.NoError(t, err, "error popping next task")
+
+	err = handler.HandleEvent(ctx, rt, task)
+	require.NoError(t, err, "error when handling event")
+
+	// message should be marked as handled (archived for blocked contacts)
+	testsuite.AssertQuery(t, db, `SELECT status FROM msgs_msg WHERE id = $1`, dbMsg.ID()).
+		Returns("H")
+
+	// contact fields should NOT have been updated (blocked contact)
+	testsuite.AssertQuery(t, db, `SELECT count(*) FROM contacts_contact WHERE id = $1 AND fields = '{}'`, testdata.George.ID).
+		Returns(1)
+}
+
+func TestMsgEventNewContactFieldsDynamicGroups(t *testing.T) {
+	ctx, rt, db, rp := testsuite.Get()
+	rc := rp.Get()
+	defer rc.Close()
+
+	defer testsuite.Reset(testsuite.ResetAll)
+
+	// create a dynamic group based on gender field
+	group := testdata.InsertContactGroup(db, testdata.Org1, assets.GroupUUID(uuids.New()), "Males", `gender = "Male"`)
+
+	// ensure Bob doesn't have any gender field set
+	db.MustExec(`UPDATE contacts_contact SET fields = '{}' WHERE id = $1`, testdata.Bob.ID)
+
+	models.FlushCache()
+
+	// Bob should not be in the Males group initially
+	testsuite.AssertQuery(t, db, `SELECT count(*) FROM contacts_contactgroup_contacts WHERE contactgroup_id = $1 AND contact_id = $2`, group.ID, testdata.Bob.ID).
+		Returns(0)
+
+	// insert a dummy message into the database
+	dbMsg := testdata.InsertIncomingMsg(db, testdata.Org1, testdata.TwilioChannel, testdata.Bob, "dynamic groups test", models.MsgStatusPending)
+
+	// create a MsgEvent with NewContactFields that should trigger dynamic group recalculation
+	event := &handler.MsgEvent{
+		ContactID:        testdata.Bob.ID,
+		OrgID:            testdata.Org1.ID,
+		ChannelID:        testdata.TwilioChannel.ID,
+		MsgID:            dbMsg.ID(),
+		MsgUUID:          dbMsg.UUID(),
+		URN:              testdata.Bob.URN,
+		URNID:            testdata.Bob.URNID,
+		Text:             "dynamic groups test",
+		NewContactFields: map[string]string{"gender": "Male"},
+	}
+
+	eventJSON, err := json.Marshal(event)
+	require.NoError(t, err)
+
+	task := &queue.Task{
+		Type:  handler.MsgEventType,
+		OrgID: int(testdata.Org1.ID),
+		Task:  eventJSON,
+	}
+
+	err = handler.QueueHandleTask(rc, testdata.Bob.ID, task)
+	require.NoError(t, err, "error adding task")
+
+	task, err = queue.PopNextTask(rc, queue.HandlerQueue)
+	require.NoError(t, err, "error popping next task")
+
+	err = handler.HandleEvent(ctx, rt, task)
+	require.NoError(t, err, "error when handling event")
+
+	// message should be marked as handled
+	testsuite.AssertQuery(t, db, `SELECT status FROM msgs_msg WHERE id = $1`, dbMsg.ID()).
+		Returns("H")
+
+	// contact field should have been updated
+	testsuite.AssertQuery(t, db, `SELECT count(*) FROM contacts_contact WHERE id = $1 AND fields->$2 = '{"text":"Male"}'::jsonb`, testdata.Bob.ID, testdata.GenderField.UUID).
+		Returns(1)
+
+	// Bob should now be in the Males group after dynamic group recalculation
+	testsuite.AssertQuery(t, db, `SELECT count(*) FROM contacts_contactgroup_contacts WHERE contactgroup_id = $1 AND contact_id = $2`, group.ID, testdata.Bob.ID).
+		Returns(1)
 }
 
 func TestTimedEvents(t *testing.T) {

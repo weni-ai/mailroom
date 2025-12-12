@@ -239,6 +239,43 @@ func (mr *Mailroom) Stop() error {
 	return nil
 }
 
+// LogPendingTasks inspects all foremen/workers and logs any tasks that are still being processed.
+// This is useful when reacting to shutdown signals to understand what work is still in-flight.
+func (mr *Mailroom) LogPendingTasks() {
+	foremen := []*Foreman{
+		mr.batchForeman,
+		mr.handlerForeman,
+		mr.flowBatchForeman,
+		mr.wppBroadcastForeman,
+		mr.templateBatchForeman,
+		mr.templateNotificationBatchForeman,
+		mr.rabbitmqForeman,
+	}
+
+	var pending []PendingTaskInfo
+	for _, f := range foremen {
+		if f == nil {
+			continue
+		}
+		pending = append(pending, f.PendingTasks()...)
+	}
+
+	if len(pending) == 0 {
+		logrus.WithField("comp", "mailroom").Info("no pending tasks in workers")
+		return
+	}
+
+	log := logrus.WithField("comp", "mailroom")
+	for _, t := range pending {
+		log.WithFields(logrus.Fields{
+			"queue":     t.Queue,
+			"worker_id": t.WorkerID,
+			"task_type": t.TaskType,
+			"org_id":    t.OrgID,
+		}).Info("pending task still in progress")
+	}
+}
+
 func openAndCheckDBConnection(url string, maxOpenConns int) (*sqlx.DB, error) {
 	db, err := sqlx.Open("postgres", url)
 	if err != nil {

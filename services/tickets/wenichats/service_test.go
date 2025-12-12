@@ -1,6 +1,7 @@
 package wenichats_test
 
 import (
+	"database/sql/driver"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -1036,4 +1037,98 @@ func TestSendHistory(t *testing.T) {
 
 	err = svc.SendHistory(ticket, models.ContactID(testdata.Cathy.ID), nil, logger.Log)
 	assert.NoError(t, err)
+}
+
+type approxTime struct {
+	t     time.Time
+	delta time.Duration
+}
+
+func (a approxTime) Match(v driver.Value) bool {
+	actual, ok := v.(time.Time)
+	if !ok {
+		return false
+	}
+	diff := actual.Sub(a.t)
+	if diff < 0 {
+		diff = -diff
+	}
+	return diff <= a.delta
+}
+
+func TestDefaultSendHistory(t *testing.T) {
+
+	_, rt, _, _ := testsuite.Get()
+
+	defer uuids.SetGenerator(uuids.DefaultGenerator)
+	defer httpx.SetRequestor(httpx.DefaultRequestor)
+
+	uuids.SetGenerator(uuids.NewSeededGenerator(12345))
+
+	roomUUID := "8ecb1e4a-b457-4645-a161-e2b02ddffa88"
+
+	httpx.SetRequestor(httpx.NewMockRequestor(map[string][]httpx.MockResponse{
+		"https://auth.weni.ai/oauth/token": {
+			httpx.NewMockResponse(200, nil, `{
+				"access_token": "token",
+				"token_type": "Bearer",
+				"expires_in": 3600
+			}`),
+		},
+		fmt.Sprintf("%s/rooms/%s/history/", baseURL, roomUUID): {
+			httpx.NewMockResponse(200, nil, `{}`),
+		},
+	}))
+
+	ticketer := flows.NewTicketer(static.NewTicketer(assets.TicketerUUID(uuids.New()), "Support", "wenichats"))
+
+	svc, err := wenichats.NewService(
+		rt.Config,
+		http.DefaultClient,
+		nil,
+		ticketer,
+		map[string]string{
+			"project_auth": authToken,
+			"sector_uuid":  "1a4bae05-993c-4f3b-91b5-80f4e09951f2",
+		},
+	)
+	assert.NoError(t, err)
+
+	ticket := models.NewTicket(
+		"88bfa1dc-be33-45c2-b469-294ecb0eba90",
+		testdata.Org1.ID,
+		testdata.Cathy.ID,
+		testdata.Wenichats.ID,
+		roomUUID,
+		testdata.DefaultTopic.ID,
+		`{}`,
+		models.NilUserID,
+		nil,
+	)
+
+	logger := &flows.HTTPLogger{}
+
+	mockDB, mock, _ := sqlmock.New()
+	defer mockDB.Close()
+	sqlxDB := sqlx.NewDb(mockDB, "sqlmock")
+
+	wenichats.SetDB(sqlxDB)
+
+	rows := sqlmock.NewRows([]string{
+		"id", "broadcast_id", "uuid", "text", "created_on", "direction", "status", "visibility", "msg_count", "error_count", "next_attempt", "external_id", "attachments", "metadata", "channel_id", "contact_id", "contact_urn_id", "org_id", "topup_id",
+	})
+
+	msgTime := time.Now()
+	rows.AddRow(464, nil, "eb234953-38e7-491f-8a50-b03056a7d002", "ahoy", msgTime, "I", "H", "V", 1, 0, msgTime, "1026", nil, nil, 3, 10000, 1, 1, 1)
+
+	expectedSince := time.Now().Add(-24 * time.Hour)
+
+	mock.ExpectQuery("SELECT").
+		WithArgs(10000, approxTime{t: expectedSince, delta: 5 * time.Second}).
+		WillReturnRows(rows)
+
+	err = svc.SendHistory(ticket, models.ContactID(testdata.Cathy.ID), nil, logger.Log)
+	assert.NoError(t, err)
+	assert.Equal(t, 1, len(logger.Logs))
+	assert.NoError(t, mock.ExpectationsWereMet())
 }
