@@ -105,6 +105,8 @@ func TestOpen(t *testing.T) {
 
 	interactionWebhookUrl := fmt.Sprintf("https://flex-api.twilio.com/v1/Instances/%s/InteractionWebhooks", testInstanceSid)
 	interactionUrl := "https://flex-api.twilio.com/v1/Interactions"
+	findParticipantUrl := "https://conversations.twilio.com/v1/Conversations/CH12345678901234567890123456789012/Participants/1_00000000-0000-4000-8000-000000000000"
+	updateChatUserUrl := fmt.Sprintf("https://chat.twilio.com/v2/Services/%s/Users/%s", testConversationServiceSid, "MB12345678901234567890123456789012")
 
 	// Mock successful responses
 	httpx.SetRequestor(httpx.NewMockRequestor(map[string][]httpx.MockResponse{
@@ -138,6 +140,22 @@ func TestOpen(t *testing.T) {
 				"webhook_ttid": "WH12345678901234567890123456789012"
 			}`),
 		},
+		findParticipantUrl: {
+			httpx.NewMockResponse(200, nil, `{
+				"sid": "MB12345678901234567890123456789012",
+				"identity": "1_00000000-0000-4000-8000-000000000000",
+				"friendly_name": "George",
+				"attributes": "{}"
+			}`),
+		},
+		updateChatUserUrl: {
+			httpx.NewMockResponse(200, nil, `{
+				"sid": "MB12345678901234567890123456789012",
+				"identity": "1_00000000-0000-4000-8000-000000000000",
+				"friendly_name": "George",
+				"attributes": "{}"
+			}`),
+		},
 		"https://conversations.twilio.com/v1/Conversations/CH12345678901234567890123456789012/Webhooks": {
 			httpx.NewMockResponse(201, nil, `{
 				"sid": "WH23456789012345678901234567890123",
@@ -164,7 +182,7 @@ func TestOpen(t *testing.T) {
 	assert.NotNil(t, ticket)
 	assert.Equal(t, "Need help with my order", ticket.Body())
 	assert.Equal(t, "CH12345678901234567890123456789012", ticket.ExternalID())
-	assert.Equal(t, 3, len(logger.Logs)) // webhook creation, interaction creation, conversation webhook creation
+	assert.Equal(t, 5, len(logger.Logs)) // interaction webhook, interaction creation, find participant, update chat user, conversation webhook
 }
 
 func TestOpenWithMissingConversationSid(t *testing.T) {
