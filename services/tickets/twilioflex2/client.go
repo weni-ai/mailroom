@@ -261,6 +261,36 @@ func (c *Client) FetchMedia(serviceSid, mediaSid string) (*Media, *httpx.Trace, 
 	return response, trace, nil
 }
 
+// FindConversationUserByIdentity fetches a participant using identity in the Participants/{Sid} slot.
+// Twilio accepts identity in place of the participant SID for lookup and returns participant details including Sid.
+func (c *Client) FindConversationUserByIdentity(conversationSid, identity string) (*CreateConversationParticipantResponse, *httpx.Trace, error) {
+	endpoint := fmt.Sprintf("https://conversations.twilio.com/v1/Conversations/%s/Participants/%s", conversationSid, identity)
+	resp := &CreateConversationParticipantResponse{}
+	data := url.Values{}
+	trace, err := c.get(endpoint, data, resp, nil)
+	if err != nil {
+		return nil, trace, err
+	}
+	return resp, trace, nil
+}
+
+// UpdateChatUser updates a Chat/Conversations Service user by SID (US...).
+// API ref: https://chat.twilio.com/v2/Services/{ServiceSid}/Users/{Sid}
+func (c *Client) UpdateChatUser(serviceSid, userSid string, user *UpdateChatUserRequest) (*ChatUser, *httpx.Trace, error) {
+	endpoint := fmt.Sprintf("https://chat.twilio.com/v2/Services/%s/Users/%s", serviceSid, userSid)
+	resp := &ChatUser{}
+	data, err := query.Values(user)
+	if err != nil {
+		return nil, nil, err
+	}
+	data = removeEmpties(data)
+	trace, err := c.post(endpoint, data, resp, nil)
+	if err != nil {
+		return nil, trace, err
+	}
+	return resp, trace, nil
+}
+
 // CreateInteractionWebhookRequest parameters for creating an interaction webhook
 // https://www.twilio.com/docs/flex/developer/conversations/register-interactions-webhooks
 type CreateInteractionWebhookRequest struct {
@@ -382,6 +412,34 @@ type CreateConversationMessageResponse struct {
 	Media           []map[string]any `json:"media,omitempty"`
 	ParticipantSid  string           `json:"participant_sid,omitempty"`
 	Index           int              `json:"index,omitempty"`
+}
+
+// CreateConversationParticipantResponse represents a participant
+// https://www.twilio.com/docs/conversations/api/conversation-participant-resource
+type CreateConversationParticipantResponse struct {
+	Sid             string `json:"sid,omitempty"`
+	AccountSid      string `json:"account_sid,omitempty"`
+	ConversationSid string `json:"conversation_sid,omitempty"`
+	Identity        string `json:"identity,omitempty"`
+	FriendlyName    string `json:"friendly_name,omitempty"`
+	Attributes      string `json:"attributes,omitempty"`
+	DateCreated     string `json:"date_created,omitempty"`
+	DateUpdated     string `json:"date_updated,omitempty"`
+	URL             string `json:"url,omitempty"`
+}
+
+// UpdateChatUserRequest payload for chat user update (FriendlyName/Attributes)
+type UpdateChatUserRequest struct {
+	FriendlyName string `url:"FriendlyName,omitempty" json:"FriendlyName,omitempty"`
+	Attributes   string `url:"Attributes,omitempty" json:"Attributes,omitempty"`
+}
+
+// ChatUser represents a chat user response (minimal fields we care about)
+type ChatUser struct {
+	Sid          string `json:"sid,omitempty"`
+	Identity     string `json:"identity,omitempty"`
+	FriendlyName string `json:"friendly_name,omitempty"`
+	Attributes   string `json:"attributes,omitempty"`
 }
 
 // UpdateInteractionChannelRequest parameters for updating an interaction channel
