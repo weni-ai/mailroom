@@ -101,7 +101,7 @@ func (s *service) Open(session flows.Session, topic *flows.Topic, body string, a
 	ticket := flows.OpenTicket(s.ticketer, topic, body, assignee)
 	contact := session.Contact()
 
-	userIdentity := fmt.Sprintf("%d_%s", contact.ID(), ticket.UUID())
+	userIdentity := fmt.Sprintf("%s_%d_%s", contact.Name(), contact.ID(), ticket.UUID())
 
 	interactionWebhook, trace, err := s.restClient.CreateInteractionScopedWebhook(s.instanceSid, &CreateInteractionWebhookRequest{
 		Type:          "interaction",
@@ -135,7 +135,6 @@ func (s *service) Open(session flows.Session, topic *flows.Topic, body string, a
 			Participants: []InteractionChannelParticipant{
 				{
 					Identity: userIdentity,
-					Name:     contact.Name(),
 				},
 			},
 		},
