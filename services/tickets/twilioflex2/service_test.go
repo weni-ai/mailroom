@@ -445,6 +445,7 @@ func TestSendHistory(t *testing.T) {
 	// Create test data
 	contactID := models.ContactID(123)
 	ticketUUID := "550e8400-e29b-41d4-a716-446655440000"
+	identity := fmt.Sprintf("%d_%s", contactID, ticketUUID)
 
 	// Instead of using runs, add history_after to ticket body to control the time
 	ticket := models.NewTicket(
@@ -476,22 +477,22 @@ func TestSendHistory(t *testing.T) {
 	// Mock API calls for sending history messages
 	httpx.SetRequestor(httpx.NewMockRequestor(map[string][]httpx.MockResponse{
 		messageUrl: {
-			httpx.NewMockResponse(201, nil, `{
+			httpx.NewMockResponse(201, nil, fmt.Sprintf(`{
 				"sid": "IM34567890123456789012345678901234",
 				"account_sid": "AC81d44315e19372138bdaffcc13cf3b94",
 				"conversation_sid": "CH12345678901234567890123456789012",
 				"body": "Hello",
-				"author": "123_550e8400-e29b-41d4-a716-446655440000",
+				"author": "%s",
 				"index": 1
-			}`),
-			httpx.NewMockResponse(201, nil, `{
+			}`, identity)),
+			httpx.NewMockResponse(201, nil, fmt.Sprintf(`{
 				"sid": "IM34567890123456789012345678901235",
 				"account_sid": "AC81d44315e19372138bdaffcc13cf3b94",
 				"conversation_sid": "CH12345678901234567890123456789012",
 				"body": "How can I help?",
 				"author": "Bot",
 				"index": 2
-			}`),
+			}`)),
 		},
 	}))
 
@@ -536,6 +537,7 @@ func TestSendHistoryWithHistoryAfter(t *testing.T) {
 	contactID := models.ContactID(123)
 	ticketUUID := "550e8400-e29b-41d4-a716-446655440000"
 	historyAfter := "2023-01-01T12:00:00Z"
+	identity := fmt.Sprintf("%d_%s", contactID, ticketUUID)
 
 	ticket := models.NewTicket(
 		flows.TicketUUID(ticketUUID),
@@ -563,14 +565,14 @@ func TestSendHistoryWithHistoryAfter(t *testing.T) {
 
 	httpx.SetRequestor(httpx.NewMockRequestor(map[string][]httpx.MockResponse{
 		messageUrl: {
-			httpx.NewMockResponse(201, nil, `{
+			httpx.NewMockResponse(201, nil, fmt.Sprintf(`{
 				"sid": "IM34567890123456789012345678901234",
 				"account_sid": "AC81d44315e19372138bdaffcc13cf3b94",
 				"conversation_sid": "CH12345678901234567890123456789012",
 				"body": "Hello from history",
-				"author": "123_550e8400-e29b-41d4-a716-446655440000",
+				"author": "%s",
 				"index": 1
-			}`),
+			}`, identity)),
 		},
 	}))
 
@@ -615,6 +617,7 @@ func TestSendHistoryWithAttachments(t *testing.T) {
 	contactID := models.ContactID(123)
 	ticketUUID := "550e8400-e29b-41d4-a716-446655440000"
 	historyAfter := "2023-01-01T10:00:00Z"
+	identity := fmt.Sprintf("%d_%s", contactID, ticketUUID)
 
 	conversationSid := "CH12345678901234567890123456789012"
 	ticket := models.NewTicket(
@@ -657,22 +660,22 @@ func TestSendHistoryWithAttachments(t *testing.T) {
 		},
 		messageUrl: {
 			// first send is for media
-			httpx.NewMockResponse(201, nil, `{
+			httpx.NewMockResponse(201, nil, fmt.Sprintf(`{
 				"sid": "IM34567890123456789012345678901234",
 				"account_sid": "AC81d44315e19372138bdaffcc13cf3b94",
 				"conversation_sid": "CH12345678901234567890123456789012",
-				"author": "123_550e8400-e29b-41d4-a716-446655440000",
+				"author": "%s",
 				"index": 1
-			}`),
+			}`, identity)),
 			// second send is for text body
-			httpx.NewMockResponse(201, nil, `{
+			httpx.NewMockResponse(201, nil, fmt.Sprintf(`{
 				"sid": "IM34567890123456789012345678901235",
 				"account_sid": "AC81d44315e19372138bdaffcc13cf3b94",
 				"conversation_sid": "CH12345678901234567890123456789012",
 				"body": "Here is the photo",
-				"author": "123_550e8400-e29b-41d4-a716-446655440000",
+				"author": "%s",
 				"index": 2
-			}`),
+			}`, identity)),
 		},
 	}))
 
