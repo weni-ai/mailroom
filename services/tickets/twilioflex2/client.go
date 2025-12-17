@@ -299,7 +299,6 @@ type InteractionChannelParam struct {
 
 type InteractionChannelParticipant struct {
 	Identity string `json:"identity,omitempty"`
-	Name     string `json:"name,omitempty"`
 }
 
 type InteractionRoutingParam struct {
