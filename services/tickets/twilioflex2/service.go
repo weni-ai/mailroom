@@ -197,7 +197,14 @@ func (s *service) Forward(ticket *models.Ticket, msgUUID flows.MsgUUID, text str
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
-	contactName := s.lookupContactName(ctx, ticket.OrgID(), ticket.ContactID())
+	contactName := ""
+	if db != nil {
+		if name, err := models.LookupContactName(ctx, db, ticket.OrgID(), ticket.ContactID()); err != nil {
+			logrus.WithError(err).Debug("failed to lookup contact name")
+		} else {
+			contactName = name
+		}
+	}
 	identity := buildUserIdentity(contactName, ticket.ContactID(), ticket.UUID())
 
 	if len(attachments) > 0 {
@@ -282,7 +289,14 @@ func (s *service) SendHistory(ticket *models.Ticket, contactID models.ContactID,
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
-	contactName := s.lookupContactName(ctx, ticket.OrgID(), contactID)
+	contactName := ""
+	if db != nil {
+		if name, err := models.LookupContactName(ctx, db, ticket.OrgID(), contactID); err != nil {
+			logrus.WithError(err).Debug("failed to lookup contact name")
+		} else {
+			contactName = name
+		}
+	}
 	userIdentity := buildUserIdentity(contactName, contactID, ticket.UUID())
 	defaultHistoryWindow := time.Now().Add(-time.Hour * 24)
 	after, err := getHistoryAfter(ticket, contactID, runs)
@@ -426,17 +440,4 @@ func parseTime(historyAfter string) (time.Time, error) {
 // buildUserIdentity matches the format used when opening tickets.
 func buildUserIdentity(contactName string, contactID models.ContactID, ticketUUID flows.TicketUUID) string {
 	return fmt.Sprintf("%s_%d_%s", contactName, contactID, ticketUUID)
-}
-
-func (s *service) lookupContactName(ctx context.Context, orgID models.OrgID, contactID models.ContactID) string {
-	if db == nil {
-		return ""
-	}
-	var name string
-	err := db.GetContext(ctx, &name, "SELECT name FROM contacts_contact WHERE id=$1 AND org_id=$2", contactID, orgID)
-	if err != nil {
-		logrus.WithError(err).Debug("failed to lookup contact name")
-		return ""
-	}
-	return name
 }
