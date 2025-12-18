@@ -258,6 +258,16 @@ func LoadContactBasic(ctx context.Context, db Queryer, org *OrgAssets, id Contac
 	return contacts[0], nil
 }
 
+// LookupContactName returns the contact name for the given org and contact ID.
+func LookupContactName(ctx context.Context, db Queryer, orgID OrgID, contactID ContactID) (string, error) {
+	var name string
+	err := db.GetContext(ctx, &name, "SELECT name FROM contacts_contact WHERE id=$1 AND org_id=$2", contactID, orgID)
+	if err != nil {
+		return "", err
+	}
+	return name, nil
+}
+
 // LoadContactsBasic loads a set of contacts with basic data only (no groups or tickets) for the passed in ids.
 // This is a performance-optimized version for cases where groups and tickets are not needed.
 // Note that the order of the returned contacts won't necessarily match the order of the ids.

@@ -101,7 +101,7 @@ func (s *service) Open(session flows.Session, topic *flows.Topic, body string, a
 	ticket := flows.OpenTicket(s.ticketer, topic, body, assignee)
 	contact := session.Contact()
 
-	userIdentity := fmt.Sprintf("%d_%s", contact.ID(), ticket.UUID())
+	userIdentity := fmt.Sprintf("%s_%d_%s", contact.Name(), contact.ID(), ticket.UUID())
 
 	interactionWebhook, trace, err := s.restClient.CreateInteractionScopedWebhook(s.instanceSid, &CreateInteractionWebhookRequest{
 		Type:          "interaction",
@@ -135,7 +135,6 @@ func (s *service) Open(session flows.Session, topic *flows.Topic, body string, a
 			Participants: []InteractionChannelParticipant{
 				{
 					Identity: userIdentity,
-					Name:     contact.Name(),
 				},
 			},
 		},
@@ -195,7 +194,16 @@ func (s *service) Open(session flows.Session, topic *flows.Topic, body string, a
 }
 
 func (s *service) Forward(ticket *models.Ticket, msgUUID flows.MsgUUID, text string, attachments []utils.Attachment, metadata json.RawMessage, msgExternalID null.String, logHTTP flows.HTTPLogCallback) error {
-	identity := fmt.Sprintf("%d_%s", ticket.ContactID(), ticket.UUID())
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	contactName := ""
+	if name, err := models.LookupContactName(ctx, db, ticket.OrgID(), ticket.ContactID()); err != nil {
+		logrus.WithError(err).Debug("failed to lookup contact name")
+	} else {
+		contactName = name
+	}
+	identity := buildUserIdentity(contactName, ticket.ContactID(), ticket.UUID())
 
 	if len(attachments) > 0 {
 		mediaAttachments := []CreateMediaParams{}
@@ -276,7 +284,18 @@ func (s *service) Reopen(tickets []*models.Ticket, logHTTP flows.HTTPLogCallback
 }
 
 func (s *service) SendHistory(ticket *models.Ticket, contactID models.ContactID, runs []*models.FlowRun, logHTTP flows.HTTPLogCallback) error {
-	userIdentity := fmt.Sprintf("%d_%s", contactID, ticket.UUID())
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	contactName := ""
+
+	if name, err := models.LookupContactName(ctx, db, ticket.OrgID(), contactID); err != nil {
+		logrus.WithError(err).Debug("failed to lookup contact name")
+	} else {
+		contactName = name
+	}
+
+	userIdentity := buildUserIdentity(contactName, contactID, ticket.UUID())
 	defaultHistoryWindow := time.Now().Add(-time.Hour * 24)
 	after, err := getHistoryAfter(ticket, contactID, runs)
 	if err != nil {
@@ -414,4 +433,9 @@ func parseTime(historyAfter string) (time.Time, error) {
 	}
 
 	return time.Time{}, fmt.Errorf("failed to parse history_after: %q, expected formats: %v", historyAfter, formats)
+}
+
+// buildUserIdentity matches the format used when opening tickets.
+func buildUserIdentity(contactName string, contactID models.ContactID, ticketUUID flows.TicketUUID) string {
+	return fmt.Sprintf("%s_%d_%s", contactName, contactID, ticketUUID)
 }

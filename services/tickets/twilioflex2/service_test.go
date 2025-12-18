@@ -445,6 +445,11 @@ func TestSendHistory(t *testing.T) {
 	// Create test data
 	contactID := models.ContactID(123)
 	ticketUUID := "550e8400-e29b-41d4-a716-446655440000"
+	contactName := "Contact 123"
+	identity := fmt.Sprintf("%s_%d_%s", contactName, contactID, ticketUUID)
+
+	mock.ExpectQuery(`SELECT name FROM contacts_contact`).WithArgs(contactID, testdata.Org1.ID).
+		WillReturnRows(sqlmock.NewRows([]string{"name"}).AddRow(contactName))
 
 	// Instead of using runs, add history_after to ticket body to control the time
 	ticket := models.NewTicket(
@@ -476,14 +481,14 @@ func TestSendHistory(t *testing.T) {
 	// Mock API calls for sending history messages
 	httpx.SetRequestor(httpx.NewMockRequestor(map[string][]httpx.MockResponse{
 		messageUrl: {
-			httpx.NewMockResponse(201, nil, `{
+			httpx.NewMockResponse(201, nil, fmt.Sprintf(`{
 				"sid": "IM34567890123456789012345678901234",
 				"account_sid": "AC81d44315e19372138bdaffcc13cf3b94",
 				"conversation_sid": "CH12345678901234567890123456789012",
 				"body": "Hello",
-				"author": "123_550e8400-e29b-41d4-a716-446655440000",
+				"author": "%s",
 				"index": 1
-			}`),
+			}`, identity)),
 			httpx.NewMockResponse(201, nil, `{
 				"sid": "IM34567890123456789012345678901235",
 				"account_sid": "AC81d44315e19372138bdaffcc13cf3b94",
@@ -536,6 +541,8 @@ func TestSendHistoryWithHistoryAfter(t *testing.T) {
 	contactID := models.ContactID(123)
 	ticketUUID := "550e8400-e29b-41d4-a716-446655440000"
 	historyAfter := "2023-01-01T12:00:00Z"
+	contactName := "Contact 123"
+	identity := fmt.Sprintf("%s_%d_%s", contactName, contactID, ticketUUID)
 
 	ticket := models.NewTicket(
 		flows.TicketUUID(ticketUUID),
@@ -552,6 +559,10 @@ func TestSendHistoryWithHistoryAfter(t *testing.T) {
 	// Parse expected time
 	expectedTime, _ := time.Parse("2006-01-02T15:04:05Z", historyAfter)
 
+	// Contact name lookup happens first inside SendHistory
+	mock.ExpectQuery(`SELECT name FROM contacts_contact`).WithArgs(contactID, testdata.Org1.ID).
+		WillReturnRows(sqlmock.NewRows([]string{"name"}).AddRow(contactName))
+
 	// Mock database query for messages
 	mock.ExpectQuery(`SELECT (.+) FROM msgs_msg`).
 		WithArgs(123, expectedTime).
@@ -563,14 +574,14 @@ func TestSendHistoryWithHistoryAfter(t *testing.T) {
 
 	httpx.SetRequestor(httpx.NewMockRequestor(map[string][]httpx.MockResponse{
 		messageUrl: {
-			httpx.NewMockResponse(201, nil, `{
+			httpx.NewMockResponse(201, nil, fmt.Sprintf(`{
 				"sid": "IM34567890123456789012345678901234",
 				"account_sid": "AC81d44315e19372138bdaffcc13cf3b94",
 				"conversation_sid": "CH12345678901234567890123456789012",
 				"body": "Hello from history",
-				"author": "123_550e8400-e29b-41d4-a716-446655440000",
+				"author": "%s",
 				"index": 1
-			}`),
+			}`, identity)),
 		},
 	}))
 
@@ -615,6 +626,8 @@ func TestSendHistoryWithAttachments(t *testing.T) {
 	contactID := models.ContactID(123)
 	ticketUUID := "550e8400-e29b-41d4-a716-446655440000"
 	historyAfter := "2023-01-01T10:00:00Z"
+	contactName := "Contact 123"
+	identity := fmt.Sprintf("%s_%d_%s", contactName, contactID, ticketUUID)
 
 	conversationSid := "CH12345678901234567890123456789012"
 	ticket := models.NewTicket(
@@ -630,6 +643,10 @@ func TestSendHistoryWithAttachments(t *testing.T) {
 	)
 
 	expectedTime, _ := time.Parse("2006-01-02T15:04:05Z", historyAfter)
+
+	// Contact name lookup happens first inside SendHistory
+	mock.ExpectQuery(`SELECT name FROM contacts_contact`).WithArgs(contactID, testdata.Org1.ID).
+		WillReturnRows(sqlmock.NewRows([]string{"name"}).AddRow(contactName))
 
 	// Mock DB messages with one attachment and non-empty text
 	mock.ExpectQuery(`SELECT (.+) FROM msgs_msg`).
@@ -657,22 +674,22 @@ func TestSendHistoryWithAttachments(t *testing.T) {
 		},
 		messageUrl: {
 			// first send is for media
-			httpx.NewMockResponse(201, nil, `{
+			httpx.NewMockResponse(201, nil, fmt.Sprintf(`{
 				"sid": "IM34567890123456789012345678901234",
 				"account_sid": "AC81d44315e19372138bdaffcc13cf3b94",
 				"conversation_sid": "CH12345678901234567890123456789012",
-				"author": "123_550e8400-e29b-41d4-a716-446655440000",
+				"author": "%s",
 				"index": 1
-			}`),
+			}`, identity)),
 			// second send is for text body
-			httpx.NewMockResponse(201, nil, `{
+			httpx.NewMockResponse(201, nil, fmt.Sprintf(`{
 				"sid": "IM34567890123456789012345678901235",
 				"account_sid": "AC81d44315e19372138bdaffcc13cf3b94",
 				"conversation_sid": "CH12345678901234567890123456789012",
 				"body": "Here is the photo",
-				"author": "123_550e8400-e29b-41d4-a716-446655440000",
+				"author": "%s",
 				"index": 2
-			}`),
+			}`, identity)),
 		},
 	}))
 
