@@ -198,12 +198,10 @@ func (s *service) Forward(ticket *models.Ticket, msgUUID flows.MsgUUID, text str
 	defer cancel()
 
 	contactName := ""
-	if db != nil {
-		if name, err := models.LookupContactName(ctx, db, ticket.OrgID(), ticket.ContactID()); err != nil {
-			logrus.WithError(err).Debug("failed to lookup contact name")
-		} else {
-			contactName = name
-		}
+	if name, err := models.LookupContactName(ctx, db, ticket.OrgID(), ticket.ContactID()); err != nil {
+		logrus.WithError(err).Debug("failed to lookup contact name")
+	} else {
+		contactName = name
 	}
 	identity := buildUserIdentity(contactName, ticket.ContactID(), ticket.UUID())
 
@@ -290,13 +288,13 @@ func (s *service) SendHistory(ticket *models.Ticket, contactID models.ContactID,
 	defer cancel()
 
 	contactName := ""
-	if db != nil {
-		if name, err := models.LookupContactName(ctx, db, ticket.OrgID(), contactID); err != nil {
-			logrus.WithError(err).Debug("failed to lookup contact name")
-		} else {
-			contactName = name
-		}
+
+	if name, err := models.LookupContactName(ctx, db, ticket.OrgID(), contactID); err != nil {
+		logrus.WithError(err).Debug("failed to lookup contact name")
+	} else {
+		contactName = name
 	}
+
 	userIdentity := buildUserIdentity(contactName, contactID, ticket.UUID())
 	defaultHistoryWindow := time.Now().Add(-time.Hour * 24)
 	after, err := getHistoryAfter(ticket, contactID, runs)
