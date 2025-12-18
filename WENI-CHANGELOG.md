@@ -1,3 +1,7 @@
+1.75.1
+----------
+* Concatenating contact name with identity on twilio flex 2 so we can se the participant name on his identity
+
 1.75.0
 ----------
  * Log pending tasks on exit
