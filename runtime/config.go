@@ -116,6 +116,8 @@ type Config struct {
 	RabbitmqPublishDelayIntervalMs int `help:"fixed delay in ms between async RabbitMQ publish retries"`
 
 	ProcessingTTL int `help:"base processing task TTL in seconds"`
+
+	WenichatsAuthToken string `help:"wenichats authorization token"`
 }
 
 // NewDefaultConfig returns a new default configuration object
@@ -203,6 +205,8 @@ func NewDefaultConfig() *Config {
 		RabbitmqPublishDelayIntervalMs: 2000,
 
 		ProcessingTTL: 120,
+
+		WenichatsAuthToken: "",
 	}
 }
 

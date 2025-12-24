@@ -134,18 +134,20 @@ func NewService(rtCfg *runtime.Config, httpClient *http.Client, httpRetries *htt
 		return nil, err
 	}
 
-	token, expiry, err := GetToken(httpClient, redisPool, rtCfg)
-	if err != nil {
-		return nil, errors.Wrap(err, "failed to get auth token")
+	authToken := rtCfg.WenichatsAuthToken
+
+	redactor := utils.NewRedactor(flows.RedactionMask)
+	if authToken != "" {
+		redactor = utils.NewRedactor(flows.RedactionMask, authToken)
 	}
 
-	client := NewClient(httpClient, httpRetries, baseURL, token, expiry, rtCfg, redisPool)
+	client := NewClient(httpClient, httpRetries, baseURL, authToken, rtCfg, redisPool)
 
 	return &service{
 		rtConfig:   rtCfg,
 		restClient: client,
 		ticketer:   ticketer,
-		redactor:   utils.NewRedactor(flows.RedactionMask, token),
+		redactor:   redactor,
 		sectorUUID: sectorUUID,
 	}, nil
 }
