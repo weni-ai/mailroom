@@ -1,3 +1,8 @@
+1.76.0
+----------
+ * Handle new contact fields on MsgEvent
+ * Add ChannelType to requestToRouter struct
+
 1.75.1
 ----------
 * Concatenating contact name with identity on twilio flex 2 so we can se the participant name on his identity
