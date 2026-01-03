@@ -1536,10 +1536,10 @@ func CreateBroadcastMessages(ctx context.Context, rt *runtime.Runtime, oa *OrgAs
 }
 
 type WppBroadcastTemplate struct {
-	UUID      assets.TemplateUUID `json:"uuid" validate:"required,uuid"`
-	Name      string              `json:"name" validate:"required"`
-	Variables []string            `json:"variables,omitempty"`
-	Locale    string              `json:"locale,omitempty" validate:"omitempty,bcp47"`
+	UUID      assets.TemplateUUID  `json:"uuid" validate:"required,uuid"`
+	Name      string               `json:"name" validate:"required"`
+	Variables []string             `json:"variables,omitempty"`
+	Locale    string               `json:"locale,omitempty" validate:"omitempty,bcp47"`
 	Carousel  []flows.CarouselCard `json:"carousel,omitempty"`
 }
 
@@ -1831,7 +1831,7 @@ func CreateWppBroadcastMessages(ctx context.Context, rt *runtime.Runtime, oa *Or
 					}
 					evaluatedVariables[i] = sub
 				}
-				
+
 				var evaluatedCarouselCards []flows.CarouselCard
 				if len(templateCarousel) > 0 {
 					evaluatedCarouselCards = make([]flows.CarouselCard, len(templateCarousel))
@@ -1841,7 +1841,7 @@ func CreateWppBroadcastMessages(ctx context.Context, rt *runtime.Runtime, oa *Or
 						for i, body := range carouselCard.Body {
 							evaluated, err := excellent.EvaluateTemplate(oa.Env(), evaluationCtx, body, nil)
 							if err != nil {
-								return nil, errors.Wrapf(err, "failed to evaluate template variable")
+								return nil, errors.Wrapf(err, "failed to evaluate template body")
 							}
 							evaluatedBody[i] = evaluated
 						}
@@ -1851,7 +1851,7 @@ func CreateWppBroadcastMessages(ctx context.Context, rt *runtime.Runtime, oa *Or
 						for i, button := range carouselCard.Buttons {
 							evaluatedButtonText, err := excellent.EvaluateTemplate(oa.Env(), evaluationCtx, button.Text, nil)
 							if err != nil {
-								// Handle the error as needed
+								return nil, errors.Wrapf(err, "failed to evaluate template button text")
 							}
 							evaluatedButtons[i] = flows.CarouselCardButton{
 								SubType:   button.SubType,
