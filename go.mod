@@ -67,17 +67,17 @@ require (
 require (
 	github.com/gabriel-vasile/mimetype v1.4.1
 	github.com/prometheus/client_golang v1.14.0
+	github.com/rabbitmq/amqp091-go v1.10.0
 )
 
 require (
 	github.com/beorn7/perks v1.0.1 // indirect
 	github.com/cespare/xxhash/v2 v2.1.2 // indirect
 	github.com/prometheus/procfs v0.8.0 // indirect
-	github.com/rabbitmq/amqp091-go v1.10.0 // indirect
 )
 
 go 1.23
 
 replace github.com/nyaruka/gocommon => github.com/Ilhasoft/gocommon v1.16.2-weni
 
-replace github.com/nyaruka/goflow => github.com/weni-ai/goflow v1.16.0
+replace github.com/nyaruka/goflow => github.com/weni-ai/goflow v1.17.0-weni-stg
