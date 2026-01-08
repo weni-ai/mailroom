@@ -1540,6 +1540,7 @@ type WppBroadcastTemplate struct {
 	Name      string               `json:"name" validate:"required"`
 	Variables []string             `json:"variables,omitempty"`
 	Locale    string               `json:"locale,omitempty" validate:"omitempty,bcp47"`
+	IsCarousel bool                 `json:"is_carousel,omitempty"`
 	Carousel  []flows.CarouselCard `json:"carousel,omitempty"`
 }
 
@@ -1750,6 +1751,7 @@ func CreateWppBroadcastMessages(ctx context.Context, rt *runtime.Runtime, oa *Or
 		templateVariables := make([]string, len(bcast.Msg().Template.Variables))
 		copy(templateVariables, bcast.Msg().Template.Variables)
 		templateLocale := bcast.Msg().Template.Locale
+		templateIsCarousel := bcast.Msg().Template.IsCarousel
 		templateCarousel := make([]flows.CarouselCard, len(bcast.Msg().Template.Carousel))
 		copy(templateCarousel, bcast.Msg().Template.Carousel)
 
@@ -1867,7 +1869,7 @@ func CreateWppBroadcastMessages(ctx context.Context, rt *runtime.Runtime, oa *Or
 
 				text = translation.Substitute(evaluatedVariables)
 				var templateReference = assets.NewTemplateReference(bcast.Msg().Template.UUID, bcast.Msg().Template.Name, templateMatch.Category())
-				templating = flows.NewMsgTemplating(templateReference, translation.Language(), translation.Country(), evaluatedVariables, translation.Namespace(), evaluatedCarouselCards)
+				templating = flows.NewMsgTemplating(templateReference, translation.Language(), translation.Country(), evaluatedVariables, translation.Namespace(), evaluatedCarouselCards, templateIsCarousel)
 			} else {
 				return nil, errors.Errorf("translation not found for template: %s, in channel: %s", bcast.Msg().Template.UUID, channel.UUID())
 			}
