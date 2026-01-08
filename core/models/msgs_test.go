@@ -663,25 +663,27 @@ func TestWppBroadcastCarouselTemplateEvaluation(t *testing.T) {
 			name: "carousel with body template variables",
 			carousel: []flows.CarouselCard{
 				{
-					Body: []string{"Hello @contact.name", "Welcome to our store"},
+					Body:  "Hello @contact.name",
+					Index: 0,
 					Buttons: []flows.CarouselCardButton{
-						{SubType: "quick_reply", Text: "Buy Now", Parameter: "buy"},
+						{SubType: "quick_reply", Parameter: "buy"},
 					},
 				},
 			},
-			expectedBodyCount:   2,
+			expectedBodyCount:   1,
 			expectedButtonCount: 1,
 			contactID:           testdata.Alexandria.ID,
 			contactName:         "Alexandria",
 		},
 		{
-			name: "carousel with button text template variables",
+			name: "carousel with button parameter template variables",
 			carousel: []flows.CarouselCard{
 				{
-					Body: []string{"Product 1"},
+					Body:  "Product 1 for @contact.name",
+					Index: 0,
 					Buttons: []flows.CarouselCardButton{
-						{SubType: "quick_reply", Text: "Hi @contact.name", Parameter: "greet"},
-						{SubType: "url", Text: "View for @contact.name", Parameter: "https://example.com"},
+						{SubType: "quick_reply", Parameter: "greet"},
+						{SubType: "url", Parameter: "https://example.com"},
 					},
 				},
 			},
@@ -694,20 +696,22 @@ func TestWppBroadcastCarouselTemplateEvaluation(t *testing.T) {
 			name: "multiple carousel cards with template variables",
 			carousel: []flows.CarouselCard{
 				{
-					Body: []string{"Card 1 for @contact.name"},
+					Body:  "Card 1 for @contact.name",
+					Index: 0,
 					Buttons: []flows.CarouselCardButton{
-						{SubType: "quick_reply", Text: "Option 1", Parameter: "opt1"},
+						{SubType: "quick_reply", Parameter: "opt1"},
 					},
 				},
 				{
-					Body: []string{"Card 2 for @contact.name", "Extra info"},
+					Body:  "Card 2 for @contact.name",
+					Index: 1,
 					Buttons: []flows.CarouselCardButton{
-						{SubType: "quick_reply", Text: "Option 2 for @contact.name", Parameter: "opt2"},
-						{SubType: "phone_number", Text: "Call us", Parameter: "+1234567890"},
+						{SubType: "quick_reply", Parameter: "opt2"},
+						{SubType: "phone_number", Parameter: "+1234567890"},
 					},
 				},
 			},
-			expectedBodyCount:   3, // total body items across all cards
+			expectedBodyCount:   1, // total body items across all cards
 			expectedButtonCount: 3, // total buttons across all cards
 			contactID:           testdata.Alexandria.ID,
 			contactName:         "Alexandria",
@@ -788,12 +792,10 @@ func TestWppBroadcastCarouselBodyEvaluation(t *testing.T) {
 	// Create a carousel with body fields containing template expressions
 	carousel := []flows.CarouselCard{
 		{
-			Body: []string{
-				"Hello @contact.name",
-				"Your ID is @contact.uuid",
-			},
+			Body:  "Hello @contact.name",
+			Index: 0,
 			Buttons: []flows.CarouselCardButton{
-				{SubType: "quick_reply", Text: "Confirm", Parameter: "confirm"},
+				{SubType: "quick_reply", Parameter: "confirm"},
 			},
 		},
 	}
@@ -877,10 +879,11 @@ func TestWppBroadcastCarouselButtonTextEvaluation(t *testing.T) {
 	// Create a carousel with button text containing template expressions
 	carousel := []flows.CarouselCard{
 		{
-			Body: []string{"Product info"},
+			Body:  "Product info",
+			Index: 0,
 			Buttons: []flows.CarouselCardButton{
-				{SubType: "quick_reply", Text: "Buy for @contact.name", Parameter: "buy"},
-				{SubType: "url", Text: "View profile", Parameter: "https://example.com/@contact.name"},
+				{SubType: "quick_reply", Parameter: "buy"},
+				{SubType: "url", Parameter: "https://example.com/@contact.name"},
 			},
 		},
 	}
@@ -970,11 +973,12 @@ func TestWppBroadcastCarouselPreservesButtonProperties(t *testing.T) {
 	// Create a carousel with various button types to verify all properties are preserved
 	carousel := []flows.CarouselCard{
 		{
-			Body: []string{"Product details"},
+			Body:  "Product details",
+			Index: 0,
 			Buttons: []flows.CarouselCardButton{
-				{SubType: "quick_reply", Text: "Quick Reply Button", Parameter: "qr_param"},
-				{SubType: "url", Text: "URL Button", Parameter: "https://example.com/path"},
-				{SubType: "phone_number", Text: "Call us", Parameter: "+5511999999999"},
+				{SubType: "quick_reply", Parameter: "qr_param"},
+				{SubType: "url", Parameter: "https://example.com/path"},
+				{SubType: "phone_number", Parameter: "+5511999999999"},
 			},
 		},
 	}

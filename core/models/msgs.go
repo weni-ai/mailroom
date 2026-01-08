@@ -1837,31 +1837,29 @@ func CreateWppBroadcastMessages(ctx context.Context, rt *runtime.Runtime, oa *Or
 					evaluatedCarouselCards = make([]flows.CarouselCard, len(templateCarousel))
 					for idx, carouselCard := range templateCarousel {
 						// Evaluate body fields using excellent.EvaluateTemplate for each entry
-						evaluatedBody := make([]string, len(carouselCard.Body))
-						for i, body := range carouselCard.Body {
-							evaluated, err := excellent.EvaluateTemplate(oa.Env(), evaluationCtx, body, nil)
-							if err != nil {
-								return nil, errors.Wrapf(err, "failed to evaluate template body")
-							}
-							evaluatedBody[i] = evaluated
+						evaluatedBody := ""
+
+						evaluatedBody, err := excellent.EvaluateTemplate(oa.Env(), evaluationCtx, carouselCard.Body, nil)
+						if err != nil {
+							return nil, errors.Wrapf(err, "failed to evaluate template body")
 						}
 
 						// Evaluate button text using excellent.EvaluateTemplate for each button
 						evaluatedButtons := make([]flows.CarouselCardButton, len(carouselCard.Buttons))
 						for i, button := range carouselCard.Buttons {
-							evaluatedButtonText, err := excellent.EvaluateTemplate(oa.Env(), evaluationCtx, button.Text, nil)
+							evaluatedButtonParameter, err := excellent.EvaluateTemplate(oa.Env(), evaluationCtx, button.Parameter, nil)
 							if err != nil {
 								return nil, errors.Wrapf(err, "failed to evaluate template button text")
 							}
 							evaluatedButtons[i] = flows.CarouselCardButton{
 								SubType:   button.SubType,
-								Text:      evaluatedButtonText,
-								Parameter: button.Parameter,
+								Parameter: evaluatedButtonParameter,
 							}
 						}
 
 						evaluatedCarouselCards[idx] = flows.CarouselCard{
 							Body:    evaluatedBody,
+							Index:   carouselCard.Index,
 							Buttons: evaluatedButtons,
 						}
 					}
