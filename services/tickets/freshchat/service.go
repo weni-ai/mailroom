@@ -1,11 +1,16 @@
 package freshchat
 
 import (
+	"context"
 	"encoding/json"
 	"net/http"
+	"sort"
 	"strings"
+	"sync"
 	"time"
 
+	"github.com/buger/jsonparser"
+	"github.com/jmoiron/sqlx"
 	"github.com/nyaruka/gocommon/httpx"
 	"github.com/nyaruka/gocommon/jsonx"
 	"github.com/nyaruka/gocommon/urns"
@@ -15,11 +20,36 @@ import (
 	"github.com/nyaruka/mailroom/runtime"
 	"github.com/nyaruka/null"
 	"github.com/pkg/errors"
+	"github.com/sirupsen/logrus"
 )
 
 const (
 	typeFreshchat = "freshchat"
+	historyDelay  = 6
 )
+
+var db *sqlx.DB
+var dbLock = &sync.Mutex{}
+
+func initDB(dbURL string) error {
+	if db == nil {
+		dbLock.Lock()
+		defer dbLock.Unlock()
+		if db == nil {
+			newDB, err := sqlx.Open("postgres", dbURL)
+			if err != nil {
+				return errors.Wrapf(err, "unable to open database connection")
+			}
+			db = newDB
+		}
+	}
+	return nil
+}
+
+// SetDB sets the database connection (used for testing)
+func SetDB(newDB *sqlx.DB) {
+	db = newDB
+}
 
 func init() {
 	models.RegisterTicketService(typeFreshchat, NewService)
@@ -38,6 +68,9 @@ func NewService(rtCfg *runtime.Config, httpClient *http.Client, httpRetries *htt
 	if baseURL == "" || authToken == "" {
 		return nil, errors.New("missing freshchat_domain or oauth_token in freshchat config")
 	}
+	if err := initDB(rtCfg.DB); err != nil {
+		return nil, err
+	}
 	return &service{
 		rtConfig:   rtCfg,
 		restClient: NewClient(httpClient, httpRetries, baseURL, authToken),
@@ -50,6 +83,7 @@ func (s *service) Open(session flows.Session, topic *flows.Topic, body string, a
 	ticket := flows.OpenTicket(s.ticketer, topic, body, assignee)
 	contactDisplay := session.Contact().Format(session.Environment())
 	contactUUID := string(session.Contact().UUID())
+	contact := session.Contact()
 
 	firstName, lastName := getNames(contactDisplay)
 
@@ -64,7 +98,20 @@ func (s *service) Open(session flows.Session, topic *flows.Topic, body string, a
 		return nil, err
 	}
 
-	msg := buildConversation(userID, channelID, bodyMap.Message, bodyMap.CustomFields)
+	// Always get history messages
+	// If no message in body, include history in conversation creation
+	// If message exists, send history after delay
+	hasMessage := bodyMap.Message != ""
+	var historyMessages []Message
+	if !hasMessage {
+		historyMessages, err = s.getHistoryMessages(session, contact.ID(), contactUUID, body, userID)
+		if err != nil {
+			// Log error but continue - we'll still create the conversation
+			logrus.Error(errors.Wrap(err, "failed to get history messages for conversation"))
+		}
+	}
+
+	msg := buildConversation(userID, channelID, bodyMap.Message, bodyMap.CustomFields, hasMessage, historyMessages)
 
 	resultsConversation, createTrace, err := s.restClient.CreateConversation(msg)
 	if createTrace != nil {
@@ -78,6 +125,18 @@ func (s *service) Open(session flows.Session, topic *flows.Topic, body string, a
 	}
 
 	ticket.SetExternalID(string(resultsConversation.ConversationID))
+
+	// Always send history:
+	// - If no message in body, history was already included in conversation creation
+	// - If message exists, send history after delay
+	conversationID := string(resultsConversation.ConversationID)
+	if hasMessage {
+		go func() {
+			time.Sleep(time.Second * time.Duration(historyDelay))
+			SendHistory(session, contact.ID(), string(ticket.UUID()), conversationID, contactUUID, body, s.restClient, s.redactor, logHTTP)
+		}()
+	}
+
 	return ticket, nil
 }
 
@@ -173,18 +232,25 @@ func (s *service) resolveChannelID(bodyMapChannelID string, client *Client, logH
 	return "", trace, errors.New("no freshchat channel found with source='freshchat'")
 }
 
-func buildConversation(userID, channelID, message string, customFields map[string]interface{}) *Conversation {
-	text := message
-	if text == "" {
-		text = "New ticket"
-	}
+func buildConversation(userID, channelID, message string, customFields map[string]interface{}, includeMessage bool, historyMessages []Message) *Conversation {
 	msg := &Conversation{
 		ChannelID: channelID,
 		Status:    "new",
 		Users: []User{
 			{ID: userID},
 		},
-		Messages: []Message{
+		Properties: Properties{
+			Value: []map[string]interface{}{},
+		},
+	}
+
+	// Include initial message if provided
+	if includeMessage {
+		text := message
+		if text == "" {
+			text = "New ticket"
+		}
+		msg.Messages = []Message{
 			{
 				MessageParts: []MessageParts{
 					{
@@ -198,11 +264,12 @@ func buildConversation(userID, channelID, message string, customFields map[strin
 				UserID:      userID,
 				CreatedTime: time.Now().Format(time.RFC3339),
 			},
-		},
-		Properties: Properties{
-			Value: []map[string]interface{}{},
-		},
+		}
+	} else if len(historyMessages) > 0 {
+		// If no initial message, include history messages
+		msg.Messages = historyMessages
 	}
+
 	if len(customFields) > 0 {
 		msg.Properties = Properties{
 			Value: []map[string]interface{}{customFields},
@@ -315,6 +382,257 @@ func (s *service) Reopen(tickets []*models.Ticket, logHTTP flows.HTTPLogCallback
 		}
 	}
 	return nil
+}
+
+func parseTime(historyAfter string) (time.Time, error) {
+	formats := []string{
+		"2006-01-02 15:04:05",
+		"2006-01-02T15:04:05",
+		"2006-01-02T15:04:05Z",
+		"2006-01-02 15:04:05-07:00",
+		time.RFC3339,
+	}
+
+	for _, format := range formats {
+		t, err := time.Parse(format, historyAfter)
+		if err == nil {
+			return t, nil
+		}
+	}
+
+	return time.Time{}, errors.Errorf("unable to parse time '%s' with formats: %v", historyAfter, formats)
+}
+
+func (s *service) getHistoryMessages(session flows.Session, contactID flows.ContactID, contactUUID string, ticketBody string, userID string) ([]Message, error) {
+	historyAfter, _ := jsonparser.GetString([]byte(ticketBody), "history_after")
+	var after time.Time
+	var err error
+	if historyAfter != "" {
+		after, err = parseTime(historyAfter)
+		if err != nil {
+			return nil, errors.Wrap(err, "failed to parse history_after")
+		}
+	} else if len(session.Runs()) > 0 {
+		// get messages for history, based on first session run start time
+		after = session.Runs()[0].CreatedOn().Add(time.Second * -1)
+	} else {
+		// No history_after and no runs, nothing to send
+		return nil, nil
+	}
+
+	cx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+	defer cancel()
+
+	// get messages for history
+	msgs, err := models.SelectContactMessages(cx, db, int(contactID), after)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to get history messages")
+	}
+
+	if len(msgs) == 0 {
+		return nil, nil
+	}
+
+	// sort messages by CreatedOn()
+	sort.SliceStable(msgs, func(i, j int) bool {
+		return msgs[i].CreatedOn().Before(msgs[j].CreatedOn())
+	})
+
+	// Convert messages to Freshchat Message format
+	historyMessages := make([]Message, 0, len(msgs))
+	for _, msg := range msgs {
+		freshchatMsg := Message{
+			CreatedTime: msg.CreatedOn().Format(time.RFC3339),
+		}
+
+		// Set actor based on message direction
+		if msg.Direction() == "I" {
+			// Incoming message from user
+			freshchatMsg.ActorType = "user"
+			freshchatMsg.ActorID = userID
+			freshchatMsg.UserID = userID
+		} else {
+			// Outgoing message from bot (no agent ID available)
+			freshchatMsg.ActorType = "bot"
+		}
+
+		// Add text content
+		text := msg.Text()
+		if text != "" {
+			freshchatMsg.MessageParts = []MessageParts{
+				{
+					Text: &Text{
+						Content: text,
+					},
+				},
+			}
+		}
+
+		// Add attachments (for conversation creation, we'll use URLs directly without upload)
+		for _, attachment := range msg.Attachments() {
+			contentType := attachment.ContentType()
+			switch contentType {
+			case "image/jpeg", "image/png", "image/gif", "image/webp":
+				freshchatMsg.MessageParts = append(freshchatMsg.MessageParts, MessageParts{
+					Image: &Image{
+						URL: attachment.URL(),
+					},
+				})
+			case "video/mp4", "video/quicktime", "video/webm":
+				freshchatMsg.MessageParts = append(freshchatMsg.MessageParts, MessageParts{
+					Video: &Video{
+						URL:         attachment.URL(),
+						ContentType: contentType,
+					},
+				})
+			default:
+				freshchatMsg.MessageParts = append(freshchatMsg.MessageParts, MessageParts{
+					File: &File{
+						URL:         attachment.URL(),
+						ContentType: contentType,
+					},
+				})
+			}
+		}
+
+		// Skip if no content
+		if len(freshchatMsg.MessageParts) == 0 {
+			continue
+		}
+
+		historyMessages = append(historyMessages, freshchatMsg)
+	}
+
+	return historyMessages, nil
+}
+
+func SendHistory(session flows.Session, contactID flows.ContactID, ticketUUID string, conversationID string, contactUUID string, ticketBody string, restClient *Client, redactor utils.Redactor, logHTTP flows.HTTPLogCallback) {
+	historyAfter, _ := jsonparser.GetString([]byte(ticketBody), "history_after")
+	var after time.Time
+	var err error
+	if historyAfter != "" {
+		after, err = parseTime(historyAfter)
+		if err != nil {
+			logrus.Error(errors.Wrap(err, "failed to parse history_after"))
+			return
+		}
+	} else if len(session.Runs()) > 0 {
+		after = session.Runs()[0].CreatedOn().Add(time.Second * -1)
+	} else {
+		return
+	}
+
+	cx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+	defer cancel()
+
+	msgs, err := models.SelectContactMessages(cx, db, int(contactID), after)
+	if err != nil {
+		logrus.Error(errors.Wrap(err, "failed to get history messages"))
+		return
+	}
+
+	if len(msgs) == 0 {
+		return
+	}
+
+	sort.SliceStable(msgs, func(i, j int) bool {
+		return msgs[i].CreatedOn().Before(msgs[j].CreatedOn())
+	})
+
+	if contactUUID == "" {
+		contactUUID = string(session.Contact().UUID())
+	}
+	if contactUUID == "" {
+		logrus.Error(errors.New("contact-uuid not found"))
+		return
+	}
+
+	user, trace, err := restClient.GetUser(contactUUID)
+	if trace != nil {
+		logHTTP(flows.NewHTTPLog(trace, flows.HTTPStatusFromCode, redactor))
+	}
+	if err != nil || user == nil {
+		logrus.Error(errors.Wrap(err, "failed to get Freshchat user for contact"))
+		return
+	}
+
+	var trace2 *httpx.Trace
+	for _, msg := range msgs {
+		freshchatMsg := &Message{
+			ConversationID: conversationID,
+			CreatedTime:    msg.CreatedOn().Format(time.RFC3339),
+		}
+
+		// Set actor based on message direction
+		if msg.Direction() == "I" {
+			// Incoming message from user
+			freshchatMsg.ActorType = "user"
+			freshchatMsg.ActorID = user.ID
+			freshchatMsg.UserID = user.ID
+		} else {
+			// Outgoing message from bot (no agent ID available)
+			freshchatMsg.ActorType = "bot"
+		}
+
+		text := msg.Text()
+		if text != "" {
+			freshchatMsg.MessageParts = []MessageParts{
+				{
+					Text: &Text{
+						Content: text,
+					},
+				},
+			}
+		}
+
+		// Add attachments
+		for _, attachment := range msg.Attachments() {
+			contentType := attachment.ContentType()
+			switch contentType {
+			case "image/jpeg", "image/png", "image/gif", "image/webp":
+				imageURL, err := restClient.UploadImage(attachment.URL())
+				if err != nil {
+					imageURL = attachment.URL()
+				}
+				freshchatMsg.MessageParts = append(freshchatMsg.MessageParts, MessageParts{
+					Image: &Image{
+						URL: imageURL,
+					},
+				})
+			case "video/mp4", "video/quicktime", "video/webm":
+				freshchatMsg.MessageParts = append(freshchatMsg.MessageParts, MessageParts{
+					Video: &Video{
+						URL:         attachment.URL(),
+						ContentType: contentType,
+					},
+				})
+			default:
+				file, err := restClient.UploadFile(attachment.URL())
+				if err != nil {
+					file = &File{
+						URL:         attachment.URL(),
+						ContentType: contentType,
+					}
+				}
+				freshchatMsg.MessageParts = append(freshchatMsg.MessageParts, MessageParts{
+					File: file,
+				})
+			}
+		}
+
+		if len(freshchatMsg.MessageParts) == 0 {
+			continue
+		}
+
+		_, trace2, err = restClient.CreateMessage(freshchatMsg)
+		if trace2 != nil {
+			logHTTP(flows.NewHTTPLog(trace2, flows.HTTPStatusFromCode, redactor))
+		}
+		if err != nil {
+			logrus.Error(errors.Wrap(err, "error calling Freshchat to send message from history"))
+			return
+		}
+	}
 }
 
 func (s *service) SendHistory(ticket *models.Ticket, contactID models.ContactID, runs []*models.FlowRun, logHTTP flows.HTTPLogCallback) error {
