@@ -2,12 +2,6 @@
   {
     "label": "open ticket with assignee",
     "http_mocks": {
-      "https://auth.weni.ai/oauth/token": [
-        {
-          "status": 200,
-          "body": "{\"access_token\":\"test_token\",\"token_type\":\"Bearer\",\"expires_in\":3600}"
-        }
-      ],
       "https://chats-engine.dev.cloud.weni.ai/v1/external/rooms/": [
         {
           "status": 200,
@@ -53,12 +47,6 @@
   {
     "label": "open ticket without assignee",
     "http_mocks": {
-      "https://auth.weni.ai/oauth/token": [
-        {
-          "status": 200,
-          "body": "{\"access_token\":\"test_token\",\"token_type\":\"Bearer\",\"expires_in\":3600}"
-        }
-      ],
       "https://chats-engine.dev.cloud.weni.ai/v1/external/rooms/": [
         {
           "status": 200,
@@ -100,12 +88,6 @@
   {
     "label": "open ticket with history_after",
     "http_mocks": {
-      "https://auth.weni.ai/oauth/token": [
-        {
-          "status": 200,
-          "body": "{\"access_token\":\"test_token\",\"token_type\":\"Bearer\",\"expires_in\":3600}"
-        }
-      ],
       "https://chats-engine.dev.cloud.weni.ai/v1/external/rooms/": [
         {
           "status": 200,
@@ -148,12 +130,6 @@
   {
     "label": "open ticket with history_after",
     "http_mocks": {
-      "https://auth.weni.ai/oauth/token": [
-        {
-          "status": 200,
-          "body": "{\"access_token\":\"test_token\",\"token_type\":\"Bearer\",\"expires_in\":3600}"
-        }
-      ],
       "https://chats-engine.dev.cloud.weni.ai/v1/external/rooms/": [
         {
           "status": 500,
