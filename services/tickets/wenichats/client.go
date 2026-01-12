@@ -23,19 +23,17 @@ type baseClient struct {
 	httpRetries *httpx.RetryConfig
 	authToken   string
 	baseURL     string
-	expiresAt   time.Time
 	rtCfg       *runtime.Config
 	redisPool   *redis.Pool
 }
 
-func newBaseClient(httpClient *http.Client, httpRetries *httpx.RetryConfig, baseURL, authToken string, expiry time.Time, rtCfg *runtime.Config, redisPool *redis.Pool) baseClient {
+func newBaseClient(httpClient *http.Client, httpRetries *httpx.RetryConfig, baseURL, authToken string, rtCfg *runtime.Config, redisPool *redis.Pool) baseClient {
 
 	return baseClient{
 		httpClient:  httpClient,
 		httpRetries: httpRetries,
 		authToken:   authToken,
 		baseURL:     baseURL,
-		expiresAt:   expiry,
 		rtCfg:       rtCfg,
 		redisPool:   redisPool,
 	}
@@ -45,23 +43,7 @@ type errorResponse struct {
 	Detail string `json:"detail"`
 }
 
-func (c *baseClient) ensureTokenValid() error {
-	if c.expiresAt.Before(time.Now()) {
-		token, expiry, err := GetToken(c.httpClient, c.redisPool, c.rtCfg)
-		if err != nil {
-			return err
-		}
-		c.authToken = token
-		c.expiresAt = expiry
-	}
-	return nil
-}
-
 func (c *baseClient) request(method, url string, params *url.Values, payload, response interface{}) (*httpx.Trace, error) {
-
-	if err := c.ensureTokenValid(); err != nil {
-		return nil, err
-	}
 
 	pjson, err := json.Marshal(payload)
 	if err != nil {
@@ -73,7 +55,9 @@ func (c *baseClient) request(method, url string, params *url.Values, payload, re
 		return nil, err
 	}
 	req.Header.Add("Content-Type", "application/json")
-	req.Header.Add("Authorization", "Bearer "+c.authToken)
+	if c.authToken != "" {
+		req.Header.Add("Authorization", "Bearer "+c.authToken)
+	}
 
 	if params != nil {
 		req.URL.RawQuery = params.Encode()
@@ -117,9 +101,9 @@ type Client struct {
 	baseClient
 }
 
-func NewClient(httpClient *http.Client, httpRetries *httpx.RetryConfig, baseURL, authToken string, expiry time.Time, rtCfg *runtime.Config, redisPool *redis.Pool) *Client {
+func NewClient(httpClient *http.Client, httpRetries *httpx.RetryConfig, baseURL, authToken string, rtCfg *runtime.Config, redisPool *redis.Pool) *Client {
 	return &Client{
-		baseClient: newBaseClient(httpClient, httpRetries, baseURL, authToken, expiry, rtCfg, redisPool),
+		baseClient: newBaseClient(httpClient, httpRetries, baseURL, authToken, rtCfg, redisPool),
 	}
 }
 
@@ -312,54 +296,6 @@ type authResponse struct {
 	AccessToken string `json:"access_token"`
 	TokenType   string `json:"token_type"`
 	ExpiresIn   int    `json:"expires_in"`
-}
-
-// GetToken returns a valid authentication token, fetching a new one if necessary
-func GetToken(httpClient *http.Client, rp *redis.Pool, rtCfg *runtime.Config) (string, time.Time, error) {
-	// First try in Redis
-	rc := rp.Get()
-
-	// Try to acquire lock for token renewal
-	lockKey := tokenCacheKey + ":lock"
-	lockAcquired, err := redis.String(rc.Do("SET", lockKey, "1", "NX", "EX", int(lockTimeout.Seconds())))
-	if err != nil && err != redis.ErrNil {
-		return "", time.Time{}, errors.Wrap(err, "error acquiring lock for token renewal")
-	}
-
-	if lockAcquired != "" {
-		// We have the lock: fetch new token
-		defer rc.Do("DEL", lockKey)
-
-		logrus.WithFields(logrus.Fields{
-			"component": "wenichats_token",
-		}).Debug("Acquired lock for token renewal")
-
-		token, expiry, err := FetchNewToken(httpClient, rtCfg)
-		if err != nil {
-			return "", time.Time{}, errors.Wrap(err, "error fetching new token")
-		}
-
-		_, err = rc.Do("SETEX", tokenCacheKey, int(tokenExpiry.Seconds()), token)
-		if err != nil {
-			logrus.WithError(err).Error("Failed to save token to Redis")
-		}
-
-		return token, expiry, nil
-	}
-
-	// If we didn't get the lock, try to get current token from Redis
-	token, err := redis.String(rc.Do("GET", tokenCacheKey))
-	if err == nil && token != "" {
-		return token, time.Time{}, nil
-	}
-
-	if err != redis.ErrNil {
-		logrus.WithError(err).Error("Error getting token from Redis")
-	}
-
-	// Wait and try again
-	time.Sleep(time.Millisecond * 100)
-	return GetToken(httpClient, rp, rtCfg)
 }
 
 // fetchNewToken calls the auth API to get a new token
