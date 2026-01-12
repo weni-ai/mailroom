@@ -1,3 +1,7 @@
+1.76.1
+----------
+ * Introduce a fixed token for wenichats authentication and remove the keycloak's one
+
 1.76.0
 ----------
  * Handle new contact fields on MsgEvent
