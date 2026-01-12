@@ -663,7 +663,7 @@ func TestWppBroadcastCarouselTemplateEvaluation(t *testing.T) {
 			name: "carousel with body template variables",
 			carousel: []flows.CarouselCard{
 				{
-					Body:  "Hello @contact.name",
+					Body:  []string{"Hello @contact.name"},
 					Index: 0,
 					Buttons: []flows.CarouselCardButton{
 						{SubType: "quick_reply", Parameter: "buy"},
@@ -679,7 +679,7 @@ func TestWppBroadcastCarouselTemplateEvaluation(t *testing.T) {
 			name: "carousel with button parameter template variables",
 			carousel: []flows.CarouselCard{
 				{
-					Body:  "Product 1 for @contact.name",
+					Body:  []string{"Product 1"},
 					Index: 0,
 					Buttons: []flows.CarouselCardButton{
 						{SubType: "quick_reply", Parameter: "greet"},
@@ -696,14 +696,14 @@ func TestWppBroadcastCarouselTemplateEvaluation(t *testing.T) {
 			name: "multiple carousel cards with template variables",
 			carousel: []flows.CarouselCard{
 				{
-					Body:  "Card 1 for @contact.name",
+					Body:  []string{"Card 1"},
 					Index: 0,
 					Buttons: []flows.CarouselCardButton{
 						{SubType: "quick_reply", Parameter: "opt1"},
 					},
 				},
 				{
-					Body:  "Card 2 for @contact.name",
+					Body:  []string{"Card 2 @contact.name"},
 					Index: 1,
 					Buttons: []flows.CarouselCardButton{
 						{SubType: "quick_reply", Parameter: "opt2"},
@@ -792,7 +792,7 @@ func TestWppBroadcastCarouselBodyEvaluation(t *testing.T) {
 	// Create a carousel with body fields containing template expressions
 	carousel := []flows.CarouselCard{
 		{
-			Body:  "Hello @contact.name",
+			Body:  []string{"Hello @contact.name"},
 			Index: 0,
 			Buttons: []flows.CarouselCardButton{
 				{SubType: "quick_reply", Parameter: "confirm"},
@@ -879,7 +879,7 @@ func TestWppBroadcastCarouselButtonTextEvaluation(t *testing.T) {
 	// Create a carousel with button text containing template expressions
 	carousel := []flows.CarouselCard{
 		{
-			Body:  "Product info",
+			Body:  []string{"Product info"},
 			Index: 0,
 			Buttons: []flows.CarouselCardButton{
 				{SubType: "quick_reply", Parameter: "buy"},
@@ -973,7 +973,7 @@ func TestWppBroadcastCarouselPreservesButtonProperties(t *testing.T) {
 	// Create a carousel with various button types to verify all properties are preserved
 	carousel := []flows.CarouselCard{
 		{
-			Body:  "Product details",
+			Body:  []string{"Product details"},
 			Index: 0,
 			Buttons: []flows.CarouselCardButton{
 				{SubType: "quick_reply", Parameter: "qr_param"},
