@@ -1839,11 +1839,13 @@ func CreateWppBroadcastMessages(ctx context.Context, rt *runtime.Runtime, oa *Or
 					evaluatedCarouselCards = make([]flows.CarouselCard, len(templateCarousel))
 					for idx, carouselCard := range templateCarousel {
 						// Evaluate body fields using excellent.EvaluateTemplate for each entry
-						evaluatedBody := ""
-
-						evaluatedBody, err := excellent.EvaluateTemplate(oa.Env(), evaluationCtx, carouselCard.Body, nil)
-						if err != nil {
-							return nil, errors.Wrapf(err, "failed to evaluate template body")
+						evaluatedBody := make([]string, len(carouselCard.Body))
+						for i, bodyPart := range carouselCard.Body {
+							var err error
+							evaluatedBody[i], err = excellent.EvaluateTemplate(oa.Env(), evaluationCtx, bodyPart, nil)
+							if err != nil {
+								return nil, errors.Wrapf(err, "failed to evaluate template body")
+							}
 						}
 
 						// Evaluate button text using excellent.EvaluateTemplate for each button
