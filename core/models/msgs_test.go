@@ -635,3 +635,383 @@ func TestSelectContactMessages(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, 3, len(msgs))
 }
+
+func TestWppBroadcastCarouselTemplateEvaluation(t *testing.T) {
+	ctx, rt, db, _ := testsuite.Get()
+	defer testsuite.Reset(testsuite.ResetData)
+
+	// Change Alexandria's URN to a whatsapp URN and set her language to eng so that a template gets used for her
+	db.MustExec(`UPDATE contacts_contacturn SET identity = 'whatsapp:559899999999', path='559899999999', scheme='whatsapp' WHERE contact_id = $1`, testdata.Alexandria.ID)
+	db.MustExec(`UPDATE contacts_contact SET language='eng' WHERE id = $1`, testdata.Alexandria.ID)
+
+	oa, err := models.GetOrgAssets(ctx, rt, testdata.Org1.ID)
+	require.NoError(t, err)
+
+	templates, err := oa.Templates()
+	require.NoError(t, err)
+	require.True(t, len(templates) > 2, "need at least 3 templates for this test")
+
+	tcs := []struct {
+		name                string
+		carousel            []flows.CarouselCard
+		expectedBodyCount   int
+		expectedButtonCount int
+		contactID           models.ContactID
+		contactName         string
+	}{
+		{
+			name: "carousel with body template variables",
+			carousel: []flows.CarouselCard{
+				{
+					Body:  []string{"Hello @contact.name"},
+					Index: 0,
+					Buttons: []flows.CarouselCardButton{
+						{SubType: "quick_reply", Parameter: "buy"},
+					},
+				},
+			},
+			expectedBodyCount:   1,
+			expectedButtonCount: 1,
+			contactID:           testdata.Alexandria.ID,
+			contactName:         "Alexandria",
+		},
+		{
+			name: "carousel with button parameter template variables",
+			carousel: []flows.CarouselCard{
+				{
+					Body:  []string{"Product 1"},
+					Index: 0,
+					Buttons: []flows.CarouselCardButton{
+						{SubType: "quick_reply", Parameter: "greet"},
+						{SubType: "url", Parameter: "https://example.com"},
+					},
+				},
+			},
+			expectedBodyCount:   1,
+			expectedButtonCount: 2,
+			contactID:           testdata.Alexandria.ID,
+			contactName:         "Alexandria",
+		},
+		{
+			name: "multiple carousel cards with template variables",
+			carousel: []flows.CarouselCard{
+				{
+					Body:  []string{"Card 1"},
+					Index: 0,
+					Buttons: []flows.CarouselCardButton{
+						{SubType: "quick_reply", Parameter: "opt1"},
+					},
+				},
+				{
+					Body:  []string{"Card 2 @contact.name"},
+					Index: 1,
+					Buttons: []flows.CarouselCardButton{
+						{SubType: "quick_reply", Parameter: "opt2"},
+						{SubType: "phone_number", Parameter: "+1234567890"},
+					},
+				},
+			},
+			expectedBodyCount:   2, // total body items across all cards
+			expectedButtonCount: 3, // total buttons across all cards
+			contactID:           testdata.Alexandria.ID,
+			contactName:         "Alexandria",
+		},
+		{
+			name:                "empty carousel",
+			carousel:            []flows.CarouselCard{},
+			expectedBodyCount:   0,
+			expectedButtonCount: 0,
+			contactID:           testdata.Alexandria.ID,
+			contactName:         "Alexandria",
+		},
+	}
+
+	for _, tc := range tcs {
+		t.Run(tc.name, func(t *testing.T) {
+			msg := models.WppBroadcastMessage{
+				Text: "hello @contact.name",
+				Template: models.WppBroadcastTemplate{
+					UUID:      templates[2].UUID(),
+					Name:      templates[2].Name(),
+					Variables: []string{"@contact.name"},
+					Locale:    "pt-BR",
+					Carousel:  tc.carousel,
+				},
+			}
+
+			bcast := models.NewWppBroadcast(
+				oa.OrgID(),
+				models.NilBroadcastID,
+				msg,
+				[]urns.URN{urns.URN("whatsapp:559899999999")},
+				nil,
+				nil,
+				testdata.WhatsAppCloudChannel.ID,
+				"batch",
+			)
+
+			batch := bcast.CreateBatch([]models.ContactID{tc.contactID})
+
+			msgs, err := models.CreateWppBroadcastMessages(ctx, rt, oa, batch)
+			require.NoError(t, err)
+			require.Len(t, msgs, 1, "expected 1 message to be created")
+
+			// Verify that the message was created successfully
+			createdMsg := msgs[0]
+			assert.NotNil(t, createdMsg)
+
+			// Count total body items and buttons in the carousel
+			totalBodyItems := 0
+			totalButtons := 0
+			for _, card := range tc.carousel {
+				totalBodyItems += len(card.Body)
+				totalButtons += len(card.Buttons)
+			}
+
+			assert.Equal(t, tc.expectedBodyCount, totalBodyItems, "unexpected total body items count")
+			assert.Equal(t, tc.expectedButtonCount, totalButtons, "unexpected total buttons count")
+		})
+	}
+}
+
+func TestWppBroadcastCarouselBodyEvaluation(t *testing.T) {
+	ctx, rt, db, _ := testsuite.Get()
+	defer testsuite.Reset(testsuite.ResetData)
+
+	// Change Alexandria's URN to a whatsapp URN and set her language to eng
+	db.MustExec(`UPDATE contacts_contacturn SET identity = 'whatsapp:559899999999', path='559899999999', scheme='whatsapp' WHERE contact_id = $1`, testdata.Alexandria.ID)
+	db.MustExec(`UPDATE contacts_contact SET language='eng' WHERE id = $1`, testdata.Alexandria.ID)
+
+	oa, err := models.GetOrgAssets(ctx, rt, testdata.Org1.ID)
+	require.NoError(t, err)
+
+	templates, err := oa.Templates()
+	require.NoError(t, err)
+	require.True(t, len(templates) > 2, "need at least 3 templates for this test")
+
+	// Create a carousel with body fields containing template expressions
+	carousel := []flows.CarouselCard{
+		{
+			Body:  []string{"Hello @contact.name"},
+			Index: 0,
+			Buttons: []flows.CarouselCardButton{
+				{SubType: "quick_reply", Parameter: "confirm"},
+			},
+		},
+	}
+
+	msg := models.WppBroadcastMessage{
+		Text: "Carousel test",
+		Template: models.WppBroadcastTemplate{
+			UUID:      templates[2].UUID(),
+			Name:      templates[2].Name(),
+			Variables: []string{"@contact.name"},
+			Locale:    "pt-BR",
+			Carousel:  carousel,
+		},
+	}
+
+	bcast := models.NewWppBroadcast(
+		oa.OrgID(),
+		models.NilBroadcastID,
+		msg,
+		[]urns.URN{urns.URN("whatsapp:559899999999")},
+		nil,
+		nil,
+		testdata.WhatsAppCloudChannel.ID,
+		"batch",
+	)
+
+	batch := bcast.CreateBatch([]models.ContactID{testdata.Alexandria.ID})
+
+	msgs, err := models.CreateWppBroadcastMessages(ctx, rt, oa, batch)
+	require.NoError(t, err)
+	require.Len(t, msgs, 1)
+
+	// Verify the message has templating metadata
+	metadata := msgs[0].Metadata()
+	assert.NotNil(t, metadata)
+
+	// Check if templating exists in metadata
+	templating, hasTemplating := metadata["templating"]
+	if hasTemplating {
+		templatingMap, ok := templating.(map[string]interface{})
+		if ok {
+			// Check if carousel data exists
+			carouselData, hasCarousel := templatingMap["carousel"]
+			if hasCarousel && carouselData != nil {
+				carouselSlice, ok := carouselData.([]interface{})
+				if ok && len(carouselSlice) > 0 {
+					firstCard, ok := carouselSlice[0].(map[string]interface{})
+					if ok {
+						body, hasBody := firstCard["body"]
+						if hasBody {
+							bodySlice, ok := body.([]interface{})
+							if ok && len(bodySlice) > 0 {
+								// Verify the body was evaluated (should contain "Alexandria" not "@contact.name")
+								firstBodyStr, _ := bodySlice[0].(string)
+								assert.Contains(t, firstBodyStr, "Alexandria", "body should be evaluated with contact name")
+								assert.NotContains(t, firstBodyStr, "@contact.name", "body should not contain unevaluated expression")
+							}
+						}
+					}
+				}
+			}
+		}
+	}
+}
+
+func TestWppBroadcastCarouselButtonTextEvaluation(t *testing.T) {
+	ctx, rt, db, _ := testsuite.Get()
+	defer testsuite.Reset(testsuite.ResetData)
+
+	// Change Alexandria's URN to a whatsapp URN and set her language to eng
+	db.MustExec(`UPDATE contacts_contacturn SET identity = 'whatsapp:559899999999', path='559899999999', scheme='whatsapp' WHERE contact_id = $1`, testdata.Alexandria.ID)
+	db.MustExec(`UPDATE contacts_contact SET language='eng' WHERE id = $1`, testdata.Alexandria.ID)
+
+	oa, err := models.GetOrgAssets(ctx, rt, testdata.Org1.ID)
+	require.NoError(t, err)
+
+	templates, err := oa.Templates()
+	require.NoError(t, err)
+	require.True(t, len(templates) > 2, "need at least 3 templates for this test")
+
+	// Create a carousel with button text containing template expressions
+	carousel := []flows.CarouselCard{
+		{
+			Body:  []string{"Product info"},
+			Index: 0,
+			Buttons: []flows.CarouselCardButton{
+				{SubType: "quick_reply", Parameter: "buy"},
+				{SubType: "url", Parameter: "https://example.com/@contact.name"},
+			},
+		},
+	}
+
+	msg := models.WppBroadcastMessage{
+		Text: "Carousel button test",
+		Template: models.WppBroadcastTemplate{
+			UUID:      templates[2].UUID(),
+			Name:      templates[2].Name(),
+			Variables: []string{"@contact.name"},
+			Locale:    "pt-BR",
+			Carousel:  carousel,
+		},
+	}
+
+	bcast := models.NewWppBroadcast(
+		oa.OrgID(),
+		models.NilBroadcastID,
+		msg,
+		[]urns.URN{urns.URN("whatsapp:559899999999")},
+		nil,
+		nil,
+		testdata.WhatsAppCloudChannel.ID,
+		"batch",
+	)
+
+	batch := bcast.CreateBatch([]models.ContactID{testdata.Alexandria.ID})
+
+	msgs, err := models.CreateWppBroadcastMessages(ctx, rt, oa, batch)
+	require.NoError(t, err)
+	require.Len(t, msgs, 1)
+
+	// Verify the message has templating metadata
+	metadata := msgs[0].Metadata()
+	assert.NotNil(t, metadata)
+
+	// Check if templating exists in metadata
+	templating, hasTemplating := metadata["templating"]
+	if hasTemplating {
+		templatingMap, ok := templating.(map[string]interface{})
+		if ok {
+			// Check if carousel data exists
+			carouselData, hasCarousel := templatingMap["carousel"]
+			if hasCarousel && carouselData != nil {
+				carouselSlice, ok := carouselData.([]interface{})
+				if ok && len(carouselSlice) > 0 {
+					firstCard, ok := carouselSlice[0].(map[string]interface{})
+					if ok {
+						buttons, hasButtons := firstCard["buttons"]
+						if hasButtons {
+							buttonsSlice, ok := buttons.([]interface{})
+							if ok && len(buttonsSlice) > 0 {
+								firstButton, ok := buttonsSlice[0].(map[string]interface{})
+								if ok {
+									buttonText, hasText := firstButton["text"]
+									if hasText {
+										buttonTextStr, _ := buttonText.(string)
+										// Verify the button text was evaluated (should contain "Alexandria" not "@contact.name")
+										assert.Contains(t, buttonTextStr, "Alexandria", "button text should be evaluated with contact name")
+										assert.NotContains(t, buttonTextStr, "@contact.name", "button text should not contain unevaluated expression")
+									}
+								}
+							}
+						}
+					}
+				}
+			}
+		}
+	}
+}
+
+func TestWppBroadcastCarouselPreservesButtonProperties(t *testing.T) {
+	ctx, rt, db, _ := testsuite.Get()
+	defer testsuite.Reset(testsuite.ResetData)
+
+	// Change Alexandria's URN to a whatsapp URN and set her language to eng
+	db.MustExec(`UPDATE contacts_contacturn SET identity = 'whatsapp:559899999999', path='559899999999', scheme='whatsapp' WHERE contact_id = $1`, testdata.Alexandria.ID)
+	db.MustExec(`UPDATE contacts_contact SET language='eng' WHERE id = $1`, testdata.Alexandria.ID)
+
+	oa, err := models.GetOrgAssets(ctx, rt, testdata.Org1.ID)
+	require.NoError(t, err)
+
+	templates, err := oa.Templates()
+	require.NoError(t, err)
+	require.True(t, len(templates) > 2, "need at least 3 templates for this test")
+
+	// Create a carousel with various button types to verify all properties are preserved
+	carousel := []flows.CarouselCard{
+		{
+			Body:  []string{"Product details"},
+			Index: 0,
+			Buttons: []flows.CarouselCardButton{
+				{SubType: "quick_reply", Parameter: "qr_param"},
+				{SubType: "url", Parameter: "https://example.com/path"},
+				{SubType: "phone_number", Parameter: "+5511999999999"},
+			},
+		},
+	}
+
+	msg := models.WppBroadcastMessage{
+		Text: "Carousel with multiple button types",
+		Template: models.WppBroadcastTemplate{
+			UUID:      templates[2].UUID(),
+			Name:      templates[2].Name(),
+			Variables: []string{"@contact.name"},
+			Locale:    "pt-BR",
+			Carousel:  carousel,
+		},
+	}
+
+	bcast := models.NewWppBroadcast(
+		oa.OrgID(),
+		models.NilBroadcastID,
+		msg,
+		[]urns.URN{urns.URN("whatsapp:559899999999")},
+		nil,
+		nil,
+		testdata.WhatsAppCloudChannel.ID,
+		"batch",
+	)
+
+	batch := bcast.CreateBatch([]models.ContactID{testdata.Alexandria.ID})
+
+	msgs, err := models.CreateWppBroadcastMessages(ctx, rt, oa, batch)
+	require.NoError(t, err)
+	require.Len(t, msgs, 1)
+
+	// Verify the message was created successfully
+	assert.NotNil(t, msgs[0])
+	assert.NotEmpty(t, msgs[0].UUID())
+}

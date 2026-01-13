@@ -1536,10 +1536,12 @@ func CreateBroadcastMessages(ctx context.Context, rt *runtime.Runtime, oa *OrgAs
 }
 
 type WppBroadcastTemplate struct {
-	UUID      assets.TemplateUUID `json:"uuid" validate:"required,uuid"`
-	Name      string              `json:"name" validate:"required"`
-	Variables []string            `json:"variables,omitempty"`
-	Locale    string              `json:"locale,omitempty" validate:"omitempty,bcp47"`
+	UUID      assets.TemplateUUID  `json:"uuid" validate:"required,uuid"`
+	Name      string               `json:"name" validate:"required"`
+	Variables []string             `json:"variables,omitempty"`
+	Locale    string               `json:"locale,omitempty" validate:"omitempty,bcp47"`
+	IsCarousel bool                 `json:"is_carousel,omitempty"`
+	Carousel  []flows.CarouselCard `json:"carousel,omitempty"`
 }
 
 type WppBroadcastMessageHeader struct {
@@ -1749,6 +1751,9 @@ func CreateWppBroadcastMessages(ctx context.Context, rt *runtime.Runtime, oa *Or
 		templateVariables := make([]string, len(bcast.Msg().Template.Variables))
 		copy(templateVariables, bcast.Msg().Template.Variables)
 		templateLocale := bcast.Msg().Template.Locale
+		templateIsCarousel := bcast.Msg().Template.IsCarousel
+		templateCarousel := make([]flows.CarouselCard, len(bcast.Msg().Template.Carousel))
+		copy(templateCarousel, bcast.Msg().Template.Carousel)
 
 		ctaMessage := bcast.Msg().CTAMessage
 		listMessage := bcast.Msg().ListMessage
@@ -1829,9 +1834,44 @@ func CreateWppBroadcastMessages(ctx context.Context, rt *runtime.Runtime, oa *Or
 					evaluatedVariables[i] = sub
 				}
 
+				var evaluatedCarouselCards []flows.CarouselCard
+				if len(templateCarousel) > 0 {
+					evaluatedCarouselCards = make([]flows.CarouselCard, len(templateCarousel))
+					for idx, carouselCard := range templateCarousel {
+						// Evaluate body fields using excellent.EvaluateTemplate for each entry
+						evaluatedBody := make([]string, len(carouselCard.Body))
+						for i, bodyPart := range carouselCard.Body {
+							var err error
+							evaluatedBody[i], err = excellent.EvaluateTemplate(oa.Env(), evaluationCtx, bodyPart, nil)
+							if err != nil {
+								return nil, errors.Wrapf(err, "failed to evaluate template body")
+							}
+						}
+
+						// Evaluate button text using excellent.EvaluateTemplate for each button
+						evaluatedButtons := make([]flows.CarouselCardButton, len(carouselCard.Buttons))
+						for i, button := range carouselCard.Buttons {
+							evaluatedButtonParameter, err := excellent.EvaluateTemplate(oa.Env(), evaluationCtx, button.Parameter, nil)
+							if err != nil {
+								return nil, errors.Wrapf(err, "failed to evaluate template button text")
+							}
+							evaluatedButtons[i] = flows.CarouselCardButton{
+								SubType:   button.SubType,
+								Parameter: evaluatedButtonParameter,
+							}
+						}
+
+						evaluatedCarouselCards[idx] = flows.CarouselCard{
+							Body:    evaluatedBody,
+							Index:   carouselCard.Index,
+							Buttons: evaluatedButtons,
+						}
+					}
+				}
+
 				text = translation.Substitute(evaluatedVariables)
 				var templateReference = assets.NewTemplateReference(bcast.Msg().Template.UUID, bcast.Msg().Template.Name, templateMatch.Category())
-				templating = flows.NewMsgTemplating(templateReference, translation.Language(), translation.Country(), evaluatedVariables, translation.Namespace())
+				templating = flows.NewMsgTemplating(templateReference, translation.Language(), translation.Country(), evaluatedVariables, translation.Namespace(), evaluatedCarouselCards, templateIsCarousel)
 			} else {
 				return nil, errors.Errorf("translation not found for template: %s, in channel: %s", bcast.Msg().Template.UUID, channel.UUID())
 			}
