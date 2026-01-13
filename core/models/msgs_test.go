@@ -711,7 +711,7 @@ func TestWppBroadcastCarouselTemplateEvaluation(t *testing.T) {
 					},
 				},
 			},
-			expectedBodyCount:   1, // total body items across all cards
+			expectedBodyCount:   2, // total body items across all cards
 			expectedButtonCount: 3, // total buttons across all cards
 			contactID:           testdata.Alexandria.ID,
 			contactName:         "Alexandria",
