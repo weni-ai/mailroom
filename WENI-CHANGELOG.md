@@ -1,3 +1,7 @@
+1.77.0
+----------
+ * feat: Enhance WppBroadcast functionality with carousel support and template evaluation
+
 1.76.1
 ----------
  * Introduce a fixed token for wenichats authentication and remove the keycloak's one
