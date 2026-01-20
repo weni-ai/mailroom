@@ -998,6 +998,11 @@ type StopEvent struct {
 func requestToRouter(event *MsgEvent, rtConfig *runtime.Config, contact *flows.Contact, projectUUID uuids.UUID, channel *models.Channel) error {
 	httpClient, httpRetries, _ := goflow.HTTP(rtConfig)
 
+	streamSupport := false
+	if fmt.Sprint(channel.Config()["version"]) == "2" {
+		streamSupport = true
+	}
+
 	body := struct {
 		ProjectUUID   uuids.UUID             `json:"project_uuid"`
 		ContactURN    urns.URN               `json:"contact_urn"`
@@ -1009,6 +1014,7 @@ func requestToRouter(event *MsgEvent, rtConfig *runtime.Config, contact *flows.C
 		ChannelUUID   assets.ChannelUUID     `json:"channel_uuid"`
 		ChannelType   string                 `json:"channel_type"`
 		ContactName   string                 `json:"contact_name"`
+		StreamSupport bool                   `json:"stream_support"`
 	}{
 		ProjectUUID:   projectUUID,
 		ContactURN:    event.URN.Identity(),
@@ -1020,6 +1026,7 @@ func requestToRouter(event *MsgEvent, rtConfig *runtime.Config, contact *flows.C
 		ChannelUUID:   channel.UUID(),
 		ChannelType:   string(channel.Type()),
 		ContactName:   contact.Name(),
+		StreamSupport: streamSupport,
 	}
 
 	var b io.Reader
