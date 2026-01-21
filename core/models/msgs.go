@@ -1536,12 +1536,12 @@ func CreateBroadcastMessages(ctx context.Context, rt *runtime.Runtime, oa *OrgAs
 }
 
 type WppBroadcastTemplate struct {
-	UUID      assets.TemplateUUID  `json:"uuid" validate:"required,uuid"`
-	Name      string               `json:"name" validate:"required"`
-	Variables []string             `json:"variables,omitempty"`
-	Locale    string               `json:"locale,omitempty" validate:"omitempty,bcp47"`
+	UUID       assets.TemplateUUID  `json:"uuid" validate:"required,uuid"`
+	Name       string               `json:"name" validate:"required"`
+	Variables  []string             `json:"variables,omitempty"`
+	Locale     string               `json:"locale,omitempty" validate:"omitempty,bcp47"`
 	IsCarousel bool                 `json:"is_carousel,omitempty"`
-	Carousel  []flows.CarouselCard `json:"carousel,omitempty"`
+	Carousel   []flows.CarouselCard `json:"carousel,omitempty"`
 }
 
 type WppBroadcastMessageHeader struct {
