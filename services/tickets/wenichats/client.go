@@ -74,7 +74,11 @@ func (c *baseClient) request(method, url string, params *url.Values, payload, re
 		if err != nil {
 			return trace, errors.Wrap(err, fmt.Sprintf("couldn't parse error response: %v", string(trace.ResponseBody)))
 		}
-		return trace, errors.New(response.Detail)
+		detail := strings.TrimSpace(response.Detail)
+		if detail == "" {
+			detail = "unknown error"
+		}
+		return trace, errors.New(detail)
 	}
 
 	if response != nil {

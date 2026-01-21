@@ -240,8 +240,7 @@ func (s *service) Open(session flows.Session, topic *flows.Topic, body string, a
 		logHTTP(flows.NewHTTPLog(trace, flows.HTTPStatusFromCode, s.redactor))
 	}
 	if err != nil {
-		logrus.Error(errors.Wrap(err, fmt.Sprintf("failed to create wenichats room for: %+v", roomData)))
-		return nil, errors.New(string(trace.ResponseBody))
+		return nil, errors.Wrap(err, fmt.Sprintf("failed to create wenichats room for: %+v, response: %s", roomData, string(trace.ResponseBody)))
 	}
 
 	ticket.SetExternalID(newRoom.UUID)
