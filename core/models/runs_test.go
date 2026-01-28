@@ -1,6 +1,7 @@
 package models_test
 
 import (
+	"encoding/json"
 	"testing"
 	"time"
 
@@ -8,6 +9,7 @@ import (
 	"github.com/nyaruka/goflow/assets"
 	"github.com/nyaruka/goflow/flows"
 	"github.com/nyaruka/goflow/flows/engine"
+	"github.com/nyaruka/goflow/flows/resumes"
 	"github.com/nyaruka/goflow/flows/triggers"
 	"github.com/nyaruka/mailroom/core/models"
 	"github.com/nyaruka/mailroom/core/runner"
@@ -150,4 +152,69 @@ func TestSelectRunUUIDs(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, len(frs), 1)
 	assert.Equal(t, frs[0], frUUID)
+}
+
+func TestFlowSessionRepairsMissingErrorText(t *testing.T) {
+	ctx, rt, db, _ := testsuite.Get()
+	defer testsuite.Reset(testsuite.ResetAll)
+
+	oa, err := models.GetOrgAssetsWithRefresh(ctx, rt, testdata.Org1.ID, models.RefreshFlows)
+	require.NoError(t, err)
+
+	_, flowContact := testdata.Cathy.Load(db, oa)
+	flow, err := oa.FlowByID(testdata.Favorites.ID)
+	require.NoError(t, err)
+
+	eng := engine.NewBuilder().Build()
+	trigger := triggers.NewBuilder(oa.Env(), flow.FlowReference(), flowContact).Manual().Build()
+	fs, _, err := eng.NewSession(oa.SessionAssets(), trigger)
+	require.NoError(t, err)
+
+	channel := oa.ChannelByID(testdata.TwilioChannel.ID)
+	msgIn := flows.NewMsgIn(flows.MsgUUID(uuids.New()), testdata.Cathy.URN, channel.ChannelReference(), "Ola", nil)
+	resume := resumes.NewMsg(oa.Env(), flowContact, msgIn)
+	_, err = fs.Resume(resume)
+	require.NoError(t, err)
+
+	output, err := json.Marshal(fs)
+	require.NoError(t, err)
+
+	var session map[string]interface{}
+	require.NoError(t, json.Unmarshal(output, &session))
+
+	runs, ok := session["runs"].([]interface{})
+	require.True(t, ok, "expected session runs")
+	require.NotEmpty(t, runs)
+
+	runMap, ok := runs[0].(map[string]interface{})
+	require.True(t, ok, "expected run map")
+
+	events, ok := runMap["events"].([]interface{})
+	require.True(t, ok, "expected run events")
+
+	events = append(events, map[string]interface{}{
+		"type":       "error",
+		"created_on": time.Now().UTC().Format(time.RFC3339Nano),
+	})
+	runMap["events"] = events
+
+	sessionJSON, err := json.Marshal(session)
+	require.NoError(t, err)
+
+	db.MustExec(
+		`INSERT INTO flows_flowsession(uuid, session_type, status, responded, output, contact_id, org_id, created_on, current_flow_id)
+		 VALUES($1, 'M', 'W', FALSE, $2, $3, $4, NOW(), $5)`,
+		uuids.New(),
+		string(sessionJSON),
+		testdata.Cathy.ID,
+		testdata.Org1.ID,
+		testdata.Favorites.ID,
+	)
+
+	sessionModel, err := models.ActiveSessionForContact(ctx, db, rt.SessionStorage, oa, models.FlowTypeMessaging, flowContact)
+	require.NoError(t, err)
+	require.NotNil(t, sessionModel)
+
+	_, err = sessionModel.FlowSession(rt.Config, oa.SessionAssets(), oa.Env())
+	assert.NoError(t, err)
 }

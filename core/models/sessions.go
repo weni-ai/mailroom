@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"net/url"
 	"path"
+	"strings"
 	"time"
 
 	"github.com/aws/aws-sdk-go/service/s3"
@@ -408,9 +409,18 @@ RETURNING id
 
 // FlowSession creates a flow session for the passed in session object. It also populates the runs we know about
 func (s *Session) FlowSession(cfg *runtime.Config, sa flows.SessionAssets, env envs.Environment) (flows.Session, error) {
-	session, err := goflow.Engine(cfg).ReadSession(sa, json.RawMessage(s.s.Output), assets.IgnoreMissing)
+	output := string(s.s.Output)
+	session, err := goflow.Engine(cfg).ReadSession(sa, json.RawMessage(output), assets.IgnoreMissing)
 	if err != nil {
-		return nil, errors.Wrapf(err, "unable to unmarshal session")
+		if repaired, changed, repairErr := sanitizeSessionOutput(output); repairErr == nil && changed {
+			session, err = goflow.Engine(cfg).ReadSession(sa, json.RawMessage(repaired), assets.IgnoreMissing)
+			if err == nil {
+				logrus.WithField("session_id", s.ID()).Warn("repaired session output missing event text")
+			}
+		}
+		if err != nil {
+			return nil, errors.Wrapf(err, "unable to unmarshal session")
+		}
 	}
 
 	// walk through our session, populate seen runs
@@ -420,6 +430,67 @@ func (s *Session) FlowSession(cfg *runtime.Config, sa flows.SessionAssets, env e
 	}
 
 	return session, nil
+}
+
+// sanitizeSessionOutput repairs the session output if it is missing event text
+func sanitizeSessionOutput(output string) (string, bool, error) {
+	if output == "" {
+		return output, false, nil
+	}
+
+	var session map[string]interface{}
+	if err := json.Unmarshal([]byte(output), &session); err != nil {
+		return output, false, err
+	}
+
+	runs, ok := session["runs"].([]interface{})
+	if !ok {
+		return output, false, nil
+	}
+
+	changed := false
+	for _, run := range runs {
+		runMap, ok := run.(map[string]interface{})
+		if !ok {
+			continue
+		}
+
+		events, ok := runMap["events"].([]interface{})
+		if !ok {
+			continue
+		}
+
+		for _, ev := range events {
+			evMap, ok := ev.(map[string]interface{})
+			if !ok {
+				continue
+			}
+
+			typ, ok := evMap["type"].(string)
+			if !ok {
+				continue
+			}
+
+			if typ == "error" || typ == "failure" {
+				text, ok := evMap["text"].(string)
+				if !ok || strings.TrimSpace(text) == "" {
+					evMap["text"] = "missing error text"
+					changed = true
+				}
+			}
+		}
+	}
+
+	if !changed {
+		return output, false, nil
+	}
+
+	repaired, err := json.Marshal(session)
+	if err != nil {
+		return output, false, err
+	}
+
+	return string(repaired), true, nil
 }
 
 // calculates the timeout value for this session based on our waits

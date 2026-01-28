@@ -133,7 +133,7 @@
       "https://chats-engine.dev.cloud.weni.ai/v1/external/rooms/": [
         {
           "status": 500,
-          "body": "{\"error\":\"The contact already have an open room in the project\"}"
+          "body": "{\"detail\":\"The contact already have an open room in the project\"}"
         }
       ]
     },
@@ -149,7 +149,7 @@
     },
     "status": 400,
     "response": {
-      "error": "{\"error\":\"The contact already have an open room in the project\"}"
+      "error": "failed to create wenichats room: The contact already have an open room in the project"
     },
     "db_assertions": [
       {
