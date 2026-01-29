@@ -282,3 +282,222 @@ func TestBroadcastTask(t *testing.T) {
 		time.Sleep(10 * time.Millisecond)
 	}
 }
+
+func TestBroadcastWithHeaderFooterAndCatalog(t *testing.T) {
+	ctx, rt, db, rp := testsuite.Get()
+	rc := rp.Get()
+	defer rc.Close()
+
+	defer testsuite.Reset(testsuite.ResetAll)
+
+	oa, err := models.GetOrgAssets(ctx, rt, testdata.Org1.ID)
+	assert.NoError(t, err)
+	eng := envs.Language("eng")
+
+	cathyOnly := []models.ContactID{testdata.Cathy.ID}
+
+	// Test with header and footer
+	headerFooterMsg := map[envs.Language]*models.BroadcastTranslation{
+		eng: {
+			Text:        "hello @contact.name",
+			Attachments: nil,
+			QuickReplies: []string{
+				"quick reply 1",
+				"quick reply 2",
+				"quick reply 3 for @contact.name",
+			},
+			Header: models.BroadcastMessageHeader{
+				Type: "text",
+				Text: "header for @contact.name",
+			},
+			Footer: "footer for @contact.name",
+		},
+	}
+
+	// Test with catalog message
+	catalogMsg := map[envs.Language]*models.BroadcastTranslation{
+		eng: {
+			Text:         "Check out our products",
+			Attachments:  nil,
+			QuickReplies: nil,
+			Header: models.BroadcastMessageHeader{
+				Type: "text",
+				Text: "header for catalog",
+			},
+			CatalogMessage: models.BroadcastCatalogMessage{
+				Products: []flows.ProductEntry{
+					{
+						Product:            "banana",
+						ProductRetailerIDs: []string{"123"},
+					},
+				},
+				ActionButtonText: "View Products",
+				SendCatalog:      true,
+			},
+		},
+	}
+
+	// Test with catalog only (no text)
+	catalogOnlyMsg := map[envs.Language]*models.BroadcastTranslation{
+		eng: {
+			Text:         "",
+			Attachments:  nil,
+			QuickReplies: nil,
+			CatalogMessage: models.BroadcastCatalogMessage{
+				Products: []flows.ProductEntry{
+					{
+						Product:            "apple",
+						ProductRetailerIDs: []string{"456"},
+					},
+				},
+				ActionButtonText: "Browse Catalog",
+				SendCatalog:      false,
+			},
+		},
+	}
+
+	tcs := []struct {
+		BroadcastID   models.BroadcastID
+		Translations  map[envs.Language]*models.BroadcastTranslation
+		TemplateState models.TemplateState
+		BaseLanguage  envs.Language
+		ContactIDs    []models.ContactID
+		URNs          []urns.URN
+		Queue         string
+		BatchCount    int
+		MsgCount      int
+		MsgText       string
+		BroadcastType events.BroadcastType
+	}{
+		{
+			models.NilBroadcastID,
+			headerFooterMsg,
+			models.TemplateStateUnevaluated,
+			eng,
+			cathyOnly,
+			nil,
+			queue.HandlerQueue,
+			1,
+			1,
+			"hello Cathy",
+			events.BroadcastTypeDefault,
+		},
+		{
+			models.NilBroadcastID,
+			catalogMsg,
+			models.TemplateStateUnevaluated,
+			eng,
+			cathyOnly,
+			nil,
+			queue.HandlerQueue,
+			1,
+			1,
+			"Check out our products",
+			events.BroadcastTypeDefault,
+		},
+		{
+			models.NilBroadcastID,
+			catalogOnlyMsg,
+			models.TemplateStateUnevaluated,
+			eng,
+			cathyOnly,
+			nil,
+			queue.HandlerQueue,
+			1,
+			1,
+			"",
+			events.BroadcastTypeDefault,
+		},
+	}
+
+	lastNow := time.Now()
+	time.Sleep(10 * time.Millisecond)
+
+	for i, tc := range tcs {
+		// handle our start task
+		bcast := models.NewBroadcast(oa.OrgID(), tc.BroadcastID, tc.Translations, tc.TemplateState, tc.BaseLanguage, tc.URNs, tc.ContactIDs, nil, models.NilTicketID, tc.BroadcastType)
+		err = msgs.CreateBroadcastBatches(ctx, rt, bcast)
+		assert.NoError(t, err)
+
+		// pop all our tasks and execute them
+		var task *queue.Task
+		count := 0
+		for {
+			task, err = queue.PopNextTask(rc, tc.Queue)
+			assert.NoError(t, err)
+			if task == nil {
+				break
+			}
+
+			count++
+			assert.Equal(t, queue.SendBroadcastBatch, task.Type)
+			batch := &models.BroadcastBatch{}
+			err = json.Unmarshal(task.Task, batch)
+			assert.NoError(t, err)
+
+			err = msgs.SendBroadcastBatch(ctx, rt, batch)
+			assert.NoError(t, err)
+		}
+
+		// assert our count of batches
+		assert.Equal(t, tc.BatchCount, count, "%d: unexpected batch count", i)
+
+		// assert our count of total msgs created
+		if tc.MsgText != "" {
+			testsuite.AssertQuery(t, db, `SELECT count(*) FROM msgs_msg WHERE org_id = 1 AND created_on > $1 AND text = $2`, lastNow, tc.MsgText).
+				Returns(tc.MsgCount, "%d: unexpected msg count", i)
+		} else {
+			// For catalog only messages, check that a message was created
+			testsuite.AssertQuery(t, db, `SELECT count(*) FROM msgs_msg WHERE org_id = 1 AND created_on > $1`, lastNow).
+				Returns(tc.MsgCount, "%d: unexpected msg count", i)
+		}
+
+		// assert our quick replies are being sent
+		if len(tc.Translations[eng].QuickReplies) > 0 {
+			if tc.MsgText != "" {
+				testsuite.AssertQuery(t, db, `SELECT count(*) FROM msgs_msg WHERE org_id = 1 AND created_on > $1 AND text = $2 AND metadata LIKE '%' || 'quick_replies' || '%'`, lastNow, tc.MsgText).
+					Returns(1, "%d: unexpected quick reply count", i)
+			} else {
+				testsuite.AssertQuery(t, db, `SELECT count(*) FROM msgs_msg WHERE org_id = 1 AND created_on > $1 AND metadata LIKE '%' || 'quick_replies' || '%'`, lastNow).
+					Returns(1, "%d: unexpected quick reply count", i)
+			}
+		}
+
+		// assert our header is being sent
+		if tc.Translations[eng].Header.Text != "" {
+			if tc.MsgText != "" {
+				testsuite.AssertQuery(t, db, `SELECT count(*) FROM msgs_msg WHERE org_id = 1 AND created_on > $1 AND text = $2 AND metadata LIKE '%' || 'header' || '%'`, lastNow, tc.MsgText).
+					Returns(1, "%d: unexpected header count", i)
+			} else {
+				testsuite.AssertQuery(t, db, `SELECT count(*) FROM msgs_msg WHERE org_id = 1 AND created_on > $1 AND metadata LIKE '%' || 'header' || '%'`, lastNow).
+					Returns(1, "%d: unexpected header count", i)
+			}
+		}
+
+		// assert our footer is being sent
+		if tc.Translations[eng].Footer != "" {
+			if tc.MsgText != "" {
+				testsuite.AssertQuery(t, db, `SELECT count(*) FROM msgs_msg WHERE org_id = 1 AND created_on > $1 AND text = $2 AND metadata LIKE '%' || 'footer' || '%'`, lastNow, tc.MsgText).
+					Returns(1, "%d: unexpected footer count", i)
+			} else {
+				testsuite.AssertQuery(t, db, `SELECT count(*) FROM msgs_msg WHERE org_id = 1 AND created_on > $1 AND metadata LIKE '%' || 'footer' || '%'`, lastNow).
+					Returns(1, "%d: unexpected footer count", i)
+			}
+		}
+
+		// Assert catalog message
+		if len(tc.Translations[eng].CatalogMessage.Products) > 0 || tc.Translations[eng].CatalogMessage.SendCatalog {
+			testsuite.AssertQuery(t, db, `SELECT count(*) FROM msgs_msg WHERE org_id = 1 AND created_on > $1 AND metadata::jsonb ? 'products'`, lastNow).
+				Returns(1, "%d: unexpected catalog message count", i)
+		}
+
+		// make sure our broadcast is marked as sent
+		if tc.BroadcastID != models.NilBroadcastID {
+			testsuite.AssertQuery(t, db, `SELECT count(*) FROM msgs_broadcast WHERE id = $1 AND status = 'S'`, tc.BroadcastID).
+				Returns(1, "%d: broadcast not marked as sent", i)
+		}
+
+		lastNow = time.Now()
+		time.Sleep(10 * time.Millisecond)
+	}
+}
