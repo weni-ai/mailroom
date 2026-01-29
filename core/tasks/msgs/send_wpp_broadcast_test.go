@@ -2,6 +2,7 @@ package msgs_test
 
 import (
 	"encoding/json"
+	"log"
 	"testing"
 	"time"
 
@@ -479,4 +480,5 @@ func TestWppBroadcastTask(t *testing.T) {
 		lastNow = time.Now()
 		time.Sleep(10 * time.Millisecond)
 	}
+	log.Println("done")
 }
