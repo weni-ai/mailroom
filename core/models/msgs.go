@@ -1059,9 +1059,12 @@ WHERE
 
 // BroadcastTranslation is the translation for the passed in language
 type BroadcastTranslation struct {
-	Text         string             `json:"text"`
-	Attachments  []utils.Attachment `json:"attachments,omitempty"`
-	QuickReplies []string           `json:"quick_replies,omitempty"`
+	Text           string                  `json:"text"`
+	Attachments    []utils.Attachment      `json:"attachments,omitempty"`
+	QuickReplies   []string                `json:"quick_replies,omitempty"`
+	Header         BroadcastMessageHeader  `json:"header,omitempty"`
+	Footer         string                  `json:"footer,omitempty"`
+	CatalogMessage BroadcastCatalogMessage `json:"catalog_message,omitempty"`
 }
 
 // Broadcast represents a broadcast that needs to be sent
@@ -1447,27 +1450,82 @@ func CreateBroadcastMessages(ctx context.Context, rt *runtime.Runtime, oa *OrgAs
 		}
 
 		text := t.Text
+		attachments := t.Attachments
+		quickReplies := make([]string, len(t.QuickReplies))
+		copy(quickReplies, t.QuickReplies)
+		headerType := t.Header.Type
+		headerText := t.Header.Text
+		footerText := t.Footer
+
+		products := t.CatalogMessage.Products
+		actionButtonText := t.CatalogMessage.ActionButtonText
+		sendCatalog := t.CatalogMessage.SendCatalog
+
+		// build up the minimum viable context for evaluation
+		evaluationCtx := types.NewXObject(map[string]types.XValue{
+			"contact": flows.Context(oa.Env(), contact),
+			"fields":  flows.Context(oa.Env(), contact.Fields()),
+			"globals": flows.Context(oa.Env(), oa.SessionAssets().Globals()),
+			"urns":    flows.ContextFunc(oa.Env(), contact.URNs().MapContext),
+		})
 
 		// if we have a template, evaluate it
 		if template != "" {
-			// build up the minimum viable context for templates
-			templateCtx := types.NewXObject(map[string]types.XValue{
-				"contact": flows.Context(oa.Env(), contact),
-				"fields":  flows.Context(oa.Env(), contact.Fields()),
-				"globals": flows.Context(oa.Env(), oa.SessionAssets().Globals()),
-				"urns":    flows.ContextFunc(oa.Env(), contact.URNs().MapContext),
-			})
-			text, _ = excellent.EvaluateTemplate(oa.Env(), templateCtx, template, nil)
+			text, _ = excellent.EvaluateTemplate(oa.Env(), evaluationCtx, template, nil)
+		}
+
+		// evaluate our header text
+		headerText, _ = excellent.EvaluateTemplate(oa.Env(), evaluationCtx, headerText, nil)
+
+		// evaluate our footer text
+		footerText, _ = excellent.EvaluateTemplate(oa.Env(), evaluationCtx, footerText, nil)
+
+		// evaluate our action text
+		actionButtonText, _ = excellent.EvaluateTemplate(oa.Env(), evaluationCtx, actionButtonText, nil)
+
+		// evaluate our quick replies
+		for i, qr := range quickReplies {
+			quickReplies[i], _ = excellent.EvaluateTemplate(oa.Env(), evaluationCtx, qr, nil)
 		}
 
 		// don't do anything if we have no text or attachments
-		if text == "" && len(t.Attachments) == 0 {
+		if text == "" && len(attachments) == 0 && len(products) == 0 {
 			return nil, nil
 		}
 
+		// build metadata for header, footer and catalog
+		broadcastMetadata := make(map[string]interface{})
+		if headerType != "" || headerText != "" {
+			headerMap := make(map[string]interface{})
+			if headerType != "" {
+				headerMap["type"] = headerType
+			}
+			if headerText != "" {
+				headerMap["text"] = headerText
+			}
+			broadcastMetadata["header"] = headerMap
+		}
+		if footerText != "" {
+			broadcastMetadata["footer"] = footerText
+		}
+		if len(products) > 0 {
+			broadcastMetadata["products"] = products
+		}
+		if actionButtonText != "" {
+			broadcastMetadata["action_button_text"] = actionButtonText
+		}
+		if sendCatalog {
+			broadcastMetadata["send_catalog"] = sendCatalog
+		}
+
+		// merge with existing extraMetadata (extraMetadata can override broadcastMetadata)
+		if extraMetadata != nil {
+			broadcastMetadata = MergeMaps(broadcastMetadata, extraMetadata)
+		}
+
 		// create our outgoing message
-		out := flows.NewMsgOut(urn, channel.ChannelReference(), text, t.Attachments, t.QuickReplies, nil, flows.NilMsgTopic, "", "", "")
-		msg, err := NewOutgoingBroadcastMsg(rt, oa.Org(), channel, c.ID(), out, time.Now(), bcast.BroadcastID(), extraMetadata)
+		out := flows.NewMsgOut(urn, channel.ChannelReference(), text, attachments, quickReplies, nil, flows.NilMsgTopic, "", "", "")
+		msg, err := NewOutgoingBroadcastMsg(rt, oa.Org(), channel, c.ID(), out, time.Now(), bcast.BroadcastID(), broadcastMetadata)
 
 		if err != nil {
 			return nil, errors.Wrapf(err, "error creating outgoing message")
@@ -1544,33 +1602,33 @@ type WppBroadcastTemplate struct {
 	Carousel   []flows.CarouselCard `json:"carousel,omitempty"`
 }
 
-type WppBroadcastMessageHeader struct {
+type BroadcastMessageHeader struct {
 	Type string `json:"type,omitempty"`
 	Text string `json:"text,omitempty"`
 }
 
-type WppBroadcastCatalogMessage struct {
+type BroadcastCatalogMessage struct {
 	Products         []flows.ProductEntry `json:"products,omitempty"`
 	ActionButtonText string               `json:"action_button_text,omitempty"`
 	SendCatalog      bool                 `json:"send_catalog,omitempty"`
 }
 
 type WppBroadcastMessage struct {
-	Text             string                     `json:"text,omitempty"`
-	Header           WppBroadcastMessageHeader  `json:"header,omitempty"`
-	Footer           string                     `json:"footer,omitempty"`
-	Attachments      []utils.Attachment         `json:"attachments,omitempty"`
-	QuickReplies     []string                   `json:"quick_replies,omitempty"`
-	Template         WppBroadcastTemplate       `json:"template,omitempty"`
-	InteractionType  string                     `json:"interaction_type,omitempty"`
-	OrderDetails     flows.OrderDetailsMessage  `json:"order_details,omitempty"`
-	FlowMessage      flows.FlowMessage          `json:"flow_message,omitempty"`
-	ListMessage      flows.ListMessage          `json:"list_message,omitempty"`
-	CTAMessage       flows.CTAMessage           `json:"cta_message,omitempty"`
-	Buttons          []flows.ButtonComponent    `json:"buttons,omitempty"`
-	CatalogMessage   WppBroadcastCatalogMessage `json:"catalog_message,omitempty"`
-	ActionExternalID string                     `json:"action_external_id,omitempty"`
-	ActionType       string                     `json:"action_type,omitempty"`
+	Text             string                    `json:"text,omitempty"`
+	Header           BroadcastMessageHeader    `json:"header,omitempty"`
+	Footer           string                    `json:"footer,omitempty"`
+	Attachments      []utils.Attachment        `json:"attachments,omitempty"`
+	QuickReplies     []string                  `json:"quick_replies,omitempty"`
+	Template         WppBroadcastTemplate      `json:"template,omitempty"`
+	InteractionType  string                    `json:"interaction_type,omitempty"`
+	OrderDetails     flows.OrderDetailsMessage `json:"order_details,omitempty"`
+	FlowMessage      flows.FlowMessage         `json:"flow_message,omitempty"`
+	ListMessage      flows.ListMessage         `json:"list_message,omitempty"`
+	CTAMessage       flows.CTAMessage          `json:"cta_message,omitempty"`
+	Buttons          []flows.ButtonComponent   `json:"buttons,omitempty"`
+	CatalogMessage   BroadcastCatalogMessage   `json:"catalog_message,omitempty"`
+	ActionExternalID string                    `json:"action_external_id,omitempty"`
+	ActionType       string                    `json:"action_type,omitempty"`
 }
 
 type WppBroadcast struct {
