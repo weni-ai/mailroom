@@ -225,7 +225,6 @@ func (s *service) Open(session flows.Session, topic *flows.Topic, body string, a
 	ticketer, err := models.LookupTicketerByUUID(cx, db, s.ticketer.UUID())
 
 	if err != nil {
-		logrus.Error(errors.Wrap(err, fmt.Sprintf("failed to lookup ticketer: %s", s.ticketer.UUID())))
 		return nil, errors.Wrap(err, "failed to lookup ticketer")
 	}
 
@@ -240,8 +239,7 @@ func (s *service) Open(session flows.Session, topic *flows.Topic, body string, a
 		logHTTP(flows.NewHTTPLog(trace, flows.HTTPStatusFromCode, s.redactor))
 	}
 	if err != nil {
-		logrus.Error(errors.Wrap(err, fmt.Sprintf("failed to create wenichats room for: %+v", roomData)))
-		return nil, errors.New(string(trace.ResponseBody))
+		return nil, errors.Wrap(err, "failed to create wenichats room")
 	}
 
 	ticket.SetExternalID(newRoom.UUID)

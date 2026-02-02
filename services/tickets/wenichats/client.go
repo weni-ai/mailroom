@@ -15,7 +15,6 @@ import (
 	"github.com/nyaruka/mailroom/runtime"
 	"github.com/nyaruka/null"
 	"github.com/pkg/errors"
-	"github.com/sirupsen/logrus"
 )
 
 type baseClient struct {
@@ -40,7 +39,7 @@ func newBaseClient(httpClient *http.Client, httpRetries *httpx.RetryConfig, base
 }
 
 type errorResponse struct {
-	Detail string `json:"detail"`
+	Detail json.RawMessage `json:"detail"`
 }
 
 func (c *baseClient) request(method, url string, params *url.Values, payload, response interface{}) (*httpx.Trace, error) {
@@ -74,7 +73,22 @@ func (c *baseClient) request(method, url string, params *url.Values, payload, re
 		if err != nil {
 			return trace, errors.Wrap(err, fmt.Sprintf("couldn't parse error response: %v", string(trace.ResponseBody)))
 		}
-		return trace, errors.New(response.Detail)
+		detail := strings.TrimSpace(string(response.Detail))
+		if len(response.Detail) > 0 {
+			var detailStr string
+			if json.Unmarshal(response.Detail, &detailStr) == nil {
+				detail = strings.TrimSpace(detailStr)
+			}
+		}
+		if detail == "" {
+			body := strings.TrimSpace(string(trace.ResponseBody))
+			if body != "" {
+				detail = fmt.Sprintf("request failed with status %d: %s", trace.Response.StatusCode, body)
+			} else {
+				detail = fmt.Sprintf("request failed with status %d", trace.Response.StatusCode)
+			}
+		}
+		return trace, errors.New(detail)
 	}
 
 	if response != nil {
@@ -296,49 +310,4 @@ type authResponse struct {
 	AccessToken string `json:"access_token"`
 	TokenType   string `json:"token_type"`
 	ExpiresIn   int    `json:"expires_in"`
-}
-
-// fetchNewToken calls the auth API to get a new token
-func FetchNewToken(httpClient *http.Client, rtCfg *runtime.Config) (string, time.Time, error) {
-	authURL := rtCfg.OidcOpTokenEndpoint
-
-	reqBody := strings.NewReader(fmt.Sprintf(
-		"client_id=%s&client_secret=%s&grant_type=client_credentials",
-		rtCfg.OidcRpClientID, rtCfg.OidcRpClientSecret,
-	))
-
-	req, err := httpx.NewRequest(http.MethodPost, authURL, reqBody, nil)
-	if err != nil {
-		return "", time.Time{}, errors.Wrap(err, "error creating auth request")
-	}
-	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
-
-	trace, err := httpx.DoTrace(httpClient, req, nil, nil, -1)
-	if err != nil {
-		return "", time.Time{}, errors.Wrap(err, "error making auth request")
-	}
-
-	if trace.Response.StatusCode >= 400 {
-		response := &errorResponse{}
-		err := jsonx.Unmarshal(trace.ResponseBody, response)
-		if err != nil {
-			return "", time.Time{}, errors.Wrap(err, fmt.Sprintf("couldn't parse error response: %v", string(trace.ResponseBody)))
-		}
-		return "", time.Time{}, errors.New(response.Detail)
-	}
-
-	var authResp authResponse
-	if err := json.Unmarshal(trace.ResponseBody, &authResp); err != nil {
-		return "", time.Time{}, errors.Wrap(err, "error decoding auth response")
-	}
-
-	expiryDuration := time.Duration(authResp.ExpiresIn) * time.Second
-	safeExpiry := time.Now().Add(expiryDuration * 9 / 10)
-
-	logrus.WithFields(logrus.Fields{
-		"component":  "wenichats_client",
-		"expires_in": authResp.ExpiresIn,
-	}).Debug("Successfully fetched new token")
-
-	return authResp.AccessToken, safeExpiry, nil
 }
