@@ -446,13 +446,8 @@ func newOutgoingMsg(rt *runtime.Runtime, org *Org, channel *Channel, contactID C
 	// populate metadata if we have any
 	hasMetadata := len(out.QuickReplies()) > 0 || out.Templating() != nil || out.Topic() != flows.NilMsgTopic || out.TextLanguage != "" || out.IGCommentID() != "" || out.IGResponseType() != ""
 
-	logrus.WithFields(logrus.Fields{
-		"contact_id":        contactID,
-		"broadcast_id":      broadcastID,
-		"hasMetadata":       hasMetadata,
-		"extraMetadata_nil": extraMetadata == nil,
-		"extraMetadata_len": len(extraMetadata),
-	}).Debug("newOutgoingMsg: checking metadata conditions")
+	fmt.Printf("[DEBUG newOutgoingMsg] checking metadata conditions contact_id=%d broadcast_id=%d hasMetadata=%v extraMetadata_nil=%v extraMetadata_len=%d\n",
+		contactID, broadcastID, hasMetadata, extraMetadata == nil, len(extraMetadata))
 
 	// check if extraMetadata has catalog-related fields (products, header, footer, etc.)
 	// following the same pattern as newOutgoingMsgWpp which always creates metadata when products are present
@@ -463,25 +458,14 @@ func newOutgoingMsg(rt *runtime.Runtime, org *Org, channel *Channel, contactID C
 		_, hasProducts := extraMetadata["products"]
 		_, hasSendCatalog := extraMetadata["send_catalog"]
 		hasExtraMetadata = hasHeader || hasFooter || hasProducts || hasSendCatalog
-		logrus.WithFields(logrus.Fields{
-			"contact_id":       contactID,
-			"hasHeader":        hasHeader,
-			"hasFooter":        hasFooter,
-			"hasProducts":      hasProducts,
-			"hasSendCatalog":   hasSendCatalog,
-			"hasExtraMetadata": hasExtraMetadata,
-		}).Debug("newOutgoingMsg: extraMetadata field checks")
+		fmt.Printf("[DEBUG newOutgoingMsg] extraMetadata field checks contact_id=%d hasHeader=%v hasFooter=%v hasProducts=%v hasSendCatalog=%v hasExtraMetadata=%v\n",
+			contactID, hasHeader, hasFooter, hasProducts, hasSendCatalog, hasExtraMetadata)
 	}
 
 	// always create metadata if we have any metadata fields OR if extraMetadata is not empty
 	shouldCreateMetadata := hasMetadata || hasExtraMetadata || len(extraMetadata) > 0
-	logrus.WithFields(logrus.Fields{
-		"contact_id":           contactID,
-		"shouldCreateMetadata": shouldCreateMetadata,
-		"hasMetadata":          hasMetadata,
-		"hasExtraMetadata":     hasExtraMetadata,
-		"extraMetadata_len":    len(extraMetadata),
-	}).Debug("newOutgoingMsg: metadata creation decision")
+	fmt.Printf("[DEBUG newOutgoingMsg] metadata creation decision contact_id=%d shouldCreateMetadata=%v hasMetadata=%v hasExtraMetadata=%v extraMetadata_len=%d\n",
+		contactID, shouldCreateMetadata, hasMetadata, hasExtraMetadata, len(extraMetadata))
 
 	if shouldCreateMetadata {
 		metadata := make(map[string]interface{})
@@ -514,37 +498,25 @@ func newOutgoingMsg(rt *runtime.Runtime, org *Org, channel *Channel, contactID C
 			metadata["ig_tag"] = out.IGTag()
 		}
 
-		logrus.WithFields(logrus.Fields{
-			"contact_id":   contactID,
-			"metadata_len": len(metadata),
-		}).Debug("newOutgoingMsg: metadata before merging extraMetadata")
+		fmt.Printf("[DEBUG newOutgoingMsg] metadata before merging extraMetadata contact_id=%d metadata_len=%d\n",
+			contactID, len(metadata))
 
 		// merge with extraMetadata if present (extraMetadata takes precedence)
 		if len(extraMetadata) > 0 {
 			metadata = MergeMaps(metadata, extraMetadata)
 			_, hasProducts := metadata["products"]
 			_, hasSendCatalog := metadata["send_catalog"]
-			logrus.WithFields(logrus.Fields{
-				"contact_id":       contactID,
-				"metadata_len":     len(metadata),
-				"has_products":     hasProducts,
-				"has_send_catalog": hasSendCatalog,
-			}).Debug("newOutgoingMsg: metadata after merging extraMetadata")
+			fmt.Printf("[DEBUG newOutgoingMsg] metadata after merging extraMetadata contact_id=%d metadata_len=%d has_products=%v has_send_catalog=%v\n",
+				contactID, len(metadata), hasProducts, hasSendCatalog)
 		}
 
 		m.Metadata = null.NewMap(metadata)
 		_, finalHasProducts := metadata["products"]
 		_, finalHasSendCatalog := metadata["send_catalog"]
-		logrus.WithFields(logrus.Fields{
-			"contact_id":             contactID,
-			"metadata_len":           len(metadata),
-			"final_has_products":     finalHasProducts,
-			"final_has_send_catalog": finalHasSendCatalog,
-		}).Debug("newOutgoingMsg: final metadata set")
+		fmt.Printf("[DEBUG newOutgoingMsg] final metadata set contact_id=%d metadata_len=%d final_has_products=%v final_has_send_catalog=%v\n",
+			contactID, len(metadata), finalHasProducts, finalHasSendCatalog)
 	} else {
-		logrus.WithFields(logrus.Fields{
-			"contact_id": contactID,
-		}).Warn("newOutgoingMsg: metadata NOT created - products may be lost!")
+		fmt.Printf("[WARN newOutgoingMsg] metadata NOT created - products may be lost! contact_id=%d\n", contactID)
 	}
 
 	// if we're sending to a phone, message may have to be sent in multiple parts
@@ -1522,6 +1494,9 @@ func CreateBroadcastMessages(ctx context.Context, rt *runtime.Runtime, oa *OrgAs
 		products := t.CatalogMessage.Products
 		sendCatalog := t.CatalogMessage.SendCatalog
 
+		fmt.Printf("[DEBUG CreateBroadcastMessages] contact_id=%d broadcast_id=%d products_len=%d sendCatalog=%v has_catalog_message=%v\n",
+			c.ID(), bcast.BroadcastID(), len(products), sendCatalog, len(products) > 0 || sendCatalog)
+
 		// build up the minimum viable context for evaluation
 		evaluationCtx := types.NewXObject(map[string]types.XValue{
 			"contact": flows.Context(oa.Env(), contact),
@@ -1568,19 +1543,19 @@ func CreateBroadcastMessages(ctx context.Context, rt *runtime.Runtime, oa *OrgAs
 		}
 		if len(products) > 0 {
 			broadcastMetadata["products"] = products
-			logrus.WithFields(logrus.Fields{
-				"contact_id":   c.ID(),
-				"products_len": len(products),
-				"broadcast_id": bcast.BroadcastID(),
-			}).Debug("adding products to broadcastMetadata")
+			fmt.Printf("[DEBUG CreateBroadcastMessages] ADDING products contact_id=%d broadcast_id=%d products_len=%d\n",
+				c.ID(), bcast.BroadcastID(), len(products))
+		} else {
+			fmt.Printf("[DEBUG CreateBroadcastMessages] NOT adding products (len is 0) contact_id=%d broadcast_id=%d products_len=%d\n",
+				c.ID(), bcast.BroadcastID(), len(products))
 		}
 		if sendCatalog {
 			broadcastMetadata["send_catalog"] = sendCatalog
-			logrus.WithFields(logrus.Fields{
-				"contact_id":   c.ID(),
-				"send_catalog": sendCatalog,
-				"broadcast_id": bcast.BroadcastID(),
-			}).Debug("adding send_catalog to broadcastMetadata")
+			fmt.Printf("[DEBUG CreateBroadcastMessages] ADDING send_catalog contact_id=%d broadcast_id=%d send_catalog=%v\n",
+				c.ID(), bcast.BroadcastID(), sendCatalog)
+		} else {
+			fmt.Printf("[DEBUG CreateBroadcastMessages] NOT adding send_catalog (false) contact_id=%d broadcast_id=%d send_catalog=%v\n",
+				c.ID(), bcast.BroadcastID(), sendCatalog)
 		}
 
 		// merge with existing extraMetadata (extraMetadata can override broadcastMetadata)
@@ -1592,15 +1567,8 @@ func CreateBroadcastMessages(ctx context.Context, rt *runtime.Runtime, oa *OrgAs
 		_, hasSendCatalog := broadcastMetadata["send_catalog"]
 		_, hasHeader := broadcastMetadata["header"]
 		_, hasFooter := broadcastMetadata["footer"]
-		logrus.WithFields(logrus.Fields{
-			"contact_id":       c.ID(),
-			"broadcast_id":     bcast.BroadcastID(),
-			"metadata_len":     len(broadcastMetadata),
-			"has_products":     hasProducts,
-			"has_send_catalog": hasSendCatalog,
-			"has_header":       hasHeader,
-			"has_footer":       hasFooter,
-		}).Debug("CreateBroadcastMessages: broadcastMetadata before creating message")
+		fmt.Printf("[DEBUG CreateBroadcastMessages] broadcastMetadata before creating message contact_id=%d broadcast_id=%d metadata_len=%d has_products=%v has_send_catalog=%v has_header=%v has_footer=%v\n",
+			c.ID(), bcast.BroadcastID(), len(broadcastMetadata), hasProducts, hasSendCatalog, hasHeader, hasFooter)
 
 		// create our outgoing message
 		out := flows.NewMsgOut(urn, channel.ChannelReference(), text, attachments, quickReplies, nil, flows.NilMsgTopic, "", "", "")
