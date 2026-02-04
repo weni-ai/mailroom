@@ -1471,7 +1471,6 @@ func CreateBroadcastMessages(ctx context.Context, rt *runtime.Runtime, oa *OrgAs
 		footerText := t.Footer
 
 		products := t.CatalogMessage.Products
-		actionButtonText := t.CatalogMessage.ActionButtonText
 		sendCatalog := t.CatalogMessage.SendCatalog
 
 		// build up the minimum viable context for evaluation
@@ -1492,9 +1491,6 @@ func CreateBroadcastMessages(ctx context.Context, rt *runtime.Runtime, oa *OrgAs
 
 		// evaluate our footer text
 		footerText, _ = excellent.EvaluateTemplate(oa.Env(), evaluationCtx, footerText, nil)
-
-		// evaluate our action text
-		actionButtonText, _ = excellent.EvaluateTemplate(oa.Env(), evaluationCtx, actionButtonText, nil)
 
 		// evaluate our quick replies
 		for i, qr := range quickReplies {
@@ -1523,9 +1519,6 @@ func CreateBroadcastMessages(ctx context.Context, rt *runtime.Runtime, oa *OrgAs
 		}
 		if len(products) > 0 {
 			broadcastMetadata["products"] = products
-		}
-		if actionButtonText != "" {
-			broadcastMetadata["action_button_text"] = actionButtonText
 		}
 		if sendCatalog {
 			broadcastMetadata["send_catalog"] = sendCatalog
