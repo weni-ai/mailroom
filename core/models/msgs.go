@@ -447,8 +447,9 @@ func newOutgoingMsg(rt *runtime.Runtime, org *Org, channel *Channel, contactID C
 	hasMetadata := len(out.QuickReplies()) > 0 || out.Templating() != nil || out.Topic() != flows.NilMsgTopic || out.TextLanguage != "" || out.IGCommentID() != "" || out.IGResponseType() != ""
 
 	// check if extraMetadata has catalog-related fields (products, header, footer, etc.)
+	// following the same pattern as newOutgoingMsgWpp which always creates metadata when products are present
 	hasExtraMetadata := false
-	if extraMetadata != nil {
+	if len(extraMetadata) > 0 {
 		_, hasHeader := extraMetadata["header"]
 		_, hasFooter := extraMetadata["footer"]
 		_, hasProducts := extraMetadata["products"]
@@ -456,7 +457,8 @@ func newOutgoingMsg(rt *runtime.Runtime, org *Org, channel *Channel, contactID C
 		hasExtraMetadata = hasHeader || hasFooter || hasProducts || hasSendCatalog
 	}
 
-	if hasMetadata || hasExtraMetadata {
+	// always create metadata if we have any metadata fields OR if extraMetadata is not empty
+	if hasMetadata || hasExtraMetadata || len(extraMetadata) > 0 {
 		metadata := make(map[string]interface{})
 		if len(out.QuickReplies()) > 0 {
 			metadata["quick_replies"] = out.QuickReplies()
@@ -487,15 +489,12 @@ func newOutgoingMsg(rt *runtime.Runtime, org *Org, channel *Channel, contactID C
 			metadata["ig_tag"] = out.IGTag()
 		}
 
-		// merge with extraMetadata if present
-		if extraMetadata != nil {
+		// merge with extraMetadata if present (extraMetadata takes precedence)
+		if len(extraMetadata) > 0 {
 			metadata = MergeMaps(metadata, extraMetadata)
 		}
 
 		m.Metadata = null.NewMap(metadata)
-	} else if extraMetadata != nil {
-		// if we only have extraMetadata without other fields, still set it
-		m.Metadata = null.NewMap(extraMetadata)
 	}
 
 	// if we're sending to a phone, message may have to be sent in multiple parts
