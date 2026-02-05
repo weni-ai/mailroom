@@ -450,7 +450,7 @@ func newOutgoingMsg(rt *runtime.Runtime, org *Org, channel *Channel, contactID C
 	// following the same pattern as newOutgoingMsgWpp which always creates metadata when products are present
 	hasExtraMetadata := false
 	if len(extraMetadata) > 0 {
-		_, hasHeader := extraMetadata["header"]
+		_, hasHeader := extraMetadata["header_text"]
 		_, hasFooter := extraMetadata["footer"]
 		_, hasProducts := extraMetadata["products"]
 		_, hasSendCatalog := extraMetadata["send_catalog"]
@@ -1540,12 +1540,8 @@ func CreateBroadcastMessages(ctx context.Context, rt *runtime.Runtime, oa *OrgAs
 		// build metadata for header, footer and catalog
 		broadcastMetadata := make(map[string]interface{})
 		if headerText != "" {
-			headerMap := make(map[string]interface{})
-			if headerText != "" {
-				headerMap["text"] = headerText
-				headerMap["type"] = "text"
-			}
-			broadcastMetadata["header"] = headerMap
+			broadcastMetadata["header_text"] = headerText
+			broadcastMetadata["header_type"] = "text"
 		}
 		if footerText != "" {
 			broadcastMetadata["footer"] = footerText

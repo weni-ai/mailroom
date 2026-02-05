@@ -169,21 +169,21 @@ func TestBroadcastTask(t *testing.T) {
 	testdata.InsertContactURN(db, testdata.Org1, testdata.Cathy, urns.URN("tel:+12065551212"), 1001)
 
 	tcs := []struct {
-		BroadcastID   models.BroadcastID
-		Translations  map[envs.Language]*models.BroadcastTranslation
-		TemplateState models.TemplateState
-		BaseLanguage  envs.Language
-		GroupIDs      []models.GroupID
-		ContactIDs    []models.ContactID
-		URNs          []urns.URN
-		TicketID      models.TicketID
-		Queue         string
-		BatchCount    int
-		MsgCount      int
-		MsgText       string
-		BroadcastType events.BroadcastType
-		Header        models.BroadcastMessageHeader
-		Footer        string
+		BroadcastID    models.BroadcastID
+		Translations   map[envs.Language]*models.BroadcastTranslation
+		TemplateState  models.TemplateState
+		BaseLanguage   envs.Language
+		GroupIDs       []models.GroupID
+		ContactIDs     []models.ContactID
+		URNs           []urns.URN
+		TicketID       models.TicketID
+		Queue          string
+		BatchCount     int
+		MsgCount       int
+		MsgText        string
+		BroadcastType  events.BroadcastType
+		Header         models.BroadcastMessageHeader
+		Footer         string
 		CatalogMessage models.BroadcastCatalogMessage
 	}{
 		{
@@ -490,10 +490,10 @@ func TestBroadcastWithHeaderFooterAndCatalog(t *testing.T) {
 		// assert our header is being sent
 		if tc.Header.Text != "" {
 			if tc.MsgText != "" {
-				testsuite.AssertQuery(t, db, `SELECT count(*) FROM msgs_msg WHERE org_id = 1 AND created_on > $1 AND text = $2 AND metadata LIKE '%' || 'header' || '%'`, lastNow, tc.MsgText).
+				testsuite.AssertQuery(t, db, `SELECT count(*) FROM msgs_msg WHERE org_id = 1 AND created_on > $1 AND text = $2 AND metadata::jsonb ? 'header_text'`, lastNow, tc.MsgText).
 					Returns(1, "%d: unexpected header count", i)
 			} else {
-				testsuite.AssertQuery(t, db, `SELECT count(*) FROM msgs_msg WHERE org_id = 1 AND created_on > $1 AND metadata LIKE '%' || 'header' || '%'`, lastNow).
+				testsuite.AssertQuery(t, db, `SELECT count(*) FROM msgs_msg WHERE org_id = 1 AND created_on > $1 AND metadata::jsonb ? 'header_text'`, lastNow).
 					Returns(1, "%d: unexpected header count", i)
 			}
 		}
