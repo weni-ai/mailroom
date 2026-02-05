@@ -182,6 +182,9 @@ func TestBroadcastTask(t *testing.T) {
 		MsgCount      int
 		MsgText       string
 		BroadcastType events.BroadcastType
+		Header        models.BroadcastMessageHeader
+		Footer        string
+		CatalogMessage models.BroadcastCatalogMessage
 	}{
 		{
 			models.NilBroadcastID,
@@ -197,6 +200,9 @@ func TestBroadcastTask(t *testing.T) {
 			121,
 			"hello world",
 			events.BroadcastTypeDefault,
+			models.BroadcastMessageHeader{},
+			"",
+			models.BroadcastCatalogMessage{},
 		},
 		{
 			legacyID,
@@ -212,6 +218,9 @@ func TestBroadcastTask(t *testing.T) {
 			1,
 			"hi Cathy legacy URN: +12065551212 Gender: F",
 			events.BroadcastTypeDefault,
+			models.BroadcastMessageHeader{},
+			"",
+			models.BroadcastCatalogMessage{},
 		},
 		{
 			models.NilBroadcastID,
@@ -227,6 +236,9 @@ func TestBroadcastTask(t *testing.T) {
 			1,
 			"hi Cathy from Nyaruka goflow URN: tel:+12065551212 Gender: F",
 			events.BroadcastTypeDefault,
+			models.BroadcastMessageHeader{},
+			"",
+			models.BroadcastCatalogMessage{},
 		},
 	}
 
@@ -235,7 +247,7 @@ func TestBroadcastTask(t *testing.T) {
 
 	for i, tc := range tcs {
 		// handle our start task
-		bcast := models.NewBroadcast(oa.OrgID(), tc.BroadcastID, tc.Translations, tc.TemplateState, tc.BaseLanguage, tc.URNs, tc.ContactIDs, tc.GroupIDs, tc.TicketID, tc.BroadcastType)
+		bcast := models.NewBroadcast(oa.OrgID(), tc.BroadcastID, tc.Translations, tc.TemplateState, tc.BaseLanguage, tc.URNs, tc.ContactIDs, tc.GroupIDs, tc.TicketID, tc.BroadcastType, tc.Header, tc.Footer, tc.CatalogMessage)
 		err = msgs.CreateBroadcastBatches(ctx, rt, bcast)
 		assert.NoError(t, err)
 
@@ -306,13 +318,13 @@ func TestBroadcastWithHeaderFooterAndCatalog(t *testing.T) {
 				"quick reply 2",
 				"quick reply 3 for @contact.name",
 			},
-			Header: models.BroadcastMessageHeader{
-				Type: "text",
-				Text: "header for @contact.name",
-			},
-			Footer: "footer for @contact.name",
 		},
 	}
+	headerFooterHeader := models.BroadcastMessageHeader{
+		Type: "text",
+		Text: "header for @contact.name",
+	}
+	headerFooterFooter := "footer for @contact.name"
 
 	// Test with catalog message
 	catalogMsg := map[envs.Language]*models.BroadcastTranslation{
@@ -320,21 +332,21 @@ func TestBroadcastWithHeaderFooterAndCatalog(t *testing.T) {
 			Text:         "Check out our products",
 			Attachments:  nil,
 			QuickReplies: nil,
-			Header: models.BroadcastMessageHeader{
-				Type: "text",
-				Text: "header for catalog",
-			},
-			CatalogMessage: models.BroadcastCatalogMessage{
-				Products: []flows.ProductEntry{
-					{
-						Product:            "banana",
-						ProductRetailerIDs: []string{"123"},
-					},
-				},
-				ActionButtonText: "View Products",
-				SendCatalog:      true,
+		},
+	}
+	catalogHeader := models.BroadcastMessageHeader{
+		Type: "text",
+		Text: "header for catalog",
+	}
+	catalogCatalogMessage := models.BroadcastCatalogMessage{
+		Products: []flows.ProductEntry{
+			{
+				Product:            "banana",
+				ProductRetailerIDs: []string{"123"},
 			},
 		},
+		ActionButtonText: "View Products",
+		SendCatalog:      true,
 	}
 
 	// Test with catalog only (no text)
@@ -343,31 +355,34 @@ func TestBroadcastWithHeaderFooterAndCatalog(t *testing.T) {
 			Text:         "",
 			Attachments:  nil,
 			QuickReplies: nil,
-			CatalogMessage: models.BroadcastCatalogMessage{
-				Products: []flows.ProductEntry{
-					{
-						Product:            "apple",
-						ProductRetailerIDs: []string{"456"},
-					},
-				},
-				ActionButtonText: "Browse Catalog",
-				SendCatalog:      false,
+		},
+	}
+	catalogOnlyCatalogMessage := models.BroadcastCatalogMessage{
+		Products: []flows.ProductEntry{
+			{
+				Product:            "apple",
+				ProductRetailerIDs: []string{"456"},
 			},
 		},
+		ActionButtonText: "Browse Catalog",
+		SendCatalog:      false,
 	}
 
 	tcs := []struct {
-		BroadcastID   models.BroadcastID
-		Translations  map[envs.Language]*models.BroadcastTranslation
-		TemplateState models.TemplateState
-		BaseLanguage  envs.Language
-		ContactIDs    []models.ContactID
-		URNs          []urns.URN
-		Queue         string
-		BatchCount    int
-		MsgCount      int
-		MsgText       string
-		BroadcastType events.BroadcastType
+		BroadcastID    models.BroadcastID
+		Translations   map[envs.Language]*models.BroadcastTranslation
+		TemplateState  models.TemplateState
+		BaseLanguage   envs.Language
+		ContactIDs     []models.ContactID
+		URNs           []urns.URN
+		Queue          string
+		BatchCount     int
+		MsgCount       int
+		MsgText        string
+		BroadcastType  events.BroadcastType
+		Header         models.BroadcastMessageHeader
+		Footer         string
+		CatalogMessage models.BroadcastCatalogMessage
 	}{
 		{
 			models.NilBroadcastID,
@@ -381,6 +396,9 @@ func TestBroadcastWithHeaderFooterAndCatalog(t *testing.T) {
 			1,
 			"hello Cathy",
 			events.BroadcastTypeDefault,
+			headerFooterHeader,
+			headerFooterFooter,
+			models.BroadcastCatalogMessage{},
 		},
 		{
 			models.NilBroadcastID,
@@ -394,6 +412,9 @@ func TestBroadcastWithHeaderFooterAndCatalog(t *testing.T) {
 			1,
 			"Check out our products",
 			events.BroadcastTypeDefault,
+			catalogHeader,
+			"",
+			catalogCatalogMessage,
 		},
 		{
 			models.NilBroadcastID,
@@ -407,6 +428,9 @@ func TestBroadcastWithHeaderFooterAndCatalog(t *testing.T) {
 			1,
 			"",
 			events.BroadcastTypeDefault,
+			models.BroadcastMessageHeader{},
+			"",
+			catalogOnlyCatalogMessage,
 		},
 	}
 
@@ -415,7 +439,7 @@ func TestBroadcastWithHeaderFooterAndCatalog(t *testing.T) {
 
 	for i, tc := range tcs {
 		// handle our start task
-		bcast := models.NewBroadcast(oa.OrgID(), tc.BroadcastID, tc.Translations, tc.TemplateState, tc.BaseLanguage, tc.URNs, tc.ContactIDs, nil, models.NilTicketID, tc.BroadcastType)
+		bcast := models.NewBroadcast(oa.OrgID(), tc.BroadcastID, tc.Translations, tc.TemplateState, tc.BaseLanguage, tc.URNs, tc.ContactIDs, nil, models.NilTicketID, tc.BroadcastType, tc.Header, tc.Footer, tc.CatalogMessage)
 		err = msgs.CreateBroadcastBatches(ctx, rt, bcast)
 		assert.NoError(t, err)
 
@@ -464,7 +488,7 @@ func TestBroadcastWithHeaderFooterAndCatalog(t *testing.T) {
 		}
 
 		// assert our header is being sent
-		if tc.Translations[eng].Header.Text != "" {
+		if tc.Header.Text != "" {
 			if tc.MsgText != "" {
 				testsuite.AssertQuery(t, db, `SELECT count(*) FROM msgs_msg WHERE org_id = 1 AND created_on > $1 AND text = $2 AND metadata LIKE '%' || 'header' || '%'`, lastNow, tc.MsgText).
 					Returns(1, "%d: unexpected header count", i)
@@ -475,7 +499,7 @@ func TestBroadcastWithHeaderFooterAndCatalog(t *testing.T) {
 		}
 
 		// assert our footer is being sent
-		if tc.Translations[eng].Footer != "" {
+		if tc.Footer != "" {
 			if tc.MsgText != "" {
 				testsuite.AssertQuery(t, db, `SELECT count(*) FROM msgs_msg WHERE org_id = 1 AND created_on > $1 AND text = $2 AND metadata LIKE '%' || 'footer' || '%'`, lastNow, tc.MsgText).
 					Returns(1, "%d: unexpected footer count", i)
@@ -486,7 +510,7 @@ func TestBroadcastWithHeaderFooterAndCatalog(t *testing.T) {
 		}
 
 		// Assert catalog message
-		if len(tc.Translations[eng].CatalogMessage.Products) > 0 || tc.Translations[eng].CatalogMessage.SendCatalog {
+		if len(tc.CatalogMessage.Products) > 0 || tc.CatalogMessage.SendCatalog {
 			testsuite.AssertQuery(t, db, `SELECT count(*) FROM msgs_msg WHERE org_id = 1 AND created_on > $1 AND metadata::jsonb ? 'products'`, lastNow).
 				Returns(1, "%d: unexpected catalog message count", i)
 		}

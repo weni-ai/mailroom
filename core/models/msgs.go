@@ -1093,30 +1093,30 @@ WHERE
 
 // BroadcastTranslation is the translation for the passed in language
 type BroadcastTranslation struct {
-	Text           string                  `json:"text"`
-	Attachments    []utils.Attachment      `json:"attachments,omitempty"`
-	QuickReplies   []string                `json:"quick_replies,omitempty"`
-	Header         BroadcastMessageHeader  `json:"header,omitempty"`
-	Footer         string                  `json:"footer,omitempty"`
-	CatalogMessage BroadcastCatalogMessage `json:"catalog_message,omitempty"`
+	Text         string             `json:"text"`
+	QuickReplies []string           `json:"quick_replies,omitempty"`
+	Attachments  []utils.Attachment `json:"attachments,omitempty"`
 }
 
 // Broadcast represents a broadcast that needs to be sent
 type Broadcast struct {
 	b struct {
-		BroadcastID   BroadcastID                             `json:"broadcast_id,omitempty" db:"id"`
-		Translations  map[envs.Language]*BroadcastTranslation `json:"translations"`
-		Text          hstore.Hstore                           `                              db:"text"`
-		TemplateState TemplateState                           `json:"template_state"`
-		BaseLanguage  envs.Language                           `json:"base_language"          db:"base_language"`
-		URNs          []urns.URN                              `json:"urns,omitempty"`
-		ContactIDs    []ContactID                             `json:"contact_ids,omitempty"`
-		GroupIDs      []GroupID                               `json:"group_ids,omitempty"`
-		OrgID         OrgID                                   `json:"org_id"                 db:"org_id"`
-		ParentID      BroadcastID                             `json:"parent_id,omitempty"    db:"parent_id"`
-		TicketID      TicketID                                `json:"ticket_id,omitempty"    db:"ticket_id"`
-		BroadcastType events.BroadcastType                    `json:"broadcast_type"         db:"broadcast_type"`
-		IsBulkSend    bool                                    `json:"is_bulk_send"           db:"is_bulk_send"`
+		BroadcastID    BroadcastID                             `json:"broadcast_id,omitempty" db:"id"`
+		Translations   map[envs.Language]*BroadcastTranslation `json:"translations"`
+		Text           hstore.Hstore                           `                              db:"text"`
+		TemplateState  TemplateState                           `json:"template_state"`
+		BaseLanguage   envs.Language                           `json:"base_language"          db:"base_language"`
+		URNs           []urns.URN                              `json:"urns,omitempty"`
+		ContactIDs     []ContactID                             `json:"contact_ids,omitempty"`
+		GroupIDs       []GroupID                               `json:"group_ids,omitempty"`
+		OrgID          OrgID                                   `json:"org_id"                 db:"org_id"`
+		ParentID       BroadcastID                             `json:"parent_id,omitempty"    db:"parent_id"`
+		TicketID       TicketID                                `json:"ticket_id,omitempty"    db:"ticket_id"`
+		BroadcastType  events.BroadcastType                    `json:"broadcast_type"         db:"broadcast_type"`
+		IsBulkSend     bool                                    `json:"is_bulk_send"           db:"is_bulk_send"`
+		CatalogMessage BroadcastCatalogMessage                 `json:"catalog_message"`
+		Footer         string                                  `json:"footer"`
+		Header         BroadcastMessageHeader                  `json:"header"`
 	}
 }
 
@@ -1131,6 +1131,9 @@ func (b *Broadcast) TemplateState() TemplateState                          { ret
 func (b *Broadcast) TicketID() TicketID                                    { return b.b.TicketID }
 func (b *Broadcast) BroadcastType() events.BroadcastType                   { return b.b.BroadcastType }
 func (b *Broadcast) IsBulkSend() bool                                      { return b.b.IsBulkSend }
+func (b *Broadcast) Header() BroadcastMessageHeader                        { return b.b.Header }
+func (b *Broadcast) Footer() string                                        { return b.b.Footer }
+func (b *Broadcast) CatalogMessage() BroadcastCatalogMessage               { return b.b.CatalogMessage }
 
 func (b *Broadcast) MarshalJSON() ([]byte, error)    { return json.Marshal(b.b) }
 func (b *Broadcast) UnmarshalJSON(data []byte) error { return json.Unmarshal(data, &b.b) }
@@ -1138,7 +1141,7 @@ func (b *Broadcast) UnmarshalJSON(data []byte) error { return json.Unmarshal(dat
 // NewBroadcast creates a new broadcast with the passed in parameters
 func NewBroadcast(
 	orgID OrgID, id BroadcastID, translations map[envs.Language]*BroadcastTranslation,
-	state TemplateState, baseLanguage envs.Language, urns []urns.URN, contactIDs []ContactID, groupIDs []GroupID, ticketID TicketID, broadcastType events.BroadcastType) *Broadcast {
+	state TemplateState, baseLanguage envs.Language, urns []urns.URN, contactIDs []ContactID, groupIDs []GroupID, ticketID TicketID, broadcastType events.BroadcastType, header BroadcastMessageHeader, footer string, catalogMessage BroadcastCatalogMessage) *Broadcast {
 
 	bcast := &Broadcast{}
 	bcast.b.OrgID = orgID
@@ -1151,7 +1154,9 @@ func NewBroadcast(
 	bcast.b.GroupIDs = groupIDs
 	bcast.b.TicketID = ticketID
 	bcast.b.BroadcastType = broadcastType
-
+	bcast.b.Header = header
+	bcast.b.Footer = footer
+	bcast.b.CatalogMessage = catalogMessage
 	return bcast
 }
 
@@ -1168,6 +1173,9 @@ func InsertChildBroadcast(ctx context.Context, db Queryer, parent *Broadcast) (*
 		parent.b.GroupIDs,
 		parent.b.TicketID,
 		parent.b.BroadcastType,
+		parent.b.Header,
+		parent.b.Footer,
+		parent.b.CatalogMessage,
 	)
 	// populate our parent id
 	child.b.ParentID = parent.ID()
@@ -1295,6 +1303,16 @@ func NewBroadcastFromEvent(ctx context.Context, tx Queryer, org *OrgAssets, even
 			QuickReplies: t.QuickReplies,
 		}
 	}
+	// header := BroadcastMessageHeader{
+	// 	Type: event.Header.Type,
+	// 	Text: event.Header.Text,
+	// }
+	// footer := event.Footer
+	// catalogMessage := BroadcastCatalogMessage{
+	// 	Products: event.CatalogMessage.Products,
+	// 	ActionButtonText: event.CatalogMessage.ActionButtonText,
+	// 	SendCatalog: event.CatalogMessage.SendCatalog,
+	// }
 
 	// resolve our contact references
 	contactIDs, err := GetContactIDsFromReferences(ctx, tx, org.OrgID(), event.Contacts)
@@ -1311,7 +1329,7 @@ func NewBroadcastFromEvent(ctx context.Context, tx Queryer, org *OrgAssets, even
 		}
 	}
 
-	return NewBroadcast(org.OrgID(), NilBroadcastID, translations, TemplateStateEvaluated, event.BaseLanguage, event.URNs, contactIDs, groupIDs, NilTicketID, event.BroadcastType), nil
+	return NewBroadcast(org.OrgID(), NilBroadcastID, translations, TemplateStateEvaluated, event.BaseLanguage, event.URNs, contactIDs, groupIDs, NilTicketID, event.BroadcastType, BroadcastMessageHeader{}, "", BroadcastCatalogMessage{}), nil
 }
 
 func (b *Broadcast) CreateBatch(contactIDs []ContactID) *BroadcastBatch {
@@ -1323,21 +1341,37 @@ func (b *Broadcast) CreateBatch(contactIDs []ContactID) *BroadcastBatch {
 	batch.b.OrgID = b.b.OrgID
 	batch.b.TicketID = b.b.TicketID
 	batch.b.ContactIDs = contactIDs
+	batch.b.Header = b.b.Header
+	batch.b.Footer = b.b.Footer
+	batch.b.CatalogMessage = b.b.CatalogMessage
+	// copy attachments from first translation if available
+	if len(b.b.Translations) > 0 {
+		for _, t := range b.b.Translations {
+			if len(t.Attachments) > 0 {
+				batch.b.Attachments = t.Attachments
+				break
+			}
+		}
+	}
 	return batch
 }
 
 // BroadcastBatch represents a batch of contacts that need messages sent for
 type BroadcastBatch struct {
 	b struct {
-		BroadcastID   BroadcastID                             `json:"broadcast_id,omitempty"`
-		Translations  map[envs.Language]*BroadcastTranslation `json:"translations"`
-		BaseLanguage  envs.Language                           `json:"base_language"`
-		TemplateState TemplateState                           `json:"template_state"`
-		URNs          map[ContactID]urns.URN                  `json:"urns,omitempty"`
-		ContactIDs    []ContactID                             `json:"contact_ids,omitempty"`
-		IsLast        bool                                    `json:"is_last"`
-		OrgID         OrgID                                   `json:"org_id"`
-		TicketID      TicketID                                `json:"ticket_id"`
+		BroadcastID    BroadcastID                             `json:"broadcast_id,omitempty"`
+		Translations   map[envs.Language]*BroadcastTranslation `json:"translations"`
+		BaseLanguage   envs.Language                           `json:"base_language"`
+		TemplateState  TemplateState                           `json:"template_state"`
+		URNs           map[ContactID]urns.URN                  `json:"urns,omitempty"`
+		ContactIDs     []ContactID                             `json:"contact_ids,omitempty"`
+		IsLast         bool                                    `json:"is_last"`
+		OrgID          OrgID                                   `json:"org_id"`
+		TicketID       TicketID                                `json:"ticket_id"`
+		CatalogMessage BroadcastCatalogMessage                 `json:"catalog_message"`
+		Footer         string                                  `json:"footer"`
+		Header         BroadcastMessageHeader                  `json:"header"`
+		Attachments    []utils.Attachment                      `json:"attachments"`
 	}
 }
 
@@ -1350,10 +1384,13 @@ func (b *BroadcastBatch) TicketID() TicketID                  { return b.b.Ticke
 func (b *BroadcastBatch) Translations() map[envs.Language]*BroadcastTranslation {
 	return b.b.Translations
 }
-func (b *BroadcastBatch) TemplateState() TemplateState { return b.b.TemplateState }
-func (b *BroadcastBatch) BaseLanguage() envs.Language  { return b.b.BaseLanguage }
-func (b *BroadcastBatch) IsLast() bool                 { return b.b.IsLast }
-func (b *BroadcastBatch) SetIsLast(last bool)          { b.b.IsLast = last }
+func (b *BroadcastBatch) CatalogMessage() BroadcastCatalogMessage { return b.b.CatalogMessage }
+func (b *BroadcastBatch) Footer() string                          { return b.b.Footer }
+func (b *BroadcastBatch) Header() BroadcastMessageHeader          { return b.b.Header }
+func (b *BroadcastBatch) TemplateState() TemplateState            { return b.b.TemplateState }
+func (b *BroadcastBatch) BaseLanguage() envs.Language             { return b.b.BaseLanguage }
+func (b *BroadcastBatch) IsLast() bool                            { return b.b.IsLast }
+func (b *BroadcastBatch) SetIsLast(last bool)                     { b.b.IsLast = last }
 
 func (b *BroadcastBatch) MarshalJSON() ([]byte, error)    { return json.Marshal(b.b) }
 func (b *BroadcastBatch) UnmarshalJSON(data []byte) error { return json.Unmarshal(data, &b.b) }
@@ -1487,12 +1524,11 @@ func CreateBroadcastMessages(ctx context.Context, rt *runtime.Runtime, oa *OrgAs
 		attachments := t.Attachments
 		quickReplies := make([]string, len(t.QuickReplies))
 		copy(quickReplies, t.QuickReplies)
-		headerType := t.Header.Type
-		headerText := t.Header.Text
-		footerText := t.Footer
+		headerText := bcast.Header().Text
+		footerText := bcast.Footer()
 
-		products := t.CatalogMessage.Products
-		sendCatalog := t.CatalogMessage.SendCatalog
+		products := bcast.CatalogMessage().Products
+		sendCatalog := bcast.CatalogMessage().SendCatalog
 
 		fmt.Printf("[DEBUG CreateBroadcastMessages] contact_id=%d broadcast_id=%d products_len=%d sendCatalog=%v has_catalog_message=%v\n",
 			c.ID(), bcast.BroadcastID(), len(products), sendCatalog, len(products) > 0 || sendCatalog)
@@ -1528,13 +1564,11 @@ func CreateBroadcastMessages(ctx context.Context, rt *runtime.Runtime, oa *OrgAs
 
 		// build metadata for header, footer and catalog
 		broadcastMetadata := make(map[string]interface{})
-		if headerType != "" || headerText != "" {
+		if headerText != "" {
 			headerMap := make(map[string]interface{})
-			if headerType != "" {
-				headerMap["type"] = headerType
-			}
 			if headerText != "" {
 				headerMap["text"] = headerText
+				headerMap["type"] = "text"
 			}
 			broadcastMetadata["header"] = headerMap
 		}
