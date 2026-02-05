@@ -449,11 +449,11 @@ func newOutgoingMsg(rt *runtime.Runtime, org *Org, channel *Channel, contactID C
 	fmt.Printf("[DEBUG newOutgoingMsg] checking metadata conditions contact_id=%d broadcast_id=%d hasMetadata=%v extraMetadata_nil=%v extraMetadata_len=%d\n",
 		contactID, broadcastID, hasMetadata, extraMetadata == nil, len(extraMetadata))
 
-	// check if extraMetadata has catalog-related fields (products, header, footer, etc.)
+	// check if extraMetadata has catalog-related fields (products, header_text, footer, etc.)
 	// following the same pattern as newOutgoingMsgWpp which always creates metadata when products are present
 	hasExtraMetadata := false
 	if len(extraMetadata) > 0 {
-		_, hasHeader := extraMetadata["header"]
+		_, hasHeader := extraMetadata["header_text"]
 		_, hasFooter := extraMetadata["footer"]
 		_, hasProducts := extraMetadata["products"]
 		_, hasSendCatalog := extraMetadata["send_catalog"]
@@ -1565,12 +1565,8 @@ func CreateBroadcastMessages(ctx context.Context, rt *runtime.Runtime, oa *OrgAs
 		// build metadata for header, footer and catalog
 		broadcastMetadata := make(map[string]interface{})
 		if headerText != "" {
-			headerMap := make(map[string]interface{})
-			if headerText != "" {
-				headerMap["text"] = headerText
-				headerMap["type"] = "text"
-			}
-			broadcastMetadata["header"] = headerMap
+			broadcastMetadata["header_text"] = headerText
+			broadcastMetadata["header_type"] = "text"
 		}
 		if footerText != "" {
 			broadcastMetadata["footer"] = footerText
@@ -1599,7 +1595,7 @@ func CreateBroadcastMessages(ctx context.Context, rt *runtime.Runtime, oa *OrgAs
 
 		_, hasProducts := broadcastMetadata["products"]
 		_, hasSendCatalog := broadcastMetadata["send_catalog"]
-		_, hasHeader := broadcastMetadata["header"]
+		_, hasHeader := broadcastMetadata["header_text"]
 		_, hasFooter := broadcastMetadata["footer"]
 		fmt.Printf("[DEBUG CreateBroadcastMessages] broadcastMetadata before creating message contact_id=%d broadcast_id=%d metadata_len=%d has_products=%v has_send_catalog=%v has_header=%v has_footer=%v\n",
 			c.ID(), bcast.BroadcastID(), len(broadcastMetadata), hasProducts, hasSendCatalog, hasHeader, hasFooter)
