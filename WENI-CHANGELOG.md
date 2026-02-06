@@ -1,3 +1,11 @@
+1.77.2
+----------
+ * feat: repair session with empty error and refactor open ticket wenichats to avoid return empty error
+
+1.77.1
+----------
+ * feat: send stream support parameter on request to router
+
 1.77.0
 ----------
  * feat: Enhance WppBroadcast functionality with carousel support and template evaluation

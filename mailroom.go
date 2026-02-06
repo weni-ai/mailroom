@@ -13,6 +13,7 @@ import (
 	"github.com/nyaruka/mailroom/core/queue"
 	"github.com/nyaruka/mailroom/runtime"
 	"github.com/nyaruka/mailroom/runtime/rmq"
+	"github.com/nyaruka/mailroom/runtime/sqs"
 	"github.com/nyaruka/mailroom/web"
 	"github.com/pkg/errors"
 
@@ -59,6 +60,7 @@ type Mailroom struct {
 	templateBatchForeman             *Foreman
 	templateNotificationBatchForeman *Foreman
 	rabbitmqForeman                  *Foreman
+	sqsForeman                       *Foreman
 
 	webserver *web.Server
 }
@@ -78,6 +80,7 @@ func NewMailroom(config *runtime.Config) *Mailroom {
 	mr.templateBatchForeman = NewForeman(mr.rt, mr.wg, queue.TemplateBatchQueue, config.TemplateBatchWorkers)
 	mr.templateNotificationBatchForeman = NewForeman(mr.rt, mr.wg, queue.TemplateNotificationBatchQueue, config.TemplateNotificationBatchWorkers)
 	mr.rabbitmqForeman = NewForeman(mr.rt, mr.wg, queue.RabbitmqPublish, config.RabbitmqPublishWorkers)
+	mr.sqsForeman = NewForeman(mr.rt, mr.wg, queue.SqsPublish, config.SqsPublishWorkers)
 
 	// set authentication token for zeroshot requests in goflow
 	routers.SetZeroshotToken(mr.rt.Config.ZeroshotAPIToken)
@@ -183,6 +186,23 @@ func (mr *Mailroom) Start() error {
 		log.Info("rabbitmq ok")
 	}
 
+	sqsConfig := sqs.ClientConfig{
+		Region: c.SqsRegion,
+	}
+	if c.SqsEndpoint != "" {
+		sqsConfig.Endpoint = c.SqsEndpoint
+	}
+	if c.SqsAccessKeyID != "" && c.SqsSecretAccessKey != "" {
+		sqsConfig.AccessKeyID = c.SqsAccessKeyID
+		sqsConfig.SecretAccessKey = c.SqsSecretAccessKey
+	}
+	mr.rt.SQS, err = sqs.New(sqsConfig)
+	if err != nil {
+		log.WithError(err).Error("sqs not available")
+	} else {
+		log.Info("sqs ok")
+	}
+
 	for _, initFunc := range initFunctions {
 		initFunc(mr.rt, mr.wg, mr.quit)
 	}
@@ -201,6 +221,7 @@ func (mr *Mailroom) Start() error {
 	mr.templateBatchForeman.Start()
 	mr.templateNotificationBatchForeman.Start()
 	mr.rabbitmqForeman.Start()
+	mr.sqsForeman.Start()
 
 	// start our web server
 	mr.webserver = web.NewServer(mr.ctx, mr.rt, mr.wg)
@@ -221,6 +242,7 @@ func (mr *Mailroom) Stop() error {
 	mr.templateBatchForeman.Stop()
 	mr.templateNotificationBatchForeman.Stop()
 	mr.rabbitmqForeman.Stop()
+	mr.sqsForeman.Stop()
 	close(mr.quit)
 	mr.cancel()
 
@@ -234,6 +256,9 @@ func (mr *Mailroom) Stop() error {
 	mr.rt.ES.Stop()
 	if mr.rt.Rabbitmq != nil {
 		mr.rt.Rabbitmq.Close()
+	}
+	if mr.rt.SQS != nil {
+		mr.rt.SQS.Close()
 	}
 	logrus.Info("mailroom stopped")
 	return nil
@@ -250,6 +275,7 @@ func (mr *Mailroom) LogPendingTasks() {
 		mr.templateBatchForeman,
 		mr.templateNotificationBatchForeman,
 		mr.rabbitmqForeman,
+		mr.sqsForeman,
 	}
 
 	var pending []PendingTaskInfo
