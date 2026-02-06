@@ -3,7 +3,7 @@ module github.com/nyaruka/mailroom
 require (
 	github.com/Masterminds/semver v1.5.0
 	github.com/apex/log v1.1.4
-	github.com/aws/aws-sdk-go v1.40.56
+	github.com/aws/aws-sdk-go v1.55.8
 	github.com/buger/jsonparser v1.0.0
 	github.com/certifi/gocertifi v0.0.0-20200211180108-c7c1fbc02894 // indirect
 	github.com/edganiukov/fcm v0.4.0

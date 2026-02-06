@@ -218,7 +218,12 @@ func (c *Client) connectLocked() error {
 		awsConfig.Endpoint = aws.String(c.endpoint)
 	}
 
-	sess, err := session.NewSession(awsConfig)
+	// Use NewSessionWithOptions to properly support all credential providers
+	// including Web Identity (IRSA) in EKS environments
+	sess, err := session.NewSessionWithOptions(session.Options{
+		Config:            *awsConfig,
+		SharedConfigState: session.SharedConfigEnable,
+	})
 	if err != nil {
 		return errors.Wrap(err, "failed to create AWS session")
 	}
