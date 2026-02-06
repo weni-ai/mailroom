@@ -84,6 +84,9 @@ const (
 
 	// RabbitmqPublish is our task type for publishing a message to RabbitMQ
 	RabbitmqPublish = "rabbitmq_publish"
+
+	// SqsPublish is our task type for publishing a message to SQS
+	SqsPublish = "sqs_publish"
 )
 
 // Size returns the number of tasks for the passed in queue

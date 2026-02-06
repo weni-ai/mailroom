@@ -115,6 +115,15 @@ type Config struct {
 	RabbitmqPublishMaxAttempts     int `help:"max attempts for async RabbitMQ publish tasks"`
 	RabbitmqPublishDelayIntervalMs int `help:"fixed delay in ms between async RabbitMQ publish retries"`
 
+	SqsAccessKeyID            string `help:"AWS access key ID for SQS (uses AWSAccessKeyID if not set)"`
+	SqsSecretAccessKey        string `help:"AWS secret access key for SQS (uses AWSSecretAccessKey if not set)"`
+	SqsRegion                 string `help:"AWS region for SQS"`
+	SqsEndpoint               string `help:"SQS endpoint URL (optional, for LocalStack or custom endpoints)"`
+	SqsPublishWorkers         int    `help:"the number of go routines that will be used to publish to SQS asynchronously"`
+	SqsPublishMaxAttempts     int    `help:"max attempts for async SQS publish tasks"`
+	SqsPublishDelayIntervalMs int    `help:"fixed delay in ms between async SQS publish retries"`
+	SqsTicketsQueueURL        string `help:"SQS queue URL for ticket messages"`
+
 	ProcessingTTL int `help:"base processing task TTL in seconds"`
 
 	WenichatsAuthToken string `help:"wenichats authorization token"`
@@ -203,6 +212,15 @@ func NewDefaultConfig() *Config {
 		// Retry every 2 seconds up to 2 hours by default (3600 attempts)
 		RabbitmqPublishMaxAttempts:     3600,
 		RabbitmqPublishDelayIntervalMs: 2000,
+
+		SqsAccessKeyID:            "",
+		SqsSecretAccessKey:        "",
+		SqsRegion:                 "us-east-1",
+		SqsEndpoint:               "",
+		SqsPublishWorkers:         2,
+		SqsPublishMaxAttempts:     10,
+		SqsPublishDelayIntervalMs: 2000,
+		SqsTicketsQueueURL:        "http://sqs.us-east-1.localhost.localstack.cloud:4566/000000000000/flows-tickets",
 
 		ProcessingTTL: 120,
 
