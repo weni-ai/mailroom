@@ -59,7 +59,7 @@ func TestWppBroadcastTask(t *testing.T) {
 	replyMsg := models.WppBroadcastMessage{
 		Text:            "hello @contact.name, how are you doing today?",
 		InteractionType: "reply",
-		Header: models.WppBroadcastMessageHeader{
+		Header: models.BroadcastMessageHeader{
 			Type: "text",
 			Text: "header for @contact.name",
 		},
@@ -157,11 +157,11 @@ func TestWppBroadcastTask(t *testing.T) {
 
 	catalogMsg := models.WppBroadcastMessage{
 		Text: "Check out our products",
-		Header: models.WppBroadcastMessageHeader{
+		Header: models.BroadcastMessageHeader{
 			Type: "text",
 			Text: "header for catalog",
 		},
-		CatalogMessage: models.WppBroadcastCatalogMessage{
+		CatalogMessage: models.BroadcastCatalogMessage{
 			Products: []flows.ProductEntry{
 				{
 					Product:            "banana",
