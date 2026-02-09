@@ -218,7 +218,7 @@ func NewDefaultConfig() *Config {
 		SqsRegion:                 "us-east-1",
 		SqsEndpoint:               "",
 		SqsPublishWorkers:         2,
-		SqsPublishMaxAttempts:     3600,
+		SqsPublishMaxAttempts:     10,
 		SqsPublishDelayIntervalMs: 2000,
 		SqsTicketsQueueURL:        "http://sqs.us-east-1.localhost.localstack.cloud:4566/000000000000/flows-tickets",
 

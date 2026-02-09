@@ -1,25 +1,27 @@
 package sqs
 
 import (
+	"context"
 	"errors"
 	"os"
 	"testing"
+	"time"
 
-	"github.com/aws/aws-sdk-go/aws"
-	"github.com/aws/aws-sdk-go/aws/credentials"
-	"github.com/aws/aws-sdk-go/aws/session"
-	"github.com/aws/aws-sdk-go/service/sqs"
+	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/aws-sdk-go-v2/config"
+	"github.com/aws/aws-sdk-go-v2/credentials"
+	"github.com/aws/aws-sdk-go-v2/service/sqs"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
 const (
-	// sqstest default configuration
-	sqstestEndpoint  = "http://localhost:4566"
-	sqstestRegion    = "us-east-1"
-	sqstestAccessKey = "test"
-	sqstestSecretKey = "test"
-	testQueueName    = "test-queue-foo"
+	// LocalStack default configuration
+	localStackEndpoint  = "http://localhost:4566"
+	localStackRegion    = "us-east-1"
+	localStackAccessKey = "test"
+	localStackSecretKey = "test"
+	testQueueName       = "test-queue-foo"
 )
 
 type failingMessage struct{}
@@ -112,22 +114,28 @@ func TestClientNew_InvalidConfig(t *testing.T) {
 	}
 }
 
-// getTestQueueURL creates the test queue in sqstest and returns its URL.
-// Returns empty string if sqstest is not available.
+// getTestQueueURL creates the test queue in LocalStack and returns its URL.
+// Returns empty string if LocalStack is not available.
 func getTestQueueURL(t *testing.T) string {
-	sess, err := session.NewSession(&aws.Config{
-		Region:      aws.String(sqstestRegion),
-		Endpoint:    aws.String(sqstestEndpoint),
-		Credentials: credentials.NewStaticCredentials(sqstestAccessKey, sqstestSecretKey, ""),
-	})
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	cfg, err := config.LoadDefaultConfig(ctx,
+		config.WithRegion(localStackRegion),
+		config.WithCredentialsProvider(
+			credentials.NewStaticCredentialsProvider(localStackAccessKey, localStackSecretKey, ""),
+		),
+	)
 	if err != nil {
 		return ""
 	}
 
-	svc := sqs.New(sess)
+	svc := sqs.NewFromConfig(cfg, func(o *sqs.Options) {
+		o.BaseEndpoint = aws.String(localStackEndpoint)
+	})
 
 	// Try to create the queue (will return existing queue URL if already exists)
-	result, err := svc.CreateQueue(&sqs.CreateQueueInput{
+	result, err := svc.CreateQueue(ctx, &sqs.CreateQueueInput{
 		QueueName: aws.String(testQueueName),
 	})
 	if err != nil {
@@ -137,44 +145,43 @@ func getTestQueueURL(t *testing.T) string {
 	return *result.QueueUrl
 }
 
-// skipIfNosqstest skips the test if sqstest is not available
-func skipIfNosqstest(t *testing.T) string {
-	if os.Getenv("TEST_SQS_SQSTEST") == "" {
-		t.Skip("Skipping sqstest integration test. Set TEST_SQS_sqstest=1 to run.")
+// skipIfNoLocalStack skips the test if LocalStack is not available
+func skipIfNoLocalStack(t *testing.T) string {
+	if os.Getenv("TEST_SQS_LOCALSTACK") == "" {
+		t.Skip("Skipping LocalStack integration test. Set TEST_SQS_LOCALSTACK=1 to run.")
 	}
 
 	queueURL := getTestQueueURL(t)
 	if queueURL == "" {
-		t.Skip("sqstest SQS not available")
+		t.Skip("LocalStack SQS not available")
 	}
 	return queueURL
 }
 
-func TestClientNew_Withsqstest(t *testing.T) {
-	skipIfNosqstest(t)
+func TestClientNew_WithLocalStack(t *testing.T) {
+	skipIfNoLocalStack(t)
 
 	c, err := New(ClientConfig{
-		Region:          sqstestRegion,
-		AccessKeyID:     sqstestAccessKey,
-		SecretAccessKey: sqstestSecretKey,
-		Endpoint:        sqstestEndpoint,
+		Region:          localStackRegion,
+		AccessKeyID:     localStackAccessKey,
+		SecretAccessKey: localStackSecretKey,
+		Endpoint:        localStackEndpoint,
 	})
 	require.NoError(t, err)
 	require.NotNil(t, c)
 	defer c.Close()
 
 	assert.NotNil(t, c.svc)
-	assert.NotNil(t, c.session)
 }
 
-func TestClientSendTo_Withsqstest(t *testing.T) {
-	queueURL := skipIfNosqstest(t)
+func TestClientSendTo_WithLocalStack(t *testing.T) {
+	queueURL := skipIfNoLocalStack(t)
 
 	c, err := New(ClientConfig{
-		Region:          sqstestRegion,
-		AccessKeyID:     sqstestAccessKey,
-		SecretAccessKey: sqstestSecretKey,
-		Endpoint:        sqstestEndpoint,
+		Region:          localStackRegion,
+		AccessKeyID:     localStackAccessKey,
+		SecretAccessKey: localStackSecretKey,
+		Endpoint:        localStackEndpoint,
 	})
 	require.NoError(t, err)
 	defer c.Close()
@@ -188,14 +195,14 @@ func TestClientSendTo_Withsqstest(t *testing.T) {
 	assert.NoError(t, err)
 }
 
-func TestClientSendToWithAttributes_Withsqstest(t *testing.T) {
-	queueURL := skipIfNosqstest(t)
+func TestClientSendToWithAttributes_WithLocalStack(t *testing.T) {
+	queueURL := skipIfNoLocalStack(t)
 
 	c, err := New(ClientConfig{
-		Region:          sqstestRegion,
-		AccessKeyID:     sqstestAccessKey,
-		SecretAccessKey: sqstestSecretKey,
-		Endpoint:        sqstestEndpoint,
+		Region:          localStackRegion,
+		AccessKeyID:     localStackAccessKey,
+		SecretAccessKey: localStackSecretKey,
+		Endpoint:        localStackEndpoint,
 	})
 	require.NoError(t, err)
 	defer c.Close()
@@ -214,14 +221,14 @@ func TestClientSendToWithAttributes_Withsqstest(t *testing.T) {
 	assert.NoError(t, err)
 }
 
-func TestClientSendTo_JSONMessage_Withsqstest(t *testing.T) {
-	queueURL := skipIfNosqstest(t)
+func TestClientSendTo_JSONMessage_WithLocalStack(t *testing.T) {
+	queueURL := skipIfNoLocalStack(t)
 
 	c, err := New(ClientConfig{
-		Region:          sqstestRegion,
-		AccessKeyID:     sqstestAccessKey,
-		SecretAccessKey: sqstestSecretKey,
-		Endpoint:        sqstestEndpoint,
+		Region:          localStackRegion,
+		AccessKeyID:     localStackAccessKey,
+		SecretAccessKey: localStackSecretKey,
+		Endpoint:        localStackEndpoint,
 	})
 	require.NoError(t, err)
 	defer c.Close()
@@ -237,14 +244,14 @@ func TestClientSendTo_JSONMessage_Withsqstest(t *testing.T) {
 	assert.NoError(t, err)
 }
 
-func TestClientReconnect_Withsqstest(t *testing.T) {
-	queueURL := skipIfNosqstest(t)
+func TestClientReconnect_WithLocalStack(t *testing.T) {
+	queueURL := skipIfNoLocalStack(t)
 
 	c, err := New(ClientConfig{
-		Region:          sqstestRegion,
-		AccessKeyID:     sqstestAccessKey,
-		SecretAccessKey: sqstestSecretKey,
-		Endpoint:        sqstestEndpoint,
+		Region:          localStackRegion,
+		AccessKeyID:     localStackAccessKey,
+		SecretAccessKey: localStackSecretKey,
+		Endpoint:        localStackEndpoint,
 	})
 	require.NoError(t, err)
 	defer c.Close()
@@ -264,14 +271,14 @@ func TestClientReconnect_Withsqstest(t *testing.T) {
 	assert.NoError(t, err)
 }
 
-func TestClientClose_Withsqstest(t *testing.T) {
-	skipIfNosqstest(t)
+func TestClientClose_WithLocalStack(t *testing.T) {
+	skipIfNoLocalStack(t)
 
 	c, err := New(ClientConfig{
-		Region:          sqstestRegion,
-		AccessKeyID:     sqstestAccessKey,
-		SecretAccessKey: sqstestSecretKey,
-		Endpoint:        sqstestEndpoint,
+		Region:          localStackRegion,
+		AccessKeyID:     localStackAccessKey,
+		SecretAccessKey: localStackSecretKey,
+		Endpoint:        localStackEndpoint,
 	})
 	require.NoError(t, err)
 
@@ -279,5 +286,4 @@ func TestClientClose_Withsqstest(t *testing.T) {
 	c.Close()
 
 	assert.Nil(t, c.svc)
-	assert.Nil(t, c.session)
 }
