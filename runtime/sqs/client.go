@@ -6,10 +6,11 @@ import (
 	"sync"
 	"time"
 
-	"github.com/aws/aws-sdk-go/aws"
-	"github.com/aws/aws-sdk-go/aws/credentials"
-	"github.com/aws/aws-sdk-go/aws/session"
-	"github.com/aws/aws-sdk-go/service/sqs"
+	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/aws-sdk-go-v2/config"
+	"github.com/aws/aws-sdk-go-v2/credentials"
+	"github.com/aws/aws-sdk-go-v2/service/sqs"
+	"github.com/aws/aws-sdk-go-v2/service/sqs/types"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 )
@@ -37,9 +38,8 @@ type Client struct {
 	secretAccessKey string
 	endpoint        string
 
-	mu      sync.Mutex
-	session *session.Session
-	svc     *sqs.SQS
+	mu  sync.Mutex
+	svc *sqs.Client
 }
 
 // ClientConfig holds the configuration for creating an SQS client.
@@ -117,7 +117,6 @@ func (c *Client) Close() {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	c.svc = nil
-	c.session = nil
 }
 
 // internal helpers
@@ -138,7 +137,7 @@ func (c *Client) publish(queueURL string, body []byte, contentType string) error
 	input := &sqs.SendMessageInput{
 		QueueUrl:    aws.String(queueURL),
 		MessageBody: aws.String(string(body)),
-		MessageAttributes: map[string]*sqs.MessageAttributeValue{
+		MessageAttributes: map[string]types.MessageAttributeValue{
 			"ContentType": {
 				DataType:    aws.String("String"),
 				StringValue: aws.String(contentType),
@@ -146,7 +145,7 @@ func (c *Client) publish(queueURL string, body []byte, contentType string) error
 		},
 	}
 
-	_, err := c.svc.SendMessageWithContext(ctx, input)
+	_, err := c.svc.SendMessage(ctx, input)
 	return err
 }
 
@@ -163,7 +162,7 @@ func (c *Client) publishWithAttributes(queueURL string, body []byte, contentType
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
-	msgAttrs := map[string]*sqs.MessageAttributeValue{
+	msgAttrs := map[string]types.MessageAttributeValue{
 		"ContentType": {
 			DataType:    aws.String("String"),
 			StringValue: aws.String(contentType),
@@ -171,7 +170,7 @@ func (c *Client) publishWithAttributes(queueURL string, body []byte, contentType
 	}
 
 	for k, v := range attributes {
-		msgAttrs[k] = &sqs.MessageAttributeValue{
+		msgAttrs[k] = types.MessageAttributeValue{
 			DataType:    aws.String("String"),
 			StringValue: aws.String(v),
 		}
@@ -183,7 +182,7 @@ func (c *Client) publishWithAttributes(queueURL string, body []byte, contentType
 		MessageAttributes: msgAttrs,
 	}
 
-	_, err := c.svc.SendMessageWithContext(ctx, input)
+	_, err := c.svc.SendMessage(ctx, input)
 	return err
 }
 
@@ -202,29 +201,40 @@ func (c *Client) connect() error {
 func (c *Client) connectLocked() error {
 	// close any existing
 	c.svc = nil
-	c.session = nil
 
-	awsConfig := &aws.Config{
-		Region: aws.String(c.region),
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	// Build config options
+	var opts []func(*config.LoadOptions) error
+
+	// Set region if provided
+	if c.region != "" {
+		opts = append(opts, config.WithRegion(c.region))
 	}
 
 	// Use explicit credentials if provided
 	if c.accessKeyID != "" && c.secretAccessKey != "" {
-		awsConfig.Credentials = credentials.NewStaticCredentials(c.accessKeyID, c.secretAccessKey, "")
+		opts = append(opts, config.WithCredentialsProvider(
+			credentials.NewStaticCredentialsProvider(c.accessKeyID, c.secretAccessKey, ""),
+		))
 	}
 
-	// Use custom endpoint if provided (for LocalStack or other S3-compatible services)
-	if c.endpoint != "" {
-		awsConfig.Endpoint = aws.String(c.endpoint)
-	}
-
-	sess, err := session.NewSession(awsConfig)
+	// Load default config with options (supports IRSA, EC2 metadata, env vars, etc.)
+	cfg, err := config.LoadDefaultConfig(ctx, opts...)
 	if err != nil {
-		return errors.Wrap(err, "failed to create AWS session")
+		return errors.Wrap(err, "failed to load AWS config")
 	}
 
-	c.session = sess
-	c.svc = sqs.New(sess)
+	// Create SQS client with optional custom endpoint
+	var sqsOpts []func(*sqs.Options)
+	if c.endpoint != "" {
+		sqsOpts = append(sqsOpts, func(o *sqs.Options) {
+			o.BaseEndpoint = aws.String(c.endpoint)
+		})
+	}
+
+	c.svc = sqs.NewFromConfig(cfg, sqsOpts...)
 	return nil
 }
 
