@@ -2,6 +2,7 @@ package publishers
 
 import (
 	"encoding/json"
+	"fmt"
 	"time"
 
 	"github.com/nyaruka/gocommon/urns"
@@ -23,5 +24,13 @@ func (m TicketSQSMessage) Marshal() ([]byte, error) { return json.Marshal(m) }
 func (m TicketSQSMessage) ContentType() string      { return "application/json" }
 
 func PublishTicketCreated(rt *runtime.Runtime, orgID models.OrgID, msg TicketSQSMessage) error {
-	return sqs.EnqueuePublish(rt, orgID, rt.Config.SqsTicketsQueueURL, msg)
+	MessageGroupId := fmt.Sprintf("%s:%s:%s", msg.ProjectUUID, msg.ChannelUUID, msg.ContactURN)
+	CorrelationID := string(uuids.New())
+	return sqs.EnqueuePublishWithAttributes(
+		rt, orgID, rt.Config.SqsTicketsQueueURL, msg,
+		map[string]string{
+			"MessageGroupId": MessageGroupId,
+			"CorrelationID":  CorrelationID,
+		},
+	)
 }

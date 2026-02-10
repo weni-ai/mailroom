@@ -77,7 +77,7 @@ func handleTicketOpened(ctx context.Context, rt *runtime.Runtime, tx *sqlx.Tx, o
 
 	sqsPublishers.PublishTicketCreated(rt, oa.OrgID(), sqsPublishers.TicketSQSMessage{
 		TicketUUID:  uuids.UUID(ticket.UUID()),
-		ContactURN:  scene.Contact().PreferredURN().URN(),
+		ContactURN:  scene.Contact().PreferredURN().URN().Identity(),
 		ProjectUUID: oa.Org().ProjectUUID(),
 		ChannelUUID: uuids.UUID(scene.Session().Contact().PreferredChannel().UUID()),
 		CreatedOn:   event.CreatedOn(),
