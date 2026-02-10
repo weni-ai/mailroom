@@ -2,7 +2,10 @@ package sqs
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
+	"strings"
 	"sync"
 	"time"
 
@@ -121,6 +124,17 @@ func (c *Client) Close() {
 
 // internal helpers
 
+// isFIFOQueue returns true if the queue URL indicates a FIFO queue
+func isFIFOQueue(queueURL string) bool {
+	return strings.HasSuffix(queueURL, ".fifo")
+}
+
+// generateDeduplicationID generates a SHA256 hash of the message body for deduplication
+func generateDeduplicationID(body []byte) string {
+	hash := sha256.Sum256(body)
+	return hex.EncodeToString(hash[:])
+}
+
 func (c *Client) publish(queueURL string, body []byte, contentType string) error {
 	c.mu.Lock()
 	defer c.mu.Unlock()
@@ -143,6 +157,12 @@ func (c *Client) publish(queueURL string, body []byte, contentType string) error
 				StringValue: aws.String(contentType),
 			},
 		},
+	}
+
+	// Add FIFO-specific parameters if this is a FIFO queue
+	if isFIFOQueue(queueURL) {
+		input.MessageGroupId = aws.String("default")
+		input.MessageDeduplicationId = aws.String(generateDeduplicationID(body))
 	}
 
 	_, err := c.svc.SendMessage(ctx, input)
@@ -180,6 +200,17 @@ func (c *Client) publishWithAttributes(queueURL string, body []byte, contentType
 		QueueUrl:          aws.String(queueURL),
 		MessageBody:       aws.String(string(body)),
 		MessageAttributes: msgAttrs,
+	}
+
+	// Add FIFO-specific parameters if this is a FIFO queue
+	if isFIFOQueue(queueURL) {
+		// Use MessageGroupId from attributes if provided, otherwise use "default"
+		messageGroupId := "default"
+		if groupId, ok := attributes["MessageGroupId"]; ok {
+			messageGroupId = groupId
+		}
+		input.MessageGroupId = aws.String(messageGroupId)
+		input.MessageDeduplicationId = aws.String(generateDeduplicationID(body))
 	}
 
 	_, err := c.svc.SendMessage(ctx, input)
