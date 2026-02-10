@@ -126,7 +126,7 @@ func handleOpen(ctx context.Context, rt *runtime.Runtime, r *http.Request, l *mo
 
 	sqsPublishers.PublishTicketCreated(rt, oa.OrgID(), sqsPublishers.TicketSQSMessage{
 		TicketUUID:  uuids.UUID(newTicket.UUID()),
-		ContactURN:  contact.PreferredURN().URN(),
+		ContactURN:  contact.PreferredURN().URN().Identity(),
 		ProjectUUID: oa.Org().ProjectUUID(),
 		ChannelUUID: uuids.UUID(contact.PreferredChannel().UUID()),
 		CreatedOn:   evt.CreatedOn(),

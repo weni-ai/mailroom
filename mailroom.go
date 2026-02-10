@@ -186,23 +186,21 @@ func (mr *Mailroom) Start() error {
 		log.Info("rabbitmq ok")
 	}
 
-	if c.SqsRegion != "" && c.SqsEndpoint != "" {
-		sqsConfig := sqs.ClientConfig{
-			Region:   c.SqsRegion,
-			Endpoint: c.SqsEndpoint,
-		}
-		if c.SqsAccessKeyID != "" && c.SqsSecretAccessKey != "" {
-			sqsConfig.AccessKeyID = c.SqsAccessKeyID
-			sqsConfig.SecretAccessKey = c.SqsSecretAccessKey
-		}
-		mr.rt.SQS, err = sqs.New(sqsConfig)
-		if err != nil {
-			log.WithError(err).Error("sqs not available")
-		} else {
-			log.Info("sqs ok")
-		}
+	sqsConfig := sqs.ClientConfig{
+		Region: c.SqsRegion,
+	}
+	if c.SqsEndpoint != "" {
+		sqsConfig.Endpoint = c.SqsEndpoint
+	}
+	if c.SqsAccessKeyID != "" && c.SqsSecretAccessKey != "" {
+		sqsConfig.AccessKeyID = c.SqsAccessKeyID
+		sqsConfig.SecretAccessKey = c.SqsSecretAccessKey
+	}
+	mr.rt.SQS, err = sqs.New(sqsConfig)
+	if err != nil {
+		log.WithError(err).Error("sqs not available")
 	} else {
-		log.Warn("sqs not configured (missing AWS credentials, SQS region or SQS endpoint)")
+		log.Info("sqs ok")
 	}
 
 	for _, initFunc := range initFunctions {
