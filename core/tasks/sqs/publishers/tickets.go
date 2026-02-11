@@ -24,6 +24,9 @@ func (m TicketSQSMessage) Marshal() ([]byte, error) { return json.Marshal(m) }
 func (m TicketSQSMessage) ContentType() string      { return "application/json" }
 
 func PublishTicketCreated(rt *runtime.Runtime, orgID models.OrgID, msg TicketSQSMessage) error {
+	if !rt.Config.SqsPublishEnabled {
+		return nil
+	}
 	MessageGroupId := fmt.Sprintf("%s:%s:%s", msg.ProjectUUID, msg.ChannelUUID, msg.ContactURN)
 	CorrelationID := string(uuids.New())
 	return sqs.EnqueuePublishWithAttributes(

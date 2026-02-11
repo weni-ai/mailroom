@@ -115,6 +115,7 @@ type Config struct {
 	RabbitmqPublishMaxAttempts     int `help:"max attempts for async RabbitMQ publish tasks"`
 	RabbitmqPublishDelayIntervalMs int `help:"fixed delay in ms between async RabbitMQ publish retries"`
 
+	SqsPublishEnabled         bool   `help:"whether SQS publish is enabled"`
 	SqsAccessKeyID            string `help:"AWS access key ID for SQS (uses AWSAccessKeyID if not set)"`
 	SqsSecretAccessKey        string `help:"AWS secret access key for SQS (uses AWSSecretAccessKey if not set)"`
 	SqsRegion                 string `help:"AWS region for SQS"`
@@ -213,6 +214,7 @@ func NewDefaultConfig() *Config {
 		RabbitmqPublishMaxAttempts:     3600,
 		RabbitmqPublishDelayIntervalMs: 2000,
 
+		SqsPublishEnabled:         true,
 		SqsAccessKeyID:            "",
 		SqsSecretAccessKey:        "",
 		SqsRegion:                 "us-east-1",
