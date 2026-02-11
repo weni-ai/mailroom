@@ -12,6 +12,7 @@ import (
 	"github.com/nyaruka/goflow/utils"
 	"github.com/nyaruka/mailroom/core/models"
 	"github.com/nyaruka/mailroom/core/tasks/rabbitmq/publishers"
+	sqsPublishers "github.com/nyaruka/mailroom/core/tasks/sqs/publishers"
 	"github.com/nyaruka/mailroom/core/tasks/tickets"
 	"github.com/nyaruka/mailroom/runtime"
 	"github.com/nyaruka/mailroom/web"
@@ -121,6 +122,14 @@ func handleOpen(ctx context.Context, rt *runtime.Runtime, r *http.Request, l *mo
 		ProjectUUID:  oa.Org().ProjectUUID(),
 		TicketerType: string(ticketer.Type()),
 		CreatedOn:    evt.CreatedOn(),
+	})
+
+	sqsPublishers.PublishTicketCreated(rt, oa.OrgID(), sqsPublishers.TicketSQSMessage{
+		TicketUUID:  uuids.UUID(newTicket.UUID()),
+		ContactURN:  contact.PreferredURN().URN().Identity(),
+		ProjectUUID: oa.Org().ProjectUUID(),
+		ChannelUUID: uuids.UUID(contact.PreferredChannel().UUID()),
+		CreatedOn:   evt.CreatedOn(),
 	})
 
 	rc := rt.RP.Get()

@@ -3,11 +3,13 @@ package handlers
 import (
 	"context"
 
+	"github.com/nyaruka/gocommon/uuids"
 	"github.com/nyaruka/goflow/flows"
 	"github.com/nyaruka/goflow/flows/events"
 	"github.com/nyaruka/mailroom/core/hooks"
 	"github.com/nyaruka/mailroom/core/models"
 	"github.com/nyaruka/mailroom/core/tasks/rabbitmq/publishers"
+	sqsPublishers "github.com/nyaruka/mailroom/core/tasks/sqs/publishers"
 	"github.com/nyaruka/mailroom/runtime"
 	"github.com/nyaruka/mailroom/services/tickets"
 
@@ -71,6 +73,14 @@ func handleTicketOpened(ctx context.Context, rt *runtime.Runtime, tx *sqlx.Tx, o
 		ProjectUUID:  oa.Org().ProjectUUID(),
 		TicketerType: string(ticketer.Type()),
 		CreatedOn:    event.CreatedOn(),
+	})
+
+	sqsPublishers.PublishTicketCreated(rt, oa.OrgID(), sqsPublishers.TicketSQSMessage{
+		TicketUUID:  uuids.UUID(ticket.UUID()),
+		ContactURN:  scene.Contact().PreferredURN().URN().Identity(),
+		ProjectUUID: oa.Org().ProjectUUID(),
+		ChannelUUID: uuids.UUID(scene.Session().Contact().PreferredChannel().UUID()),
+		CreatedOn:   event.CreatedOn(),
 	})
 
 	logrus.WithFields(logrus.Fields{
