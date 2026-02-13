@@ -111,8 +111,10 @@ func MergeMaps(maps ...map[string]interface{}) map[string]interface{} {
 	for _, m := range maps {
 		for k, v := range m {
 			if resValue, ok := result[k]; ok {
-				if resMap, ok := resValue.(map[string]interface{}); ok {
-					result[k] = MergeMaps(resMap, v.(map[string]interface{}))
+				resMap, resIsMap := resValue.(map[string]interface{})
+				vMap, vIsMap := v.(map[string]interface{})
+				if resIsMap && vIsMap {
+					result[k] = MergeMaps(resMap, vMap)
 				} else {
 					result[k] = v
 				}
