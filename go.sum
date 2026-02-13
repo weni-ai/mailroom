@@ -330,6 +330,10 @@ github.com/tj/go-kinesis v0.0.0-20171128231115-08b17f58cb1b/go.mod h1:/yhzCV0xPf
 github.com/tj/go-spin v1.1.0/go.mod h1:Mg1mzmePZm4dva8Qz60H2lHwmJ2loum4VIrLgVnKwh4=
 github.com/weni-ai/goflow v1.18.0-a1-stg h1:vJvYaBma4oe8JU3jgNVZHZ7A/wBcG7IMS/j3CWfJPHw=
 github.com/weni-ai/goflow v1.18.0-a1-stg/go.mod h1:JdwQA06TLpen2PL4m8Cm0fO7ovfvr1NH9w3vQU6J58M=
+github.com/weni-ai/goflow v1.18.1-a0-stg h1:Bx9w7td+ESpKHXXjlimbK5h+kOSyV5hzISw19NNZ2rk=
+github.com/weni-ai/goflow v1.18.1-a0-stg/go.mod h1:JdwQA06TLpen2PL4m8Cm0fO7ovfvr1NH9w3vQU6J58M=
+github.com/weni-ai/goflow v1.18.1 h1:+MDEZ2gM7EPPJ/jxvtHoagtGvePLEpvBnlb0bUBWHPs=
+github.com/weni-ai/goflow v1.18.1/go.mod h1:JdwQA06TLpen2PL4m8Cm0fO7ovfvr1NH9w3vQU6J58M=
 github.com/yuin/goldmark v1.1.25/go.mod h1:3hX8gzYuyVAZsxl0MRgGTJEmQBFcNTphYh9decYSb74=
 github.com/yuin/goldmark v1.1.27/go.mod h1:3hX8gzYuyVAZsxl0MRgGTJEmQBFcNTphYh9decYSb74=
 github.com/yuin/goldmark v1.1.32/go.mod h1:3hX8gzYuyVAZsxl0MRgGTJEmQBFcNTphYh9decYSb74=
