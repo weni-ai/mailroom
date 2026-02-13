@@ -1,3 +1,7 @@
+1.78.1
+----------
+ * chore: update goflow 1.18.1
+
 1.78.0
 ----------
  * chore: Update go.mod and go.sum to replace the goflow version with v1.18.0 and adjust the default broadcast message construction
