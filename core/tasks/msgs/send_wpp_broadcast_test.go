@@ -2,7 +2,6 @@ package msgs_test
 
 import (
 	"encoding/json"
-	"log"
 	"testing"
 	"time"
 
@@ -477,8 +476,13 @@ func TestWppBroadcastTask(t *testing.T) {
 				Returns(1, "%d: broadcast not marked as sent", i)
 		}
 
+		// assert queue metadata is present when using template_notification_batch queue
+		if tc.Queue == queue.TemplateNotificationBatchQueue {
+			testsuite.AssertQuery(t, db, `SELECT count(*) FROM msgs_msg WHERE org_id = 1 AND created_on > $1 AND metadata::jsonb @> '{"queue": "template_notification_batch"}'::jsonb`, lastNow).
+				Returns(tc.MsgCount, "%d: unexpected queue metadata count for template_notification_batch", i)
+		}
+
 		lastNow = time.Now()
 		time.Sleep(10 * time.Millisecond)
 	}
-	log.Println("done")
 }
