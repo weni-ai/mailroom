@@ -2,40 +2,59 @@ name: CI
 on: [push, pull_request]
 env:
   go-version: '1.23.5'
-  postgis-version: '3.4'
-  redis-version: '3.2.4'
 jobs:
   test:
     name: Test
-    strategy:
-      matrix:
-        pg-version: ['15']
     runs-on: ubuntu-latest
+
+    services:
+      redis:
+        image: redis:7
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 5
+      rabbitmq:
+        image: rabbitmq:3.9-management
+        ports:
+          - 5672:5672
+        options: --health-cmd "rabbitmqctl node_health_check" --health-interval 10s --health-timeout 5s --health-retries 5
+
     steps:
     - name: Checkout code
       uses: actions/checkout@v6
 
-    - name: Install Redis
-      uses: zhulik/redis-action@v1.0.0
-      with:
-        redis version: ${{ env.redis-version }}
+    - name: Start PostgreSQL with custom max_connections
+      run: |
+        docker run -d \
+          --name postgres \
+          -e POSTGRES_PASSWORD=temba \
+          -p 5432:5432 \
+          --shm-size=256m \
+          postgis/postgis:15-3.3-alpine \
+          postgres -c max_connections=300
+        
+        # Wait for PostgreSQL to be ready
+        for i in {1..30}; do
+          if docker exec postgres pg_isready -U postgres > /dev/null 2>&1; then
+            echo "PostgreSQL is ready!"
+            break
+          fi
+          echo "Waiting for PostgreSQL to start... ($i/30)"
+          sleep 1
+        done
 
-    - name: Install PostgreSQL
-      uses: nyaruka/postgis-action@v2.1.0
-      with:
-        postgresql version: ${{ matrix.pg-version }}
-        postgis version: ${{ env.postgis-version }}
-        postgresql password: temba
-        postgresql arguments: postgres -N 300
-    
-    - name: Install Rabbitmq
-      uses: namoshek/rabbitmq-github-action@v1
-      with:
-        version: '3.9.7'
-        ports: '5672:5672'
-  
-    - name: Install Linux packages
-      run: sudo apt install -y --no-install-recommends postgresql-client
+    - name: Install Postgres Client
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y wget gnupg2 lsb-release
+        echo "deb http://apt.postgresql.org/pub/repos/apt $(lsb_release -cs)-pgdg main" | sudo tee /etc/apt/sources.list.d/pgdg.list
+        wget --quiet -O - https://www.postgresql.org/media/keys/ACCC4CF8.asc | sudo tee /etc/apt/trusted.gpg.d/postgresql.asc > /dev/null
+        sudo apt-get update
+        sudo apt-get install -y --no-install-recommends postgresql-client-15
 
     - name: Initialize database
       # we create our test database with a different user so that we can drop everything owned by this user between tests
