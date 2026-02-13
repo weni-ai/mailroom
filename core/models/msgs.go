@@ -357,7 +357,7 @@ func NewOutgoingFlowMsgCatalog(rt *runtime.Runtime, org *Org, channel *Channel, 
 
 // NewOutgoingFlowMsgWpp creates an outgoing message for the passed in flow message
 func NewOutgoingFlowMsgWpp(rt *runtime.Runtime, org *Org, channel *Channel, session *Session, out *flows.MsgWppOut, createdOn time.Time) (*Msg, error) {
-	return newOutgoingMsgWpp(rt, org, channel, session.ContactID(), out, createdOn, session, NilBroadcastID, true)
+	return newOutgoingMsgWpp(rt, org, channel, session.ContactID(), out, createdOn, session, NilBroadcastID, true, nil)
 }
 
 // NewOutgoingBroadcastMsg creates an outgoing message which is part of a broadcast
@@ -365,8 +365,8 @@ func NewOutgoingBroadcastMsg(rt *runtime.Runtime, org *Org, channel *Channel, co
 	return newOutgoingMsg(rt, org, channel, contactID, out, createdOn, nil, broadcastID, extraMetadata)
 }
 
-func NewOutgoingWppBroadcastMsg(rt *runtime.Runtime, org *Org, channel *Channel, contactID ContactID, out *flows.MsgWppOut, createdOn time.Time, broadcastID BroadcastID, highPriority bool) (*Msg, error) {
-	return newOutgoingMsgWpp(rt, org, channel, contactID, out, createdOn, nil, broadcastID, highPriority)
+func NewOutgoingWppBroadcastMsg(rt *runtime.Runtime, org *Org, channel *Channel, contactID ContactID, out *flows.MsgWppOut, createdOn time.Time, broadcastID BroadcastID, highPriority bool, extraMetadata map[string]interface{}) (*Msg, error) {
+	return newOutgoingMsgWpp(rt, org, channel, contactID, out, createdOn, nil, broadcastID, highPriority, extraMetadata)
 }
 
 // NewOutgoingMsg creates an outgoing message that does not belong to any flow or broadcast, it's used to the a direct message to the contact
@@ -615,7 +615,7 @@ func newOutgoingMsgCatalog(rt *runtime.Runtime, org *Org, channel *Channel, cont
 	return msg, nil
 }
 
-func newOutgoingMsgWpp(rt *runtime.Runtime, org *Org, channel *Channel, contactID ContactID, msgWpp *flows.MsgWppOut, createdOn time.Time, session *Session, broadcastID BroadcastID, highPriority bool) (*Msg, error) {
+func newOutgoingMsgWpp(rt *runtime.Runtime, org *Org, channel *Channel, contactID ContactID, msgWpp *flows.MsgWppOut, createdOn time.Time, session *Session, broadcastID BroadcastID, highPriority bool, extraMetadata map[string]interface{}) (*Msg, error) {
 	msg := &Msg{}
 	m := &msg.m
 	m.UUID = msgWpp.UUID()
@@ -783,6 +783,14 @@ func newOutgoingMsgWpp(rt *runtime.Runtime, org *Org, channel *Channel, contactI
 
 		m.Metadata = null.NewMap(metadata)
 	}
+
+	if extraMetadata != nil {
+		if len(m.Metadata.Map()) > 0 {
+			extraMetadata = MergeMaps(extraMetadata, m.Metadata.Map())
+		}
+		m.Metadata = null.NewMap(extraMetadata)
+	}
+
 	return msg, nil
 }
 
@@ -2041,8 +2049,36 @@ func CreateWppBroadcastMessages(ctx context.Context, rt *runtime.Runtime, oa *Or
 		}
 
 		// create our outgoing message
-		out := flows.NewMsgWppOut(urn, channel.ChannelReference(), bcast.Msg().InteractionType, headerType, headerText, text, footerText, ctaMessage, listMessage, flowMessage, orderDetails, attachments, quickReplies, buttons, templating, flows.NilMsgTopic, products, actionButtonText, sendCatalog, actionType, actionExternalID)
-		msg, err := NewOutgoingWppBroadcastMsg(rt, oa.Org(), channel, c.ID(), out, time.Now(), bcast.BroadcastID(), highPriority)
+		out := flows.NewMsgWppOut(
+			urn,
+			channel.ChannelReference(),
+			bcast.Msg().InteractionType,
+			headerType,
+			headerText,
+			text,
+			footerText,
+			ctaMessage,
+			listMessage,
+			flowMessage,
+			orderDetails,
+			attachments,
+			quickReplies,
+			buttons,
+			templating,
+			flows.NilMsgTopic,
+			products,
+			actionButtonText,
+			sendCatalog,
+			actionType,
+			actionExternalID,
+		)
+
+		extraMetadata := map[string]interface{}{}
+		if bcast.Queue() != "" {
+			extraMetadata["queue"] = bcast.Queue()
+		}
+
+		msg, err := NewOutgoingWppBroadcastMsg(rt, oa.Org(), channel, c.ID(), out, time.Now(), bcast.BroadcastID(), highPriority, extraMetadata)
 		if err != nil {
 			return nil, errors.Wrapf(err, "error creating outgoing message")
 		}
