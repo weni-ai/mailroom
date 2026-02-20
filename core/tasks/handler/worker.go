@@ -632,14 +632,10 @@ func handleMsgEvent(ctx context.Context, rt *runtime.Runtime, event *MsgEvent) e
 	}
 
 	// check whether it is to direct to the brain or not
-	isBrain := false
-	if oa.Org().BrainOn() && !isIGComment {
-		isBrain = true
-	}
+	isBrain := oa.Org().BrainOn() && !isIGComment
 
 	// we found a trigger and their session is nil or doesn't ignore keywords
-	if ((trigger != nil && trigger.TriggerType() != models.CatchallTriggerType && (flow == nil || !flow.IgnoreTriggers())) ||
-		(trigger != nil && trigger.TriggerType() == models.CatchallTriggerType && (flow == nil))) && !isBrain {
+	if shouldFireTrigger(trigger, flow, isBrain) {
 		// load our flow
 		flow, err := oa.FlowByID(trigger.FlowID())
 		if err != nil && err != models.ErrNotFound {
@@ -728,6 +724,18 @@ func handleMsgEvent(ctx context.Context, rt *runtime.Runtime, event *MsgEvent) e
 	}
 
 	return nil
+}
+
+// shouldFireTrigger reports whether a matching trigger should start a new flow, taking into account
+// the current session's flow (if any) and whether the brain routing is active.
+func shouldFireTrigger(trigger *models.Trigger, flow *models.Flow, isBrain bool) bool {
+	if isBrain || trigger == nil {
+		return false
+	}
+	if trigger.TriggerType() == models.CatchallTriggerType {
+		return flow == nil
+	}
+	return flow == nil || !flow.IgnoreTriggers()
 }
 
 // applyContactFieldModifiers creates and applies field modifiers from the event's new contact fields.
