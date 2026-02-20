@@ -636,45 +636,9 @@ func handleMsgEvent(ctx context.Context, rt *runtime.Runtime, event *MsgEvent) e
 
 	// we found a trigger and their session is nil or doesn't ignore keywords
 	if shouldFireTrigger(trigger, flow, isBrain) {
-		// load our flow
-		flow, err := oa.FlowByID(trigger.FlowID())
-		if err != nil && err != models.ErrNotFound {
-			return errors.Wrapf(err, "error loading flow for trigger")
-		}
-
-		// trigger flow is still active, start it
-		if flow != nil {
-			// if this is an IVR flow, we need to trigger that start (which happens in a different queue)
-			if flow.FlowType() == models.FlowTypeVoice {
-				ivrMsgHook := func(ctx context.Context, tx *sqlx.Tx) error {
-					return markMsgHandled(ctx, tx, contact, msgIn, models.MsgTypeFlow, topupID, tickets)
-				}
-				err = runner.TriggerIVRFlow(ctx, rt, oa.OrgID(), flow.ID(), []models.ContactID{modelContact.ID()}, ivrMsgHook)
-				if err != nil {
-					return errors.Wrapf(err, "error while triggering ivr flow")
-				}
-				return nil
-			}
-
-			// otherwise build the trigger and start the flow directly
-			trigger := triggers.NewBuilder(oa.Env(), flow.FlowReference(), contact).Msg(msgIn).WithMatch(trigger.Match())
-
-			if event.Metadata != nil {
-				var params *types.XObject
-				params, err = types.ReadXObject(event.Metadata)
-				if err != nil {
-					log.WithError(err).Error("unable to marshal metadata from msg event")
-				}
-
-				trigger.WithParams(params)
-			}
-			triggerBuild := trigger.Build()
-
-			_, err = runner.StartFlowForContacts(ctx, rt, oa, flow, []flows.Trigger{triggerBuild}, flowMsgHook, true)
-			if err != nil {
-				return errors.Wrapf(err, "error starting flow for contact")
-			}
-			return nil
+		fired, err := handleTriggerFlow(ctx, rt, oa, contact, modelContact, trigger, event, msgIn, topupID, tickets, flowMsgHook)
+		if err != nil || fired {
+			return err
 		}
 	}
 
@@ -724,6 +688,63 @@ func handleMsgEvent(ctx context.Context, rt *runtime.Runtime, event *MsgEvent) e
 	}
 
 	return nil
+}
+
+// handleTriggerFlow loads and starts the flow associated with a matched trigger.
+// Returns (true, nil) when processing is complete (flow started or not found after load),
+// (true, err) on error, or (false, nil) when the trigger's flow was deleted and processing
+// should continue to the next handler (session resume, brain, inbox).
+func handleTriggerFlow(
+	ctx context.Context,
+	rt *runtime.Runtime,
+	oa *models.OrgAssets,
+	contact *flows.Contact,
+	modelContact *models.Contact,
+	matchedTrigger *models.Trigger,
+	event *MsgEvent,
+	msgIn *flows.MsgIn,
+	topupID models.TopupID,
+	tickets []*models.Ticket,
+	flowMsgHook models.SessionCommitHook,
+) (bool, error) {
+	flow, err := oa.FlowByID(matchedTrigger.FlowID())
+	if err != nil && err != models.ErrNotFound {
+		return true, errors.Wrapf(err, "error loading flow for trigger")
+	}
+
+	// trigger flow has been deleted, fall through to next handler
+	if flow == nil {
+		return false, nil
+	}
+
+	// IVR flows are started via a separate queue
+	if flow.FlowType() == models.FlowTypeVoice {
+		ivrMsgHook := func(ctx context.Context, tx *sqlx.Tx) error {
+			return markMsgHandled(ctx, tx, contact, msgIn, models.MsgTypeFlow, topupID, tickets)
+		}
+		err = runner.TriggerIVRFlow(ctx, rt, oa.OrgID(), flow.ID(), []models.ContactID{modelContact.ID()}, ivrMsgHook)
+		if err != nil {
+			return true, errors.Wrapf(err, "error while triggering ivr flow")
+		}
+		return true, nil
+	}
+
+	// build the trigger and start the flow directly
+	tb := triggers.NewBuilder(oa.Env(), flow.FlowReference(), contact).Msg(msgIn).WithMatch(matchedTrigger.Match())
+	if event.Metadata != nil {
+		var params *types.XObject
+		params, err = types.ReadXObject(event.Metadata)
+		if err != nil {
+			log.WithError(err).Error("unable to marshal metadata from msg event")
+		}
+		tb.WithParams(params)
+	}
+
+	_, err = runner.StartFlowForContacts(ctx, rt, oa, flow, []flows.Trigger{tb.Build()}, flowMsgHook, true)
+	if err != nil {
+		return true, errors.Wrapf(err, "error starting flow for contact")
+	}
+	return true, nil
 }
 
 // shouldFireTrigger reports whether a matching trigger should start a new flow, taking into account
