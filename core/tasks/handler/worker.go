@@ -618,54 +618,7 @@ func handleMsgEvent(ctx context.Context, rt *runtime.Runtime, event *MsgEvent) e
 	msgIn := flows.NewMsgIn(event.MsgUUID, event.URN, channel.ChannelReference(), event.Text, event.Attachments)
 	msgIn.SetExternalID(string(event.MsgExternalID))
 	msgIn.SetID(event.MsgID)
-	var order *flows.Order
-	var nfmReply *flows.NFMReply
-	var igComment *flows.IGComment
-	var isIGComment bool
-	if event.Metadata != nil {
-		var metadata map[string]interface{}
-		err := json.Unmarshal(event.Metadata, &metadata)
-		if err != nil {
-			log.WithError(err).Error("unable to unmarshal metadata from msg event")
-		}
-		// if metadata has order key set msg order
-		mdValue, isOrder := metadata["order"]
-		if isOrder {
-			asJSON, err := json.Marshal(mdValue)
-			if err != nil {
-				log.WithError(err).Error("unable to marshal metadata from msg event")
-			}
-			err = json.Unmarshal(asJSON, &order)
-			if err != nil {
-				log.WithError(err).Error("unable to unmarshal orderJSON from metadata[\"order\"]")
-			}
-			msgIn.SetOrder(order)
-		}
-		mdValue, isNFMReply := metadata["nfm_reply"]
-		if isNFMReply {
-			asJSON, err := json.Marshal(mdValue)
-			if err != nil {
-				log.WithError(err).Error("unable to marshal metadata from msg event")
-			}
-			err = json.Unmarshal(asJSON, &nfmReply)
-			if err != nil {
-				log.WithError(err).Error("unable to unmarshal orderJSON from metadata[\"nfm_reply\"]")
-			}
-			msgIn.SetNFMReply(nfmReply)
-		}
-		mdValue, isIGComment = metadata["ig_comment"]
-		if isIGComment {
-			asJSON, err := json.Marshal(mdValue)
-			if err != nil {
-				log.WithError(err).Error("unable to marshal metadata from msg event")
-			}
-			err = json.Unmarshal(asJSON, &igComment)
-			if err != nil {
-				log.WithError(err).Error("unable to unmarshal orderJSON from metadata[\"ig_comment\"]")
-			}
-			msgIn.SetIGComment(igComment)
-		}
-	}
+	isIGComment := parseMsgInMetadata(event, msgIn)
 
 	// build our hook to mark a flow message as handled
 	flowMsgHook := func(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, oa *models.OrgAssets, sessions []*models.Session) error {
@@ -832,6 +785,57 @@ func applyContactFieldModifiers(
 	}
 
 	return modelContact, updatedContact, recalculateDynamicGroups, nil
+}
+
+// parseMsgInMetadata populates msgIn with structured data (order, nfm_reply, ig_comment) parsed
+// from the event metadata. Errors are logged but not returned, preserving the original lenient
+// behaviour. Returns whether the message is an Instagram comment.
+func parseMsgInMetadata(event *MsgEvent, msgIn *flows.MsgIn) (isIGComment bool) {
+	if event.Metadata == nil {
+		return false
+	}
+
+	var metadata map[string]interface{}
+	if err := json.Unmarshal(event.Metadata, &metadata); err != nil {
+		log.WithError(err).Error("unable to unmarshal metadata from msg event")
+		return false
+	}
+
+	if mdValue, ok := metadata["order"]; ok {
+		var order *flows.Order
+		if asJSON, err := json.Marshal(mdValue); err != nil {
+			log.WithError(err).Error("unable to marshal metadata from msg event")
+		} else if err = json.Unmarshal(asJSON, &order); err != nil {
+			log.WithError(err).Error("unable to unmarshal orderJSON from metadata[\"order\"]")
+		} else {
+			msgIn.SetOrder(order)
+		}
+	}
+
+	if mdValue, ok := metadata["nfm_reply"]; ok {
+		var nfmReply *flows.NFMReply
+		if asJSON, err := json.Marshal(mdValue); err != nil {
+			log.WithError(err).Error("unable to marshal metadata from msg event")
+		} else if err = json.Unmarshal(asJSON, &nfmReply); err != nil {
+			log.WithError(err).Error("unable to unmarshal orderJSON from metadata[\"nfm_reply\"]")
+		} else {
+			msgIn.SetNFMReply(nfmReply)
+		}
+	}
+
+	if mdValue, ok := metadata["ig_comment"]; ok {
+		var igComment *flows.IGComment
+		if asJSON, err := json.Marshal(mdValue); err != nil {
+			log.WithError(err).Error("unable to marshal metadata from msg event")
+		} else if err = json.Unmarshal(asJSON, &igComment); err != nil {
+			log.WithError(err).Error("unable to unmarshal orderJSON from metadata[\"ig_comment\"]")
+		} else {
+			msgIn.SetIGComment(igComment)
+			isIGComment = true
+		}
+	}
+
+	return isIGComment
 }
 
 func handleTicketEvent(ctx context.Context, rt *runtime.Runtime, event *models.TicketEvent) error {
