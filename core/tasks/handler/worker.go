@@ -653,38 +653,51 @@ func handleMsgEvent(ctx context.Context, rt *runtime.Runtime, event *MsgEvent) e
 	}
 
 	if isBrain && len(tickets) == 0 {
-		db := rt.ReadonlyDB
-		var projectUUID uuids.UUID
-		err := db.GetContext(ctx, &projectUUID, `SELECT project_uuid FROM internal_project WHERE org_ptr_id = $1;`, oa.OrgID())
-		if err != nil && err != sql.ErrNoRows {
-			return errors.Wrapf(err, "error when searching for project uuid with org id %d", oa.OrgID())
+		if err := handleBrainRouting(ctx, rt, oa, contact, event, channel, topupID); err != nil {
+			return err
 		}
-
-		if err == sql.ErrNoRows {
-			return fmt.Errorf("no project uuid found")
-		}
-
-		err = requestToRouter(event, rt.Config, contact, projectUUID, channel)
-		if err != nil {
-			return errors.Wrap(err, "unable to send message to router")
-		}
-
-		err = models.UpdateMessage(ctx, rt.DB, event.MsgID, models.MsgStatusHandled, models.VisibilityVisible, models.MsgTypeInbox, topupID)
-		if err != nil {
-			return errors.Wrapf(err, "error marking message as handled")
-		}
-
-		err = models.CalculateDynamicGroups(ctx, rt.DB, oa, []*flows.Contact{contact})
-		if err != nil {
-			logrus.WithError(err).Error("error calculating dynamic groups")
-		}
-
 	}
 
 	// this message didn't trigger and new sessions or resume any existing ones, so handle as inbox
 	err = handleAsInbox(ctx, rt, oa, contact, msgIn, topupID, tickets)
 	if err != nil {
 		return errors.Wrapf(err, "error handling inbox message")
+	}
+
+	return nil
+}
+
+// handleBrainRouting sends the incoming message to the external router (brain) when BrainOn is
+// active and the contact has no open tickets. It marks the message as handled and recalculates
+// dynamic groups. Errors from group recalculation are logged but not returned.
+func handleBrainRouting(
+	ctx context.Context,
+	rt *runtime.Runtime,
+	oa *models.OrgAssets,
+	contact *flows.Contact,
+	event *MsgEvent,
+	channel *models.Channel,
+	topupID models.TopupID,
+) error {
+	var projectUUID uuids.UUID
+	err := rt.ReadonlyDB.GetContext(ctx, &projectUUID, `SELECT project_uuid FROM internal_project WHERE org_ptr_id = $1;`, oa.OrgID())
+	if err != nil && err != sql.ErrNoRows {
+		return errors.Wrapf(err, "error when searching for project uuid with org id %d", oa.OrgID())
+	}
+	if err == sql.ErrNoRows {
+		return fmt.Errorf("no project uuid found")
+	}
+
+	if err = requestToRouter(event, rt.Config, contact, projectUUID, channel); err != nil {
+		return errors.Wrap(err, "unable to send message to router")
+	}
+
+	if err = models.UpdateMessage(ctx, rt.DB, event.MsgID, models.MsgStatusHandled, models.VisibilityVisible, models.MsgTypeInbox, topupID); err != nil {
+		return errors.Wrapf(err, "error marking message as handled")
+	}
+
+	if err = models.CalculateDynamicGroups(ctx, rt.DB, oa, []*flows.Contact{contact}); err != nil {
+		logrus.WithError(err).Error("error calculating dynamic groups")
 	}
 
 	return nil
