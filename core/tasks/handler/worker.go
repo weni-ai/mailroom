@@ -550,51 +550,15 @@ func handleMsgEvent(ctx context.Context, rt *runtime.Runtime, event *MsgEvent) e
 	// track if we need to recalculate dynamic groups (due to field changes or new contact)
 	recalculateDynamicGroups := false
 
-	// if we have new contact fields, create the contact field update modifiers and apply them
+	// if we have new contact fields, apply them and reload the contact
 	if event.NewContactFields != nil {
-
-		// create our field modifiers
-		fieldModifiers := make([]flows.Modifier, 0, len(event.NewContactFields))
-		for key, value := range event.NewContactFields {
-			field := oa.SessionAssets().Fields().Get(key)
-			if field == nil {
-				logrus.WithField("key", key).Error("unknown contact field")
-				continue
-			}
-			fieldModifiers = append(fieldModifiers, modifiers.NewField(field, value))
-		}
-
-		// apply our field modifiers
-		if len(fieldModifiers) > 0 {
-			modifiersByContact := map[*flows.Contact][]flows.Modifier{contact: fieldModifiers}
-			_, err = models.ApplyModifiers(ctx, rt, oa, modifiersByContact)
-			if err != nil {
-				return errors.Wrapf(err, "error applying contact field modifiers")
-			}
-
-			// field changes may affect dynamic group membership
-			recalculateDynamicGroups = true
-		}
-
-		// reload our contact from write DB to ensure we see the changes we just made
-		contacts, err = models.LoadContacts(ctx, rt.DB, oa, []models.ContactID{event.ContactID})
+		modelContact, contact, recalculateDynamicGroups, err = applyContactFieldModifiers(ctx, rt, oa, event, contact, topupID)
 		if err != nil {
-			return errors.Wrapf(err, "error loading contact after updating fields")
+			return err
 		}
-
-		// contact has been deleted, ignore this message but mark it as handled
-		if len(contacts) == 0 {
-			err := models.UpdateMessage(ctx, rt.DB, event.MsgID, models.MsgStatusHandled, models.VisibilityArchived, models.MsgTypeInbox, topupID)
-			if err != nil {
-				return errors.Wrapf(err, "error updating message for deleted contact after updating fields")
-			}
+		// contact was deleted after field update, message already marked as handled
+		if modelContact == nil {
 			return nil
-		}
-
-		modelContact = contacts[0]
-		contact, err = modelContact.FlowContact(oa)
-		if err != nil {
-			return errors.Wrapf(err, "error creating flow contact after updating fields")
 		}
 	}
 
@@ -811,6 +775,63 @@ func handleMsgEvent(ctx context.Context, rt *runtime.Runtime, event *MsgEvent) e
 	}
 
 	return nil
+}
+
+// applyContactFieldModifiers creates and applies field modifiers from the event's new contact fields.
+// It reloads the contact from the write DB afterward to ensure consistency.
+// Returns nil modelContact (with nil error) if the contact was deleted after the update — in that
+// case the incoming message has already been marked as handled.
+func applyContactFieldModifiers(
+	ctx context.Context,
+	rt *runtime.Runtime,
+	oa *models.OrgAssets,
+	event *MsgEvent,
+	contact *flows.Contact,
+	topupID models.TopupID,
+) (*models.Contact, *flows.Contact, bool, error) {
+	fieldModifiers := make([]flows.Modifier, 0, len(event.NewContactFields))
+	for key, value := range event.NewContactFields {
+		field := oa.SessionAssets().Fields().Get(key)
+		if field == nil {
+			logrus.WithField("key", key).Error("unknown contact field")
+			continue
+		}
+		fieldModifiers = append(fieldModifiers, modifiers.NewField(field, value))
+	}
+
+	recalculateDynamicGroups := false
+	if len(fieldModifiers) > 0 {
+		modifiersByContact := map[*flows.Contact][]flows.Modifier{contact: fieldModifiers}
+		_, err := models.ApplyModifiers(ctx, rt, oa, modifiersByContact)
+		if err != nil {
+			return nil, nil, false, errors.Wrapf(err, "error applying contact field modifiers")
+		}
+		// field changes may affect dynamic group membership
+		recalculateDynamicGroups = true
+	}
+
+	// reload from write DB to ensure we see the changes we just made
+	contacts, err := models.LoadContacts(ctx, rt.DB, oa, []models.ContactID{event.ContactID})
+	if err != nil {
+		return nil, nil, false, errors.Wrapf(err, "error loading contact after updating fields")
+	}
+
+	// contact has been deleted, mark message as handled
+	if len(contacts) == 0 {
+		err := models.UpdateMessage(ctx, rt.DB, event.MsgID, models.MsgStatusHandled, models.VisibilityArchived, models.MsgTypeInbox, topupID)
+		if err != nil {
+			return nil, nil, false, errors.Wrapf(err, "error updating message for deleted contact after updating fields")
+		}
+		return nil, nil, false, nil
+	}
+
+	modelContact := contacts[0]
+	updatedContact, err := modelContact.FlowContact(oa)
+	if err != nil {
+		return nil, nil, false, errors.Wrapf(err, "error creating flow contact after updating fields")
+	}
+
+	return modelContact, updatedContact, recalculateDynamicGroups, nil
 }
 
 func handleTicketEvent(ctx context.Context, rt *runtime.Runtime, event *models.TicketEvent) error {
