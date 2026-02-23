@@ -541,6 +541,9 @@ func TestNonPersistentBroadcasts(t *testing.T) {
 		[]models.GroupID{testdata.DoctorsGroup.ID},
 		ticket.ID,
 		events.BroadcastTypeDefault,
+		models.BroadcastMessageHeader{},
+		"",
+		models.BroadcastCatalogMessage{},
 	)
 
 	assert.Equal(t, models.NilBroadcastID, bcast.ID())

@@ -59,7 +59,7 @@ func TestWppBroadcastTask(t *testing.T) {
 	replyMsg := models.WppBroadcastMessage{
 		Text:            "hello @contact.name, how are you doing today?",
 		InteractionType: "reply",
-		Header: models.WppBroadcastMessageHeader{
+		Header: models.BroadcastMessageHeader{
 			Type: "text",
 			Text: "header for @contact.name",
 		},
@@ -157,11 +157,11 @@ func TestWppBroadcastTask(t *testing.T) {
 
 	catalogMsg := models.WppBroadcastMessage{
 		Text: "Check out our products",
-		Header: models.WppBroadcastMessageHeader{
+		Header: models.BroadcastMessageHeader{
 			Type: "text",
 			Text: "header for catalog",
 		},
-		CatalogMessage: models.WppBroadcastCatalogMessage{
+		CatalogMessage: models.BroadcastCatalogMessage{
 			Products: []flows.ProductEntry{
 				{
 					Product:            "banana",
@@ -474,6 +474,12 @@ func TestWppBroadcastTask(t *testing.T) {
 		if tc.BroadcastID != models.NilBroadcastID {
 			testsuite.AssertQuery(t, db, `SELECT count(*) FROM msgs_broadcast WHERE id = $1 AND status = 'S'`, tc.BroadcastID).
 				Returns(1, "%d: broadcast not marked as sent", i)
+		}
+
+		// assert queue metadata is present when using template_notification_batch queue
+		if tc.Queue == queue.TemplateNotificationBatchQueue {
+			testsuite.AssertQuery(t, db, `SELECT count(*) FROM msgs_msg WHERE org_id = 1 AND created_on > $1 AND metadata::jsonb @> '{"queue": "template_notification_batch"}'::jsonb`, lastNow).
+				Returns(tc.MsgCount, "%d: unexpected queue metadata count for template_notification_batch", i)
 		}
 
 		lastNow = time.Now()

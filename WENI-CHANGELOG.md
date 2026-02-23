@@ -1,3 +1,15 @@
+1.79.0
+----------
+ * feat: persist queue name on msg metadata on create msg
+
+1.78.1
+----------
+ * chore: update goflow 1.18.1
+
+1.78.0
+----------
+ * chore: Update go.mod and go.sum to replace the goflow version with v1.18.0 and adjust the default broadcast message construction
+
 1.77.2
 ----------
  * feat: repair session with empty error and refactor open ticket wenichats to avoid return empty error
