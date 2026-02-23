@@ -1,3 +1,7 @@
+1.80.0
+----------
+ * feat: sqs worker, producer and publish ticket events
+
 1.79.0
 ----------
  * feat: persist queue name on msg metadata on create msg
