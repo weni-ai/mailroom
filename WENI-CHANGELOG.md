@@ -1,3 +1,7 @@
+1.79.0
+----------
+ * feat: persist queue name on msg metadata on create msg
+
 1.78.1
 ----------
  * chore: update goflow 1.18.1
