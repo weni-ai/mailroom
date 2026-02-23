@@ -18,6 +18,148 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+func TestParseMsgInMetadata(t *testing.T) {
+	newMsgIn := func() *flows.MsgIn {
+		return flows.NewMsgIn(flows.MsgUUID(uuids.New()), urns.URN("tel:+1234567890"), nil, "", nil)
+	}
+
+	tests := []struct {
+		name         string
+		metadata     json.RawMessage
+		isIGComment  bool
+		hasOrder     bool
+		hasNFMReply  bool
+		hasIGComment bool
+	}{
+		{
+			name:     "nil metadata",
+			metadata: nil,
+		},
+		{
+			name:     "metadata without known keys",
+			metadata: json.RawMessage(`{"foo": "bar"}`),
+		},
+		{
+			name:     "metadata with order",
+			metadata: json.RawMessage(`{"order": {"catalog_id": "cat1", "text": "buy now"}}`),
+			hasOrder: true,
+		},
+		{
+			name:        "metadata with nfm_reply",
+			metadata:    json.RawMessage(`{"nfm_reply": {"name": "test", "response_json": {}}}`),
+			hasNFMReply: true,
+		},
+		{
+			name:         "metadata with ig_comment",
+			metadata:     json.RawMessage(`{"ig_comment": {"text": "cool!", "id": "123"}}`),
+			isIGComment:  true,
+			hasIGComment: true,
+		},
+		{
+			name:         "metadata with all keys",
+			metadata:     json.RawMessage(`{"order": {"catalog_id": "cat1"}, "nfm_reply": {"name": "test"}, "ig_comment": {"text": "cool!"}}`),
+			isIGComment:  true,
+			hasOrder:     true,
+			hasNFMReply:  true,
+			hasIGComment: true,
+		},
+		{
+			name:     "malformed top-level JSON",
+			metadata: json.RawMessage(`not json`),
+		},
+		{
+			// ig_comment is a plain string; Unmarshal into *IGComment fails, so isIGComment stays false
+			name:        "ig_comment with non-object value",
+			metadata:    json.RawMessage(`{"ig_comment": "not an object"}`),
+			isIGComment: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			event := &MsgEvent{Metadata: tt.metadata}
+			msgIn := newMsgIn()
+
+			isIGComment := parseMsgInMetadata(event, msgIn)
+
+			assert.Equal(t, tt.isIGComment, isIGComment)
+
+			if tt.hasOrder {
+				assert.NotNil(t, msgIn.Order())
+			} else {
+				assert.Nil(t, msgIn.Order())
+			}
+			if tt.hasNFMReply {
+				assert.NotNil(t, msgIn.NFMReply())
+			} else {
+				assert.Nil(t, msgIn.NFMReply())
+			}
+			if tt.hasIGComment {
+				assert.NotNil(t, msgIn.IGComment())
+			} else {
+				assert.Nil(t, msgIn.IGComment())
+			}
+		})
+	}
+}
+
+func TestShouldFireTrigger(t *testing.T) {
+	ctx, rt, db, _ := testsuite.Get()
+	defer testsuite.Reset(testsuite.ResetAll)
+
+	testdata.InsertKeywordTrigger(db, testdata.Org1, testdata.Favorites, "start", models.MatchOnly, nil, nil)
+	testdata.InsertCatchallTrigger(db, testdata.Org1, testdata.SingleMessage, nil, nil)
+
+	// configure IVRFlow to ignore triggers so we can test that path
+	db.MustExec(`UPDATE flows_flow SET ignore_triggers = TRUE WHERE id = $1`, testdata.IVRFlow.ID)
+
+	models.FlushCache()
+
+	oa, err := models.GetOrgAssets(ctx, rt, testdata.Org1.ID)
+	require.NoError(t, err)
+
+	var keywordTrigger, catchallTrigger *models.Trigger
+	for _, tr := range oa.Triggers() {
+		switch tr.TriggerType() {
+		case models.KeywordTriggerType:
+			keywordTrigger = tr
+		case models.CatchallTriggerType:
+			catchallTrigger = tr
+		}
+	}
+	require.NotNil(t, keywordTrigger, "expected a keyword trigger")
+	require.NotNil(t, catchallTrigger, "expected a catchall trigger")
+
+	activeFlow, err := oa.FlowByID(testdata.Favorites.ID)
+	require.NoError(t, err)
+
+	ignoringFlow, err := oa.FlowByID(testdata.IVRFlow.ID)
+	require.NoError(t, err)
+	require.True(t, ignoringFlow.IgnoreTriggers(), "IVRFlow should have ignore_triggers=true after DB update")
+
+	tests := []struct {
+		description string
+		trigger     *models.Trigger
+		flow        *models.Flow
+		isBrain     bool
+		expected    bool
+	}{
+		{"nil trigger always returns false", nil, nil, false, false},
+		{"brain active suppresses any trigger", keywordTrigger, nil, true, false},
+		{"keyword trigger with no active session flow", keywordTrigger, nil, false, true},
+		{"keyword trigger, active flow not ignoring triggers", keywordTrigger, activeFlow, false, true},
+		{"keyword trigger, active flow ignoring triggers", keywordTrigger, ignoringFlow, false, false},
+		{"catchall trigger with no active session flow", catchallTrigger, nil, false, true},
+		{"catchall trigger does not interrupt an active session", catchallTrigger, activeFlow, false, false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.description, func(t *testing.T) {
+			assert.Equal(t, tt.expected, shouldFireTrigger(tt.trigger, tt.flow, tt.isBrain))
+		})
+	}
+}
+
 func TestRequestToRouter(t *testing.T) {
 	ctx, rt, db, _ := testsuite.Get()
 	defer testsuite.Reset(testsuite.ResetAll)
