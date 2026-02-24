@@ -186,21 +186,26 @@ func (mr *Mailroom) Start() error {
 		log.Info("rabbitmq ok")
 	}
 
-	sqsConfig := sqs.ClientConfig{
-		Region: c.SqsRegion,
-	}
-	if c.SqsEndpoint != "" {
-		sqsConfig.Endpoint = c.SqsEndpoint
-	}
-	if c.SqsAccessKeyID != "" && c.SqsSecretAccessKey != "" {
-		sqsConfig.AccessKeyID = c.SqsAccessKeyID
-		sqsConfig.SecretAccessKey = c.SqsSecretAccessKey
-	}
-	mr.rt.SQS, err = sqs.New(sqsConfig)
-	if err != nil {
-		log.WithError(err).Error("sqs not available")
+	if c.SqsPublishEnabled {
+		sqsConfig := sqs.ClientConfig{
+			Region: c.SqsRegion,
+		}
+		if c.SqsEndpoint != "" {
+			sqsConfig.Endpoint = c.SqsEndpoint
+		}
+		if c.SqsAccessKeyID != "" && c.SqsSecretAccessKey != "" {
+			sqsConfig.AccessKeyID = c.SqsAccessKeyID
+			sqsConfig.SecretAccessKey = c.SqsSecretAccessKey
+		}
+		mr.rt.SQS, err = sqs.New(sqsConfig)
+		if err != nil {
+			log.WithError(err).Error("sqs not available")
+		} else {
+			log.Info("sqs ok")
+		}
 	} else {
-		log.Info("sqs ok")
+		log.Info("sqs publish is not enabled, skipping sqs initialization")
+		mr.rt.SQS = nil
 	}
 
 	for _, initFunc := range initFunctions {

@@ -737,6 +737,10 @@ func newOutgoingMsgWpp(rt *runtime.Runtime, org *Org, channel *Channel, contactI
 			metadata["interaction_type"] = msgWpp.InteractionType()
 			metadata["order_details_message"] = msgWpp.OrderDetailsMessage()
 		}
+		if len(msgWpp.Cards()) > 0 {
+			metadata["interaction_type"] = "carousel"
+			metadata["carousel"] = msgWpp.Cards()
+		}
 		if len(msgWpp.Buttons()) > 0 {
 			metadata["buttons"] = msgWpp.Buttons()
 		}
@@ -1710,6 +1714,7 @@ type WppBroadcastMessage struct {
 	FlowMessage      flows.FlowMessage         `json:"flow_message,omitempty"`
 	ListMessage      flows.ListMessage         `json:"list_message,omitempty"`
 	CTAMessage       flows.CTAMessage          `json:"cta_message,omitempty"`
+	CarouselMessage  []flows.CarouselMessage   `json:"carousel,omitempty"`
 	Buttons          []flows.ButtonComponent   `json:"buttons,omitempty"`
 	CatalogMessage   BroadcastCatalogMessage   `json:"catalog_message,omitempty"`
 	ActionExternalID string                    `json:"action_external_id,omitempty"`
@@ -1902,6 +1907,7 @@ func CreateWppBroadcastMessages(ctx context.Context, rt *runtime.Runtime, oa *Or
 		listMessage := bcast.Msg().ListMessage
 		flowMessage := bcast.Msg().FlowMessage
 		orderDetails := bcast.Msg().OrderDetails
+		carouselMessage := bcast.Msg().CarouselMessage
 
 		products := bcast.Msg().CatalogMessage.Products
 		actionButtonText := bcast.Msg().CatalogMessage.ActionButtonText
@@ -2071,6 +2077,7 @@ func CreateWppBroadcastMessages(ctx context.Context, rt *runtime.Runtime, oa *Or
 			sendCatalog,
 			actionType,
 			actionExternalID,
+			carouselMessage,
 		)
 
 		extraMetadata := map[string]interface{}{}
