@@ -154,6 +154,35 @@ func TestMsgWppCreated(t *testing.T) {
 						true,
 					),
 				},
+				testdata.Cathy: []flows.Action{
+					actions.NewSendWppMsg(
+						handlers.NewActionUUID(),
+						"text", "Hi", "", "Hi there.", "footer",
+						[]flows.ListItems{},
+						"",
+						nil,
+						"carousel",
+						"",
+						"",
+						nil,
+						"",
+						"",
+						nil,
+						flows.CarouselMessage{
+							Body: "Carousel card body",
+							Buttons: []flows.CarouselButton{
+								{
+									SubType: "quick_reply",
+									Parameters: map[string]interface{}{
+										"id":    "btn_1",
+										"title": "Click me",
+									},
+								},
+							},
+						},
+						true,
+					),
+				},
 			},
 			Msgs: handlers.ContactMsgMap{
 				testdata.Cathy: msg1,
@@ -172,6 +201,11 @@ func TestMsgWppCreated(t *testing.T) {
 				{
 					SQL:   "SELECT COUNT(*) FROM msgs_msg WHERE contact_id=$1 AND STATUS = 'F' AND failed_reason = 'D';",
 					Args:  []interface{}{testdata.Bob.ID},
+					Count: 1,
+				},
+				{
+					SQL:   "SELECT COUNT(*) FROM msgs_msg WHERE text='Carousel message' AND contact_id = $1 AND status = 'Q' AND metadata::jsonb->>'interaction_type' = 'carousel'",
+					Args:  []interface{}{testdata.Cathy.ID},
 					Count: 1,
 				},
 			},
