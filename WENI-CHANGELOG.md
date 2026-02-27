@@ -1,3 +1,7 @@
+1.81.0
+----------
+ * feat: Add CarouselMessage support in WppBroadcastMessage
+
 1.80.0
 ----------
  * feat: sqs worker, producer and publish ticket events
