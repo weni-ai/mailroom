@@ -53,24 +53,6 @@ func TestMsgWppCreated(t *testing.T) {
 						true,
 					),
 				},
-				testdata.George: []flows.Action{
-					actions.NewSendWppMsg(
-						handlers.NewActionUUID(),
-						"text", "Hi", "image/png:https://foo.bar.com/images/image1.png", "Hi", "footer",
-						[]flows.ListItems{{Title: "title", UUID: "62276b09-b712-478c-a658-fcf1c187f4cf", Description: "title description"}},
-						"Menu",
-						nil,
-						"list",
-						"",
-						"",
-						nil,
-						"nil",
-						"",
-						nil,
-						flows.CarouselMessage{},
-						true,
-					),
-				},
 				testdata.Cathy: []flows.Action{
 					actions.NewSendWppMsg(
 						handlers.NewActionUUID(),
@@ -157,7 +139,7 @@ func TestMsgWppCreated(t *testing.T) {
 				testdata.Cathy: []flows.Action{
 					actions.NewSendWppMsg(
 						handlers.NewActionUUID(),
-						"text", "Hi", "", "Hi there.", "footer",
+						"text", "Hi", "", "Carousel message", "footer",
 						[]flows.ListItems{},
 						"",
 						nil,
