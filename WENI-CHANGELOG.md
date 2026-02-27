@@ -1,3 +1,7 @@
+1.81.1
+----------
+ * feat: refactor handleMsgEvent
+
 1.81.0
 ----------
  * feat: Add CarouselMessage support in WppBroadcastMessage
