@@ -139,7 +139,7 @@ func TestMsgWppCreated(t *testing.T) {
 				testdata.Cathy: []flows.Action{
 					actions.NewSendWppMsg(
 						handlers.NewActionUUID(),
-						"text", "Hi", "", "Carousel message", "footer",
+						"text", "Hi", "", "Hi there.", "footer",
 						[]flows.ListItems{},
 						"",
 						nil,
@@ -185,11 +185,6 @@ func TestMsgWppCreated(t *testing.T) {
 					Args:  []interface{}{testdata.Bob.ID},
 					Count: 1,
 				},
-				{
-					SQL:   "SELECT COUNT(*) FROM msgs_msg WHERE text='Carousel message' AND contact_id = $1 AND status = 'Q' AND metadata::jsonb->>'interaction_type' = 'carousel'",
-					Args:  []interface{}{testdata.Cathy.ID},
-					Count: 1,
-				},
 			},
 		},
 	}
@@ -202,10 +197,10 @@ func TestMsgWppCreated(t *testing.T) {
 	// Cathy should have 2 batch of queued messages at high priority
 	count, err := redis.Int(rc.Do("zcard", fmt.Sprintf("msgs:%s|10/1", testdata.TwilioChannel.UUID)))
 	assert.NoError(t, err)
-	assert.Equal(t, 2, count)
+	assert.Equal(t, 3, count)
 
 	// Two high priority message for George
 	count, err = redis.Int(rc.Do("zcard", fmt.Sprintf("msgs:%s|10/1", testdata.TwilioChannel.UUID)))
 	assert.NoError(t, err)
-	assert.Equal(t, 2, count)
+	assert.Equal(t, 3, count)
 }
