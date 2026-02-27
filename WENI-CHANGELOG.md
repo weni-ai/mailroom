@@ -1,3 +1,19 @@
+1.81.0
+----------
+ * feat: Add CarouselMessage support in WppBroadcastMessage
+
+1.80.1
+----------
+ * chore: update goflow 1.18.2
+
+1.80.0
+----------
+ * feat: sqs worker, producer and publish ticket events
+
+1.79.0
+----------
+ * feat: persist queue name on msg metadata on create msg
+
 1.78.1
 ----------
  * chore: update goflow 1.18.1

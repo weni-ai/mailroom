@@ -5,6 +5,7 @@ import (
 	"github.com/jmoiron/sqlx"
 	"github.com/nyaruka/gocommon/storage"
 	"github.com/nyaruka/mailroom/runtime/rmq"
+	"github.com/nyaruka/mailroom/runtime/sqs"
 	"github.com/olivere/elastic/v7"
 )
 
@@ -20,4 +21,5 @@ type Runtime struct {
 	Config         *Config
 	IRP            *redis.Pool
 	Rabbitmq       *rmq.Client
+	SQS            *sqs.Client
 }

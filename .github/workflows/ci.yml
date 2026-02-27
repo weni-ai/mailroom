@@ -73,6 +73,11 @@ jobs:
       run: |
         export PGPASSWORD=temba
         go test -p=1 -coverprofile=coverage.text -covermode=atomic ./...
+      env:
+        TEST_SQS_SQSTEST: 1
+        AWS_ACCESS_KEY_ID: 'test'
+        AWS_SECRET_ACCESS_KEY: 'test'
+        AWS_DEFAULT_REGION: 'us-east-1'
 
     - name: Upload coverage
       if: success()
