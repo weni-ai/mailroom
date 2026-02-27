@@ -1,3 +1,7 @@
+1.81.0
+----------
+ * feat: Add CarouselMessage support in WppBroadcastMessage
+
 1.80.1
 ----------
  * chore: update goflow 1.18.2
