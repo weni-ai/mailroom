@@ -550,51 +550,15 @@ func handleMsgEvent(ctx context.Context, rt *runtime.Runtime, event *MsgEvent) e
 	// track if we need to recalculate dynamic groups (due to field changes or new contact)
 	recalculateDynamicGroups := false
 
-	// if we have new contact fields, create the contact field update modifiers and apply them
+	// if we have new contact fields, apply them and reload the contact
 	if event.NewContactFields != nil {
-
-		// create our field modifiers
-		fieldModifiers := make([]flows.Modifier, 0, len(event.NewContactFields))
-		for key, value := range event.NewContactFields {
-			field := oa.SessionAssets().Fields().Get(key)
-			if field == nil {
-				logrus.WithField("key", key).Error("unknown contact field")
-				continue
-			}
-			fieldModifiers = append(fieldModifiers, modifiers.NewField(field, value))
-		}
-
-		// apply our field modifiers
-		if len(fieldModifiers) > 0 {
-			modifiersByContact := map[*flows.Contact][]flows.Modifier{contact: fieldModifiers}
-			_, err = models.ApplyModifiers(ctx, rt, oa, modifiersByContact)
-			if err != nil {
-				return errors.Wrapf(err, "error applying contact field modifiers")
-			}
-
-			// field changes may affect dynamic group membership
-			recalculateDynamicGroups = true
-		}
-
-		// reload our contact from write DB to ensure we see the changes we just made
-		contacts, err = models.LoadContacts(ctx, rt.DB, oa, []models.ContactID{event.ContactID})
+		modelContact, contact, recalculateDynamicGroups, err = applyContactFieldModifiers(ctx, rt, oa, event, contact, topupID)
 		if err != nil {
-			return errors.Wrapf(err, "error loading contact after updating fields")
+			return err
 		}
-
-		// contact has been deleted, ignore this message but mark it as handled
-		if len(contacts) == 0 {
-			err := models.UpdateMessage(ctx, rt.DB, event.MsgID, models.MsgStatusHandled, models.VisibilityArchived, models.MsgTypeInbox, topupID)
-			if err != nil {
-				return errors.Wrapf(err, "error updating message for deleted contact after updating fields")
-			}
+		// contact was deleted after field update, message already marked as handled
+		if modelContact == nil {
 			return nil
-		}
-
-		modelContact = contacts[0]
-		contact, err = modelContact.FlowContact(oa)
-		if err != nil {
-			return errors.Wrapf(err, "error creating flow contact after updating fields")
 		}
 	}
 
@@ -654,54 +618,7 @@ func handleMsgEvent(ctx context.Context, rt *runtime.Runtime, event *MsgEvent) e
 	msgIn := flows.NewMsgIn(event.MsgUUID, event.URN, channel.ChannelReference(), event.Text, event.Attachments)
 	msgIn.SetExternalID(string(event.MsgExternalID))
 	msgIn.SetID(event.MsgID)
-	var order *flows.Order
-	var nfmReply *flows.NFMReply
-	var igComment *flows.IGComment
-	var isIGComment bool
-	if event.Metadata != nil {
-		var metadata map[string]interface{}
-		err := json.Unmarshal(event.Metadata, &metadata)
-		if err != nil {
-			log.WithError(err).Error("unable to unmarshal metadata from msg event")
-		}
-		// if metadata has order key set msg order
-		mdValue, isOrder := metadata["order"]
-		if isOrder {
-			asJSON, err := json.Marshal(mdValue)
-			if err != nil {
-				log.WithError(err).Error("unable to marshal metadata from msg event")
-			}
-			err = json.Unmarshal(asJSON, &order)
-			if err != nil {
-				log.WithError(err).Error("unable to unmarshal orderJSON from metadata[\"order\"]")
-			}
-			msgIn.SetOrder(order)
-		}
-		mdValue, isNFMReply := metadata["nfm_reply"]
-		if isNFMReply {
-			asJSON, err := json.Marshal(mdValue)
-			if err != nil {
-				log.WithError(err).Error("unable to marshal metadata from msg event")
-			}
-			err = json.Unmarshal(asJSON, &nfmReply)
-			if err != nil {
-				log.WithError(err).Error("unable to unmarshal orderJSON from metadata[\"nfm_reply\"]")
-			}
-			msgIn.SetNFMReply(nfmReply)
-		}
-		mdValue, isIGComment = metadata["ig_comment"]
-		if isIGComment {
-			asJSON, err := json.Marshal(mdValue)
-			if err != nil {
-				log.WithError(err).Error("unable to marshal metadata from msg event")
-			}
-			err = json.Unmarshal(asJSON, &igComment)
-			if err != nil {
-				log.WithError(err).Error("unable to unmarshal orderJSON from metadata[\"ig_comment\"]")
-			}
-			msgIn.SetIGComment(igComment)
-		}
-	}
+	isIGComment := parseMsgInMetadata(event, msgIn)
 
 	// build our hook to mark a flow message as handled
 	flowMsgHook := func(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, oa *models.OrgAssets, sessions []*models.Session) error {
@@ -715,53 +632,13 @@ func handleMsgEvent(ctx context.Context, rt *runtime.Runtime, event *MsgEvent) e
 	}
 
 	// check whether it is to direct to the brain or not
-	isBrain := false
-	if oa.Org().BrainOn() && !isIGComment {
-		isBrain = true
-	}
+	isBrain := oa.Org().BrainOn() && !isIGComment
 
 	// we found a trigger and their session is nil or doesn't ignore keywords
-	if ((trigger != nil && trigger.TriggerType() != models.CatchallTriggerType && (flow == nil || !flow.IgnoreTriggers())) ||
-		(trigger != nil && trigger.TriggerType() == models.CatchallTriggerType && (flow == nil))) && !isBrain {
-		// load our flow
-		flow, err := oa.FlowByID(trigger.FlowID())
-		if err != nil && err != models.ErrNotFound {
-			return errors.Wrapf(err, "error loading flow for trigger")
-		}
-
-		// trigger flow is still active, start it
-		if flow != nil {
-			// if this is an IVR flow, we need to trigger that start (which happens in a different queue)
-			if flow.FlowType() == models.FlowTypeVoice {
-				ivrMsgHook := func(ctx context.Context, tx *sqlx.Tx) error {
-					return markMsgHandled(ctx, tx, contact, msgIn, models.MsgTypeFlow, topupID, tickets)
-				}
-				err = runner.TriggerIVRFlow(ctx, rt, oa.OrgID(), flow.ID(), []models.ContactID{modelContact.ID()}, ivrMsgHook)
-				if err != nil {
-					return errors.Wrapf(err, "error while triggering ivr flow")
-				}
-				return nil
-			}
-
-			// otherwise build the trigger and start the flow directly
-			trigger := triggers.NewBuilder(oa.Env(), flow.FlowReference(), contact).Msg(msgIn).WithMatch(trigger.Match())
-
-			if event.Metadata != nil {
-				var params *types.XObject
-				params, err = types.ReadXObject(event.Metadata)
-				if err != nil {
-					log.WithError(err).Error("unable to marshal metadata from msg event")
-				}
-
-				trigger.WithParams(params)
-			}
-			triggerBuild := trigger.Build()
-
-			_, err = runner.StartFlowForContacts(ctx, rt, oa, flow, []flows.Trigger{triggerBuild}, flowMsgHook, true)
-			if err != nil {
-				return errors.Wrapf(err, "error starting flow for contact")
-			}
-			return nil
+	if shouldFireTrigger(trigger, flow, isBrain) {
+		fired, err := handleTriggerFlow(ctx, rt, oa, contact, modelContact, trigger, event, msgIn, topupID, tickets, flowMsgHook)
+		if err != nil || fired {
+			return err
 		}
 	}
 
@@ -776,32 +653,9 @@ func handleMsgEvent(ctx context.Context, rt *runtime.Runtime, event *MsgEvent) e
 	}
 
 	if isBrain && len(tickets) == 0 {
-		db := rt.ReadonlyDB
-		var projectUUID uuids.UUID
-		err := db.GetContext(ctx, &projectUUID, `SELECT project_uuid FROM internal_project WHERE org_ptr_id = $1;`, oa.OrgID())
-		if err != nil && err != sql.ErrNoRows {
-			return errors.Wrapf(err, "error when searching for project uuid with org id %d", oa.OrgID())
+		if err := handleBrainRouting(ctx, rt, oa, contact, event, channel, topupID); err != nil {
+			return err
 		}
-
-		if err == sql.ErrNoRows {
-			return fmt.Errorf("no project uuid found")
-		}
-
-		err = requestToRouter(event, rt.Config, contact, projectUUID, channel)
-		if err != nil {
-			return errors.Wrap(err, "unable to send message to router")
-		}
-
-		err = models.UpdateMessage(ctx, rt.DB, event.MsgID, models.MsgStatusHandled, models.VisibilityVisible, models.MsgTypeInbox, topupID)
-		if err != nil {
-			return errors.Wrapf(err, "error marking message as handled")
-		}
-
-		err = models.CalculateDynamicGroups(ctx, rt.DB, oa, []*flows.Contact{contact})
-		if err != nil {
-			logrus.WithError(err).Error("error calculating dynamic groups")
-		}
-
 	}
 
 	// this message didn't trigger and new sessions or resume any existing ones, so handle as inbox
@@ -811,6 +665,219 @@ func handleMsgEvent(ctx context.Context, rt *runtime.Runtime, event *MsgEvent) e
 	}
 
 	return nil
+}
+
+// handleBrainRouting sends the incoming message to the external router (brain) when BrainOn is
+// active and the contact has no open tickets. It marks the message as handled and recalculates
+// dynamic groups. Errors from group recalculation are logged but not returned.
+func handleBrainRouting(
+	ctx context.Context,
+	rt *runtime.Runtime,
+	oa *models.OrgAssets,
+	contact *flows.Contact,
+	event *MsgEvent,
+	channel *models.Channel,
+	topupID models.TopupID,
+) error {
+	var projectUUID uuids.UUID
+	err := rt.ReadonlyDB.GetContext(ctx, &projectUUID, `SELECT project_uuid FROM internal_project WHERE org_ptr_id = $1;`, oa.OrgID())
+	if err != nil && err != sql.ErrNoRows {
+		return errors.Wrapf(err, "error when searching for project uuid with org id %d", oa.OrgID())
+	}
+	if err == sql.ErrNoRows {
+		return fmt.Errorf("no project uuid found")
+	}
+
+	if err = requestToRouter(event, rt.Config, contact, projectUUID, channel); err != nil {
+		return errors.Wrap(err, "unable to send message to router")
+	}
+
+	if err = models.UpdateMessage(ctx, rt.DB, event.MsgID, models.MsgStatusHandled, models.VisibilityVisible, models.MsgTypeInbox, topupID); err != nil {
+		return errors.Wrapf(err, "error marking message as handled")
+	}
+
+	if err = models.CalculateDynamicGroups(ctx, rt.DB, oa, []*flows.Contact{contact}); err != nil {
+		logrus.WithError(err).Error("error calculating dynamic groups")
+	}
+
+	return nil
+}
+
+// handleTriggerFlow loads and starts the flow associated with a matched trigger.
+// Returns (true, nil) when processing is complete (flow started or not found after load),
+// (true, err) on error, or (false, nil) when the trigger's flow was deleted and processing
+// should continue to the next handler (session resume, brain, inbox).
+func handleTriggerFlow(
+	ctx context.Context,
+	rt *runtime.Runtime,
+	oa *models.OrgAssets,
+	contact *flows.Contact,
+	modelContact *models.Contact,
+	matchedTrigger *models.Trigger,
+	event *MsgEvent,
+	msgIn *flows.MsgIn,
+	topupID models.TopupID,
+	tickets []*models.Ticket,
+	flowMsgHook models.SessionCommitHook,
+) (bool, error) {
+	flow, err := oa.FlowByID(matchedTrigger.FlowID())
+	if err != nil && err != models.ErrNotFound {
+		return true, errors.Wrapf(err, "error loading flow for trigger")
+	}
+
+	// trigger flow has been deleted, fall through to next handler
+	if flow == nil {
+		return false, nil
+	}
+
+	// IVR flows are started via a separate queue
+	if flow.FlowType() == models.FlowTypeVoice {
+		ivrMsgHook := func(ctx context.Context, tx *sqlx.Tx) error {
+			return markMsgHandled(ctx, tx, contact, msgIn, models.MsgTypeFlow, topupID, tickets)
+		}
+		err = runner.TriggerIVRFlow(ctx, rt, oa.OrgID(), flow.ID(), []models.ContactID{modelContact.ID()}, ivrMsgHook)
+		if err != nil {
+			return true, errors.Wrapf(err, "error while triggering ivr flow")
+		}
+		return true, nil
+	}
+
+	// build the trigger and start the flow directly
+	tb := triggers.NewBuilder(oa.Env(), flow.FlowReference(), contact).Msg(msgIn).WithMatch(matchedTrigger.Match())
+	if event.Metadata != nil {
+		var params *types.XObject
+		params, err = types.ReadXObject(event.Metadata)
+		if err != nil {
+			log.WithError(err).Error("unable to marshal metadata from msg event")
+		}
+		tb.WithParams(params)
+	}
+
+	_, err = runner.StartFlowForContacts(ctx, rt, oa, flow, []flows.Trigger{tb.Build()}, flowMsgHook, true)
+	if err != nil {
+		return true, errors.Wrapf(err, "error starting flow for contact")
+	}
+	return true, nil
+}
+
+// shouldFireTrigger reports whether a matching trigger should start a new flow, taking into account
+// the current session's flow (if any) and whether the brain routing is active.
+func shouldFireTrigger(trigger *models.Trigger, flow *models.Flow, isBrain bool) bool {
+	if isBrain || trigger == nil {
+		return false
+	}
+	if trigger.TriggerType() == models.CatchallTriggerType {
+		return flow == nil
+	}
+	return flow == nil || !flow.IgnoreTriggers()
+}
+
+// applyContactFieldModifiers creates and applies field modifiers from the event's new contact fields.
+// It reloads the contact from the write DB afterward to ensure consistency.
+// Returns nil modelContact (with nil error) if the contact was deleted after the update — in that
+// case the incoming message has already been marked as handled.
+func applyContactFieldModifiers(
+	ctx context.Context,
+	rt *runtime.Runtime,
+	oa *models.OrgAssets,
+	event *MsgEvent,
+	contact *flows.Contact,
+	topupID models.TopupID,
+) (*models.Contact, *flows.Contact, bool, error) {
+	fieldModifiers := make([]flows.Modifier, 0, len(event.NewContactFields))
+	for key, value := range event.NewContactFields {
+		field := oa.SessionAssets().Fields().Get(key)
+		if field == nil {
+			logrus.WithField("key", key).Error("unknown contact field")
+			continue
+		}
+		fieldModifiers = append(fieldModifiers, modifiers.NewField(field, value))
+	}
+
+	recalculateDynamicGroups := false
+	if len(fieldModifiers) > 0 {
+		modifiersByContact := map[*flows.Contact][]flows.Modifier{contact: fieldModifiers}
+		_, err := models.ApplyModifiers(ctx, rt, oa, modifiersByContact)
+		if err != nil {
+			return nil, nil, false, errors.Wrapf(err, "error applying contact field modifiers")
+		}
+		// field changes may affect dynamic group membership
+		recalculateDynamicGroups = true
+	}
+
+	// reload from write DB to ensure we see the changes we just made
+	contacts, err := models.LoadContacts(ctx, rt.DB, oa, []models.ContactID{event.ContactID})
+	if err != nil {
+		return nil, nil, false, errors.Wrapf(err, "error loading contact after updating fields")
+	}
+
+	// contact has been deleted, mark message as handled
+	if len(contacts) == 0 {
+		err := models.UpdateMessage(ctx, rt.DB, event.MsgID, models.MsgStatusHandled, models.VisibilityArchived, models.MsgTypeInbox, topupID)
+		if err != nil {
+			return nil, nil, false, errors.Wrapf(err, "error updating message for deleted contact after updating fields")
+		}
+		return nil, nil, false, nil
+	}
+
+	modelContact := contacts[0]
+	updatedContact, err := modelContact.FlowContact(oa)
+	if err != nil {
+		return nil, nil, false, errors.Wrapf(err, "error creating flow contact after updating fields")
+	}
+
+	return modelContact, updatedContact, recalculateDynamicGroups, nil
+}
+
+// parseMsgInMetadata populates msgIn with structured data (order, nfm_reply, ig_comment) parsed
+// from the event metadata. Errors are logged but not returned, preserving the original lenient
+// behaviour. Returns whether the message is an Instagram comment.
+func parseMsgInMetadata(event *MsgEvent, msgIn *flows.MsgIn) (isIGComment bool) {
+	if event.Metadata == nil {
+		return false
+	}
+
+	var metadata map[string]interface{}
+	if err := json.Unmarshal(event.Metadata, &metadata); err != nil {
+		log.WithError(err).Error("unable to unmarshal metadata from msg event")
+		return false
+	}
+
+	if mdValue, ok := metadata["order"]; ok {
+		var order *flows.Order
+		if asJSON, err := json.Marshal(mdValue); err != nil {
+			log.WithError(err).Error("unable to marshal metadata from msg event")
+		} else if err = json.Unmarshal(asJSON, &order); err != nil {
+			log.WithError(err).Error("unable to unmarshal orderJSON from metadata[\"order\"]")
+		} else {
+			msgIn.SetOrder(order)
+		}
+	}
+
+	if mdValue, ok := metadata["nfm_reply"]; ok {
+		var nfmReply *flows.NFMReply
+		if asJSON, err := json.Marshal(mdValue); err != nil {
+			log.WithError(err).Error("unable to marshal metadata from msg event")
+		} else if err = json.Unmarshal(asJSON, &nfmReply); err != nil {
+			log.WithError(err).Error("unable to unmarshal orderJSON from metadata[\"nfm_reply\"]")
+		} else {
+			msgIn.SetNFMReply(nfmReply)
+		}
+	}
+
+	if mdValue, ok := metadata["ig_comment"]; ok {
+		var igComment *flows.IGComment
+		if asJSON, err := json.Marshal(mdValue); err != nil {
+			log.WithError(err).Error("unable to marshal metadata from msg event")
+		} else if err = json.Unmarshal(asJSON, &igComment); err != nil {
+			log.WithError(err).Error("unable to unmarshal orderJSON from metadata[\"ig_comment\"]")
+		} else {
+			msgIn.SetIGComment(igComment)
+			isIGComment = true
+		}
+	}
+
+	return isIGComment
 }
 
 func handleTicketEvent(ctx context.Context, rt *runtime.Runtime, event *models.TicketEvent) error {
