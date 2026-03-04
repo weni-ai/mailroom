@@ -1070,6 +1070,18 @@ func requestToRouter(event *MsgEvent, rtConfig *runtime.Config, contact *flows.C
 		streamSupport = true
 	}
 
+	preview := false
+
+	if event.Metadata != nil {
+		var metadata map[string]interface{}
+		if err := json.Unmarshal(event.Metadata, &metadata); err != nil {
+			return err
+		}
+		if previewFlag, ok := metadata["preview"].(bool); ok {
+			preview = previewFlag
+		}
+	}
+
 	body := struct {
 		ProjectUUID   uuids.UUID             `json:"project_uuid"`
 		ContactURN    urns.URN               `json:"contact_urn"`
@@ -1082,6 +1094,7 @@ func requestToRouter(event *MsgEvent, rtConfig *runtime.Config, contact *flows.C
 		ChannelType   string                 `json:"channel_type"`
 		ContactName   string                 `json:"contact_name"`
 		StreamSupport bool                   `json:"stream_support"`
+		Preview       bool                   `json:"preview"`
 	}{
 		ProjectUUID:   projectUUID,
 		ContactURN:    event.URN.Identity(),
@@ -1094,6 +1107,7 @@ func requestToRouter(event *MsgEvent, rtConfig *runtime.Config, contact *flows.C
 		ChannelType:   string(channel.Type()),
 		ContactName:   contact.Name(),
 		StreamSupport: streamSupport,
+		Preview:       preview,
 	}
 
 	var b io.Reader
