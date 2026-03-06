@@ -1070,6 +1070,11 @@ func requestToRouter(event *MsgEvent, rtConfig *runtime.Config, contact *flows.C
 		streamSupport = true
 	}
 
+	webchatPview := false
+	if fmt.Sprint(channel.Config()["preview"]) == "true" {
+		webchatPview = true
+	}
+
 	body := struct {
 		ProjectUUID   uuids.UUID             `json:"project_uuid"`
 		ContactURN    urns.URN               `json:"contact_urn"`
@@ -1082,6 +1087,7 @@ func requestToRouter(event *MsgEvent, rtConfig *runtime.Config, contact *flows.C
 		ChannelType   string                 `json:"channel_type"`
 		ContactName   string                 `json:"contact_name"`
 		StreamSupport bool                   `json:"stream_support"`
+		Preview       bool                   `json:"preview"`
 	}{
 		ProjectUUID:   projectUUID,
 		ContactURN:    event.URN.Identity(),
@@ -1094,6 +1100,7 @@ func requestToRouter(event *MsgEvent, rtConfig *runtime.Config, contact *flows.C
 		ChannelType:   string(channel.Type()),
 		ContactName:   contact.Name(),
 		StreamSupport: streamSupport,
+		Preview:       webchatPview,
 	}
 
 	var b io.Reader
