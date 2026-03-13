@@ -1,3 +1,7 @@
+1.82.0
+----------
+ * chore: update goflow dependency to version v1.19.1
+
 1.81.1
 ----------
  * feat: refactor handleMsgEvent
