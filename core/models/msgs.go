@@ -785,6 +785,13 @@ func newOutgoingMsgWpp(rt *runtime.Runtime, org *Org, channel *Channel, contactI
 			metadata["action_external_id"] = msgWpp.ActionExternalID()
 		}
 
+		if msgWpp.DirectSend() {
+			metadata["direct_send"] = true
+		}
+		if msgWpp.TTLSeconds() != 0 {
+			metadata["ttl_seconds"] = msgWpp.TTLSeconds()
+		}
+
 		m.Metadata = null.NewMap(metadata)
 	}
 
@@ -1719,6 +1726,8 @@ type WppBroadcastMessage struct {
 	CatalogMessage   BroadcastCatalogMessage   `json:"catalog_message,omitempty"`
 	ActionExternalID string                    `json:"action_external_id,omitempty"`
 	ActionType       string                    `json:"action_type,omitempty"`
+	DirectSend       bool                      `json:"direct_send,omitempty"`
+	TTLSeconds       int                       `json:"ttl_seconds,omitempty"`
 }
 
 type WppBroadcast struct {
@@ -1902,6 +1911,8 @@ func CreateWppBroadcastMessages(ctx context.Context, rt *runtime.Runtime, oa *Or
 		templateIsCarousel := bcast.Msg().Template.IsCarousel
 		templateCarousel := make([]flows.CarouselCard, len(bcast.Msg().Template.Carousel))
 		copy(templateCarousel, bcast.Msg().Template.Carousel)
+		directSend := bcast.Msg().DirectSend
+		ttlSeconds := bcast.Msg().TTLSeconds
 
 		ctaMessage := bcast.Msg().CTAMessage
 		listMessage := bcast.Msg().ListMessage
@@ -2078,6 +2089,8 @@ func CreateWppBroadcastMessages(ctx context.Context, rt *runtime.Runtime, oa *Or
 			actionType,
 			actionExternalID,
 			carouselMessage,
+			directSend,
+			ttlSeconds,
 		)
 
 		extraMetadata := map[string]interface{}{}
