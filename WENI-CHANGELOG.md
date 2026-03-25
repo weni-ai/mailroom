@@ -1,3 +1,7 @@
+1.83.0
+----------
+ * chore: update goflow dependency to version v1.20.0 and add direct_send and ttl_seconds fields to WppBroadcastMessage
+
 1.82.0
 ----------
  * chore: update goflow dependency to version v1.19.1
