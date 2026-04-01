@@ -75,13 +75,17 @@ func handleTicketOpened(ctx context.Context, rt *runtime.Runtime, tx *sqlx.Tx, o
 		CreatedOn:    event.CreatedOn(),
 	})
 
-	sqsPublishers.PublishTicketCreated(rt, oa.OrgID(), sqsPublishers.TicketSQSMessage{
-		TicketUUID:  uuids.UUID(ticket.UUID()),
-		ContactURN:  scene.Contact().PreferredURN().URN().Identity(),
-		ProjectUUID: oa.Org().ProjectUUID(),
-		ChannelUUID: uuids.UUID(scene.Session().Contact().PreferredChannel().UUID()),
-		CreatedOn:   event.CreatedOn(),
-	})
+	// is ab2 if is_multi_agents is true
+	isMultiAgents := oa.Org().ConfigValue("is_multi_agents", "false")
+	if isMultiAgents == "true" {
+		sqsPublishers.PublishTicketCreated(rt, oa.OrgID(), sqsPublishers.TicketSQSMessage{
+			TicketUUID:  uuids.UUID(ticket.UUID()),
+			ContactURN:  scene.Contact().PreferredURN().URN().Identity(),
+			ProjectUUID: oa.Org().ProjectUUID(),
+			ChannelUUID: uuids.UUID(scene.Session().Contact().PreferredChannel().UUID()),
+			CreatedOn:   event.CreatedOn(),
+		})
+	}
 
 	logrus.WithFields(logrus.Fields{
 		"contact_uuid":  scene.ContactUUID(),
