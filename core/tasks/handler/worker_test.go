@@ -9,6 +9,7 @@ import (
 
 	"github.com/nyaruka/gocommon/urns"
 	"github.com/nyaruka/gocommon/uuids"
+	"github.com/nyaruka/goflow/assets"
 	"github.com/nyaruka/goflow/envs"
 	"github.com/nyaruka/goflow/flows"
 	"github.com/nyaruka/mailroom/core/models"
@@ -276,4 +277,175 @@ func TestRequestToRouter(t *testing.T) {
 	assert.Equal(t, event.URNID, msgEvent.URNID)
 	assert.Equal(t, event.Text, msgEvent.Text)
 	assert.JSONEq(t, string(metadata), string(msgEvent.Metadata))
+}
+
+func TestApplyContactFieldModifiers(t *testing.T) {
+	ctx, rt, db, _ := testsuite.Get()
+	defer testsuite.Reset(testsuite.ResetAll)
+
+	oa, err := models.GetOrgAssetsWithRefresh(ctx, rt, testdata.Org1.ID, models.RefreshAll)
+	require.NoError(t, err)
+
+	_, flowContact := testdata.Cathy.Load(db, oa)
+
+	msg := testdata.InsertIncomingMsg(db, testdata.Org1, testdata.TwilioChannel, testdata.Cathy, "hello", models.MsgStatusPending)
+
+	t.Run("existing field applies normally", func(t *testing.T) {
+		event := &MsgEvent{
+			ContactID:        testdata.Cathy.ID,
+			OrgID:            testdata.Org1.ID,
+			MsgID:            msg.ID(),
+			MsgUUID:          flows.MsgUUID(uuids.New()),
+			NewContactFields: map[string]string{"gender": "Female"},
+		}
+
+		modelContact, updatedContact, recalcGroups, err := applyContactFieldModifiers(ctx, rt, oa, event, flowContact, models.NilTopupID)
+		require.NoError(t, err)
+		require.NotNil(t, modelContact)
+		require.NotNil(t, updatedContact)
+		assert.True(t, recalcGroups)
+	})
+
+	t.Run("unknown non-whitelisted field is skipped", func(t *testing.T) {
+		event := &MsgEvent{
+			ContactID:        testdata.Cathy.ID,
+			OrgID:            testdata.Org1.ID,
+			MsgID:            msg.ID(),
+			MsgUUID:          flows.MsgUUID(uuids.New()),
+			NewContactFields: map[string]string{"nonexistent_field": "some value"},
+		}
+
+		modelContact, updatedContact, recalcGroups, err := applyContactFieldModifiers(ctx, rt, oa, event, flowContact, models.NilTopupID)
+		require.NoError(t, err)
+		require.NotNil(t, modelContact)
+		require.NotNil(t, updatedContact)
+		assert.False(t, recalcGroups, "no modifiers applied, so no group recalc needed")
+	})
+
+	t.Run("segment field is auto-created and applied", func(t *testing.T) {
+		require.Nil(t, oa.SessionAssets().Fields().Get("segment"), "segment field should not exist yet")
+
+		event := &MsgEvent{
+			ContactID:        testdata.Cathy.ID,
+			OrgID:            testdata.Org1.ID,
+			MsgID:            msg.ID(),
+			MsgUUID:          flows.MsgUUID(uuids.New()),
+			NewContactFields: map[string]string{"segment": "premium"},
+		}
+
+		modelContact, updatedContact, recalcGroups, err := applyContactFieldModifiers(ctx, rt, oa, event, flowContact, models.NilTopupID)
+		require.NoError(t, err)
+		require.NotNil(t, modelContact)
+		require.NotNil(t, updatedContact)
+		assert.True(t, recalcGroups)
+
+		testsuite.AssertQuery(t, db,
+			`SELECT count(*) FROM contacts_contactfield WHERE org_id = $1 AND key = 'segment' AND is_active = TRUE AND value_type = 'T'`,
+			testdata.Org1.ID,
+		).Returns(1)
+
+		refreshedOA, err := models.GetOrgAssetsWithRefresh(ctx, rt, testdata.Org1.ID, models.RefreshFields)
+		require.NoError(t, err)
+		field := refreshedOA.FieldByKey("segment")
+		require.NotNil(t, field)
+		assert.Equal(t, "Segment", field.Name())
+		assert.Equal(t, assets.FieldTypeText, field.Type())
+	})
+
+	t.Run("orderform field is auto-created and applied", func(t *testing.T) {
+		require.Nil(t, oa.SessionAssets().Fields().Get("orderform"), "orderform field should not exist yet")
+
+		event := &MsgEvent{
+			ContactID:        testdata.Cathy.ID,
+			OrgID:            testdata.Org1.ID,
+			MsgID:            msg.ID(),
+			MsgUUID:          flows.MsgUUID(uuids.New()),
+			NewContactFields: map[string]string{"orderform": "order-123"},
+		}
+
+		modelContact, updatedContact, recalcGroups, err := applyContactFieldModifiers(ctx, rt, oa, event, flowContact, models.NilTopupID)
+		require.NoError(t, err)
+		require.NotNil(t, modelContact)
+		require.NotNil(t, updatedContact)
+		assert.True(t, recalcGroups)
+
+		testsuite.AssertQuery(t, db,
+			`SELECT count(*) FROM contacts_contactfield WHERE org_id = $1 AND key = 'orderform' AND is_active = TRUE AND value_type = 'T'`,
+			testdata.Org1.ID,
+		).Returns(1)
+
+		refreshedOA, err := models.GetOrgAssetsWithRefresh(ctx, rt, testdata.Org1.ID, models.RefreshFields)
+		require.NoError(t, err)
+		field := refreshedOA.FieldByKey("orderform")
+		require.NotNil(t, field)
+		assert.Equal(t, "Orderform", field.Name())
+		assert.Equal(t, assets.FieldTypeText, field.Type())
+	})
+
+	t.Run("both whitelisted fields in one event", func(t *testing.T) {
+		db.MustExec(`DELETE FROM contacts_contactfield WHERE org_id = $1 AND key IN ('segment', 'orderform')`, testdata.Org1.ID)
+		models.FlushCache()
+
+		freshOA, err := models.GetOrgAssetsWithRefresh(ctx, rt, testdata.Org1.ID, models.RefreshAll)
+		require.NoError(t, err)
+
+		_, freshContact := testdata.Cathy.Load(db, freshOA)
+
+		event := &MsgEvent{
+			ContactID:        testdata.Cathy.ID,
+			OrgID:            testdata.Org1.ID,
+			MsgID:            msg.ID(),
+			MsgUUID:          flows.MsgUUID(uuids.New()),
+			NewContactFields: map[string]string{"segment": "vip", "orderform": "order-456"},
+		}
+
+		modelContact, updatedContact, recalcGroups, err := applyContactFieldModifiers(ctx, rt, freshOA, event, freshContact, models.NilTopupID)
+		require.NoError(t, err)
+		require.NotNil(t, modelContact)
+		require.NotNil(t, updatedContact)
+		assert.True(t, recalcGroups)
+
+		testsuite.AssertQuery(t, db,
+			`SELECT count(*) FROM contacts_contactfield WHERE org_id = $1 AND key IN ('segment', 'orderform') AND is_active = TRUE`,
+			testdata.Org1.ID,
+		).Returns(2)
+	})
+
+	t.Run("mix of existing, whitelisted, and unknown fields", func(t *testing.T) {
+		db.MustExec(`DELETE FROM contacts_contactfield WHERE org_id = $1 AND key IN ('segment', 'orderform')`, testdata.Org1.ID)
+		models.FlushCache()
+
+		freshOA, err := models.GetOrgAssetsWithRefresh(ctx, rt, testdata.Org1.ID, models.RefreshAll)
+		require.NoError(t, err)
+
+		_, freshContact := testdata.Cathy.Load(db, freshOA)
+
+		event := &MsgEvent{
+			ContactID: testdata.Cathy.ID,
+			OrgID:     testdata.Org1.ID,
+			MsgID:     msg.ID(),
+			MsgUUID:   flows.MsgUUID(uuids.New()),
+			NewContactFields: map[string]string{
+				"gender":      "Male",
+				"segment":     "enterprise",
+				"nonexistent": "ignored",
+			},
+		}
+
+		modelContact, updatedContact, recalcGroups, err := applyContactFieldModifiers(ctx, rt, freshOA, event, freshContact, models.NilTopupID)
+		require.NoError(t, err)
+		require.NotNil(t, modelContact)
+		require.NotNil(t, updatedContact)
+		assert.True(t, recalcGroups, "gender and segment should produce modifiers")
+
+		testsuite.AssertQuery(t, db,
+			`SELECT count(*) FROM contacts_contactfield WHERE org_id = $1 AND key = 'segment' AND is_active = TRUE`,
+			testdata.Org1.ID,
+		).Returns(1)
+
+		testsuite.AssertQuery(t, db,
+			`SELECT count(*) FROM contacts_contactfield WHERE org_id = $1 AND key = 'nonexistent' AND is_active = TRUE`,
+			testdata.Org1.ID,
+		).Returns(0)
+	})
 }
