@@ -106,15 +106,28 @@ ORDER BY
 // GetOrCreateContactField ensures a contact field exists for the given org, creating it as a text
 // field if necessary. If the field was previously soft-deleted, it is reactivated.
 func GetOrCreateContactField(ctx context.Context, db Queryer, orgID OrgID, key string, label string) error {
-	_, err := db.ExecContext(ctx, getOrCreateContactFieldSQL, uuids.New(), key, label, orgID)
+	var exists bool
+	err := db.GetContext(ctx, &exists,
+		`SELECT EXISTS(SELECT 1 FROM contacts_contactfield WHERE org_id = $1 AND key = $2)`,
+		orgID, key)
+	if err != nil {
+		return errors.Wrapf(err, "error checking contact field '%s' for org %d", key, orgID)
+	}
+
+	if exists {
+		_, err = db.ExecContext(ctx,
+			`UPDATE contacts_contactfield SET is_active = TRUE, modified_on = NOW() WHERE org_id = $1 AND key = $2`,
+			orgID, key)
+	} else {
+		_, err = db.ExecContext(ctx, insertContactFieldSQL, uuids.New(), key, label, orgID)
+	}
 	if err != nil {
 		return errors.Wrapf(err, "error creating contact field '%s' for org %d", key, orgID)
 	}
 	return nil
 }
 
-const getOrCreateContactFieldSQL = `
+const insertContactFieldSQL = `
 INSERT INTO contacts_contactfield (uuid, key, label, value_type, field_type, show_in_table, priority, is_active, org_id, created_on, modified_on, created_by_id, modified_by_id)
 VALUES ($1, $2, $3, 'T', 'U', FALSE, 0, TRUE, $4, NOW(), NOW(), 1, 1)
-ON CONFLICT (org_id, key) DO UPDATE SET is_active = TRUE, modified_on = NOW()
 `
