@@ -772,6 +772,12 @@ func shouldFireTrigger(trigger *models.Trigger, flow *models.Flow, isBrain bool)
 	return flow == nil || !flow.IgnoreTriggers()
 }
 
+// fields that should be auto-created when received but not present in the org
+var autoCreateFieldKeys = map[string]string{
+	"segment":   "Segment",
+	"orderform": "Orderform",
+}
+
 // applyContactFieldModifiers creates and applies field modifiers from the event's new contact fields.
 // It reloads the contact from the write DB afterward to ensure consistency.
 // Returns nil modelContact (with nil error) if the contact was deleted after the update — in that
@@ -784,6 +790,30 @@ func applyContactFieldModifiers(
 	contact *flows.Contact,
 	topupID models.TopupID,
 ) (*models.Contact, *flows.Contact, bool, error) {
+	needsRefresh := false
+	for key := range event.NewContactFields {
+		if oa.SessionAssets().Fields().Get(key) != nil {
+			continue
+		}
+		label, ok := autoCreateFieldKeys[key]
+		if !ok {
+			continue
+		}
+		if err := models.GetOrCreateContactField(ctx, rt.DB, oa.OrgID(), key, label); err != nil {
+			logrus.WithField("key", key).WithError(err).Error("error auto-creating contact field")
+			continue
+		}
+		needsRefresh = true
+	}
+
+	if needsRefresh {
+		var err error
+		oa, err = models.GetOrgAssetsWithRefresh(ctx, rt, oa.OrgID(), models.RefreshFields)
+		if err != nil {
+			return nil, nil, false, errors.Wrapf(err, "error refreshing org assets after creating fields")
+		}
+	}
+
 	fieldModifiers := make([]flows.Modifier, 0, len(event.NewContactFields))
 	for key, value := range event.NewContactFields {
 		field := oa.SessionAssets().Fields().Get(key)
