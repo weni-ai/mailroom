@@ -1,3 +1,7 @@
+1.85.0
+----------
+ * feat: implement GetOrCreateContactField function and add tests for contact field creation and modifiers
+
 1.84.0
 ----------
  * feat: update goflow dependency to version v1.20.1 and add flow_token to outgoing message structure
