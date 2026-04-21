@@ -6,6 +6,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/DATA-DOG/go-sqlmock"
+	"github.com/jmoiron/sqlx"
 	"github.com/nyaruka/gocommon/dates"
 	"github.com/nyaruka/gocommon/httpx"
 	"github.com/nyaruka/gocommon/uuids"
@@ -683,4 +685,166 @@ func TestReopen(t *testing.T) {
 	logger = &flows.HTTPLogger{}
 	err = svc.Reopen([]*models.Ticket{ticket}, logger.Log)
 	require.NoError(t, err)
+}
+
+func TestSendHistory(t *testing.T) {
+	defer dates.SetNowSource(dates.DefaultNowSource)
+	dates.SetNowSource(dates.NewSequentialNowSource(time.Date(2019, 10, 7, 15, 21, 30, 0, time.UTC)))
+
+	session, _, err := test.CreateTestSession("", envs.RedactionPolicyNone)
+	require.NoError(t, err)
+
+	defer uuids.SetGenerator(uuids.DefaultGenerator)
+	defer httpx.SetRequestor(httpx.DefaultRequestor)
+
+	uuids.SetGenerator(uuids.NewSeededGenerator(12345))
+
+	conversationID := "conv123"
+	contactUUID := string(testdata.Cathy.UUID)
+	ticketUUID := "88bfa1dc-be33-45c2-b469-294ecb0eba90"
+	ticketBody := `{"history_after": "2019-10-07 15:21:29"}`
+
+	mockDB, mock, _ := sqlmock.New()
+	defer mockDB.Close()
+	sqlxDB := sqlx.NewDb(mockDB, "sqlmock")
+	freshchat.SetDB(sqlxDB)
+
+	restClient := freshchat.NewClient(http.DefaultClient, nil, baseURL, apiKey)
+	redactor := utils.NewRedactor(flows.RedactionMask, apiKey)
+
+	httpx.SetRequestor(httpx.NewMockRequestor(map[string][]httpx.MockResponse{
+		fmt.Sprintf("%s/v2/users?reference_id=%s", baseURL, contactUUID): {
+			httpx.MockConnectionError,
+		},
+	}))
+
+	mock.ExpectQuery("SELECT").
+		WithArgs(testdata.Cathy.ID, sqlmock.AnyArg()).
+		WillReturnRows(sqlmock.NewRows([]string{
+			"id", "broadcast_id", "uuid", "text", "created_on", "direction", "status", "visibility", "msg_count", "error_count", "next_attempt", "external_id", "attachments", "metadata", "channel_id", "contact_id", "contact_urn_id", "org_id", "topup_id",
+		}))
+
+	logger := &flows.HTTPLogger{}
+	freshchat.SendHistory(
+		session,
+		flows.ContactID(testdata.Cathy.ID),
+		ticketUUID,
+		conversationID,
+		contactUUID,
+		ticketBody,
+		restClient,
+		redactor,
+		logger.Log,
+	)
+	assert.Equal(t, 0, len(logger.Logs))
+
+	httpx.SetRequestor(httpx.NewMockRequestor(map[string][]httpx.MockResponse{
+		fmt.Sprintf("%s/v2/users?reference_id=%s", baseURL, contactUUID): {
+			httpx.NewMockResponse(200, nil, `{
+				"users": [
+					{
+						"id": "user123",
+						"reference_id": "`+contactUUID+`"
+					}
+				]
+			}`),
+		},
+		fmt.Sprintf("%s/v2/conversations/%s/messages", baseURL, conversationID): {
+			httpx.MockConnectionError,
+		},
+	}))
+
+	msgTime, _ := time.Parse(time.RFC3339, "2019-10-07T15:21:30Z")
+	rows := sqlmock.NewRows([]string{
+		"id", "broadcast_id", "uuid", "text", "created_on", "direction", "status", "visibility", "msg_count", "error_count", "next_attempt", "external_id", "attachments", "metadata", "channel_id", "contact_id", "contact_urn_id", "org_id", "topup_id",
+	})
+	rows.AddRow(100, nil, "eb234953-38e7-491f-8a50-b03056a7d002", "Hi! I'll try to help you!", msgTime, "O", "H", "V", 1, 0, msgTime, "1026", nil, nil, 3, testdata.Cathy.ID, 1, 1, 1)
+
+	after, _ := time.Parse("2006-01-02 15:04:05", "2019-10-07 15:21:29")
+
+	mock.ExpectQuery("SELECT").
+		WithArgs(testdata.Cathy.ID, after).
+		WillReturnRows(rows)
+
+	logger = &flows.HTTPLogger{}
+	freshchat.SendHistory(
+		session,
+		flows.ContactID(testdata.Cathy.ID),
+		ticketUUID,
+		conversationID,
+		contactUUID,
+		ticketBody,
+		restClient,
+		redactor,
+		logger.Log,
+	)
+
+	assert.Equal(t, 2, len(logger.Logs))
+
+	httpx.SetRequestor(httpx.NewMockRequestor(map[string][]httpx.MockResponse{
+		fmt.Sprintf("%s/v2/users?reference_id=%s", baseURL, contactUUID): {
+			httpx.NewMockResponse(200, nil, `{
+				"users": [
+					{
+						"id": "user123",
+						"reference_id": "`+contactUUID+`"
+					}
+				]
+			}`),
+		},
+		fmt.Sprintf("%s/v2/conversations/%s/messages", baseURL, conversationID): {
+			httpx.NewMockResponse(201, nil, `{
+				"channel_id": "channel123",
+				"conversation_id": "`+conversationID+`",
+				"message_parts": [{
+					"text": {
+						"content": "Hi! I'll try to help you!"
+					}
+				}]
+			}`),
+			httpx.NewMockResponse(201, nil, `{
+				"channel_id": "channel123",
+				"conversation_id": "`+conversationID+`",
+				"message_parts": [{
+					"text": {
+						"content": "Where are you from?"
+					}
+				}]
+			}`),
+			httpx.NewMockResponse(201, nil, `{
+				"channel_id": "channel123",
+				"conversation_id": "`+conversationID+`",
+				"message_parts": [{
+					"text": {
+						"content": "I'm from Brazil"
+					}
+				}]
+			}`),
+		},
+	}))
+
+	rows = sqlmock.NewRows([]string{
+		"id", "broadcast_id", "uuid", "text", "created_on", "direction", "status", "visibility", "msg_count", "error_count", "next_attempt", "external_id", "attachments", "metadata", "channel_id", "contact_id", "contact_urn_id", "org_id", "topup_id",
+	})
+	rows.AddRow(100, nil, "eb234953-38e7-491f-8a50-b03056a7d002", "Hi! I'll try to help you!", msgTime, "O", "H", "V", 1, 0, msgTime, "1026", nil, nil, 3, testdata.Cathy.ID, 1, 1, 1)
+	rows.AddRow(101, nil, "c864c4e0-9863-4fd3-9f76-bee481b4a138", "Where are you from?", msgTime.Add(time.Second), "O", "H", "V", 1, 0, msgTime, "1027", nil, nil, 3, testdata.Cathy.ID, 1, 1, 1)
+	rows.AddRow(102, nil, "d975d5f1-0974-5ge4-0g87-cff592c5b249", "I'm from Brazil", msgTime.Add(time.Second*2), "I", "H", "V", 1, 0, msgTime, "1028", nil, nil, 3, testdata.Cathy.ID, 1, 1, 1)
+
+	mock.ExpectQuery("SELECT").
+		WithArgs(testdata.Cathy.ID, after).
+		WillReturnRows(rows)
+
+	logger = &flows.HTTPLogger{}
+	freshchat.SendHistory(
+		session,
+		flows.ContactID(testdata.Cathy.ID),
+		ticketUUID,
+		conversationID,
+		contactUUID,
+		ticketBody,
+		restClient,
+		redactor,
+		logger.Log,
+	)
+	assert.Equal(t, 4, len(logger.Logs))
 }
