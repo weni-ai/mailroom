@@ -1,3 +1,7 @@
+1.85.2
+----------
+* feat: check if is ab2(is_multi_agents) before publish sqs ticket event
+
 1.85.1
 ----------
  * chore: update goflow for v1.20.2
