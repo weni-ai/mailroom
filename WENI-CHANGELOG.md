@@ -1,3 +1,15 @@
+1.85.1
+----------
+ * chore: update goflow for v1.20.2
+
+1.85.0
+----------
+ * feat: implement GetOrCreateContactField function and add tests for contact field creation and modifiers
+
+1.84.0
+----------
+ * feat: update goflow dependency to version v1.20.1 and add flow_token to outgoing message structure
+
 1.83.0
 ----------
  * chore: update goflow dependency to version v1.20.0 and add direct_send and ttl_seconds fields to WppBroadcastMessage
