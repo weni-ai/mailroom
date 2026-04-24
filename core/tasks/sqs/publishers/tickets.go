@@ -10,6 +10,7 @@ import (
 	"github.com/nyaruka/mailroom/core/models"
 	"github.com/nyaruka/mailroom/core/tasks/sqs"
 	"github.com/nyaruka/mailroom/runtime"
+	"github.com/sirupsen/logrus"
 )
 
 type TicketSQSMessage struct {
@@ -29,11 +30,22 @@ func PublishTicketCreated(rt *runtime.Runtime, orgID models.OrgID, msg TicketSQS
 	}
 	MessageGroupId := fmt.Sprintf("%s:%s:%s", msg.ProjectUUID, msg.ChannelUUID, msg.ContactURN)
 	CorrelationID := string(uuids.New())
-	return sqs.EnqueuePublishWithAttributes(
+	enqueued := sqs.EnqueuePublishWithAttributes(
 		rt, orgID, rt.Config.SqsTicketsQueueURL, msg,
 		map[string]string{
 			"MessageGroupId": MessageGroupId,
 			"CorrelationID":  CorrelationID,
 		},
 	)
+	if enqueued != nil {
+		logrus.WithFields(logrus.Fields{
+			"message_group_id": MessageGroupId,
+			"correlation_id":   CorrelationID,
+			"org_id":           orgID,
+			"queue_url":        rt.Config.SqsTicketsQueueURL,
+		}).Info("enqueued ticket created message")
+		return enqueued
+	}
+
+	return nil
 }

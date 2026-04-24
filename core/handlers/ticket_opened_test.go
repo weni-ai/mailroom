@@ -147,6 +147,11 @@ func TestTicketOpened(t *testing.T) {
 		},
 	}
 
+	db.MustExec(`UPDATE orgs_org SET config = '{"is_multi_agents": true}' WHERE id = $1`, testdata.Org1.ID)
+	oa, err := models.GetOrgAssets(ctx, rt, testdata.Org1.ID)
+	require.NoError(t, err)
+	require.True(t, oa.Org().ConfigBoolValue("is_multi_agents", false))
+
 	handlers.RunTestCases(t, ctx, rt, tcs)
 }
 
