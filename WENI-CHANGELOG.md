@@ -1,3 +1,7 @@
+1.83.1
+----------
+ * feat: check if is ab2(is_multi_agents) before publish sqs ticket event
+
 1.83.0
 ----------
  * chore: update goflow dependency to version v1.20.0 and add direct_send and ttl_seconds fields to WppBroadcastMessage
