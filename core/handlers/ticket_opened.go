@@ -76,8 +76,8 @@ func handleTicketOpened(ctx context.Context, rt *runtime.Runtime, tx *sqlx.Tx, o
 	})
 
 	// is ab2 if is_multi_agents is true
-	isMultiAgents := oa.Org().ConfigValue("is_multi_agents", "false")
-	if isMultiAgents == "true" {
+	isMultiAgents := oa.Org().ConfigBoolValue("is_multi_agents", false)
+	if isMultiAgents {
 		sqsPublishers.PublishTicketCreated(rt, oa.OrgID(), sqsPublishers.TicketSQSMessage{
 			TicketUUID:  uuids.UUID(ticket.UUID()),
 			ContactURN:  scene.Contact().PreferredURN().URN().Identity(),
