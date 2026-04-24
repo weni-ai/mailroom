@@ -125,8 +125,8 @@ func handleOpen(ctx context.Context, rt *runtime.Runtime, r *http.Request, l *mo
 	})
 
 	// is ab2 if is_multi_agents is true
-	isMultiAgents := oa.Org().ConfigValue("is_multi_agents", "false")
-	if isMultiAgents == "true" {
+	isMultiAgents := oa.Org().ConfigBoolValue("is_multi_agents", false)
+	if isMultiAgents {
 		sqsPublishers.PublishTicketCreated(rt, oa.OrgID(), sqsPublishers.TicketSQSMessage{
 			TicketUUID:  uuids.UUID(newTicket.UUID()),
 			ContactURN:  contact.PreferredURN().URN().Identity(),

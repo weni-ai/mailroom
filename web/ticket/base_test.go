@@ -3,12 +3,14 @@ package ticket
 import (
 	"testing"
 
+	"github.com/nyaruka/mailroom/core/models"
 	_ "github.com/nyaruka/mailroom/services/tickets/mailgun"
 	"github.com/nyaruka/mailroom/services/tickets/wenichats"
 	_ "github.com/nyaruka/mailroom/services/tickets/zendesk"
 	"github.com/nyaruka/mailroom/testsuite"
 	"github.com/nyaruka/mailroom/testsuite/testdata"
 	"github.com/nyaruka/mailroom/web"
+	"github.com/stretchr/testify/require"
 )
 
 func TestTicketAssign(t *testing.T) {
@@ -76,9 +78,14 @@ func TestTicketReopen(t *testing.T) {
 }
 
 func TestOpenTicket(t *testing.T) {
-	ctx, rt, _, _ := testsuite.Get()
+	ctx, rt, db, _ := testsuite.Get()
 
 	defer testsuite.Reset(testsuite.ResetData)
+
+	db.MustExec(`UPDATE orgs_org SET config = '{"is_multi_agents": true}' WHERE id = $1`, testdata.Org1.ID)
+	oa, err := models.GetOrgAssets(ctx, rt, testdata.Org1.ID)
+	require.NoError(t, err)
+	require.True(t, oa.Org().ConfigBoolValue("is_multi_agents", false))
 
 	wenichats.SetDB(rt.DB)
 	web.RunWebTests(t, ctx, rt, "testdata/open.json", nil)
