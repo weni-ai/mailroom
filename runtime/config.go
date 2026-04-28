@@ -60,6 +60,12 @@ type Config struct {
 	S3MediaBucket        string `help:"the S3 bucket we will write attachments to"`
 	S3MediaPrefix        string `help:"the prefix that will be added to attachment filenames"`
 	S3MediaPrefixZendesk string `help:"the prefix that will be added to file attachment names for Zendesk tickets"`
+
+	ZendeskMarketplaceName   string `help:"the app name for Zendesk Marketplace API headers"`
+	ZendeskMarketplaceOrgID  string `help:"the organization ID for Zendesk Marketplace API headers"`
+	ZendeskMarketplaceAppID  string `help:"the app ID for Zendesk Marketplace API headers"`
+	ZendeskClientID          string `help:"the OAuth client ID for Zendesk Global OAuth"`
+	ZendeskClientSecret      string `help:"the OAuth client secret for Zendesk Global OAuth"`
 	S3SessionBucket      string `help:"the S3 bucket we will write attachments to"`
 	S3SessionPrefix      string `help:"the prefix that will be added to attachment filenames"`
 	S3DisableSSL         bool   `help:"whether we disable SSL when accessing S3. Should always be set to False unless you're hosting an S3 compatible service within a secure internal network"`
