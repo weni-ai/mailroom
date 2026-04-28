@@ -158,6 +158,15 @@ func (o *Org) ConfigValue(key string, def string) string {
 	return o.o.Config.GetString(key, def)
 }
 
+func (o *Org) ConfigBoolValue(key string, def bool) bool {
+	confVal := o.o.Config.Get(key, def)
+	val, isBool := confVal.(bool)
+	if isBool {
+		return val
+	}
+	return def
+}
+
 // EmailService returns the email service for this org
 func (o *Org) EmailService(c *runtime.Config, retries *smtpx.RetryConfig) (flows.EmailService, error) {
 	connectionURL := o.ConfigValue(configSMTPServer, c.SMTPServer)
