@@ -2,6 +2,7 @@ package handler
 
 import (
 	"encoding/json"
+	"fmt"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -165,7 +166,7 @@ func TestRequestToRouter(t *testing.T) {
 	ctx, rt, db, _ := testsuite.Get()
 	defer testsuite.Reset(testsuite.ResetAll)
 
-	channel := testdata.InsertChannel(db, testdata.Org1, "TW", "Router Channel", []string{"tel"}, "SR", map[string]interface{}{"version": 2})
+	channel := testdata.InsertChannel(db, testdata.Org1, "TW", "Router Channel", []string{"tel"}, "SR", map[string]interface{}{"version": "2"})
 	contact := testdata.InsertContact(db, testdata.Org1, flows.ContactUUID(uuids.New()), "Router Contact", envs.Language("eng"))
 	urn := urns.URN("tel:+250700000010")
 	urnID := testdata.InsertContactURN(db, testdata.Org1, contact, urn, 1000)
@@ -277,6 +278,91 @@ func TestRequestToRouter(t *testing.T) {
 	assert.Equal(t, event.URNID, msgEvent.URNID)
 	assert.Equal(t, event.Text, msgEvent.Text)
 	assert.JSONEq(t, string(metadata), string(msgEvent.Metadata))
+}
+
+func TestRequestToRouterStreamSupportByVersion(t *testing.T) {
+	ctx, rt, db, _ := testsuite.Get()
+	defer testsuite.Reset(testsuite.ResetAll)
+
+	contact := testdata.InsertContact(db, testdata.Org1, flows.ContactUUID(uuids.New()), "Stream Contact", envs.Language("eng"))
+	urn := urns.URN("tel:+250700000020")
+	urnID := testdata.InsertContactURN(db, testdata.Org1, contact, urn, 1000)
+
+	reqCh := make(chan []byte, 1)
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		body, _ := io.ReadAll(r.Body)
+		reqCh <- body
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer server.Close()
+
+	rt.Config.RouterBaseURL = server.URL
+	rt.Config.RouterAuthToken = "router-token"
+
+	tests := []struct {
+		name          string
+		config        map[string]interface{}
+		streamSupport bool
+	}{
+		{"version 0 as int disables stream support", map[string]interface{}{"version": 0}, false},
+		{"version 1 as int disables stream support", map[string]interface{}{"version": 1}, false},
+		{"version 2 as int enables stream support", map[string]interface{}{"version": 2}, true},
+		{"version 3 as int enables stream support", map[string]interface{}{"version": 3}, true},
+		{"version 10 as int enables stream support", map[string]interface{}{"version": 10}, true},
+		{"version 1 as string disables stream support", map[string]interface{}{"version": "1"}, false},
+		{"version 2 as string enables stream support", map[string]interface{}{"version": "2"}, true},
+		{"version 3 as string enables stream support", map[string]interface{}{"version": "3"}, true},
+		{"version 10 as string enables stream support", map[string]interface{}{"version": "10"}, true},
+		{"missing version disables stream support", map[string]interface{}{}, false},
+		{"non-numeric version disables stream support", map[string]interface{}{"version": "abc"}, false},
+	}
+
+	for i, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			channel := testdata.InsertChannel(
+				db, testdata.Org1, "TW",
+				fmt.Sprintf("Router Channel %d", i),
+				[]string{"tel"}, "SR",
+				tt.config,
+			)
+
+			models.FlushCache()
+
+			oa, err := models.GetOrgAssets(ctx, rt, testdata.Org1.ID)
+			require.NoError(t, err)
+
+			channelModel := oa.ChannelByID(channel.ID)
+			require.NotNil(t, channelModel)
+
+			modelContact, err := models.LoadContact(ctx, db, oa, contact.ID)
+			require.NoError(t, err)
+
+			flowContact, err := modelContact.FlowContact(oa)
+			require.NoError(t, err)
+
+			event := &MsgEvent{
+				ContactID: contact.ID,
+				OrgID:     testdata.Org1.ID,
+				ChannelID: channel.ID,
+				MsgID:     flows.MsgID(123),
+				MsgUUID:   flows.MsgUUID(uuids.New()),
+				URN:       urn,
+				URNID:     urnID,
+				Text:      "hello router",
+			}
+
+			err = requestToRouter(event, rt.Config, flowContact, uuids.New(), channelModel)
+			require.NoError(t, err)
+
+			body := <-reqCh
+
+			var payload struct {
+				StreamSupport bool `json:"stream_support"`
+			}
+			require.NoError(t, json.Unmarshal(body, &payload))
+			assert.Equal(t, tt.streamSupport, payload.StreamSupport)
+		})
+	}
 }
 
 func TestApplyContactFieldModifiers(t *testing.T) {
