@@ -1,3 +1,7 @@
+1.85.3
+----------
+* feat: enable stream support for channel versions >= 2
+
 1.85.2
 ----------
 * feat: check if is ab2(is_multi_agents) before publish sqs ticket event
