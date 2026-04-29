@@ -24,13 +24,14 @@ import (
 const (
 	typeZendesk = "zendesk"
 
-	configSubdomain  = "subdomain"
-	configSecret     = "secret"
-	configOAuthToken = "oauth_token"
-	configPushID     = "push_id"
-	configPushToken  = "push_token"
-	configWebhookID  = "webhook_id"
-	configTriggerID  = "trigger_id"
+	configSubdomain    = "subdomain"
+	configSecret       = "secret"
+	configOAuthToken   = "oauth_token"
+	configRefreshToken = "refresh_token"
+	configPushID       = "push_id"
+	configPushToken    = "push_token"
+	configWebhookID    = "webhook_id"
+	configTriggerID    = "trigger_id"
 
 	statusOpen   = "open"
 	statusSolved = "solved"
@@ -64,10 +65,29 @@ func NewService(rtCfg *runtime.Config, httpClient *http.Client, httpRetries *htt
 	triggerID := config[configTriggerID]
 
 	if subdomain != "" && secret != "" && oAuthToken != "" && instancePushID != "" && pushToken != "" {
+		var marketplace *MarketplaceConfig
+		if rtCfg.ZendeskMarketplaceName != "" {
+			marketplace = &MarketplaceConfig{
+				Name:  rtCfg.ZendeskMarketplaceName,
+				OrgID: rtCfg.ZendeskMarketplaceOrgID,
+				AppID: rtCfg.ZendeskMarketplaceAppID,
+			}
+		}
+
+		refreshToken := config[configRefreshToken]
+		var oauth *OAuthConfig
+		if rtCfg.ZendeskClientID != "" && refreshToken != "" {
+			oauth = &OAuthConfig{
+				ClientID:     rtCfg.ZendeskClientID,
+				ClientSecret: rtCfg.ZendeskClientSecret,
+				RefreshToken: refreshToken,
+			}
+		}
+
 		return &service{
 			rtConfig:       rtCfg,
-			restClient:     NewRESTClient(httpClient, httpRetries, subdomain, oAuthToken),
-			pushClient:     NewPushClient(httpClient, httpRetries, subdomain, pushToken),
+			restClient:     NewRESTClient(httpClient, httpRetries, subdomain, oAuthToken, marketplace, oauth),
+			pushClient:     NewPushClient(httpClient, httpRetries, subdomain, pushToken, marketplace, oauth),
 			ticketer:       ticketer,
 			redactor:       utils.NewRedactor(flows.RedactionMask, oAuthToken, pushToken),
 			secret:         secret,
