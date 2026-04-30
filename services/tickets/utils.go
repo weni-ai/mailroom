@@ -55,7 +55,7 @@ func FromTicketUUID(ctx context.Context, rt *runtime.Runtime, uuid flows.TicketU
 	}
 
 	// and load it as a service
-	svc, err := ticketer.AsService(rt.Config, flows.NewTicketer(ticketer))
+	svc, err := ticketer.AsService(rt.Config, flows.NewTicketer(ticketer), ctx, rt.DB)
 	if err != nil {
 		return nil, nil, nil, errors.Wrap(err, "error loading ticketer service")
 	}
@@ -71,7 +71,7 @@ func FromTicketerUUID(ctx context.Context, rt *runtime.Runtime, uuid assets.Tick
 	}
 
 	// and load it as a service
-	svc, err := ticketer.AsService(rt.Config, flows.NewTicketer(ticketer))
+	svc, err := ticketer.AsService(rt.Config, flows.NewTicketer(ticketer), ctx, rt.DB)
 	if err != nil {
 		return nil, nil, errors.Wrap(err, "error loading ticketer service")
 	}

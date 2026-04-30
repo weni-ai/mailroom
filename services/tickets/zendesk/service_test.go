@@ -1,6 +1,7 @@
 package zendesk_test
 
 import (
+	"context"
 	"net/http"
 	"testing"
 	"time"
@@ -85,14 +86,17 @@ func TestOpenAndForward(t *testing.T) {
 		},
 	}))
 
-	ticketer := flows.NewTicketer(static.NewTicketer(assets.TicketerUUID(uuids.New()), "Support", "zendesk"))
+	tickUUID := assets.TicketerUUID(uuids.New())
+	flowTicketer := flows.NewTicketer(static.NewTicketer(tickUUID, "Support", "zendesk"))
 
 	_, err = zendesk.NewService(
 		rt.Config,
 		http.DefaultClient,
 		nil,
-		ticketer,
-		map[string]string{},
+		flowTicketer,
+		models.BuildTicketer(models.TicketerID(0), tickUUID, testdata.Org1.ID, "zendesk", "Support", map[string]string{}),
+		ctx,
+		nil,
 	)
 	assert.EqualError(t, err, "missing subdomain or secret or oauth_token or push_id or push_token in zendesk config")
 
@@ -100,14 +104,16 @@ func TestOpenAndForward(t *testing.T) {
 		rt.Config,
 		http.DefaultClient,
 		nil,
-		ticketer,
-		map[string]string{
+		flowTicketer,
+		models.BuildTicketer(models.TicketerID(0), tickUUID, testdata.Org1.ID, "zendesk", "Support", map[string]string{
 			"subdomain":   "nyaruka",
 			"secret":      "sesame",
 			"oauth_token": "987654321",
 			"push_id":     "1234-abcd",
 			"push_token":  "123456789",
-		},
+		}),
+		ctx,
+		nil,
 	)
 	require.NoError(t, err)
 
@@ -186,19 +192,23 @@ func TestCloseAndReopen(t *testing.T) {
 		},
 	}))
 
-	ticketer := flows.NewTicketer(static.NewTicketer(assets.TicketerUUID(uuids.New()), "Support", "zendesk"))
+	tickUUID := assets.TicketerUUID(uuids.New())
+	flowTicketer := flows.NewTicketer(static.NewTicketer(tickUUID, "Support", "zendesk"))
+	model := models.BuildTicketer(models.TicketerID(0), tickUUID, testdata.Org1.ID, "zendesk", "Support", map[string]string{
+		"subdomain":   "nyaruka",
+		"secret":      "sesame",
+		"oauth_token": "987654321",
+		"push_id":     "1234-abcd",
+		"push_token":  "123456789",
+	})
 	svc, err := zendesk.NewService(
 		rt.Config,
 		http.DefaultClient,
 		nil,
-		ticketer,
-		map[string]string{
-			"subdomain":   "nyaruka",
-			"secret":      "sesame",
-			"oauth_token": "987654321",
-			"push_id":     "1234-abcd",
-			"push_token":  "123456789",
-		},
+		flowTicketer,
+		model,
+		context.Background(),
+		nil,
 	)
 	require.NoError(t, err)
 

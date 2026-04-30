@@ -119,7 +119,8 @@ type service struct {
 	sectorUUID string
 }
 
-func NewService(rtCfg *runtime.Config, httpClient *http.Client, httpRetries *httpx.RetryConfig, ticketer *flows.Ticketer, config map[string]string) (models.TicketService, error) {
+func NewService(rtCfg *runtime.Config, httpClient *http.Client, httpRetries *httpx.RetryConfig, ticketer *flows.Ticketer, model *models.Ticketer, ctx context.Context, db models.Queryer) (models.TicketService, error) {
+	config := model.ConfigMap()
 	sectorUUID := config[configurationSectorUUID]
 	baseURL := rtCfg.WenichatsServiceURL
 	if sectorUUID == "" {

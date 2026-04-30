@@ -14,6 +14,7 @@ import (
 	"github.com/nyaruka/mailroom/core/goflow"
 	"github.com/nyaruka/mailroom/runtime"
 	cache "github.com/patrickmn/go-cache"
+	"github.com/jmoiron/sqlx"
 	"github.com/pkg/errors"
 )
 
@@ -516,6 +517,14 @@ func GetOrgAssetsWithRefresh(ctx context.Context, rt *runtime.Runtime, orgID Org
 }
 
 func (a *OrgAssets) OrgID() OrgID { return a.orgID }
+
+// DB returns the primary database pool associated with these assets, or nil if unavailable.
+func (a *OrgAssets) DB() *sqlx.DB {
+	if a == nil || a.rt == nil {
+		return nil
+	}
+	return a.rt.DB
+}
 
 func (a *OrgAssets) Env() envs.Environment { return a.org }
 

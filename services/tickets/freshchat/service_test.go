@@ -1,6 +1,7 @@
 package freshchat_test
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 	"testing"
@@ -26,15 +27,19 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+
+var freshEmptyRT = &runtime.Runtime{Config: &runtime.Config{}}
+
+func mustFreshSvc(rt *runtime.Runtime, ft *flows.Ticketer, cfg map[string]string) (models.TicketService, error) {
+	model := models.BuildTicketer(models.TicketerID(0), ft.UUID(), testdata.Org1.ID, "freshchat", "Freshchat", cfg)
+	return freshchat.NewService(rt.Config, http.DefaultClient, nil, ft, model, context.Background(), nil)
+}
+
 func TestNewService(t *testing.T) {
 	ticketer := flows.NewTicketer(static.NewTicketer(assets.TicketerUUID(uuids.New()), "Support", "freshchat"))
 
 	// Test missing freshchat_domain
-	_, err := freshchat.NewService(
-		&runtime.Config{},
-		http.DefaultClient,
-		nil,
-		ticketer,
+	_, err := mustFreshSvc(freshEmptyRT, ticketer,
 		map[string]string{
 			"oauth_token": apiKey,
 		},
@@ -42,11 +47,7 @@ func TestNewService(t *testing.T) {
 	assert.EqualError(t, err, "missing freshchat_domain or oauth_token in freshchat config")
 
 	// Test missing oauth_token
-	_, err = freshchat.NewService(
-		&runtime.Config{},
-		http.DefaultClient,
-		nil,
-		ticketer,
+	_, err = mustFreshSvc(freshEmptyRT, ticketer,
 		map[string]string{
 			"freshchat_domain": baseURL,
 		},
@@ -54,11 +55,7 @@ func TestNewService(t *testing.T) {
 	assert.EqualError(t, err, "missing freshchat_domain or oauth_token in freshchat config")
 
 	// Test valid config
-	svc, err := freshchat.NewService(
-		&runtime.Config{},
-		http.DefaultClient,
-		nil,
-		ticketer,
+	svc, err := mustFreshSvc(freshEmptyRT, ticketer,
 		map[string]string{
 			"freshchat_domain": baseURL,
 			"oauth_token":      apiKey,
@@ -179,11 +176,7 @@ func TestOpen(t *testing.T) {
 
 	ticketer := flows.NewTicketer(static.NewTicketer(assets.TicketerUUID(uuids.New()), "Support", "freshchat"))
 
-	svc, err := freshchat.NewService(
-		rt.Config,
-		http.DefaultClient,
-		nil,
-		ticketer,
+	svc, err := mustFreshSvc(rt, ticketer,
 		map[string]string{
 			"freshchat_domain": baseURL,
 			"oauth_token":      apiKey,
@@ -280,11 +273,7 @@ func TestOpenWithChannelID(t *testing.T) {
 
 	ticketer := flows.NewTicketer(static.NewTicketer(assets.TicketerUUID(uuids.New()), "Support", "freshchat"))
 
-	svc, err := freshchat.NewService(
-		rt.Config,
-		http.DefaultClient,
-		nil,
-		ticketer,
+	svc, err := mustFreshSvc(rt, ticketer,
 		map[string]string{
 			"freshchat_domain": baseURL,
 			"oauth_token":      apiKey,
@@ -371,11 +360,7 @@ func TestOpenWithoutChannelID(t *testing.T) {
 
 	ticketer := flows.NewTicketer(static.NewTicketer(assets.TicketerUUID(uuids.New()), "Support", "freshchat"))
 
-	svc, err := freshchat.NewService(
-		rt.Config,
-		http.DefaultClient,
-		nil,
-		ticketer,
+	svc, err := mustFreshSvc(rt, ticketer,
 		map[string]string{
 			"freshchat_domain": baseURL,
 			"oauth_token":      apiKey,
@@ -510,11 +495,7 @@ func TestForward(t *testing.T) {
 	}))
 
 	ticketer := flows.NewTicketer(static.NewTicketer(assets.TicketerUUID(uuids.New()), "Support", "freshchat"))
-	svc, err := freshchat.NewService(
-		rt.Config,
-		http.DefaultClient,
-		nil,
-		ticketer,
+	svc, err := mustFreshSvc(rt, ticketer,
 		map[string]string{
 			"freshchat_domain": baseURL,
 			"oauth_token":      apiKey,
@@ -583,11 +564,7 @@ func TestClose(t *testing.T) {
 	}))
 
 	ticketer := flows.NewTicketer(static.NewTicketer(assets.TicketerUUID(uuids.New()), "Support", "freshchat"))
-	svc, err := freshchat.NewService(
-		rt.Config,
-		http.DefaultClient,
-		nil,
-		ticketer,
+	svc, err := mustFreshSvc(rt, ticketer,
 		map[string]string{
 			"freshchat_domain": baseURL,
 			"oauth_token":      apiKey,
@@ -648,11 +625,7 @@ func TestReopen(t *testing.T) {
 	}))
 
 	ticketer := flows.NewTicketer(static.NewTicketer(assets.TicketerUUID(uuids.New()), "Support", "freshchat"))
-	svc, err := freshchat.NewService(
-		rt.Config,
-		http.DefaultClient,
-		nil,
-		ticketer,
+	svc, err := mustFreshSvc(rt, ticketer,
 		map[string]string{
 			"freshchat_domain": baseURL,
 			"oauth_token":      apiKey,

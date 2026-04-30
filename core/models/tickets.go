@@ -65,7 +65,14 @@ func init() {
 
 func ticketServiceFactory(c *runtime.Config) engine.TicketServiceFactory {
 	return func(session flows.Session, ticketer *flows.Ticketer) (flows.TicketService, error) {
-		return ticketer.Asset().(*Ticketer).AsService(c, ticketer)
+		modelTicketer := ticketer.Asset().(*Ticketer)
+		var db Queryer
+		if oa, ok := session.Assets().Source().(*OrgAssets); ok {
+			if rtDB := oa.DB(); rtDB != nil {
+				db = rtDB
+			}
+		}
+		return modelTicketer.AsService(c, ticketer, context.Background(), db)
 	}
 }
 
@@ -159,7 +166,7 @@ func (t *Ticket) ForwardIncoming(ctx context.Context, rt *runtime.Runtime, org *
 		return errors.Errorf("can't find ticketer with id %d", t.t.TicketerID)
 	}
 
-	service, err := ticketer.AsService(rt.Config, flows.NewTicketer(ticketer))
+	service, err := ticketer.AsService(rt.Config, flows.NewTicketer(ticketer), ctx, rt.DB)
 	if err != nil {
 		return err
 	}
@@ -547,7 +554,7 @@ func CloseTickets(ctx context.Context, rt *runtime.Runtime, oa *OrgAssets, userI
 		for ticketerID, ticketerTickets := range byTicketer {
 			ticketer := oa.TicketerByID(ticketerID)
 			if ticketer != nil {
-				service, err := ticketer.AsService(rt.Config, flows.NewTicketer(ticketer))
+				service, err := ticketer.AsService(rt.Config, flows.NewTicketer(ticketer), ctx, rt.DB)
 				if err != nil {
 					return nil, err
 				}
@@ -619,7 +626,7 @@ func ReopenTickets(ctx context.Context, rt *runtime.Runtime, oa *OrgAssets, user
 		for ticketerID, ticketerTickets := range byTicketer {
 			ticketer := oa.TicketerByID(ticketerID)
 			if ticketer != nil {
-				service, err := ticketer.AsService(rt.Config, flows.NewTicketer(ticketer))
+				service, err := ticketer.AsService(rt.Config, flows.NewTicketer(ticketer), ctx, rt.DB)
 				if err != nil {
 					return nil, err
 				}
@@ -703,18 +710,43 @@ func (t *Ticketer) Type() string { return t.t.Type }
 // Config returns the named config value
 func (t *Ticketer) Config(key string) string { return t.t.Config[key] }
 
+// ConfigMap returns the ticketer configuration map (same backing store as Config / UpdateConfig).
+func (t *Ticketer) ConfigMap() map[string]string {
+	return t.t.Config
+}
+
+// BuildTicketer returns a ticketer without loading from the database (e.g. for tests or local assembly).
+func BuildTicketer(id TicketerID, uuid assets.TicketerUUID, orgID OrgID, ticketerType, name string, config map[string]string) *Ticketer {
+	cfg := make(map[string]string, len(config))
+	for k, v := range config {
+		cfg[k] = v
+	}
+	t := &Ticketer{}
+	t.t.ID = id
+	t.t.UUID = uuid
+	t.t.OrgID = orgID
+	t.t.Type = ticketerType
+	t.t.Name = name
+	t.t.Config = cfg
+	return t
+}
+
 // Reference returns an asset reference to this ticketer
 func (t *Ticketer) Reference() *assets.TicketerReference {
 	return assets.NewTicketerReference(t.t.UUID, t.t.Name)
 }
 
 // AsService builds the corresponding engine service for the passed in Ticketer
-func (t *Ticketer) AsService(cfg *runtime.Config, ticketer *flows.Ticketer) (TicketService, error) {
+func (t *Ticketer) AsService(cfg *runtime.Config, ticketer *flows.Ticketer, ctx context.Context, db Queryer) (TicketService, error) {
+	if ctx == nil {
+		ctx = context.Background()
+	}
+
 	httpClient, httpRetries, _ := goflow.HTTP(cfg)
 
 	initFunc := ticketServices[t.Type()]
 	if initFunc != nil {
-		return initFunc(cfg, httpClient, httpRetries, ticketer, t.t.Config)
+		return initFunc(cfg, httpClient, httpRetries, ticketer, t, ctx, db)
 	}
 
 	return nil, errors.Errorf("unrecognized ticket service type '%s'", t.Type())
@@ -749,7 +781,7 @@ type TicketService interface {
 }
 
 // TicketServiceFunc is a func which creates a ticket service
-type TicketServiceFunc func(*runtime.Config, *http.Client, *httpx.RetryConfig, *flows.Ticketer, map[string]string) (TicketService, error)
+type TicketServiceFunc func(*runtime.Config, *http.Client, *httpx.RetryConfig, *flows.Ticketer, *Ticketer, context.Context, Queryer) (TicketService, error)
 
 var ticketServices = map[string]TicketServiceFunc{}
 

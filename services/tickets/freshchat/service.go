@@ -1,6 +1,7 @@
 package freshchat
 
 import (
+	"context"
 	"encoding/json"
 	"net/http"
 	"strings"
@@ -32,7 +33,8 @@ type service struct {
 	redactor   utils.Redactor
 }
 
-func NewService(rtCfg *runtime.Config, httpClient *http.Client, httpRetries *httpx.RetryConfig, ticketer *flows.Ticketer, config map[string]string) (models.TicketService, error) {
+func NewService(rtCfg *runtime.Config, httpClient *http.Client, httpRetries *httpx.RetryConfig, ticketer *flows.Ticketer, model *models.Ticketer, ctx context.Context, db models.Queryer) (models.TicketService, error) {
+	config := model.ConfigMap()
 	baseURL := config["freshchat_domain"]
 	authToken := config["oauth_token"]
 	if baseURL == "" || authToken == "" {

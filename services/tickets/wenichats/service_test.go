@@ -1,6 +1,7 @@
 package wenichats_test
 
 import (
+	"context"
 	"database/sql/driver"
 	"encoding/json"
 	"fmt"
@@ -20,6 +21,7 @@ import (
 	"github.com/nyaruka/goflow/test"
 	"github.com/nyaruka/goflow/utils"
 	"github.com/nyaruka/mailroom/core/models"
+	"github.com/nyaruka/mailroom/runtime"
 	"github.com/nyaruka/mailroom/services/tickets/wenichats"
 	"github.com/nyaruka/mailroom/testsuite"
 	"github.com/nyaruka/mailroom/testsuite/testdata"
@@ -27,6 +29,13 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
+
+
+
+func mustWeniSvc(rt *runtime.Runtime, ft *flows.Ticketer, cfg map[string]string) (models.TicketService, error) {
+	model := models.BuildTicketer(models.TicketerID(0), ft.UUID(), testdata.Org1.ID, "wenichats", "Wenichats", cfg)
+	return wenichats.NewService(rt.Config, http.DefaultClient, nil, ft, model, context.Background(), nil)
+}
 
 func TestOpenAndForward(t *testing.T) {
 	ctx, rt, _, _ := testsuite.Get()
@@ -473,11 +482,7 @@ func TestOpenAndForward(t *testing.T) {
 
 	ticketer := flows.NewTicketer(static.NewTicketer(assets.TicketerUUID(uuids.New()), "Support", "wenichats"))
 
-	_, err = wenichats.NewService(
-		rt.Config,
-		http.DefaultClient,
-		nil,
-		ticketer,
+	_, err = mustWeniSvc(rt, ticketer,
 		map[string]string{},
 	)
 	assert.EqualError(t, err, "missing project_auth or sector_uuid")
@@ -492,11 +497,7 @@ func TestOpenAndForward(t *testing.T) {
 
 	wenichats.SetDB(sqlxDB)
 
-	svc, err := wenichats.NewService(
-		rt.Config,
-		http.DefaultClient,
-		nil,
-		ticketer,
+	svc, err := mustWeniSvc(rt, ticketer,
 		map[string]string{
 			"project_auth": authToken,
 			"sector_uuid":  "1a4bae05-993c-4f3b-91b5-80f4e09951f2",
@@ -806,11 +807,7 @@ func TestOpenFails(t *testing.T) {
 
 	ticketer := flows.NewTicketer(static.NewTicketer(assets.TicketerUUID(uuids.New()), "Support", "wenichats"))
 
-	svc, err := wenichats.NewService(
-		rt.Config,
-		http.DefaultClient,
-		nil,
-		ticketer,
+	svc, err := mustWeniSvc(rt, ticketer,
 		map[string]string{
 			"project_auth": authToken,
 			"sector_uuid":  "1a4bae05-993c-4f3b-91b5-80f4e09951f2",
@@ -936,11 +933,7 @@ func TestCloseAndReopen(t *testing.T) {
 
 	ticketer := flows.NewTicketer(static.NewTicketer(assets.TicketerUUID(uuids.New()), "Support", "wenichats"))
 
-	svc, err := wenichats.NewService(
-		rt.Config,
-		http.DefaultClient,
-		nil,
-		ticketer,
+	svc, err := mustWeniSvc(rt, ticketer,
 		map[string]string{
 			"project_auth": authToken,
 			"sector_uuid":  "1a4bae05-993c-4f3b-91b5-80f4e09951f2",
@@ -991,11 +984,7 @@ func TestSendHistory(t *testing.T) {
 
 	ticketer := flows.NewTicketer(static.NewTicketer(assets.TicketerUUID(uuids.New()), "Support", "wenichats"))
 
-	svc, err := wenichats.NewService(
-		rt.Config,
-		http.DefaultClient,
-		nil,
-		ticketer,
+	svc, err := mustWeniSvc(rt, ticketer,
 		map[string]string{
 			"project_auth": authToken,
 			"sector_uuid":  "1a4bae05-993c-4f3b-91b5-80f4e09951f2",
@@ -1082,11 +1071,7 @@ func TestDefaultSendHistory(t *testing.T) {
 
 	ticketer := flows.NewTicketer(static.NewTicketer(assets.TicketerUUID(uuids.New()), "Support", "wenichats"))
 
-	svc, err := wenichats.NewService(
-		rt.Config,
-		http.DefaultClient,
-		nil,
-		ticketer,
+	svc, err := mustWeniSvc(rt, ticketer,
 		map[string]string{
 			"project_auth": authToken,
 			"sector_uuid":  "1a4bae05-993c-4f3b-91b5-80f4e09951f2",

@@ -1,6 +1,7 @@
 package mailgun
 
 import (
+	"context"
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
@@ -85,7 +86,8 @@ type service struct {
 }
 
 // NewService creates a new mailgun email-based ticket service
-func NewService(rtCfg *runtime.Config, httpClient *http.Client, httpRetries *httpx.RetryConfig, ticketer *flows.Ticketer, config map[string]string) (models.TicketService, error) {
+func NewService(rtCfg *runtime.Config, httpClient *http.Client, httpRetries *httpx.RetryConfig, ticketer *flows.Ticketer, model *models.Ticketer, ctx context.Context, db models.Queryer) (models.TicketService, error) {
+	config := model.ConfigMap()
 	domain := config[configDomain]
 	apiKey := config[configAPIKey]
 	toAddress := config[configToAddress]
