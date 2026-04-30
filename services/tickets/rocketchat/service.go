@@ -1,6 +1,7 @@
 package rocketchat
 
 import (
+	"context"
 	"encoding/json"
 	"net/http"
 	"strconv"
@@ -37,7 +38,8 @@ type service struct {
 }
 
 // NewService creates a new RocketChat ticket service
-func NewService(rtCfg *runtime.Config, httpClient *http.Client, httpRetries *httpx.RetryConfig, ticketer *flows.Ticketer, config map[string]string) (models.TicketService, error) {
+func NewService(rtCfg *runtime.Config, httpClient *http.Client, httpRetries *httpx.RetryConfig, ticketer *flows.Ticketer, model *models.Ticketer, ctx context.Context, db models.Queryer) (models.TicketService, error) {
+	config := model.ConfigMap()
 	baseURL := config[configBaseURL]
 	secret := config[configSecret]
 

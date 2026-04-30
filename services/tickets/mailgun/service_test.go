@@ -1,6 +1,7 @@
 package mailgun_test
 
 import (
+	"context"
 	"net/http"
 	"testing"
 	"time"
@@ -15,6 +16,7 @@ import (
 	"github.com/nyaruka/goflow/test"
 	"github.com/nyaruka/goflow/utils"
 	"github.com/nyaruka/mailroom/core/models"
+	"github.com/nyaruka/mailroom/runtime"
 	"github.com/nyaruka/mailroom/services/tickets/mailgun"
 	"github.com/nyaruka/mailroom/testsuite"
 	"github.com/nyaruka/mailroom/testsuite/testdata"
@@ -23,6 +25,13 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
+
+
+
+func mustMailgunSvc(rt *runtime.Runtime, ft *flows.Ticketer, cfg map[string]string) (models.TicketService, error) {
+	model := models.BuildTicketer(models.TicketerID(0), ft.UUID(), testdata.Org1.ID, "mailgun", "Support", cfg)
+	return mailgun.NewService(rt.Config, http.DefaultClient, nil, ft, model, context.Background(), nil)
+}
 
 func TestOpenAndForward(t *testing.T) {
 	ctx, rt, _, _ := testsuite.Get()
@@ -55,20 +64,12 @@ func TestOpenAndForward(t *testing.T) {
 
 	ticketer := flows.NewTicketer(static.NewTicketer(assets.TicketerUUID(uuids.New()), "Support", "mailgun"))
 
-	_, err = mailgun.NewService(
-		rt.Config,
-		http.DefaultClient,
-		nil,
-		ticketer,
+	_, err = mustMailgunSvc(rt, ticketer,
 		map[string]string{},
 	)
 	assert.EqualError(t, err, "missing domain or api_key or to_address or url_base in mailgun config")
 
-	svc, err := mailgun.NewService(
-		rt.Config,
-		http.DefaultClient,
-		nil,
-		ticketer,
+	svc, err := mustMailgunSvc(rt, ticketer,
 		map[string]string{
 			"domain":     "tickets.rapidpro.io",
 			"api_key":    "123456789",
@@ -145,11 +146,7 @@ func TestCloseAndReopen(t *testing.T) {
 	}))
 
 	ticketer := flows.NewTicketer(static.NewTicketer(assets.TicketerUUID(uuids.New()), "Support", "mailgun"))
-	svc, err := mailgun.NewService(
-		rt.Config,
-		http.DefaultClient,
-		nil,
-		ticketer,
+	svc, err := mustMailgunSvc(rt, ticketer,
 		map[string]string{
 			"domain":     "tickets.rapidpro.io",
 			"api_key":    "123456789",

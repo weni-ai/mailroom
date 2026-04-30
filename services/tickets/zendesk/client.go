@@ -13,20 +13,98 @@ import (
 	"github.com/nyaruka/gocommon/jsonx"
 )
 
+// MarketplaceConfig holds the Zendesk Marketplace identification headers
+// required for all API requests from public apps.
+type MarketplaceConfig struct {
+	Name  string
+	OrgID string
+	AppID string
+}
+
+// OAuthConfig holds the credentials needed to refresh expired OAuth tokens.
+type OAuthConfig struct {
+	ClientID     string
+	ClientSecret string
+	RefreshToken string
+	OnRefresh    func(newAccessToken, newRefreshToken string)
+}
+
 type baseClient struct {
 	httpClient  *http.Client
 	httpRetries *httpx.RetryConfig
 	subdomain   string
 	token       string
+	marketplace *MarketplaceConfig
+	oauth       *OAuthConfig
 }
 
-func newBaseClient(httpClient *http.Client, httpRetries *httpx.RetryConfig, subdomain, token string) baseClient {
+func newBaseClient(httpClient *http.Client, httpRetries *httpx.RetryConfig, subdomain, token string, marketplace *MarketplaceConfig, oauth *OAuthConfig) baseClient {
 	return baseClient{
 		httpClient:  httpClient,
 		httpRetries: httpRetries,
 		subdomain:   subdomain,
 		token:       token,
+		marketplace: marketplace,
+		oauth:       oauth,
 	}
+}
+
+type oauthTokenResponse struct {
+	AccessToken  string `json:"access_token"`
+	RefreshToken string `json:"refresh_token"`
+	TokenType    string `json:"token_type"`
+}
+
+func (c *baseClient) refreshAccessToken() error {
+	if c.oauth == nil || c.oauth.RefreshToken == "" {
+		return errors.New("no refresh token available")
+	}
+
+	payload := map[string]string{
+		"grant_type":    "refresh_token",
+		"refresh_token": c.oauth.RefreshToken,
+		"client_id":     c.oauth.ClientID,
+		"client_secret": c.oauth.ClientSecret,
+		"scope":         "read write",
+	}
+
+	data, err := jsonx.Marshal(payload)
+	if err != nil {
+		return err
+	}
+
+	url := fmt.Sprintf("https://%s.zendesk.com/oauth/tokens", c.subdomain)
+	req, err := httpx.NewRequest("POST", url, bytes.NewReader(data), map[string]string{
+		"Content-Type": "application/json",
+	})
+	if err != nil {
+		return err
+	}
+
+	trace, err := httpx.DoTrace(c.httpClient, req, nil, nil, -1)
+	if err != nil {
+		return fmt.Errorf("token refresh request failed: %w", err)
+	}
+
+	if trace.Response.StatusCode != 200 {
+		return fmt.Errorf("token refresh returned status %d", trace.Response.StatusCode)
+	}
+
+	tokenResp := &oauthTokenResponse{}
+	if err := jsonx.Unmarshal(trace.ResponseBody, tokenResp); err != nil {
+		return fmt.Errorf("failed to parse token refresh response: %w", err)
+	}
+
+	c.token = tokenResp.AccessToken
+	if tokenResp.RefreshToken != "" {
+		c.oauth.RefreshToken = tokenResp.RefreshToken
+	}
+
+	if c.oauth.OnRefresh != nil {
+		c.oauth.OnRefresh(tokenResp.AccessToken, tokenResp.RefreshToken)
+	}
+
+	return nil
 }
 
 type errorResponse struct {
@@ -52,28 +130,53 @@ func (c *baseClient) delete(endpoint string) (*httpx.Trace, error) {
 
 func (c *baseClient) request(method, endpoint string, payload interface{}, response interface{}) (*httpx.Trace, error) {
 	url := fmt.Sprintf("https://%s.zendesk.com/api/v2/%s", c.subdomain, endpoint)
-	headers := map[string]string{
-		"Authorization": fmt.Sprintf("Bearer %s", c.token),
-	}
-	var body io.Reader
 
+	var payloadData []byte
 	if payload != nil {
 		data, err := jsonx.Marshal(payload)
 		if err != nil {
 			return nil, err
 		}
-		body = bytes.NewReader(data)
-		headers["Content-Type"] = "application/json"
+		payloadData = data
 	}
 
-	req, err := httpx.NewRequest(method, url, body, headers)
-	if err != nil {
-		return nil, err
+	makeRequest := func() (*httpx.Trace, error) {
+		headers := map[string]string{
+			"Authorization": fmt.Sprintf("Bearer %s", c.token),
+		}
+
+		if c.marketplace != nil && c.marketplace.Name != "" {
+			headers["X-Zendesk-Marketplace-Name"] = c.marketplace.Name
+			headers["X-Zendesk-Marketplace-Organization-Id"] = c.marketplace.OrgID
+			headers["X-Zendesk-Marketplace-App-Id"] = c.marketplace.AppID
+		}
+
+		var body io.Reader
+		if payloadData != nil {
+			body = bytes.NewReader(payloadData)
+			headers["Content-Type"] = "application/json"
+		}
+
+		req, err := httpx.NewRequest(method, url, body, headers)
+		if err != nil {
+			return nil, err
+		}
+
+		return httpx.DoTrace(c.httpClient, req, c.httpRetries, nil, -1)
 	}
 
-	trace, err := httpx.DoTrace(c.httpClient, req, c.httpRetries, nil, -1)
+	trace, err := makeRequest()
 	if err != nil {
 		return trace, err
+	}
+
+	if trace.Response.StatusCode == 401 && c.oauth != nil && c.oauth.RefreshToken != "" {
+		if refreshErr := c.refreshAccessToken(); refreshErr == nil {
+			trace, err = makeRequest()
+			if err != nil {
+				return trace, err
+			}
+		}
 	}
 
 	if trace.Response.StatusCode >= 400 {
@@ -94,8 +197,8 @@ type RESTClient struct {
 }
 
 // NewRESTClient creates a new REST client
-func NewRESTClient(httpClient *http.Client, httpRetries *httpx.RetryConfig, subdomain, token string) *RESTClient {
-	return &RESTClient{baseClient: newBaseClient(httpClient, httpRetries, subdomain, token)}
+func NewRESTClient(httpClient *http.Client, httpRetries *httpx.RetryConfig, subdomain, token string, marketplace *MarketplaceConfig, oauth *OAuthConfig) *RESTClient {
+	return &RESTClient{baseClient: newBaseClient(httpClient, httpRetries, subdomain, token, marketplace, oauth)}
 }
 
 type Webhook struct {
@@ -229,8 +332,8 @@ type PushClient struct {
 }
 
 // NewPushClient creates a new push client
-func NewPushClient(httpClient *http.Client, httpRetries *httpx.RetryConfig, subdomain, token string) *PushClient {
-	return &PushClient{baseClient: newBaseClient(httpClient, httpRetries, subdomain, token)}
+func NewPushClient(httpClient *http.Client, httpRetries *httpx.RetryConfig, subdomain, token string, marketplace *MarketplaceConfig, oauth *OAuthConfig) *PushClient {
+	return &PushClient{baseClient: newBaseClient(httpClient, httpRetries, subdomain, token, marketplace, oauth)}
 }
 
 // FieldValue is a value for the named field

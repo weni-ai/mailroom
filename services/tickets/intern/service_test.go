@@ -1,6 +1,7 @@
 package intern_test
 
 import (
+	"context"
 	"net/http"
 	"testing"
 
@@ -32,13 +33,9 @@ func TestOpenAndForward(t *testing.T) {
 
 	ticketer := flows.NewTicketer(static.NewTicketer(assets.TicketerUUID(uuids.New()), "Support", "internal"))
 
-	svc, err := intern.NewService(
-		rt.Config,
-		http.DefaultClient,
-		nil,
-		ticketer,
-		nil,
-	)
+	model := models.BuildTicketer(models.TicketerID(0), ticketer.UUID(), testdata.Org1.ID, "internal", "Support", nil)
+	svc, err := intern.NewService(rt.Config, http.DefaultClient, nil, ticketer, model, ctx, nil)
+
 	require.NoError(t, err)
 
 	logger := &flows.HTTPLogger{}
@@ -80,7 +77,8 @@ func TestCloseAndReopen(t *testing.T) {
 	uuids.SetGenerator(uuids.NewSeededGenerator(12345))
 
 	ticketer := flows.NewTicketer(static.NewTicketer(assets.TicketerUUID(uuids.New()), "Support", "internal"))
-	svc, err := intern.NewService(rt.Config, http.DefaultClient, nil, ticketer, nil)
+	model := models.BuildTicketer(models.TicketerID(0), ticketer.UUID(), testdata.Org1.ID, "internal", "Support", nil)
+	svc, err := intern.NewService(rt.Config, http.DefaultClient, nil, ticketer, model, context.Background(), nil)
 	require.NoError(t, err)
 
 	logger := &flows.HTTPLogger{}
