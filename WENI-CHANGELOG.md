@@ -1,3 +1,7 @@
+1.86.0
+----------
+* feat: add POST /mr/ticket/change_ticketer endpoint to move tickets between ticketers without closing them
+
 1.85.4
 ----------
 * feat: add email field support in contact field modifiers

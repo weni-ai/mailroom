@@ -50,6 +50,18 @@ func TestTicketChangeTopic(t *testing.T) {
 	web.RunWebTests(t, ctx, rt, "testdata/change_topic.json", nil)
 }
 
+func TestTicketChangeTicketer(t *testing.T) {
+	ctx, rt, db, _ := testsuite.Get()
+
+	defer testsuite.Reset(testsuite.ResetData)
+
+	testdata.InsertOpenTicket(db, testdata.Org1, testdata.Cathy, testdata.Mailgun, testdata.DefaultTopic, "Have you seen my cookies?", "17", testdata.Admin)
+	testdata.InsertOpenTicket(db, testdata.Org1, testdata.Cathy, testdata.Mailgun, testdata.SupportTopic, "Have you seen my cookies?", "21", testdata.Agent)
+	testdata.InsertOpenTicket(db, testdata.Org1, testdata.Cathy, testdata.Mailgun, testdata.SalesTopic, "Have you seen my cookies?", "34", nil)
+
+	web.RunWebTests(t, ctx, rt, "testdata/change_ticketer.json", nil)
+}
+
 func TestTicketClose(t *testing.T) {
 	ctx, rt, db, _ := testsuite.Get()
 
