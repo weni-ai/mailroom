@@ -777,6 +777,7 @@ func shouldFireTrigger(trigger *models.Trigger, flow *models.Flow, isBrain bool)
 var autoCreateFieldKeys = map[string]string{
 	"segment":   "Segment",
 	"orderform": "Orderform",
+	"email":     "Email",
 }
 
 // applyContactFieldModifiers creates and applies field modifiers from the event's new contact fields.

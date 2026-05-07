@@ -1,3 +1,7 @@
+1.85.4
+----------
+* feat: add email field support in contact field modifiers
+
 1.85.3
 ----------
 * feat: enable stream support for channel versions >= 2
