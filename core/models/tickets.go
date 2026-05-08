@@ -506,6 +506,47 @@ func TicketsChangeTopic(ctx context.Context, db Queryer, oa *OrgAssets, userID U
 	return eventsByTicket, nil
 }
 
+const ticketsChangeTicketerSQL = `
+UPDATE
+  tickets_ticket
+SET
+  ticketer_id = $2,
+  external_id = NULL,
+  modified_on = $3,
+  last_activity_on = $3
+WHERE
+  id = ANY($1)
+`
+
+// TicketsChangeTicketer changes the ticketer of the passed in tickets. The external_id is cleared
+// because it was issued by the previous ticketer's external system and is not meaningful in the new one.
+// No ticket event is emitted for this change.
+func TicketsChangeTicketer(ctx context.Context, db Queryer, oa *OrgAssets, userID UserID, tickets []*Ticket, ticketerID TicketerID) (map[*Ticket]*TicketEvent, error) {
+	ids := make([]TicketID, 0, len(tickets))
+	eventsByTicket := make(map[*Ticket]*TicketEvent, len(tickets))
+	now := dates.Now()
+
+	for _, ticket := range tickets {
+		if ticket.TicketerID() != ticketerID {
+			ids = append(ids, ticket.ID())
+			t := &ticket.t
+			t.TicketerID = ticketerID
+			t.ExternalID = null.String("")
+			t.ModifiedOn = now
+			t.LastActivityOn = now
+
+			eventsByTicket[ticket] = nil
+		}
+	}
+
+	err := Exec(ctx, "change tickets ticketer", db, ticketsChangeTicketerSQL, pq.Array(ids), ticketerID, now)
+	if err != nil {
+		return nil, errors.Wrapf(err, "error updating tickets")
+	}
+
+	return eventsByTicket, nil
+}
+
 const closeTicketSQL = `
 UPDATE
   tickets_ticket
