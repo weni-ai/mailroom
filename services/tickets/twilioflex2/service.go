@@ -71,7 +71,8 @@ type service struct {
 	conversationServiceSid string
 }
 
-func NewService(rtConfig *runtime.Config, httpClient *http.Client, httpRetries *httpx.RetryConfig, ticketer *flows.Ticketer, config map[string]string) (models.TicketService, error) {
+func NewService(rtConfig *runtime.Config, httpClient *http.Client, httpRetries *httpx.RetryConfig, ticketer *flows.Ticketer, model *models.Ticketer, ctx context.Context, db models.Queryer) (models.TicketService, error) {
+	config := model.ConfigMap()
 	authToken := config[configurationAuthToken]
 	accountSid := config[configurationAccountSid]
 	instanceSid := config[configurationInstanceSid]

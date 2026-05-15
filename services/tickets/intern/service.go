@@ -1,6 +1,7 @@
 package intern
 
 import (
+	"context"
 	"encoding/json"
 	"net/http"
 
@@ -25,7 +26,7 @@ type service struct {
 }
 
 // NewService creates a new internal ticket service
-func NewService(rtCfg *runtime.Config, httpClient *http.Client, httpRetries *httpx.RetryConfig, ticketer *flows.Ticketer, config map[string]string) (models.TicketService, error) {
+func NewService(rtCfg *runtime.Config, httpClient *http.Client, httpRetries *httpx.RetryConfig, ticketer *flows.Ticketer, model *models.Ticketer, ctx context.Context, db models.Queryer) (models.TicketService, error) {
 	return &service{ticketer: ticketer}, nil
 }
 

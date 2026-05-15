@@ -43,7 +43,7 @@ func TestCreateWebhook(t *testing.T) {
 		},
 	}))
 
-	client := zendesk.NewRESTClient(http.DefaultClient, nil, "nyaruka", "123456789")
+	client := zendesk.NewRESTClient(http.DefaultClient, nil, "nyaruka", "123456789", nil, nil)
 	webhook := &zendesk.Webhook{
 		Authentication: struct {
 			AddPosition string "json:\"add_position\""
@@ -87,7 +87,7 @@ func TestDeleteWebhook(t *testing.T) {
 		},
 	}))
 
-	client := zendesk.NewRESTClient(http.DefaultClient, nil, "nyaruka", "123456789")
+	client := zendesk.NewRESTClient(http.DefaultClient, nil, "nyaruka", "123456789", nil, nil)
 
 	trace, err := client.DeleteWebhook(123)
 
@@ -125,7 +125,7 @@ func TestCreateTrigger(t *testing.T) {
 		},
 	}))
 
-	client := zendesk.NewRESTClient(http.DefaultClient, nil, "nyaruka", "123456789")
+	client := zendesk.NewRESTClient(http.DefaultClient, nil, "nyaruka", "123456789", nil, nil)
 	trigger := &zendesk.Trigger{
 		Title: "Temba",
 		Conditions: zendesk.Conditions{
@@ -161,7 +161,7 @@ func TestDeleteTrigger(t *testing.T) {
 		},
 	}))
 
-	client := zendesk.NewRESTClient(http.DefaultClient, nil, "nyaruka", "123456789")
+	client := zendesk.NewRESTClient(http.DefaultClient, nil, "nyaruka", "123456789", nil, nil)
 
 	trace, err := client.DeleteTrigger(123)
 
@@ -183,7 +183,7 @@ func TestUpdateManyTickets(t *testing.T) {
 		},
 	}))
 
-	client := zendesk.NewRESTClient(http.DefaultClient, nil, "nyaruka", "123456789")
+	client := zendesk.NewRESTClient(http.DefaultClient, nil, "nyaruka", "123456789", nil, nil)
 
 	jobStatus, trace, err := client.UpdateManyTickets([]int64{123, 234}, "solved")
 
@@ -215,7 +215,7 @@ func TestPush(t *testing.T) {
 		},
 	}))
 
-	client := zendesk.NewPushClient(http.DefaultClient, nil, "nyaruka", "123456789")
+	client := zendesk.NewPushClient(http.DefaultClient, nil, "nyaruka", "123456789", nil, nil)
 
 	_, _, err := client.Push("1234-abcd", "5678-edfg", []*zendesk.ExternalResource{})
 	assert.EqualError(t, err, "unable to connect to server")
@@ -286,7 +286,7 @@ func TestCreateUser(t *testing.T) {
 		},
 	}))
 
-	client := zendesk.NewRESTClient(http.DefaultClient, nil, "mocked_subdomain", "123456789")
+	client := zendesk.NewRESTClient(http.DefaultClient, nil, "mocked_subdomain", "123456789", nil, nil)
 
 	user := &zendesk.User{
 		Name:       "Dummy User",
@@ -321,7 +321,7 @@ func TestSearchUser(t *testing.T) {
 		},
 	}))
 
-	client := zendesk.NewRESTClient(http.DefaultClient, nil, "mocked_subdomain", "123456789")
+	client := zendesk.NewRESTClient(http.DefaultClient, nil, "mocked_subdomain", "123456789", nil, nil)
 
 	_, _, err := client.SearchUser(userUUID)
 	assert.EqualError(t, err, "unable to connect to server")
