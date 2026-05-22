@@ -778,6 +778,7 @@ var autoCreateFieldKeys = map[string]string{
 	"segment":   "Segment",
 	"orderform": "Orderform",
 	"email":     "Email",
+	"session":   "Session",
 }
 
 // applyContactFieldModifiers creates and applies field modifiers from the event's new contact fields.
