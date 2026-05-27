@@ -767,6 +767,9 @@ func newOutgoingMsgWpp(rt *runtime.Runtime, org *Org, channel *Channel, contactI
 		if msgWpp.DirectSend() {
 			metadata["direct_send"] = true
 		}
+		if msgWpp.DirectSendTemplateName() != "" {
+			metadata["direct_send_template_name"] = msgWpp.DirectSendTemplateName()
+		}
 		if msgWpp.TTLSeconds() != 0 {
 			metadata["ttl_seconds"] = msgWpp.TTLSeconds()
 		}
@@ -1669,24 +1672,25 @@ type BroadcastCatalogMessage struct {
 }
 
 type WppBroadcastMessage struct {
-	Text             string                    `json:"text,omitempty"`
-	Header           BroadcastMessageHeader    `json:"header,omitempty"`
-	Footer           string                    `json:"footer,omitempty"`
-	Attachments      []utils.Attachment        `json:"attachments,omitempty"`
-	QuickReplies     []string                  `json:"quick_replies,omitempty"`
-	Template         WppBroadcastTemplate      `json:"template,omitempty"`
-	InteractionType  string                    `json:"interaction_type,omitempty"`
-	OrderDetails     flows.OrderDetailsMessage `json:"order_details,omitempty"`
-	FlowMessage      flows.FlowMessage         `json:"flow_message,omitempty"`
-	ListMessage      flows.ListMessage         `json:"list_message,omitempty"`
-	CTAMessage       flows.CTAMessage          `json:"cta_message,omitempty"`
-	CarouselMessage  []flows.CarouselMessage   `json:"carousel,omitempty"`
-	Buttons          []flows.ButtonComponent   `json:"buttons,omitempty"`
-	CatalogMessage   BroadcastCatalogMessage   `json:"catalog_message,omitempty"`
-	ActionExternalID string                    `json:"action_external_id,omitempty"`
-	ActionType       string                    `json:"action_type,omitempty"`
-	DirectSend       bool                      `json:"direct_send,omitempty"`
-	TTLSeconds       int                       `json:"ttl_seconds,omitempty"`
+	Text                   string                    `json:"text,omitempty"`
+	Header                 BroadcastMessageHeader    `json:"header,omitempty"`
+	Footer                 string                    `json:"footer,omitempty"`
+	Attachments            []utils.Attachment        `json:"attachments,omitempty"`
+	QuickReplies           []string                  `json:"quick_replies,omitempty"`
+	Template               WppBroadcastTemplate      `json:"template,omitempty"`
+	InteractionType        string                    `json:"interaction_type,omitempty"`
+	OrderDetails           flows.OrderDetailsMessage `json:"order_details,omitempty"`
+	FlowMessage            flows.FlowMessage         `json:"flow_message,omitempty"`
+	ListMessage            flows.ListMessage         `json:"list_message,omitempty"`
+	CTAMessage             flows.CTAMessage          `json:"cta_message,omitempty"`
+	CarouselMessage        []flows.CarouselMessage   `json:"carousel,omitempty"`
+	Buttons                []flows.ButtonComponent   `json:"buttons,omitempty"`
+	CatalogMessage         BroadcastCatalogMessage   `json:"catalog_message,omitempty"`
+	ActionExternalID       string                    `json:"action_external_id,omitempty"`
+	ActionType             string                    `json:"action_type,omitempty"`
+	DirectSend             bool                      `json:"direct_send,omitempty"`
+	DirectSendTemplateName string                    `json:"direct_send_template_name,omitempty"`
+	TTLSeconds             int                       `json:"ttl_seconds,omitempty"`
 }
 
 type WppBroadcast struct {
@@ -1871,6 +1875,7 @@ func CreateWppBroadcastMessages(ctx context.Context, rt *runtime.Runtime, oa *Or
 		templateCarousel := make([]flows.CarouselCard, len(bcast.Msg().Template.Carousel))
 		copy(templateCarousel, bcast.Msg().Template.Carousel)
 		directSend := bcast.Msg().DirectSend
+		directSendTemplateName := bcast.Msg().DirectSendTemplateName
 		ttlSeconds := bcast.Msg().TTLSeconds
 
 		ctaMessage := bcast.Msg().CTAMessage
@@ -2050,6 +2055,7 @@ func CreateWppBroadcastMessages(ctx context.Context, rt *runtime.Runtime, oa *Or
 			carouselMessage,
 			directSend,
 			ttlSeconds,
+			directSendTemplateName,
 		)
 
 		extraMetadata := map[string]interface{}{}
