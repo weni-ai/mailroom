@@ -104,6 +104,9 @@ func TestGetOrCreateContactField(t *testing.T) {
 		err = models.GetOrCreateContactField(ctx, db, orgID, "email", "Email")
 		require.NoError(t, err)
 
+		err = models.GetOrCreateContactField(ctx, db, orgID, "session", "Session")
+		require.NoError(t, err)
+
 		testsuite.AssertQuery(t, db,
 			`SELECT count(*) FROM contacts_contactfield WHERE org_id = $1 AND key = 'orderform' AND is_active = TRUE`,
 			orgID,
@@ -114,11 +117,17 @@ func TestGetOrCreateContactField(t *testing.T) {
 			orgID,
 		).Returns(1)
 
+		testsuite.AssertQuery(t, db,
+			`SELECT count(*) FROM contacts_contactfield WHERE org_id = $1 AND key = 'session' AND is_active = TRUE`,
+			orgID,
+		).Returns(1)
+
 		oa, err := models.GetOrgAssetsWithRefresh(ctx, rt, orgID, models.RefreshFields)
 		require.NoError(t, err)
 
 		assert.NotNil(t, oa.FieldByKey("segment"))
 		assert.NotNil(t, oa.FieldByKey("orderform"))
 		assert.NotNil(t, oa.FieldByKey("email"))
+		assert.NotNil(t, oa.FieldByKey("session"))
 	})
 }
