@@ -1,3 +1,7 @@
+1.87.1
+----------
+* feat: enhance WppBroadcastMessage to include DirectSendTemplateName
+
 1.87.0
 ----------
 * feat: add session field support in contact field modifiers
