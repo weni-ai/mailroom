@@ -511,17 +511,31 @@ UPDATE
   tickets_ticket
 SET
   ticketer_id = $2,
-  external_id = NULL,
   modified_on = $3,
   last_activity_on = $3
 WHERE
   id = ANY($1)
 `
 
-// TicketsChangeTicketer changes the ticketer of the passed in tickets. The external_id is cleared
-// because it was issued by the previous ticketer's external system and is not meaningful in the new one.
-// No ticket event is emitted for this change.
-func TicketsChangeTicketer(ctx context.Context, db Queryer, oa *OrgAssets, userID UserID, tickets []*Ticket, ticketerID TicketerID) (map[*Ticket]*TicketEvent, error) {
+const ticketsChangeTicketerWithExternalIDSQL = `
+UPDATE
+  tickets_ticket
+SET
+  ticketer_id = $2,
+  external_id = NULLIF($4, ''),
+  modified_on = $3,
+  last_activity_on = $3
+WHERE
+  id = ANY($1)
+`
+
+// TicketsChangeTicketer changes the ticketer of the passed in tickets. When externalID is non-nil
+// the ticket's external_id is overwritten with the given value (an empty string clears it). When
+// nil the existing external_id is preserved, so callers that do not know the new ticketer's
+// external identifier do not silently break the link to the external system (e.g. the wenichats
+// room UUID used to forward incoming messages to the agent). No ticket event is emitted for this
+// change.
+func TicketsChangeTicketer(ctx context.Context, db Queryer, oa *OrgAssets, userID UserID, tickets []*Ticket, ticketerID TicketerID, externalID *string) (map[*Ticket]*TicketEvent, error) {
 	ids := make([]TicketID, 0, len(tickets))
 	eventsByTicket := make(map[*Ticket]*TicketEvent, len(tickets))
 	now := dates.Now()
@@ -531,7 +545,9 @@ func TicketsChangeTicketer(ctx context.Context, db Queryer, oa *OrgAssets, userI
 			ids = append(ids, ticket.ID())
 			t := &ticket.t
 			t.TicketerID = ticketerID
-			t.ExternalID = null.String("")
+			if externalID != nil {
+				t.ExternalID = null.String(*externalID)
+			}
 			t.ModifiedOn = now
 			t.LastActivityOn = now
 
@@ -539,7 +555,12 @@ func TicketsChangeTicketer(ctx context.Context, db Queryer, oa *OrgAssets, userI
 		}
 	}
 
-	err := Exec(ctx, "change tickets ticketer", db, ticketsChangeTicketerSQL, pq.Array(ids), ticketerID, now)
+	var err error
+	if externalID != nil {
+		err = Exec(ctx, "change tickets ticketer", db, ticketsChangeTicketerWithExternalIDSQL, pq.Array(ids), ticketerID, now, *externalID)
+	} else {
+		err = Exec(ctx, "change tickets ticketer", db, ticketsChangeTicketerSQL, pq.Array(ids), ticketerID, now)
+	}
 	if err != nil {
 		return nil, errors.Wrapf(err, "error updating tickets")
 	}
