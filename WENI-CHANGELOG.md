@@ -1,3 +1,7 @@
+1.88.0
+----------
+* fix: stop wiping ticket external_id on change_ticketer; accept optional external_id and preserve the existing one when not provided
+
 1.87.1
 ----------
 * feat: enhance WppBroadcastMessage to include DirectSendTemplateName
