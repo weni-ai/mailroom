@@ -283,7 +283,8 @@ func TestTicketsChangeTicketer(t *testing.T) {
 	ticket3 := testdata.InsertOpenTicket(db, testdata.Org1, testdata.Cathy, testdata.Mailgun, testdata.DefaultTopic, "C", "ext-3", nil)
 	modelTicket3 := ticket3.Load(db)
 
-	evts, err := models.TicketsChangeTicketer(ctx, db, oa, testdata.Admin.ID, []*models.Ticket{modelTicket1, modelTicket2, modelTicket3}, testdata.Zendesk.ID)
+	// no external_id passed: external_id is preserved on the moved tickets
+	evts, err := models.TicketsChangeTicketer(ctx, db, oa, testdata.Admin.ID, []*models.Ticket{modelTicket1, modelTicket2, modelTicket3}, testdata.Zendesk.ID, nil)
 	require.NoError(t, err)
 	assert.Equal(t, 2, len(evts)) // ticket 2 not included as already on Zendesk
 
@@ -295,14 +296,34 @@ func TestTicketsChangeTicketer(t *testing.T) {
 	// all 3 tickets are now on the Zendesk ticketer
 	testsuite.AssertQuery(t, db, `SELECT count(*) FROM tickets_ticket WHERE ticketer_id = $1`, testdata.Zendesk.ID).Returns(3)
 
-	// moved tickets had their external_id cleared
-	testsuite.AssertQuery(t, db, `SELECT count(*) FROM tickets_ticket WHERE id IN ($1, $2) AND external_id IS NOT NULL`, ticket1.ID, ticket3.ID).Returns(0)
+	// moved tickets keep their original external_id when none was provided
+	testsuite.AssertQuery(t, db, `SELECT count(*) FROM tickets_ticket WHERE id = $1 AND external_id = 'ext-1'`, ticket1.ID).Returns(1)
+	testsuite.AssertQuery(t, db, `SELECT count(*) FROM tickets_ticket WHERE id = $1 AND external_id = 'ext-3'`, ticket3.ID).Returns(1)
 
 	// the untouched ticket keeps its external_id
 	testsuite.AssertQuery(t, db, `SELECT count(*) FROM tickets_ticket WHERE id = $1 AND external_id = 'ext-2'`, ticket2.ID).Returns(1)
 
 	// no ticket events emitted for ticketer changes
 	testsuite.AssertQuery(t, db, `SELECT count(*) FROM tickets_ticketevent WHERE ticket_id IN ($1, $2, $3)`, ticket1.ID, ticket2.ID, ticket3.ID).Returns(0)
+
+	// move ticket1 back to Mailgun and supply a new external_id: it is persisted
+	newExternalID := "room-uuid-from-new-ticketer"
+	modelTicket1 = ticket1.Load(db)
+	evts, err = models.TicketsChangeTicketer(ctx, db, oa, testdata.Admin.ID, []*models.Ticket{modelTicket1}, testdata.Mailgun.ID, &newExternalID)
+	require.NoError(t, err)
+	assert.Equal(t, 1, len(evts))
+	testsuite.AssertQuery(t, db, `SELECT count(*) FROM tickets_ticket WHERE id = $1 AND ticketer_id = $2 AND external_id = $3`, ticket1.ID, testdata.Mailgun.ID, newExternalID).Returns(1)
+
+	// in-memory ticket was updated too
+	assert.Equal(t, null.String(newExternalID), modelTicket1.ExternalID())
+
+	// move ticket3 back to Mailgun and explicitly clear external_id by passing ""
+	emptyExternalID := ""
+	modelTicket3 = ticket3.Load(db)
+	evts, err = models.TicketsChangeTicketer(ctx, db, oa, testdata.Admin.ID, []*models.Ticket{modelTicket3}, testdata.Mailgun.ID, &emptyExternalID)
+	require.NoError(t, err)
+	assert.Equal(t, 1, len(evts))
+	testsuite.AssertQuery(t, db, `SELECT count(*) FROM tickets_ticket WHERE id = $1 AND ticketer_id = $2 AND external_id IS NULL`, ticket3.ID, testdata.Mailgun.ID).Returns(1)
 }
 
 func TestCloseTickets(t *testing.T) {
