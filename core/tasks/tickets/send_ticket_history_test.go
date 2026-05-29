@@ -1,6 +1,7 @@
 package tickets_test
 
 import (
+	"context"
 	"encoding/json"
 	"net/http"
 	"testing"
@@ -131,7 +132,7 @@ func TestSendTicketHistoryRetry(t *testing.T) {
 }
 
 func setupMockTicketer(t *testing.T, db *sqlx.DB) *testdata.Ticketer {
-	models.RegisterTicketService("mock", func(cfg *runtime.Config, httpClient *http.Client, httpRetries *httpx.RetryConfig, ticketer *flows.Ticketer, config map[string]string) (models.TicketService, error) {
+	models.RegisterTicketService("mock", func(cfg *runtime.Config, httpClient *http.Client, httpRetries *httpx.RetryConfig, ticketer *flows.Ticketer, model *models.Ticketer, ctx context.Context, db models.Queryer) (models.TicketService, error) {
 		return &mockTicketService{}, nil
 	})
 

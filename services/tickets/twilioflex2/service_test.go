@@ -1,6 +1,7 @@
 package twilioflex2_test
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 	"testing"
@@ -19,6 +20,7 @@ import (
 	"github.com/nyaruka/goflow/test"
 	"github.com/nyaruka/goflow/utils"
 	"github.com/nyaruka/mailroom/core/models"
+	"github.com/nyaruka/mailroom/runtime"
 	"github.com/nyaruka/mailroom/services/tickets/twilioflex2"
 	"github.com/nyaruka/mailroom/testsuite"
 	"github.com/nyaruka/mailroom/testsuite/testdata"
@@ -36,6 +38,11 @@ const (
 	testConversationServiceSid = "CS12345678901234567890123456789012"
 )
 
+func mustFlex2Svc(rt *runtime.Runtime, ticketer *flows.Ticketer, cfg map[string]string) (models.TicketService, error) {
+	model := models.BuildTicketer(models.TicketerID(0), ticketer.UUID(), testdata.Org1.ID, "twilioflex2", "TwilioFlex2", cfg)
+	return twilioflex2.NewService(rt.Config, http.DefaultClient, nil, ticketer, model, context.Background(), nil)
+}
+
 func TestNewService(t *testing.T) {
 	_, rt, _, _ := testsuite.Get()
 	defer testsuite.Reset(testsuite.ResetAll)
@@ -51,7 +58,7 @@ func TestNewService(t *testing.T) {
 	ticketer := flows.NewTicketer(static.NewTicketer(assets.TicketerUUID(uuids.New()), "TwilioFlex2", "twilioflex2"))
 
 	// Test with empty configuration - should return error
-	svc, err := twilioflex2.NewService(rt.Config, http.DefaultClient, nil, ticketer, map[string]string{})
+	svc, err := mustFlex2Svc(rt, ticketer, map[string]string{})
 	assert.Error(t, err)
 	assert.Nil(t, svc)
 	assert.Contains(t, err.Error(), "missing auth_token or account_sid")
@@ -63,7 +70,7 @@ func TestNewService(t *testing.T) {
 		// missing other required fields
 	}
 
-	svc, err = twilioflex2.NewService(rt.Config, http.DefaultClient, nil, ticketer, incompleteConfig)
+	svc, err = mustFlex2Svc(rt, ticketer, incompleteConfig)
 	assert.Error(t, err)
 	assert.Nil(t, svc)
 	assert.Contains(t, err.Error(), "missing auth_token or account_sid")
@@ -100,7 +107,7 @@ func TestOpen(t *testing.T) {
 		"conversation_service_sid": testConversationServiceSid,
 	}
 
-	svc, err := twilioflex2.NewService(rt.Config, http.DefaultClient, nil, ticketer, config)
+	svc, err := mustFlex2Svc(rt, ticketer, config)
 	require.NoError(t, err)
 
 	interactionWebhookUrl := fmt.Sprintf("https://flex-api.twilio.com/v1/Instances/%s/InteractionWebhooks", testInstanceSid)
@@ -198,7 +205,7 @@ func TestOpenWithMissingConversationSid(t *testing.T) {
 		"conversation_service_sid": testConversationServiceSid,
 	}
 
-	svc, err := twilioflex2.NewService(rt.Config, http.DefaultClient, nil, ticketer, config)
+	svc, err := mustFlex2Svc(rt, ticketer, config)
 	require.NoError(t, err)
 
 	interactionWebhookUrl := fmt.Sprintf("https://flex-api.twilio.com/v1/Instances/%s/InteractionWebhooks", testInstanceSid)
@@ -274,7 +281,7 @@ func TestForward(t *testing.T) {
 		"conversation_service_sid": testConversationServiceSid,
 	}
 
-	svc, err := twilioflex2.NewService(rt.Config, http.DefaultClient, nil, ticketer, config)
+	svc, err := mustFlex2Svc(rt, ticketer, config)
 	require.NoError(t, err)
 
 	// Create a test ticket
@@ -344,7 +351,7 @@ func TestForwardWithAttachments(t *testing.T) {
 		"conversation_service_sid": testConversationServiceSid,
 	}
 
-	svc, err := twilioflex2.NewService(rt.Config, http.DefaultClient, nil, ticketer, config)
+	svc, err := mustFlex2Svc(rt, ticketer, config)
 	require.NoError(t, err)
 
 	// Create a test ticket
@@ -439,7 +446,7 @@ func TestSendHistory(t *testing.T) {
 		"conversation_service_sid": testConversationServiceSid,
 	}
 
-	svc, err := twilioflex2.NewService(rt.Config, http.DefaultClient, nil, ticketer, config)
+	svc, err := mustFlex2Svc(rt, ticketer, config)
 	require.NoError(t, err)
 
 	// Create test data
@@ -534,7 +541,7 @@ func TestSendHistoryWithHistoryAfter(t *testing.T) {
 		"conversation_service_sid": testConversationServiceSid,
 	}
 
-	svc, err := twilioflex2.NewService(rt.Config, http.DefaultClient, nil, ticketer, config)
+	svc, err := mustFlex2Svc(rt, ticketer, config)
 	require.NoError(t, err)
 
 	// Create test data with history_after in ticket body
@@ -619,7 +626,7 @@ func TestSendHistoryWithAttachments(t *testing.T) {
 		"conversation_service_sid": testConversationServiceSid,
 	}
 
-	svc, err := twilioflex2.NewService(rt.Config, http.DefaultClient, nil, ticketer, config)
+	svc, err := mustFlex2Svc(rt, ticketer, config)
 	require.NoError(t, err)
 
 	// Test data
@@ -769,7 +776,7 @@ func TestClose(t *testing.T) {
 		"conversation_service_sid": testConversationServiceSid,
 	}
 
-	svc, err := twilioflex2.NewService(rt.Config, http.DefaultClient, nil, ticketer, config)
+	svc, err := mustFlex2Svc(rt, ticketer, config)
 	require.NoError(t, err)
 
 	logger := &flows.HTTPLogger{}
@@ -800,7 +807,7 @@ func TestReopen(t *testing.T) {
 		"conversation_service_sid": testConversationServiceSid,
 	}
 
-	svc, err := twilioflex2.NewService(rt.Config, http.DefaultClient, nil, ticketer, config)
+	svc, err := mustFlex2Svc(rt, ticketer, config)
 	require.NoError(t, err)
 
 	logger := &flows.HTTPLogger{}

@@ -1,6 +1,7 @@
 package zendesk
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -19,18 +20,20 @@ import (
 	"github.com/nyaruka/null"
 
 	"github.com/pkg/errors"
+	"github.com/sirupsen/logrus"
 )
 
 const (
 	typeZendesk = "zendesk"
 
-	configSubdomain  = "subdomain"
-	configSecret     = "secret"
-	configOAuthToken = "oauth_token"
-	configPushID     = "push_id"
-	configPushToken  = "push_token"
-	configWebhookID  = "webhook_id"
-	configTriggerID  = "trigger_id"
+	configSubdomain    = "subdomain"
+	configSecret       = "secret"
+	configOAuthToken   = "oauth_token"
+	configRefreshToken = "refresh_token"
+	configPushID       = "push_id"
+	configPushToken    = "push_token"
+	configWebhookID    = "webhook_id"
+	configTriggerID    = "trigger_id"
 
 	statusOpen   = "open"
 	statusSolved = "solved"
@@ -54,7 +57,8 @@ type service struct {
 }
 
 // NewService creates a new zendesk ticket service
-func NewService(rtCfg *runtime.Config, httpClient *http.Client, httpRetries *httpx.RetryConfig, ticketer *flows.Ticketer, config map[string]string) (models.TicketService, error) {
+func NewService(rtCfg *runtime.Config, httpClient *http.Client, httpRetries *httpx.RetryConfig, ticketer *flows.Ticketer, model *models.Ticketer, ctx context.Context, db models.Queryer) (models.TicketService, error) {
+	config := model.ConfigMap()
 	subdomain := config[configSubdomain]
 	secret := config[configSecret]
 	oAuthToken := config[configOAuthToken]
@@ -64,10 +68,45 @@ func NewService(rtCfg *runtime.Config, httpClient *http.Client, httpRetries *htt
 	triggerID := config[configTriggerID]
 
 	if subdomain != "" && secret != "" && oAuthToken != "" && instancePushID != "" && pushToken != "" {
+		var marketplace *MarketplaceConfig
+		if rtCfg.ZendeskMarketplaceName != "" {
+			marketplace = &MarketplaceConfig{
+				Name:  rtCfg.ZendeskMarketplaceName,
+				OrgID: rtCfg.ZendeskMarketplaceOrgID,
+				AppID: rtCfg.ZendeskMarketplaceAppID,
+			}
+		}
+
+		refreshToken := config[configRefreshToken]
+		persistCtx := ctx
+		if persistCtx == nil {
+			persistCtx = context.Background()
+		}
+
+		var oauth *OAuthConfig
+		if rtCfg.ZendeskClientID != "" && refreshToken != "" {
+			oauth = &OAuthConfig{
+				ClientID:     rtCfg.ZendeskClientID,
+				ClientSecret: rtCfg.ZendeskClientSecret,
+				RefreshToken: refreshToken,
+			}
+			if db != nil {
+				oauth.OnRefresh = func(newAccessToken, newRefreshToken string) {
+					updates := map[string]string{configOAuthToken: newAccessToken}
+					if newRefreshToken != "" {
+						updates[configRefreshToken] = newRefreshToken
+					}
+					if err := model.UpdateConfig(persistCtx, db, updates, nil); err != nil {
+						logrus.WithError(err).WithField("ticketer_uuid", model.UUID()).Error("failed to persist zendesk oauth tokens after refresh")
+					}
+				}
+			}
+		}
+
 		return &service{
 			rtConfig:       rtCfg,
-			restClient:     NewRESTClient(httpClient, httpRetries, subdomain, oAuthToken),
-			pushClient:     NewPushClient(httpClient, httpRetries, subdomain, pushToken),
+			restClient:     NewRESTClient(httpClient, httpRetries, subdomain, oAuthToken, marketplace, oauth),
+			pushClient:     NewPushClient(httpClient, httpRetries, subdomain, pushToken, marketplace, oauth),
 			ticketer:       ticketer,
 			redactor:       utils.NewRedactor(flows.RedactionMask, oAuthToken, pushToken),
 			secret:         secret,
