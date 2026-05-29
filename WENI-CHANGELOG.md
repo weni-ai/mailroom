@@ -1,3 +1,7 @@
+1.86.0
+----------
+* feat: add Zendesk Marketplace and OAuth configuration support
+
 1.85.2
 ----------
 * feat: check if is ab2(is_multi_agents) before publish sqs ticket event
