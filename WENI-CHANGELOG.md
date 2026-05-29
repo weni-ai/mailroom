@@ -1,6 +1,31 @@
-1.86.0
+1.89.0
 ----------
 * feat: add Zendesk Marketplace and OAuth configuration support
+
+1.88.0
+----------
+* fix: stop wiping ticket external_id on change_ticketer; accept optional external_id and preserve the existing one when not provided
+* chore: Update go.mod and go.sum to replace gocommon version with v1.17.0
+
+1.87.1
+----------
+* feat: enhance WppBroadcastMessage to include DirectSendTemplateName
+
+1.87.0
+----------
+* feat: add session field support in contact field modifiers
+
+1.86.0
+----------
+* feat: add POST /mr/ticket/change_ticketer endpoint to move tickets between ticketers without closing them
+
+1.85.4
+----------
+* feat: add email field support in contact field modifiers
+
+1.85.3
+----------
+* feat: enable stream support for channel versions >= 2
 
 1.85.2
 ----------

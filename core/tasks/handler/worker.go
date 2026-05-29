@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"io"
 	"net/url"
+	"strconv"
 	"time"
 
 	"github.com/apex/log"
@@ -776,6 +777,8 @@ func shouldFireTrigger(trigger *models.Trigger, flow *models.Flow, isBrain bool)
 var autoCreateFieldKeys = map[string]string{
 	"segment":   "Segment",
 	"orderform": "Orderform",
+	"email":     "Email",
+	"session":   "Session",
 }
 
 // applyContactFieldModifiers creates and applies field modifiers from the event's new contact fields.
@@ -1096,7 +1099,7 @@ func requestToRouter(event *MsgEvent, rtConfig *runtime.Config, contact *flows.C
 	httpClient, httpRetries, _ := goflow.HTTP(rtConfig)
 
 	streamSupport := false
-	if fmt.Sprint(channel.Config()["version"]) == "2" {
+	if version, err := strconv.Atoi(fmt.Sprint(channel.Config()["version"])); err == nil && version >= 2 {
 		streamSupport = true
 	}
 

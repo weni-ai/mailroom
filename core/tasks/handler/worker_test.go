@@ -2,6 +2,7 @@ package handler
 
 import (
 	"encoding/json"
+	"fmt"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -165,7 +166,7 @@ func TestRequestToRouter(t *testing.T) {
 	ctx, rt, db, _ := testsuite.Get()
 	defer testsuite.Reset(testsuite.ResetAll)
 
-	channel := testdata.InsertChannel(db, testdata.Org1, "TW", "Router Channel", []string{"tel"}, "SR", map[string]interface{}{"version": 2})
+	channel := testdata.InsertChannel(db, testdata.Org1, "TW", "Router Channel", []string{"tel"}, "SR", map[string]interface{}{"version": "2"})
 	contact := testdata.InsertContact(db, testdata.Org1, flows.ContactUUID(uuids.New()), "Router Contact", envs.Language("eng"))
 	urn := urns.URN("tel:+250700000010")
 	urnID := testdata.InsertContactURN(db, testdata.Org1, contact, urn, 1000)
@@ -279,6 +280,91 @@ func TestRequestToRouter(t *testing.T) {
 	assert.JSONEq(t, string(metadata), string(msgEvent.Metadata))
 }
 
+func TestRequestToRouterStreamSupportByVersion(t *testing.T) {
+	ctx, rt, db, _ := testsuite.Get()
+	defer testsuite.Reset(testsuite.ResetAll)
+
+	contact := testdata.InsertContact(db, testdata.Org1, flows.ContactUUID(uuids.New()), "Stream Contact", envs.Language("eng"))
+	urn := urns.URN("tel:+250700000020")
+	urnID := testdata.InsertContactURN(db, testdata.Org1, contact, urn, 1000)
+
+	reqCh := make(chan []byte, 1)
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		body, _ := io.ReadAll(r.Body)
+		reqCh <- body
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer server.Close()
+
+	rt.Config.RouterBaseURL = server.URL
+	rt.Config.RouterAuthToken = "router-token"
+
+	tests := []struct {
+		name          string
+		config        map[string]interface{}
+		streamSupport bool
+	}{
+		{"version 0 as int disables stream support", map[string]interface{}{"version": 0}, false},
+		{"version 1 as int disables stream support", map[string]interface{}{"version": 1}, false},
+		{"version 2 as int enables stream support", map[string]interface{}{"version": 2}, true},
+		{"version 3 as int enables stream support", map[string]interface{}{"version": 3}, true},
+		{"version 10 as int enables stream support", map[string]interface{}{"version": 10}, true},
+		{"version 1 as string disables stream support", map[string]interface{}{"version": "1"}, false},
+		{"version 2 as string enables stream support", map[string]interface{}{"version": "2"}, true},
+		{"version 3 as string enables stream support", map[string]interface{}{"version": "3"}, true},
+		{"version 10 as string enables stream support", map[string]interface{}{"version": "10"}, true},
+		{"missing version disables stream support", map[string]interface{}{}, false},
+		{"non-numeric version disables stream support", map[string]interface{}{"version": "abc"}, false},
+	}
+
+	for i, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			channel := testdata.InsertChannel(
+				db, testdata.Org1, "TW",
+				fmt.Sprintf("Router Channel %d", i),
+				[]string{"tel"}, "SR",
+				tt.config,
+			)
+
+			models.FlushCache()
+
+			oa, err := models.GetOrgAssets(ctx, rt, testdata.Org1.ID)
+			require.NoError(t, err)
+
+			channelModel := oa.ChannelByID(channel.ID)
+			require.NotNil(t, channelModel)
+
+			modelContact, err := models.LoadContact(ctx, db, oa, contact.ID)
+			require.NoError(t, err)
+
+			flowContact, err := modelContact.FlowContact(oa)
+			require.NoError(t, err)
+
+			event := &MsgEvent{
+				ContactID: contact.ID,
+				OrgID:     testdata.Org1.ID,
+				ChannelID: channel.ID,
+				MsgID:     flows.MsgID(123),
+				MsgUUID:   flows.MsgUUID(uuids.New()),
+				URN:       urn,
+				URNID:     urnID,
+				Text:      "hello router",
+			}
+
+			err = requestToRouter(event, rt.Config, flowContact, uuids.New(), channelModel)
+			require.NoError(t, err)
+
+			body := <-reqCh
+
+			var payload struct {
+				StreamSupport bool `json:"stream_support"`
+			}
+			require.NoError(t, json.Unmarshal(body, &payload))
+			assert.Equal(t, tt.streamSupport, payload.StreamSupport)
+		})
+	}
+}
+
 func TestApplyContactFieldModifiers(t *testing.T) {
 	ctx, rt, db, _ := testsuite.Get()
 	defer testsuite.Reset(testsuite.ResetAll)
@@ -382,8 +468,68 @@ func TestApplyContactFieldModifiers(t *testing.T) {
 		assert.Equal(t, assets.FieldTypeText, field.Type())
 	})
 
+	t.Run("email field is auto-created and applied", func(t *testing.T) {
+		require.Nil(t, oa.SessionAssets().Fields().Get("email"), "email field should not exist yet")
+
+		event := &MsgEvent{
+			ContactID:        testdata.Cathy.ID,
+			OrgID:            testdata.Org1.ID,
+			MsgID:            msg.ID(),
+			MsgUUID:          flows.MsgUUID(uuids.New()),
+			NewContactFields: map[string]string{"email": "test@example.com"},
+		}
+
+		modelContact, updatedContact, recalcGroups, err := applyContactFieldModifiers(ctx, rt, oa, event, flowContact, models.NilTopupID)
+		require.NoError(t, err)
+		require.NotNil(t, modelContact)
+		require.NotNil(t, updatedContact)
+		assert.True(t, recalcGroups)
+
+		testsuite.AssertQuery(t, db,
+			`SELECT count(*) FROM contacts_contactfield WHERE org_id = $1 AND key = 'email' AND is_active = TRUE AND value_type = 'T'`,
+			testdata.Org1.ID,
+		).Returns(1)
+
+		refreshedOA, err := models.GetOrgAssetsWithRefresh(ctx, rt, testdata.Org1.ID, models.RefreshFields)
+		require.NoError(t, err)
+		field := refreshedOA.FieldByKey("email")
+		require.NotNil(t, field)
+		assert.Equal(t, "Email", field.Name())
+		assert.Equal(t, assets.FieldTypeText, field.Type())
+	})
+
+	t.Run("session field is auto-created and applied", func(t *testing.T) {
+		require.Nil(t, oa.SessionAssets().Fields().Get("session"), "session field should not exist yet")
+
+		event := &MsgEvent{
+			ContactID:        testdata.Cathy.ID,
+			OrgID:            testdata.Org1.ID,
+			MsgID:            msg.ID(),
+			MsgUUID:          flows.MsgUUID(uuids.New()),
+			NewContactFields: map[string]string{"session": "abc123"},
+		}
+
+		modelContact, updatedContact, recalcGroups, err := applyContactFieldModifiers(ctx, rt, oa, event, flowContact, models.NilTopupID)
+		require.NoError(t, err)
+		require.NotNil(t, modelContact)
+		require.NotNil(t, updatedContact)
+		assert.True(t, recalcGroups)
+
+		testsuite.AssertQuery(t, db,
+			`SELECT count(*) FROM contacts_contactfield WHERE org_id = $1 AND key = 'session' AND is_active = TRUE AND value_type = 'T'`,
+			testdata.Org1.ID,
+		).Returns(1)
+
+		refreshedOA, err := models.GetOrgAssetsWithRefresh(ctx, rt, testdata.Org1.ID, models.RefreshFields)
+		require.NoError(t, err)
+		field := refreshedOA.FieldByKey("session")
+		require.NotNil(t, field)
+		assert.Equal(t, "Session", field.Name())
+		assert.Equal(t, assets.FieldTypeText, field.Type())
+	})
+
 	t.Run("both whitelisted fields in one event", func(t *testing.T) {
-		db.MustExec(`DELETE FROM contacts_contactfield WHERE org_id = $1 AND key IN ('segment', 'orderform')`, testdata.Org1.ID)
+		db.MustExec(`DELETE FROM contacts_contactfield WHERE org_id = $1 AND key IN ('segment', 'orderform', 'email', 'session')`, testdata.Org1.ID)
 		models.FlushCache()
 
 		freshOA, err := models.GetOrgAssetsWithRefresh(ctx, rt, testdata.Org1.ID, models.RefreshAll)
@@ -396,7 +542,7 @@ func TestApplyContactFieldModifiers(t *testing.T) {
 			OrgID:            testdata.Org1.ID,
 			MsgID:            msg.ID(),
 			MsgUUID:          flows.MsgUUID(uuids.New()),
-			NewContactFields: map[string]string{"segment": "vip", "orderform": "order-456"},
+			NewContactFields: map[string]string{"segment": "vip", "orderform": "order-456", "email": "cathy@example.com", "session": "sess-789"},
 		}
 
 		modelContact, updatedContact, recalcGroups, err := applyContactFieldModifiers(ctx, rt, freshOA, event, freshContact, models.NilTopupID)
@@ -406,13 +552,13 @@ func TestApplyContactFieldModifiers(t *testing.T) {
 		assert.True(t, recalcGroups)
 
 		testsuite.AssertQuery(t, db,
-			`SELECT count(*) FROM contacts_contactfield WHERE org_id = $1 AND key IN ('segment', 'orderform') AND is_active = TRUE`,
+			`SELECT count(*) FROM contacts_contactfield WHERE org_id = $1 AND key IN ('segment', 'orderform', 'email', 'session') AND is_active = TRUE`,
 			testdata.Org1.ID,
-		).Returns(2)
+		).Returns(4)
 	})
 
 	t.Run("mix of existing, whitelisted, and unknown fields", func(t *testing.T) {
-		db.MustExec(`DELETE FROM contacts_contactfield WHERE org_id = $1 AND key IN ('segment', 'orderform')`, testdata.Org1.ID)
+		db.MustExec(`DELETE FROM contacts_contactfield WHERE org_id = $1 AND key IN ('segment', 'orderform', 'email', 'session')`, testdata.Org1.ID)
 		models.FlushCache()
 
 		freshOA, err := models.GetOrgAssetsWithRefresh(ctx, rt, testdata.Org1.ID, models.RefreshAll)
