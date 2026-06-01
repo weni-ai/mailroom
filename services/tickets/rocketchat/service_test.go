@@ -1,6 +1,7 @@
 package rocketchat_test
 
 import (
+	"context"
 	"net/http"
 	"testing"
 	"time"
@@ -15,6 +16,7 @@ import (
 	"github.com/nyaruka/goflow/test"
 	"github.com/nyaruka/goflow/utils"
 	"github.com/nyaruka/mailroom/core/models"
+	"github.com/nyaruka/mailroom/runtime"
 	"github.com/nyaruka/mailroom/services/tickets/rocketchat"
 	"github.com/nyaruka/mailroom/testsuite"
 	"github.com/nyaruka/mailroom/testsuite/testdata"
@@ -23,6 +25,13 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
+
+
+
+func mustRcSvc(rt *runtime.Runtime, ft *flows.Ticketer, cfg map[string]string) (models.TicketService, error) {
+	model := models.BuildTicketer(models.TicketerID(0), ft.UUID(), testdata.Org1.ID, "rocketchat", "Support", cfg)
+	return rocketchat.NewService(rt.Config, http.DefaultClient, nil, ft, model, context.Background(), nil)
+}
 
 func TestOpenAndForward(t *testing.T) {
 	ctx, rt, _, _ := testsuite.Get()
@@ -50,20 +59,12 @@ func TestOpenAndForward(t *testing.T) {
 
 	ticketer := flows.NewTicketer(static.NewTicketer(assets.TicketerUUID(uuids.New()), "Support", "rocketchat"))
 
-	_, err = rocketchat.NewService(
-		rt.Config,
-		http.DefaultClient,
-		nil,
-		ticketer,
+	_, err = mustRcSvc(rt, ticketer,
 		map[string]string{},
 	)
 	assert.EqualError(t, err, "missing base_url or secret config")
 
-	svc, err := rocketchat.NewService(
-		rt.Config,
-		http.DefaultClient,
-		nil,
-		ticketer,
+	svc, err := mustRcSvc(rt, ticketer,
 		map[string]string{
 			"base_url": baseURL,
 			"secret":   secret,
@@ -125,11 +126,7 @@ func TestCloseAndReopen(t *testing.T) {
 	}))
 
 	ticketer := flows.NewTicketer(static.NewTicketer(assets.TicketerUUID(uuids.New()), "Support", "rocketchat"))
-	svc, err := rocketchat.NewService(
-		rt.Config,
-		http.DefaultClient,
-		nil,
-		ticketer,
+	svc, err := mustRcSvc(rt, ticketer,
 		map[string]string{
 			"base_url": baseURL,
 			"secret":   secret,

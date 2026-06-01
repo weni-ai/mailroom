@@ -67,7 +67,7 @@ func handleOpen(ctx context.Context, rt *runtime.Runtime, r *http.Request, l *mo
 
 	currentSession := newEndpointSession(contact, oa.Env())
 
-	svc, err := ticketer.AsService(rt.Config, flowsTicketer)
+	svc, err := ticketer.AsService(rt.Config, flowsTicketer, ctx, rt.DB)
 	if err != nil {
 		return nil, 500, errors.Wrapf(err, "error creating ticketer service")
 	}

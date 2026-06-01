@@ -1,6 +1,11 @@
-1.87.2
+1.89.0
+----------
+* feat: add Zendesk Marketplace and OAuth configuration support
+
+1.88.0
 ----------
 * fix: stop wiping ticket external_id on change_ticketer; accept optional external_id and preserve the existing one when not provided
+* chore: Update go.mod and go.sum to replace gocommon version with v1.17.0
 
 1.87.1
 ----------

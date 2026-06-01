@@ -104,7 +104,7 @@ func SendTicketHistory(ctx context.Context, rt *runtime.Runtime, task *SendHisto
 	}
 
 	// Create the service
-	service, err := ticketer.AsService(rt.Config, flows.NewTicketer(ticketer))
+	service, err := ticketer.AsService(rt.Config, flows.NewTicketer(ticketer), ctx, rt.DB)
 	if err != nil {
 		return errors.Wrapf(err, "error creating ticketer service")
 	}

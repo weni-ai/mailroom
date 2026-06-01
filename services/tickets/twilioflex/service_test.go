@@ -1,6 +1,7 @@
 package twilioflex_test
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 	"testing"
@@ -18,6 +19,7 @@ import (
 	"github.com/nyaruka/goflow/test"
 	"github.com/nyaruka/goflow/utils"
 	"github.com/nyaruka/mailroom/core/models"
+	"github.com/nyaruka/mailroom/runtime"
 	"github.com/nyaruka/mailroom/services/tickets/twilioflex"
 	"github.com/nyaruka/mailroom/testsuite"
 	"github.com/nyaruka/mailroom/testsuite/testdata"
@@ -25,6 +27,13 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
+
+
+
+func mustFlexSvc(rt *runtime.Runtime, ft *flows.Ticketer, cfg map[string]string) (models.TicketService, error) {
+	model := models.BuildTicketer(models.TicketerID(0), ft.UUID(), testdata.Org1.ID, "twilioflex", "Support", cfg)
+	return twilioflex.NewService(rt.Config, http.DefaultClient, nil, ft, model, context.Background(), nil)
+}
 
 func TestOpenAndForward(t *testing.T) {
 	ctx, rt, _, _ := testsuite.Get()
@@ -390,20 +399,12 @@ func TestOpenAndForward(t *testing.T) {
 
 	ticketer := flows.NewTicketer(static.NewTicketer(assets.TicketerUUID(uuids.New()), "Support", "twilioflex"))
 
-	_, err = twilioflex.NewService(
-		rt.Config,
-		http.DefaultClient,
-		nil,
-		ticketer,
+	_, err = mustFlexSvc(rt, ticketer,
 		map[string]string{},
 	)
 	assert.EqualError(t, err, "missing auth_token or account_sid or chat_service_sid or workspace_sid in twilio flex config")
 
-	svc, err := twilioflex.NewService(
-		rt.Config,
-		http.DefaultClient,
-		nil,
-		ticketer,
+	svc, err := mustFlexSvc(rt, ticketer,
 		map[string]string{
 			"auth_token":       authToken,
 			"account_sid":      accountSid,
@@ -570,11 +571,7 @@ func TestCloseAndReopen(t *testing.T) {
 
 	ticketer := flows.NewTicketer(static.NewTicketer(assets.TicketerUUID(uuids.New()), "Support", "twilioflex"))
 
-	svc, err := twilioflex.NewService(
-		rt.Config,
-		http.DefaultClient,
-		nil,
-		ticketer,
+	svc, err := mustFlexSvc(rt, ticketer,
 		map[string]string{
 			"auth_token":       authToken,
 			"account_sid":      accountSid,

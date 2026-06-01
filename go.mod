@@ -93,6 +93,6 @@ require (
 
 go 1.23
 
-replace github.com/nyaruka/gocommon => github.com/weni-ai/gocommon v1.17.0-weni-stg
+replace github.com/nyaruka/gocommon => github.com/weni-ai/gocommon v1.17.0
 
 replace github.com/nyaruka/goflow => github.com/weni-ai/goflow v1.20.3
