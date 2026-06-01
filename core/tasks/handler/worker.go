@@ -775,10 +775,11 @@ func shouldFireTrigger(trigger *models.Trigger, flow *models.Flow, isBrain bool)
 
 // fields that should be auto-created when received but not present in the org
 var autoCreateFieldKeys = map[string]string{
-	"segment":   "Segment",
-	"orderform": "Orderform",
-	"email":     "Email",
-	"session":   "Session",
+	"segment":      "Segment",
+	"orderform":    "Orderform",
+	"email":        "Email",
+	"session":      "Session",
+	"vtex_account": "Vtex account",
 }
 
 // applyContactFieldModifiers creates and applies field modifiers from the event's new contact fields.

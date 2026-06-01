@@ -528,8 +528,38 @@ func TestApplyContactFieldModifiers(t *testing.T) {
 		assert.Equal(t, assets.FieldTypeText, field.Type())
 	})
 
+	t.Run("vtex_account field is auto-created and applied", func(t *testing.T) {
+		require.Nil(t, oa.SessionAssets().Fields().Get("vtex_account"), "vtex_account field should not exist yet")
+
+		event := &MsgEvent{
+			ContactID:        testdata.Cathy.ID,
+			OrgID:            testdata.Org1.ID,
+			MsgID:            msg.ID(),
+			MsgUUID:          flows.MsgUUID(uuids.New()),
+			NewContactFields: map[string]string{"vtex_account": "mystore"},
+		}
+
+		modelContact, updatedContact, recalcGroups, err := applyContactFieldModifiers(ctx, rt, oa, event, flowContact, models.NilTopupID)
+		require.NoError(t, err)
+		require.NotNil(t, modelContact)
+		require.NotNil(t, updatedContact)
+		assert.True(t, recalcGroups)
+
+		testsuite.AssertQuery(t, db,
+			`SELECT count(*) FROM contacts_contactfield WHERE org_id = $1 AND key = 'vtex_account' AND is_active = TRUE AND value_type = 'T'`,
+			testdata.Org1.ID,
+		).Returns(1)
+
+		refreshedOA, err := models.GetOrgAssetsWithRefresh(ctx, rt, testdata.Org1.ID, models.RefreshFields)
+		require.NoError(t, err)
+		field := refreshedOA.FieldByKey("vtex_account")
+		require.NotNil(t, field)
+		assert.Equal(t, "Vtex account", field.Name())
+		assert.Equal(t, assets.FieldTypeText, field.Type())
+	})
+
 	t.Run("both whitelisted fields in one event", func(t *testing.T) {
-		db.MustExec(`DELETE FROM contacts_contactfield WHERE org_id = $1 AND key IN ('segment', 'orderform', 'email', 'session')`, testdata.Org1.ID)
+		db.MustExec(`DELETE FROM contacts_contactfield WHERE org_id = $1 AND key IN ('segment', 'orderform', 'email', 'session', 'vtex_account')`, testdata.Org1.ID)
 		models.FlushCache()
 
 		freshOA, err := models.GetOrgAssetsWithRefresh(ctx, rt, testdata.Org1.ID, models.RefreshAll)
@@ -542,7 +572,7 @@ func TestApplyContactFieldModifiers(t *testing.T) {
 			OrgID:            testdata.Org1.ID,
 			MsgID:            msg.ID(),
 			MsgUUID:          flows.MsgUUID(uuids.New()),
-			NewContactFields: map[string]string{"segment": "vip", "orderform": "order-456", "email": "cathy@example.com", "session": "sess-789"},
+			NewContactFields: map[string]string{"segment": "vip", "orderform": "order-456", "email": "cathy@example.com", "session": "sess-789", "vtex_account": "mystore"},
 		}
 
 		modelContact, updatedContact, recalcGroups, err := applyContactFieldModifiers(ctx, rt, freshOA, event, freshContact, models.NilTopupID)
@@ -552,13 +582,13 @@ func TestApplyContactFieldModifiers(t *testing.T) {
 		assert.True(t, recalcGroups)
 
 		testsuite.AssertQuery(t, db,
-			`SELECT count(*) FROM contacts_contactfield WHERE org_id = $1 AND key IN ('segment', 'orderform', 'email', 'session') AND is_active = TRUE`,
+			`SELECT count(*) FROM contacts_contactfield WHERE org_id = $1 AND key IN ('segment', 'orderform', 'email', 'session', 'vtex_account') AND is_active = TRUE`,
 			testdata.Org1.ID,
-		).Returns(4)
+		).Returns(5)
 	})
 
 	t.Run("mix of existing, whitelisted, and unknown fields", func(t *testing.T) {
-		db.MustExec(`DELETE FROM contacts_contactfield WHERE org_id = $1 AND key IN ('segment', 'orderform', 'email', 'session')`, testdata.Org1.ID)
+		db.MustExec(`DELETE FROM contacts_contactfield WHERE org_id = $1 AND key IN ('segment', 'orderform', 'email', 'session', 'vtex_account')`, testdata.Org1.ID)
 		models.FlushCache()
 
 		freshOA, err := models.GetOrgAssetsWithRefresh(ctx, rt, testdata.Org1.ID, models.RefreshAll)
