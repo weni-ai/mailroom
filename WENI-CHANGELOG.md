@@ -1,3 +1,7 @@
+1.90.0
+----------
+* feat: add vtex_account field support in contact field management
+
 1.89.0
 ----------
 * feat: add Zendesk Marketplace and OAuth configuration support
