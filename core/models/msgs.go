@@ -1733,6 +1733,7 @@ type WppBroadcastMessage struct {
 	DirectSend             bool                      `json:"direct_send,omitempty"`
 	DirectSendTemplateName string                    `json:"direct_send_template_name,omitempty"`
 	TTLSeconds             int                       `json:"ttl_seconds,omitempty"`
+	ProductCarousel        bool                      `json:"product_carousel,omitempty"`
 }
 
 type WppBroadcast struct {
@@ -1932,6 +1933,7 @@ func CreateWppBroadcastMessages(ctx context.Context, rt *runtime.Runtime, oa *Or
 
 		actionType := bcast.Msg().ActionType
 		actionExternalID := bcast.Msg().ActionExternalID
+		productCarousel := bcast.Msg().ProductCarousel
 
 		// build up the minimum viable context for evaluation
 		evaluationCtx := types.NewXObject(map[string]types.XValue{
@@ -2103,6 +2105,9 @@ func CreateWppBroadcastMessages(ctx context.Context, rt *runtime.Runtime, oa *Or
 		extraMetadata := map[string]interface{}{}
 		if bcast.Queue() != "" {
 			extraMetadata["queue"] = bcast.Queue()
+		}
+		if productCarousel {
+			extraMetadata["product_carousel"] = productCarousel
 		}
 
 		msg, err := NewOutgoingWppBroadcastMsg(rt, oa.Org(), channel, c.ID(), out, time.Now(), bcast.BroadcastID(), highPriority, extraMetadata)
