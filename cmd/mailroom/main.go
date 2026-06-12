@@ -32,6 +32,7 @@ import (
 	_ "github.com/nyaruka/mailroom/services/ivr/twiml"
 	_ "github.com/nyaruka/mailroom/services/ivr/vonage"
 	_ "github.com/nyaruka/mailroom/services/tickets/freshchat"
+	_ "github.com/nyaruka/mailroom/services/tickets/generic"
 	_ "github.com/nyaruka/mailroom/services/tickets/intern"
 	_ "github.com/nyaruka/mailroom/services/tickets/mailgun"
 	_ "github.com/nyaruka/mailroom/services/tickets/rocketchat"
