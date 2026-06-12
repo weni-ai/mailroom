@@ -173,6 +173,13 @@ func TestWppBroadcastTask(t *testing.T) {
 		},
 	}
 
+	productCarouselMsg := models.WppBroadcastMessage{
+		Text: "Check out our carousel",
+		CatalogMessage: models.BroadcastCatalogMessage{
+			Carousel: true,
+		},
+	}
+
 	tcs := []struct {
 		BroadcastID models.BroadcastID
 		URNs        []urns.URN
@@ -355,6 +362,18 @@ func TestWppBroadcastTask(t *testing.T) {
 			"",
 			models.NilChannelID,
 		},
+		{
+			models.NilBroadcastID,
+			nil,
+			cathyOnly,
+			nil,
+			queue.WppBroadcastBatchQueue,
+			1,
+			1,
+			productCarouselMsg,
+			"Check out our carousel",
+			models.NilChannelID,
+		},
 	}
 
 	lastNow := time.Now()
@@ -453,6 +472,12 @@ func TestWppBroadcastTask(t *testing.T) {
 				lastNow,
 				`{"action":"View Products","body":"Check out our products","products":[{"product":"banana","product_retailer_ids":["123"]}],"send_catalog":true,"text":""}`,
 			).Returns(1, "%d: unexpected catalog message count", i)
+		}
+
+		// assert product_carousel is being sent
+		if tc.Msg.CatalogMessage.Carousel {
+			testsuite.AssertQuery(t, db, `SELECT count(*) FROM msgs_msg WHERE org_id = 1 AND created_on > $1 AND text = $2 AND metadata LIKE '%' || 'product_carousel' || '%'`, lastNow, tc.MsgText).
+				Returns(1, "%d: unexpected product_carousel count", i)
 		}
 
 		// assert our template is being sent

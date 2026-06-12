@@ -1669,6 +1669,7 @@ type BroadcastCatalogMessage struct {
 	Products         []flows.ProductEntry `json:"products,omitempty"`
 	ActionButtonText string               `json:"action_button_text,omitempty"`
 	SendCatalog      bool                 `json:"send_catalog,omitempty"`
+	Carousel         bool                 `json:"carousel,omitempty"`
 }
 
 type WppBroadcastMessage struct {
@@ -1887,6 +1888,7 @@ func CreateWppBroadcastMessages(ctx context.Context, rt *runtime.Runtime, oa *Or
 		products := bcast.Msg().CatalogMessage.Products
 		actionButtonText := bcast.Msg().CatalogMessage.ActionButtonText
 		sendCatalog := bcast.Msg().CatalogMessage.SendCatalog
+		carousel := bcast.Msg().CatalogMessage.Carousel
 
 		actionType := bcast.Msg().ActionType
 		actionExternalID := bcast.Msg().ActionExternalID
@@ -2061,6 +2063,9 @@ func CreateWppBroadcastMessages(ctx context.Context, rt *runtime.Runtime, oa *Or
 		extraMetadata := map[string]interface{}{}
 		if bcast.Queue() != "" {
 			extraMetadata["queue"] = bcast.Queue()
+		}
+		if carousel {
+			extraMetadata["product_carousel"] = carousel
 		}
 
 		msg, err := NewOutgoingWppBroadcastMsg(rt, oa.Org(), channel, c.ID(), out, time.Now(), bcast.BroadcastID(), highPriority, extraMetadata)
