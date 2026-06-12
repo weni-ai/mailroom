@@ -174,8 +174,10 @@ func TestWppBroadcastTask(t *testing.T) {
 	}
 
 	productCarouselMsg := models.WppBroadcastMessage{
-		Text:            "Check out our carousel",
-		ProductCarousel: true,
+		Text: "Check out our carousel",
+		CatalogMessage: models.BroadcastCatalogMessage{
+			Carousel: true,
+		},
 	}
 
 	tcs := []struct {
@@ -473,7 +475,7 @@ func TestWppBroadcastTask(t *testing.T) {
 		}
 
 		// assert product_carousel is being sent
-		if tc.Msg.ProductCarousel != false {
+		if tc.Msg.CatalogMessage.Carousel {
 			testsuite.AssertQuery(t, db, `SELECT count(*) FROM msgs_msg WHERE org_id = 1 AND created_on > $1 AND text = $2 AND metadata LIKE '%' || 'product_carousel' || '%'`, lastNow, tc.MsgText).
 				Returns(1, "%d: unexpected product_carousel count", i)
 		}
