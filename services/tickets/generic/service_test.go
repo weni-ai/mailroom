@@ -1,6 +1,7 @@
 package generic_test
 
 import (
+	"context"
 	"errors"
 	"net/http"
 	"testing"
@@ -52,6 +53,17 @@ func newDefaultTopic() *flows.Topic {
 	))
 }
 
+func newModelTicketer(config map[string]string) *models.Ticketer {
+	return models.BuildTicketer(
+		models.TicketerID(1),
+		assets.TicketerUUID("11111111-2222-3333-4444-555555555555"),
+		testdata.Org1.ID,
+		"generic",
+		"Generic Partner",
+		config,
+	)
+}
+
 func TestNewServiceConfigValidation(t *testing.T) {
 	_, rt, _, _ := testsuite.Get()
 
@@ -69,24 +81,24 @@ func TestNewServiceConfigValidation(t *testing.T) {
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			_, err := generic.NewService(rt.Config, http.DefaultClient, nil, ticketer, tc.config)
+			_, err := generic.NewService(rt.Config, http.DefaultClient, nil, ticketer, newModelTicketer(tc.config), context.Background(), nil)
 			assert.EqualError(t, err, "missing base_url, api_token or webhook_secret in generic ticketer config")
 		})
 	}
 
-	svc, err := generic.NewService(rt.Config, http.DefaultClient, nil, ticketer, map[string]string{
+	svc, err := generic.NewService(rt.Config, http.DefaultClient, nil, ticketer, newModelTicketer(map[string]string{
 		"base_url":       svcBaseURL,
 		"api_token":      svcAPIToken,
 		"webhook_secret": svcWebhookSecret,
-	})
+	}), context.Background(), nil)
 	require.NoError(t, err)
 	require.NotNil(t, svc)
 
-	svc, err = generic.NewService(rt.Config, http.DefaultClient, nil, ticketer, map[string]string{
+	svc, err = generic.NewService(rt.Config, http.DefaultClient, nil, ticketer, newModelTicketer(map[string]string{
 		"base_url":          svcBaseURL,
 		"api_token":         svcAPIToken,
 		"skip_webhook_hmac": "true",
-	})
+	}), context.Background(), nil)
 	require.NoError(t, err)
 	require.NotNil(t, svc)
 }
@@ -123,13 +135,13 @@ func TestOpenAndForward(t *testing.T) {
 	}))
 
 	ticketer := newTicketer()
-	svc, err := generic.NewService(rt.Config, http.DefaultClient, nil, ticketer, map[string]string{
+	svc, err := generic.NewService(rt.Config, http.DefaultClient, nil, ticketer, newModelTicketer(map[string]string{
 		"base_url":       svcBaseURL,
 		"api_token":      svcAPIToken,
 		"webhook_secret": svcWebhookSecret,
 		"project_uuid":   "f0e1d2c3-b4a5-4968-8c7d-9e0f1a2b3c4d",
 		"project_name":   "Partner Project",
-	})
+	}), context.Background(), nil)
 	require.NoError(t, err)
 
 	defaultTopic := newDefaultTopic()
@@ -237,11 +249,11 @@ func TestOpenAlreadyOpenIsTreatedAsSuccess(t *testing.T) {
 	}))
 
 	ticketer := newTicketer()
-	svc, err := generic.NewService(rt.Config, http.DefaultClient, nil, ticketer, map[string]string{
+	svc, err := generic.NewService(rt.Config, http.DefaultClient, nil, ticketer, newModelTicketer(map[string]string{
 		"base_url":       svcBaseURL,
 		"api_token":      svcAPIToken,
 		"webhook_secret": svcWebhookSecret,
-	})
+	}), context.Background(), nil)
 	require.NoError(t, err)
 
 	defaultTopic := newDefaultTopic()
@@ -273,11 +285,11 @@ func TestOpenPartnerError(t *testing.T) {
 	}))
 
 	ticketer := newTicketer()
-	svc, err := generic.NewService(rt.Config, http.DefaultClient, nil, ticketer, map[string]string{
+	svc, err := generic.NewService(rt.Config, http.DefaultClient, nil, ticketer, newModelTicketer(map[string]string{
 		"base_url":       svcBaseURL,
 		"api_token":      svcAPIToken,
 		"webhook_secret": svcWebhookSecret,
-	})
+	}), context.Background(), nil)
 	require.NoError(t, err)
 
 	defaultTopic := newDefaultTopic()
@@ -319,11 +331,11 @@ func TestCloseAndReopen(t *testing.T) {
 	}))
 
 	ticketer := newTicketer()
-	svc, err := generic.NewService(rt.Config, http.DefaultClient, nil, ticketer, map[string]string{
+	svc, err := generic.NewService(rt.Config, http.DefaultClient, nil, ticketer, newModelTicketer(map[string]string{
 		"base_url":       svcBaseURL,
 		"api_token":      svcAPIToken,
 		"webhook_secret": svcWebhookSecret,
-	})
+	}), context.Background(), nil)
 	require.NoError(t, err)
 
 	ticketA := models.NewTicket("88bfa1dc-be33-45c2-b469-294ecb0eba90", testdata.Org1.ID, testdata.Cathy.ID, testdata.RocketChat.ID, "EXT-A", testdata.DefaultTopic.ID, "first", models.NilUserID, nil)
@@ -365,11 +377,11 @@ func TestSendHistoryIsNoop(t *testing.T) {
 	httpx.SetRequestor(httpx.NewMockRequestor(nil))
 
 	ticketer := newTicketer()
-	svc, err := generic.NewService(rt.Config, http.DefaultClient, nil, ticketer, map[string]string{
+	svc, err := generic.NewService(rt.Config, http.DefaultClient, nil, ticketer, newModelTicketer(map[string]string{
 		"base_url":       svcBaseURL,
 		"api_token":      svcAPIToken,
 		"webhook_secret": svcWebhookSecret,
-	})
+	}), context.Background(), nil)
 	require.NoError(t, err)
 
 	dbTicket := models.NewTicket("88bfa1dc-be33-45c2-b469-294ecb0eba90", testdata.Org1.ID, testdata.Cathy.ID, testdata.RocketChat.ID, "EXT-X", testdata.DefaultTopic.ID, "x", models.NilUserID, nil)
@@ -399,12 +411,12 @@ func TestCustomRoutesThroughConfig(t *testing.T) {
 	}))
 
 	ticketer := newTicketer()
-	svc, err := generic.NewService(rt.Config, http.DefaultClient, nil, ticketer, map[string]string{
+	svc, err := generic.NewService(rt.Config, http.DefaultClient, nil, ticketer, newModelTicketer(map[string]string{
 		"base_url":       svcBaseURL,
 		"api_token":      svcAPIToken,
 		"webhook_secret": svcWebhookSecret,
 		"route_open":     "/api/conversations",
-	})
+	}), context.Background(), nil)
 	require.NoError(t, err)
 
 	defaultTopic := newDefaultTopic()
