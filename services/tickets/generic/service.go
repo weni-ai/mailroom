@@ -7,6 +7,7 @@
 package generic
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -75,7 +76,8 @@ type service struct {
 // NewService creates a new generic ticket service from the given config map.
 // Required keys: base_url, api_token. webhook_secret is required unless
 // skip_webhook_hmac is true.
-func NewService(rtCfg *runtime.Config, httpClient *http.Client, httpRetries *httpx.RetryConfig, ticketer *flows.Ticketer, config map[string]string) (models.TicketService, error) {
+func NewService(rtCfg *runtime.Config, httpClient *http.Client, httpRetries *httpx.RetryConfig, ticketer *flows.Ticketer, model *models.Ticketer, ctx context.Context, db models.Queryer) (models.TicketService, error) {
+	config := model.ConfigMap()
 	baseURL := strings.TrimSpace(config[configBaseURL])
 	apiToken := strings.TrimSpace(config[configAPIToken])
 	webhookSecret := strings.TrimSpace(config[configWebhookSecret])
