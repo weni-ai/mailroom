@@ -30,7 +30,7 @@ import (
 // We first realign the id sequence with MAX(id) because the shared test DB
 // dump can have its sequence trail behind the existing rows, which would
 // otherwise make the INSERT collide on the primary key.
-func seedTicketer(t *testing.T, db *sqlx.DB, secret string) assets.TicketerUUID {
+func seedTicketer(t *testing.T, db *sqlx.DB, secret string, skipWebhookHMAC bool) assets.TicketerUUID {
 	t.Helper()
 	u := assets.TicketerUUID(uuids.New())
 
@@ -40,9 +40,13 @@ func seedTicketer(t *testing.T, db *sqlx.DB, secret string) assets.TicketerUUID 
 	)`)
 
 	config := fmt.Sprintf(
-		`{"base_url":"https://partner.example.com","api_token":"x","webhook_secret":%q}`,
+		`{"base_url":"https://partner.example.com","api_token":"x","webhook_secret":%q`,
 		secret,
 	)
+	if skipWebhookHMAC {
+		config += `,"skip_webhook_hmac":"true"`
+	}
+	config += "}"
 	db.MustExec(
 		`INSERT INTO tickets_ticketer(uuid, org_id, name, ticketer_type, config, is_active, created_on, modified_on, created_by_id, modified_by_id)
 		 VALUES ($1, 1, 'Generic Test', 'generic', $2, TRUE, NOW(), NOW(), 1, 1)`,
@@ -96,7 +100,7 @@ func TestHandleAgentMessage_TicketerNotFound(t *testing.T) {
 func TestHandleAgentMessage_InvalidSignature(t *testing.T) {
 	ctx, rt, db, _ := testsuite.Get()
 
-	u := seedTicketer(t, db, "real-secret")
+	u := seedTicketer(t, db, "real-secret", false)
 
 	body := `{"external_id":"EXT-1","text":"hi","sent_at":"2026-05-20T14:30:00Z"}`
 	resp, status, err := handleAgentMessage(ctx, rt, makeReq("POST", body, u, "sha256=deadbeef", ""), &models.HTTPLogger{})
@@ -110,7 +114,7 @@ func TestHandleAgentMessage_InvalidSignature(t *testing.T) {
 func TestHandleAgentMessage_MissingSignature(t *testing.T) {
 	ctx, rt, db, _ := testsuite.Get()
 
-	u := seedTicketer(t, db, "real-secret")
+	u := seedTicketer(t, db, "real-secret", false)
 
 	body := `{"external_id":"EXT-1","text":"hi","sent_at":"2026-05-20T14:30:00Z"}`
 	resp, status, err := handleAgentMessage(ctx, rt, makeReq("POST", body, u, "", ""), &models.HTTPLogger{})
@@ -121,11 +125,25 @@ func TestHandleAgentMessage_MissingSignature(t *testing.T) {
 	assert.Equal(t, "invalid_signature", m["error"])
 }
 
+func TestHandleAgentMessage_SkipHMACAcceptsUnsignedRequest(t *testing.T) {
+	ctx, rt, db, _ := testsuite.Get()
+
+	u := seedTicketer(t, db, "", true)
+
+	body := `{"external_id":"DOES-NOT-EXIST","text":"hi","sent_at":"2026-05-20T14:30:00Z"}`
+	resp, status, err := handleAgentMessage(ctx, rt, makeReq("POST", body, u, "", ""), &models.HTTPLogger{})
+
+	assert.NoError(t, err)
+	assert.Equal(t, http.StatusNotFound, status)
+	m := decodeResp(t, resp)
+	assert.Equal(t, "ticket_not_found", m["error"])
+}
+
 func TestHandleAgentMessage_ExpiredTimestamp(t *testing.T) {
 	ctx, rt, db, _ := testsuite.Get()
 
 	const secret = "real-secret"
-	u := seedTicketer(t, db, secret)
+	u := seedTicketer(t, db, secret, false)
 
 	body := `{"external_id":"EXT-1","text":"hi","sent_at":"2026-05-20T14:30:00Z"}`
 	sig := "sha256=" + computeSig(secret, body)
@@ -144,7 +162,7 @@ func TestHandleAgentMessage_InvalidJSON(t *testing.T) {
 	ctx, rt, db, _ := testsuite.Get()
 
 	const secret = "real-secret"
-	u := seedTicketer(t, db, secret)
+	u := seedTicketer(t, db, secret, false)
 
 	body := `not json`
 	sig := "sha256=" + computeSig(secret, body)
@@ -160,7 +178,7 @@ func TestHandleAgentMessage_EmptyMessage(t *testing.T) {
 	ctx, rt, db, _ := testsuite.Get()
 
 	const secret = "real-secret"
-	u := seedTicketer(t, db, secret)
+	u := seedTicketer(t, db, secret, false)
 
 	// Valid JSON but no text and no attachments — rejected as empty
 	body := `{"external_id":"EXT-1","sent_at":"2026-05-20T14:30:00Z"}`
@@ -177,7 +195,7 @@ func TestHandleAgentMessage_TicketNotFound(t *testing.T) {
 	ctx, rt, db, _ := testsuite.Get()
 
 	const secret = "real-secret"
-	u := seedTicketer(t, db, secret)
+	u := seedTicketer(t, db, secret, false)
 
 	body := `{"external_id":"DOES-NOT-EXIST","text":"hi","sent_at":"2026-05-20T14:30:00Z"}`
 	sig := "sha256=" + computeSig(secret, body)
@@ -193,7 +211,7 @@ func TestHandleCloseTicket_TicketNotFound(t *testing.T) {
 	ctx, rt, db, _ := testsuite.Get()
 
 	const secret = "real-secret"
-	u := seedTicketer(t, db, secret)
+	u := seedTicketer(t, db, secret, false)
 
 	body := `{"external_id":"DOES-NOT-EXIST","closed_at":"2026-05-20T14:30:00Z"}`
 	sig := "sha256=" + computeSig(secret, body)
@@ -209,7 +227,7 @@ func TestHandleReopenTicket_TicketNotFound(t *testing.T) {
 	ctx, rt, db, _ := testsuite.Get()
 
 	const secret = "real-secret"
-	u := seedTicketer(t, db, secret)
+	u := seedTicketer(t, db, secret, false)
 
 	body := `{"external_id":"DOES-NOT-EXIST","reopened_at":"2026-05-20T14:30:00Z"}`
 	sig := "sha256=" + computeSig(secret, body)

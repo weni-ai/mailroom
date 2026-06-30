@@ -29,7 +29,8 @@ const (
 	// Required config
 	configBaseURL       = "base_url"
 	configAPIToken      = "api_token"
-	configWebhookSecret = "webhook_secret"
+	configWebhookSecret   = "webhook_secret"
+	configSkipWebhookHMAC = "skip_webhook_hmac"
 
 	// Optional metadata enrichment for partner-side context
 	configProjectUUID = "project_uuid"
@@ -51,6 +52,17 @@ func init() {
 	models.RegisterTicketService(typeGeneric, NewService)
 }
 
+// skipWebhookHMAC reports whether inbound webhook HMAC verification is
+// disabled for this ticketer. Accepts "true", "1" or "yes" (case-insensitive).
+func skipWebhookHMAC(config map[string]string) bool {
+	return skipWebhookHMACValue(config[configSkipWebhookHMAC])
+}
+
+func skipWebhookHMACValue(value string) bool {
+	v := strings.TrimSpace(strings.ToLower(value))
+	return v == "true" || v == "1" || v == "yes"
+}
+
 type service struct {
 	rtConfig    *runtime.Config
 	client      *Client
@@ -61,13 +73,18 @@ type service struct {
 }
 
 // NewService creates a new generic ticket service from the given config map.
-// Required keys: base_url, api_token, webhook_secret.
+// Required keys: base_url, api_token. webhook_secret is required unless
+// skip_webhook_hmac is true.
 func NewService(rtCfg *runtime.Config, httpClient *http.Client, httpRetries *httpx.RetryConfig, ticketer *flows.Ticketer, config map[string]string) (models.TicketService, error) {
 	baseURL := strings.TrimSpace(config[configBaseURL])
 	apiToken := strings.TrimSpace(config[configAPIToken])
 	webhookSecret := strings.TrimSpace(config[configWebhookSecret])
+	skipHMAC := skipWebhookHMAC(config)
 
-	if baseURL == "" || apiToken == "" || webhookSecret == "" {
+	if baseURL == "" || apiToken == "" {
+		return nil, errors.New("missing base_url, api_token or webhook_secret in generic ticketer config")
+	}
+	if !skipHMAC && webhookSecret == "" {
 		return nil, errors.New("missing base_url, api_token or webhook_secret in generic ticketer config")
 	}
 
@@ -79,11 +96,16 @@ func NewService(rtCfg *runtime.Config, httpClient *http.Client, httpRetries *htt
 		SendHistory:    config[configRouteHistory],
 	}
 
+	redactArgs := []string{apiToken}
+	if webhookSecret != "" {
+		redactArgs = append(redactArgs, webhookSecret)
+	}
+
 	return &service{
 		rtConfig:    rtCfg,
 		client:      NewClient(httpClient, httpRetries, baseURL, apiToken, WithRoutes(routes)),
 		ticketer:    ticketer,
-		redactor:    utils.NewRedactor(flows.RedactionMask, apiToken, webhookSecret),
+		redactor:    utils.NewRedactor(flows.RedactionMask, redactArgs...),
 		projectUUID: config[configProjectUUID],
 		projectName: config[configProjectName],
 	}, nil
