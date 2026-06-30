@@ -81,6 +81,14 @@ func TestNewServiceConfigValidation(t *testing.T) {
 	})
 	require.NoError(t, err)
 	require.NotNil(t, svc)
+
+	svc, err = generic.NewService(rt.Config, http.DefaultClient, nil, ticketer, map[string]string{
+		"base_url":          svcBaseURL,
+		"api_token":         svcAPIToken,
+		"skip_webhook_hmac": "true",
+	})
+	require.NoError(t, err)
+	require.NotNil(t, svc)
 }
 
 func TestOpenAndForward(t *testing.T) {

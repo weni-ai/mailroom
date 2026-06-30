@@ -103,18 +103,20 @@ func readWebhook(ctx context.Context, rt *runtime.Runtime, r *http.Request) (*mo
 		return nil, nil, errBody("payload_too_large", "request body exceeds limit"), http.StatusRequestEntityTooLarge
 	}
 
-	secret := ticketer.Config(configWebhookSecret)
-	if secret == "" {
-		return nil, nil, errBody("misconfigured", "ticketer has no webhook secret"), http.StatusInternalServerError
-	}
+	if !skipWebhookHMACValue(ticketer.Config(configSkipWebhookHMAC)) {
+		secret := ticketer.Config(configWebhookSecret)
+		if secret == "" {
+			return nil, nil, errBody("misconfigured", "ticketer has no webhook secret"), http.StatusInternalServerError
+		}
 
-	if !verifySignature(secret, body, r.Header.Get(headerSignature)) {
-		return nil, nil, errBody("invalid_signature", "HMAC verification failed"), http.StatusUnauthorized
-	}
+		if !verifySignature(secret, body, r.Header.Get(headerSignature)) {
+			return nil, nil, errBody("invalid_signature", "HMAC verification failed"), http.StatusUnauthorized
+		}
 
-	if ts := r.Header.Get(headerTimestamp); ts != "" {
-		if !verifyTimestamp(ts, time.Now()) {
-			return nil, nil, errBody("expired_request", "X-Webhook-Timestamp outside the accepted window"), http.StatusUnauthorized
+		if ts := r.Header.Get(headerTimestamp); ts != "" {
+			if !verifyTimestamp(ts, time.Now()) {
+				return nil, nil, errBody("expired_request", "X-Webhook-Timestamp outside the accepted window"), http.StatusUnauthorized
+			}
 		}
 	}
 
