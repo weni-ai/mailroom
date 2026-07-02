@@ -307,10 +307,11 @@ func (c *Client) request(method, endpoint string, payload, response interface{},
 	fullURL := c.baseURL + endpoint
 
 	headers := map[string]string{
-		"Authorization": "Bearer " + c.apiToken,
-		"Content-Type":  "application/json",
-		"X-API-Version": apiVersion,
-		"X-Request-Id":  string(uuids.New()),
+		"Authorization":              "Bearer " + c.apiToken,
+		"Content-Type":               "application/json",
+		"X-API-Version":              apiVersion,
+		"X-Request-Id":               string(uuids.New()),
+		"ngrok-skip-browser-warning": "1",
 	}
 	if idempotencyKey != "" {
 		headers["Idempotency-Key"] = idempotencyKey
