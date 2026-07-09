@@ -1,3 +1,7 @@
+1.91.0
+----------
+* feat: add product carousel support to WppBroadcastMessage and related tests
+
 1.90.0
 ----------
 * feat: add vtex_account field support in contact field management

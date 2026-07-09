@@ -705,26 +705,17 @@ func newOutgoingMsgWpp(rt *runtime.Runtime, org *Org, channel *Channel, contactI
 		}
 		if len(msgWpp.QuickReplies()) > 0 {
 			metadata["quick_replies"] = msgWpp.QuickReplies()
-			metadata["interaction_type"] = string(msgWpp.InteractionType())
 		}
 		if len(msgWpp.ListMessage().ListItems) > 0 {
 			metadata["list_message"] = msgWpp.ListMessage()
-			metadata["interaction_type"] = string(msgWpp.InteractionType())
-		}
-		if msgWpp.InteractionType() == "location" {
-			metadata["interaction_type"] = string(msgWpp.InteractionType())
 		}
 		if msgWpp.InteractionType() == "cta_url" {
-			metadata["interaction_type"] = msgWpp.InteractionType()
-			metadata["cta_message"] = msgWpp.CTAMessage()
 			metadata["cta_message"] = map[string]string{
 				"url":          msgWpp.CTAMessage().URL_,
 				"display_text": msgWpp.CTAMessage().DisplayText_,
 			}
 		}
 		if msgWpp.InteractionType() == "flow_msg" {
-			metadata["interaction_type"] = msgWpp.InteractionType()
-			metadata["flow_message"] = msgWpp.FlowMessage()
 			metadata["flow_message"] = map[string]interface{}{
 				"flow_id":     msgWpp.FlowMessage().FlowID,
 				"flow_screen": msgWpp.FlowMessage().FlowScreen,
@@ -735,12 +726,18 @@ func newOutgoingMsgWpp(rt *runtime.Runtime, org *Org, channel *Channel, contactI
 			}
 		}
 		if msgWpp.InteractionType() == "order_details" {
-			metadata["interaction_type"] = msgWpp.InteractionType()
 			metadata["order_details_message"] = msgWpp.OrderDetailsMessage()
 		}
 		if len(msgWpp.Cards()) > 0 {
-			metadata["interaction_type"] = "carousel"
 			metadata["carousel"] = msgWpp.Cards()
+		}
+
+		interactionType := string(msgWpp.InteractionType())
+		if len(msgWpp.Cards()) > 0 {
+			interactionType = "carousel"
+		}
+		if interactionType != "" {
+			metadata["interaction_type"] = interactionType
 		}
 		if len(msgWpp.Buttons()) > 0 {
 			metadata["buttons"] = msgWpp.Buttons()
