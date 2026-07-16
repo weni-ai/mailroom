@@ -118,6 +118,26 @@ func TestOpenTicketRaw(t *testing.T) {
 	assert.NotContains(t, string(trace.RequestTrace), `"ticket_id":`)
 }
 
+func TestForwardMessageRaw(t *testing.T) {
+	resetGlobals(t)
+
+	endpoint := testBaseURL + "/v1/tickets/" + sampleExternalID + "/messages"
+	httpx.SetRequestor(httpx.NewMockRequestor(map[string][]httpx.MockResponse{
+		endpoint: {
+			httpx.NewMockResponse(200, nil, `{"message_external_id":"external-msg-raw","status":"received"}`),
+		},
+	}))
+
+	client := newTestClient()
+	body := []byte(`{"ticket":"` + sampleExternalID + `","body":"templated forward"}`)
+	resp, trace, err := client.ForwardMessageRaw(sampleExternalID, body, "forward-raw-1")
+	require.NoError(t, err)
+	assert.Equal(t, "external-msg-raw", resp.MessageExternalID)
+	assert.Equal(t, "forward-raw-1", trace.Request.Header.Get("Idempotency-Key"))
+	assert.Contains(t, string(trace.RequestTrace), `"body":"templated forward"`)
+	assert.NotContains(t, string(trace.RequestTrace), `"ticket_id":`)
+}
+
 func TestForwardMessage(t *testing.T) {
 	resetGlobals(t)
 

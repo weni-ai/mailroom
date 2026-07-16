@@ -53,6 +53,10 @@ const (
 	// the standard OpenResponse shape (external_id, status, created_at).
 	configOpenResponseTemplate = "open_response_template"
 
+	// Optional Go text/template that renders the Forward request body. When
+	// empty, the standard MessageRequest JSON contract is sent.
+	configForwardTemplate = "forward_template"
+
 	// Webhook URL pattern (legacy, kept for compatibility with existing
 	// ticketer webhook handlers in Mailroom).
 	webhookBasePath = "/mr/tickets/types/" + typeGeneric + "/event_callback"
@@ -82,6 +86,7 @@ type service struct {
 	projectName          string
 	openTemplate         *template.Template
 	openResponseTemplate *template.Template
+	forwardTemplate      *template.Template
 }
 
 // NewService creates a new generic ticket service from the given config map.
@@ -127,6 +132,15 @@ func NewService(rtCfg *runtime.Config, httpClient *http.Client, httpRetries *htt
 		}
 	}
 
+	var forwardTmpl *template.Template
+	if src := strings.TrimSpace(config[configForwardTemplate]); src != "" {
+		var err error
+		forwardTmpl, err = parseForwardTemplate(src)
+		if err != nil {
+			return nil, err
+		}
+	}
+
 	redactArgs := []string{apiToken}
 	if webhookSecret != "" {
 		redactArgs = append(redactArgs, webhookSecret)
@@ -141,6 +155,7 @@ func NewService(rtCfg *runtime.Config, httpClient *http.Client, httpRetries *htt
 		projectName:          config[configProjectName],
 		openTemplate:         openTmpl,
 		openResponseTemplate: openRespTmpl,
+		forwardTemplate:      forwardTmpl,
 	}, nil
 }
 
@@ -295,7 +310,16 @@ func (s *service) Forward(ticket *models.Ticket, msgUUID flows.MsgUUID, text str
 		idempotencyKey = "forward-" + string(msgUUID)
 	}
 
-	_, trace, err := s.client.ForwardMessage(externalID, req, idempotencyKey)
+	var payload interface{} = req
+	if s.forwardTemplate != nil {
+		templatedBody, err := renderForwardTemplate(s.forwardTemplate, req)
+		if err != nil {
+			return errors.Wrap(err, "error rendering forward_template")
+		}
+		payload = json.RawMessage(templatedBody)
+	}
+
+	_, trace, err := s.client.forwardMessageRequest(externalID, payload, idempotencyKey)
 	if trace != nil {
 		logHTTP(flows.NewHTTPLog(trace, flows.HTTPStatusFromCode, s.redactor))
 	}

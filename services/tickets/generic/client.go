@@ -257,8 +257,18 @@ type MessageResponse struct {
 
 // ForwardMessage delivers an incoming message from the contact to the partner.
 func (c *Client) ForwardMessage(externalID string, req *MessageRequest, idempotencyKey string) (*MessageResponse, *httpx.Trace, error) {
+	return c.forwardMessageRequest(externalID, req, idempotencyKey)
+}
+
+// ForwardMessageRaw delivers an incoming message using a pre-rendered JSON body
+// (e.g. from forward_template).
+func (c *Client) ForwardMessageRaw(externalID string, body []byte, idempotencyKey string) (*MessageResponse, *httpx.Trace, error) {
+	return c.forwardMessageRequest(externalID, json.RawMessage(body), idempotencyKey)
+}
+
+func (c *Client) forwardMessageRequest(externalID string, payload interface{}, idempotencyKey string) (*MessageResponse, *httpx.Trace, error) {
 	resp := &MessageResponse{}
-	trace, err := c.request(http.MethodPost, c.endpoint(c.routes.ForwardMessage, externalID), req, resp, idempotencyKey)
+	trace, err := c.request(http.MethodPost, c.endpoint(c.routes.ForwardMessage, externalID), payload, resp, idempotencyKey)
 	return resp, trace, err
 }
 
