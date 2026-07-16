@@ -98,6 +98,26 @@ func TestOpenTicket(t *testing.T) {
 	assert.Contains(t, string(clientErr.Details), "EXT-999")
 }
 
+func TestOpenTicketRaw(t *testing.T) {
+	resetGlobals(t)
+
+	httpx.SetRequestor(httpx.NewMockRequestor(map[string][]httpx.MockResponse{
+		testBaseURL + "/v1/tickets": {
+			httpx.NewMockResponse(201, nil, `{"external_id":"EXT-RAW","status":"open","created_at":"2026-05-20T14:30:03Z"}`),
+		},
+	}))
+
+	client := newTestClient()
+	body := []byte(`{"id":"` + sampleTicketUUID + `","subject":"templated"}`)
+	resp, trace, err := client.OpenTicketRaw(body, "open-raw-1")
+	require.NoError(t, err)
+	assert.Equal(t, "EXT-RAW", resp.ExternalID)
+	assert.Equal(t, "open-raw-1", trace.Request.Header.Get("Idempotency-Key"))
+	assert.Contains(t, string(trace.RequestTrace), `"id":"`+sampleTicketUUID+`"`)
+	assert.Contains(t, string(trace.RequestTrace), `"subject":"templated"`)
+	assert.NotContains(t, string(trace.RequestTrace), `"ticket_id":`)
+}
+
 func TestForwardMessage(t *testing.T) {
 	resetGlobals(t)
 

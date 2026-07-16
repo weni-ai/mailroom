@@ -101,6 +101,15 @@ func TestNewServiceConfigValidation(t *testing.T) {
 	}), context.Background(), nil)
 	require.NoError(t, err)
 	require.NotNil(t, svc)
+
+	_, err = generic.NewService(rt.Config, http.DefaultClient, nil, ticketer, newModelTicketer(map[string]string{
+		"base_url":       svcBaseURL,
+		"api_token":      svcAPIToken,
+		"webhook_secret": svcWebhookSecret,
+		"open_template":  `{"id":"{{.ticket_id"`,
+	}), context.Background(), nil)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "invalid open_template")
 }
 
 func TestOpenAndForward(t *testing.T) {
@@ -428,4 +437,74 @@ func TestCustomRoutesThroughConfig(t *testing.T) {
 	assert.Equal(t, "EXT-ROUTE-1", ticket.ExternalID())
 	require.Equal(t, 1, len(logger.Logs))
 	assert.Contains(t, logger.Logs[0].Request, "POST /api/conversations ")
+}
+
+func TestOpenWithTemplate(t *testing.T) {
+	_, rt, _, _ := testsuite.Get()
+
+	defer dates.SetNowSource(dates.DefaultNowSource)
+	dates.SetNowSource(dates.NewSequentialNowSource(time.Date(2026, 5, 20, 14, 30, 0, 0, time.UTC)))
+
+	session, _, err := test.CreateTestSession("", envs.RedactionPolicyNone)
+	require.NoError(t, err)
+
+	defer uuids.SetGenerator(uuids.DefaultGenerator)
+	uuids.SetGenerator(uuids.NewSeededGenerator(33333))
+	defer httpx.SetRequestor(httpx.DefaultRequestor)
+
+	httpx.SetRequestor(httpx.NewMockRequestor(map[string][]httpx.MockResponse{
+		svcBaseURL + "/v1/tickets": {
+			httpx.NewMockResponse(201, nil, `{"external_id":"EXT-TMPL-1","status":"open","created_at":"2026-05-20T14:30:00Z"}`),
+		},
+	}))
+
+	ticketer := newTicketer()
+	svc, err := generic.NewService(rt.Config, http.DefaultClient, nil, ticketer, newModelTicketer(map[string]string{
+		"base_url":       svcBaseURL,
+		"api_token":      svcAPIToken,
+		"webhook_secret": svcWebhookSecret,
+		"open_template":  `{"id":"{{.ticket_id}}","customer":{{json .contact}},"subject":"{{.body}}"}`,
+	}), context.Background(), nil)
+	require.NoError(t, err)
+
+	logger := &flows.HTTPLogger{}
+	ticket, err := svc.Open(session, newDefaultTopic(), "Need human help", nil, logger.Log)
+	require.NoError(t, err)
+	require.NotNil(t, ticket)
+	assert.Equal(t, "EXT-TMPL-1", ticket.ExternalID())
+	require.Equal(t, 1, len(logger.Logs))
+
+	reqBody := logger.Logs[0].Request
+	assert.Contains(t, reqBody, `"id":"`+string(ticket.UUID())+`"`)
+	assert.Contains(t, reqBody, `"subject":"Need human help"`)
+	assert.Contains(t, reqBody, `"customer":`)
+	assert.NotContains(t, reqBody, `"ticket_id":`)
+}
+
+func TestOpenWithTemplateInvalidJSON(t *testing.T) {
+	_, rt, _, _ := testsuite.Get()
+
+	session, _, err := test.CreateTestSession("", envs.RedactionPolicyNone)
+	require.NoError(t, err)
+
+	defer uuids.SetGenerator(uuids.DefaultGenerator)
+	uuids.SetGenerator(uuids.NewSeededGenerator(44444))
+	defer httpx.SetRequestor(httpx.DefaultRequestor)
+	httpx.SetRequestor(httpx.NewMockRequestor(map[string][]httpx.MockResponse{}))
+
+	ticketer := newTicketer()
+	svc, err := generic.NewService(rt.Config, http.DefaultClient, nil, ticketer, newModelTicketer(map[string]string{
+		"base_url":       svcBaseURL,
+		"api_token":      svcAPIToken,
+		"webhook_secret": svcWebhookSecret,
+		"open_template":  `not-json {{.ticket_id}}`,
+	}), context.Background(), nil)
+	require.NoError(t, err)
+
+	logger := &flows.HTTPLogger{}
+	_, err = svc.Open(session, newDefaultTopic(), "test", nil, logger.Log)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "open_template")
+	assert.Contains(t, err.Error(), "invalid JSON")
+	assert.Equal(t, 0, len(logger.Logs))
 }

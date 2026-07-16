@@ -213,6 +213,14 @@ func (c *Client) OpenTicket(req *OpenRequest, idempotencyKey string) (*OpenRespo
 	return resp, trace, err
 }
 
+// OpenTicketRaw creates a new ticket using a pre-rendered JSON body (e.g. from
+// open_template). The partner response is still parsed as OpenResponse.
+func (c *Client) OpenTicketRaw(body []byte, idempotencyKey string) (*OpenResponse, *httpx.Trace, error) {
+	resp := &OpenResponse{}
+	trace, err := c.request(http.MethodPost, c.endpoint(c.routes.OpenTicket, ""), json.RawMessage(body), resp, idempotencyKey)
+	return resp, trace, err
+}
+
 // Forward (incoming message) -----------------------------------------------
 
 // MessageRequest is the body of POST /v1/tickets/{external_id}/messages.
@@ -318,11 +326,18 @@ func (c *Client) request(method, endpoint string, payload, response interface{},
 
 	var body io.Reader
 	if payload != nil {
-		data, err := jsonx.Marshal(payload)
-		if err != nil {
-			return nil, errors.Wrap(err, "error marshalling request payload")
+		switch p := payload.(type) {
+		case []byte:
+			body = bytes.NewReader(p)
+		case json.RawMessage:
+			body = bytes.NewReader(p)
+		default:
+			data, err := jsonx.Marshal(payload)
+			if err != nil {
+				return nil, errors.Wrap(err, "error marshalling request payload")
+			}
+			body = bytes.NewReader(data)
 		}
-		body = bytes.NewReader(data)
 	}
 
 	req, err := httpx.NewRequest(method, fullURL, body, headers)

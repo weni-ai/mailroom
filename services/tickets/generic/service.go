@@ -12,6 +12,7 @@ import (
 	"fmt"
 	"net/http"
 	"strings"
+	"text/template"
 
 	"github.com/nyaruka/gocommon/dates"
 	"github.com/nyaruka/gocommon/httpx"
@@ -44,6 +45,10 @@ const (
 	configRouteReopen  = "route_reopen"
 	configRouteHistory = "route_history"
 
+	// Optional Go text/template that renders the Open request body. When empty,
+	// the standard OpenRequest JSON contract is sent.
+	configOpenTemplate = "open_template"
+
 	// Webhook URL pattern (legacy, kept for compatibility with existing
 	// ticketer webhook handlers in Mailroom).
 	webhookBasePath = "/mr/tickets/types/" + typeGeneric + "/event_callback"
@@ -65,12 +70,13 @@ func skipWebhookHMACValue(value string) bool {
 }
 
 type service struct {
-	rtConfig    *runtime.Config
-	client      *Client
-	ticketer    *flows.Ticketer
-	redactor    utils.Redactor
-	projectUUID string
-	projectName string
+	rtConfig     *runtime.Config
+	client       *Client
+	ticketer     *flows.Ticketer
+	redactor     utils.Redactor
+	projectUUID  string
+	projectName  string
+	openTemplate *template.Template
 }
 
 // NewService creates a new generic ticket service from the given config map.
@@ -98,18 +104,28 @@ func NewService(rtCfg *runtime.Config, httpClient *http.Client, httpRetries *htt
 		SendHistory:    config[configRouteHistory],
 	}
 
+	var openTmpl *template.Template
+	if src := strings.TrimSpace(config[configOpenTemplate]); src != "" {
+		var err error
+		openTmpl, err = parseOpenTemplate(src)
+		if err != nil {
+			return nil, err
+		}
+	}
+
 	redactArgs := []string{apiToken}
 	if webhookSecret != "" {
 		redactArgs = append(redactArgs, webhookSecret)
 	}
 
 	return &service{
-		rtConfig:    rtCfg,
-		client:      NewClient(httpClient, httpRetries, baseURL, apiToken, WithRoutes(routes)),
-		ticketer:    ticketer,
-		redactor:    utils.NewRedactor(flows.RedactionMask, redactArgs...),
-		projectUUID: config[configProjectUUID],
-		projectName: config[configProjectName],
+		rtConfig:     rtCfg,
+		client:       NewClient(httpClient, httpRetries, baseURL, apiToken, WithRoutes(routes)),
+		ticketer:     ticketer,
+		redactor:     utils.NewRedactor(flows.RedactionMask, redactArgs...),
+		projectUUID:  config[configProjectUUID],
+		projectName:  config[configProjectName],
+		openTemplate: openTmpl,
 	}, nil
 }
 
@@ -167,7 +183,22 @@ func (s *service) Open(session flows.Session, topic *flows.Topic, body string, a
 	req.Metadata = s.buildOpenMetadata(session)
 
 	idempotencyKey := "open-" + string(ticket.UUID())
-	resp, trace, err := s.client.OpenTicket(req, idempotencyKey)
+
+	var (
+		resp  *OpenResponse
+		trace *httpx.Trace
+		err   error
+	)
+	if s.openTemplate != nil {
+		var body []byte
+		body, err = renderOpenTemplate(s.openTemplate, req)
+		if err != nil {
+			return nil, errors.Wrap(err, "error rendering open_template")
+		}
+		resp, trace, err = s.client.OpenTicketRaw(body, idempotencyKey)
+	} else {
+		resp, trace, err = s.client.OpenTicket(req, idempotencyKey)
+	}
 	if trace != nil {
 		logHTTP(flows.NewHTTPLog(trace, flows.HTTPStatusFromCode, s.redactor))
 	}
