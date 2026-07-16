@@ -17,6 +17,15 @@ func TestParseOpenTemplate(t *testing.T) {
 	assert.Contains(t, err.Error(), "invalid open_template")
 }
 
+func TestParseOpenResponseTemplate(t *testing.T) {
+	_, err := parseOpenResponseTemplate(`{"external_id":"{{.id}}"}`)
+	require.NoError(t, err)
+
+	_, err = parseOpenResponseTemplate(`{{.id`)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "invalid open_response_template")
+}
+
 func TestRenderOpenTemplate(t *testing.T) {
 	tmpl, err := parseOpenTemplate(`{"id":"{{.ticket_id}}","customer":{{json .contact}},"subject":"{{.body}}"}`)
 	require.NoError(t, err)
@@ -39,6 +48,28 @@ func TestRenderOpenTemplate(t *testing.T) {
 		"customer":{"uuid":"7ad9d98e-321f-4c61-9a50-79b1c7d7f621","name":"João Silva","urn":"whatsapp:+5511999999999"},
 		"subject":"Need help"
 	}`, string(out))
+}
+
+func TestMapOpenResponse(t *testing.T) {
+	tmpl, err := parseOpenResponseTemplate(`{"external_id":"{{.data.id}}","status":"{{.data.state}}","created_at":"{{.data.created}}"}`)
+	require.NoError(t, err)
+
+	resp, err := mapOpenResponse(tmpl, []byte(`{
+		"data": {"id":"EXT-999","state":"open","created":"2026-05-20T14:30:03Z"}
+	}`))
+	require.NoError(t, err)
+	assert.Equal(t, "EXT-999", resp.ExternalID)
+	assert.Equal(t, "open", resp.Status)
+	assert.Equal(t, time.Date(2026, 5, 20, 14, 30, 3, 0, time.UTC), resp.CreatedAt.UTC())
+}
+
+func TestMapOpenResponseInvalidJSON(t *testing.T) {
+	tmpl, err := parseOpenResponseTemplate(`not-json {{.id}}`)
+	require.NoError(t, err)
+
+	_, err = mapOpenResponse(tmpl, []byte(`{"id":"EXT-1"}`))
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "invalid JSON")
 }
 
 func TestRenderOpenTemplateInvalidJSON(t *testing.T) {
