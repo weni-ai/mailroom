@@ -17,6 +17,37 @@ func TestParseOpenTemplate(t *testing.T) {
 	assert.Contains(t, err.Error(), "invalid open_template")
 }
 
+func TestParseForwardTemplate(t *testing.T) {
+	_, err := parseForwardTemplate(`{"text":"{{.text}}"}`)
+	require.NoError(t, err)
+
+	_, err = parseForwardTemplate(`{{.text`)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "invalid forward_template")
+}
+
+func TestRenderForwardTemplate(t *testing.T) {
+	tmpl, err := parseForwardTemplate(`{"ticket":"{{.external_id}}","from":{{json .sender}},"body":"{{.text}}"}`)
+	require.NoError(t, err)
+
+	req := &MessageRequest{
+		TicketID:   "0f4d2c8a-2c83-4f2c-9f7d-1d4f70d50e71",
+		ExternalID: "EXT-123",
+		Direction:  "incoming",
+		Sender:     Sender{Type: "contact", ID: "c-1", Name: "João"},
+		Text:       "Hello",
+		SentAt:     time.Date(2026, 5, 20, 14, 32, 0, 0, time.UTC),
+	}
+
+	out, err := renderForwardTemplate(tmpl, req)
+	require.NoError(t, err)
+	assert.JSONEq(t, `{
+		"ticket":"EXT-123",
+		"from":{"type":"contact","id":"c-1","name":"João"},
+		"body":"Hello"
+	}`, string(out))
+}
+
 func TestParseOpenResponseTemplate(t *testing.T) {
 	_, err := parseOpenResponseTemplate(`{"external_id":"{{.id}}"}`)
 	require.NoError(t, err)
