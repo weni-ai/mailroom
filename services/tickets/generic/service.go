@@ -49,6 +49,10 @@ const (
 	// the standard OpenRequest JSON contract is sent.
 	configOpenTemplate = "open_template"
 
+	// Optional Go text/template that maps the partner Open response JSON into
+	// the standard OpenResponse shape (external_id, status, created_at).
+	configOpenResponseTemplate = "open_response_template"
+
 	// Webhook URL pattern (legacy, kept for compatibility with existing
 	// ticketer webhook handlers in Mailroom).
 	webhookBasePath = "/mr/tickets/types/" + typeGeneric + "/event_callback"
@@ -70,13 +74,14 @@ func skipWebhookHMACValue(value string) bool {
 }
 
 type service struct {
-	rtConfig     *runtime.Config
-	client       *Client
-	ticketer     *flows.Ticketer
-	redactor     utils.Redactor
-	projectUUID  string
-	projectName  string
-	openTemplate *template.Template
+	rtConfig             *runtime.Config
+	client               *Client
+	ticketer             *flows.Ticketer
+	redactor             utils.Redactor
+	projectUUID          string
+	projectName          string
+	openTemplate         *template.Template
+	openResponseTemplate *template.Template
 }
 
 // NewService creates a new generic ticket service from the given config map.
@@ -113,19 +118,29 @@ func NewService(rtCfg *runtime.Config, httpClient *http.Client, httpRetries *htt
 		}
 	}
 
+	var openRespTmpl *template.Template
+	if src := strings.TrimSpace(config[configOpenResponseTemplate]); src != "" {
+		var err error
+		openRespTmpl, err = parseOpenResponseTemplate(src)
+		if err != nil {
+			return nil, err
+		}
+	}
+
 	redactArgs := []string{apiToken}
 	if webhookSecret != "" {
 		redactArgs = append(redactArgs, webhookSecret)
 	}
 
 	return &service{
-		rtConfig:     rtCfg,
-		client:       NewClient(httpClient, httpRetries, baseURL, apiToken, WithRoutes(routes)),
-		ticketer:     ticketer,
-		redactor:     utils.NewRedactor(flows.RedactionMask, redactArgs...),
-		projectUUID:  config[configProjectUUID],
-		projectName:  config[configProjectName],
-		openTemplate: openTmpl,
+		rtConfig:             rtCfg,
+		client:               NewClient(httpClient, httpRetries, baseURL, apiToken, WithRoutes(routes)),
+		ticketer:             ticketer,
+		redactor:             utils.NewRedactor(flows.RedactionMask, redactArgs...),
+		projectUUID:          config[configProjectUUID],
+		projectName:          config[configProjectName],
+		openTemplate:         openTmpl,
+		openResponseTemplate: openRespTmpl,
 	}, nil
 }
 
@@ -184,21 +199,16 @@ func (s *service) Open(session flows.Session, topic *flows.Topic, body string, a
 
 	idempotencyKey := "open-" + string(ticket.UUID())
 
-	var (
-		resp  *OpenResponse
-		trace *httpx.Trace
-		err   error
-	)
+	var payload interface{} = req
 	if s.openTemplate != nil {
-		var body []byte
-		body, err = renderOpenTemplate(s.openTemplate, req)
+		templatedBody, err := renderOpenTemplate(s.openTemplate, req)
 		if err != nil {
 			return nil, errors.Wrap(err, "error rendering open_template")
 		}
-		resp, trace, err = s.client.OpenTicketRaw(body, idempotencyKey)
-	} else {
-		resp, trace, err = s.client.OpenTicket(req, idempotencyKey)
+		payload = json.RawMessage(templatedBody)
 	}
+
+	trace, err := s.client.openTicketRequest(payload, idempotencyKey)
 	if trace != nil {
 		logHTTP(flows.NewHTTPLog(trace, flows.HTTPStatusFromCode, s.redactor))
 	}
@@ -219,11 +229,28 @@ func (s *service) Open(session flows.Session, topic *flows.Topic, body string, a
 		return nil, errors.Wrap(err, "error opening generic ticket")
 	}
 
+	resp, err := s.parseOpenResponse(trace.ResponseBody)
+	if err != nil {
+		return nil, err
+	}
+
 	if resp.ExternalID == "" {
 		return nil, errors.New("generic ticketer did not return an external_id")
 	}
 	ticket.SetExternalID(resp.ExternalID)
 	return ticket, nil
+}
+
+// parseOpenResponse maps or decodes the partner Open response into OpenResponse.
+func (s *service) parseOpenResponse(raw []byte) (*OpenResponse, error) {
+	if s.openResponseTemplate != nil {
+		resp, err := mapOpenResponse(s.openResponseTemplate, raw)
+		if err != nil {
+			return nil, errors.Wrap(err, "error mapping open_response_template")
+		}
+		return resp, nil
+	}
+	return decodeOpenResponse(raw)
 }
 
 // Forward delivers an inbound contact message to the partner over the

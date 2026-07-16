@@ -208,17 +208,30 @@ type OpenResponse struct {
 
 // OpenTicket creates a new ticket on the partner side.
 func (c *Client) OpenTicket(req *OpenRequest, idempotencyKey string) (*OpenResponse, *httpx.Trace, error) {
-	resp := &OpenResponse{}
-	trace, err := c.request(http.MethodPost, c.endpoint(c.routes.OpenTicket, ""), req, resp, idempotencyKey)
+	trace, err := c.openTicketRequest(req, idempotencyKey)
+	if err != nil {
+		return nil, trace, err
+	}
+	resp, err := decodeOpenResponse(trace.ResponseBody)
 	return resp, trace, err
 }
 
 // OpenTicketRaw creates a new ticket using a pre-rendered JSON body (e.g. from
-// open_template). The partner response is still parsed as OpenResponse.
+// open_template). The partner response is parsed as the standard OpenResponse
+// envelope unless the caller maps it separately.
 func (c *Client) OpenTicketRaw(body []byte, idempotencyKey string) (*OpenResponse, *httpx.Trace, error) {
-	resp := &OpenResponse{}
-	trace, err := c.request(http.MethodPost, c.endpoint(c.routes.OpenTicket, ""), json.RawMessage(body), resp, idempotencyKey)
+	trace, err := c.openTicketRequest(json.RawMessage(body), idempotencyKey)
+	if err != nil {
+		return nil, trace, err
+	}
+	resp, err := decodeOpenResponse(trace.ResponseBody)
 	return resp, trace, err
+}
+
+// openTicketRequest performs the Open HTTP call without parsing the response
+// body, so callers can apply open_response_template or the default decoder.
+func (c *Client) openTicketRequest(payload interface{}, idempotencyKey string) (*httpx.Trace, error) {
+	return c.request(http.MethodPost, c.endpoint(c.routes.OpenTicket, ""), payload, nil, idempotencyKey)
 }
 
 // Forward (incoming message) -----------------------------------------------
