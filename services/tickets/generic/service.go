@@ -65,6 +65,10 @@ const (
 	// empty, the standard CloseRequest JSON contract is sent.
 	configCloseTemplate = "close_template"
 
+	// Optional Go text/template that maps the partner Close response JSON
+	// into the standard CloseResponse shape (status).
+	configCloseResponseTemplate = "close_response_template"
+
 	// Webhook URL pattern (legacy, kept for compatibility with existing
 	// ticketer webhook handlers in Mailroom).
 	webhookBasePath = "/mr/tickets/types/" + typeGeneric + "/event_callback"
@@ -97,6 +101,7 @@ type service struct {
 	forwardTemplate         *template.Template
 	forwardResponseTemplate *template.Template
 	closeTemplate           *template.Template
+	closeResponseTemplate   *template.Template
 }
 
 // NewService creates a new generic ticket service from the given config map.
@@ -169,6 +174,15 @@ func NewService(rtCfg *runtime.Config, httpClient *http.Client, httpRetries *htt
 		}
 	}
 
+	var closeRespTmpl *template.Template
+	if src := strings.TrimSpace(config[configCloseResponseTemplate]); src != "" {
+		var err error
+		closeRespTmpl, err = parseCloseResponseTemplate(src)
+		if err != nil {
+			return nil, err
+		}
+	}
+
 	redactArgs := []string{apiToken}
 	if webhookSecret != "" {
 		redactArgs = append(redactArgs, webhookSecret)
@@ -186,6 +200,7 @@ func NewService(rtCfg *runtime.Config, httpClient *http.Client, httpRetries *htt
 		forwardTemplate:         forwardTmpl,
 		forwardResponseTemplate: forwardRespTmpl,
 		closeTemplate:           closeTmpl,
+		closeResponseTemplate:   closeRespTmpl,
 	}, nil
 }
 
@@ -413,8 +428,24 @@ func (s *service) Close(tickets []*models.Ticket, logHTTP flows.HTTPLogCallback)
 			}
 			return errors.Wrapf(err, "error closing generic ticket %s", t.UUID())
 		}
+
+		if _, err := s.parseCloseResponse(trace.ResponseBody); err != nil {
+			return errors.Wrapf(err, "error parsing close response for ticket %s", t.UUID())
+		}
 	}
 	return nil
+}
+
+// parseCloseResponse maps or decodes the partner Close response into CloseResponse.
+func (s *service) parseCloseResponse(raw []byte) (*CloseResponse, error) {
+	if s.closeResponseTemplate != nil {
+		resp, err := mapCloseResponse(s.closeResponseTemplate, raw)
+		if err != nil {
+			return nil, errors.Wrap(err, "error mapping close_response_template")
+		}
+		return resp, nil
+	}
+	return decodeCloseResponse(raw)
 }
 
 // Reopen notifies the partner that one or more tickets were reopened on the

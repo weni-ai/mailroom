@@ -59,6 +59,12 @@ func parseCloseTemplate(src string) (*template.Template, error) {
 	return parseNamedTemplate("close_template", src)
 }
 
+// parseCloseResponseTemplate parses a Go text/template that maps a partner
+// Close response into the platform CloseResponse JSON shape.
+func parseCloseResponseTemplate(src string) (*template.Template, error) {
+	return parseNamedTemplate("close_response_template", src)
+}
+
 // renderRequestTemplate marshals req to JSON map context and executes tmpl.
 func renderRequestTemplate(tmpl *template.Template, req interface{}, name string) ([]byte, error) {
 	raw, err := jsonx.Marshal(req)
@@ -121,6 +127,20 @@ func mapForwardResponse(tmpl *template.Template, raw []byte) (*MessageResponse, 
 	return resp, nil
 }
 
+// mapCloseResponse executes tmpl against the partner response JSON and
+// unmarshals the result into CloseResponse.
+func mapCloseResponse(tmpl *template.Template, raw []byte) (*CloseResponse, error) {
+	out, err := mapResponseBody(tmpl, raw, "close_response_template")
+	if err != nil {
+		return nil, err
+	}
+	resp := &CloseResponse{}
+	if err := json.Unmarshal(out, resp); err != nil {
+		return nil, errors.Wrap(err, "error decoding mapped close response")
+	}
+	return resp, nil
+}
+
 func mapResponseBody(tmpl *template.Template, raw []byte, name string) ([]byte, error) {
 	ctx := make(map[string]interface{})
 	if len(bytes.TrimSpace(raw)) > 0 {
@@ -154,6 +174,18 @@ func decodeForwardResponse(raw []byte) (*MessageResponse, error) {
 	}
 	if err := jsonx.Unmarshal(raw, resp); err != nil {
 		return nil, errors.Wrap(err, "error unmarshalling forward response")
+	}
+	return resp, nil
+}
+
+// decodeCloseResponse unmarshals a standard CloseResponse envelope.
+func decodeCloseResponse(raw []byte) (*CloseResponse, error) {
+	resp := &CloseResponse{}
+	if len(bytes.TrimSpace(raw)) == 0 {
+		return resp, nil
+	}
+	if err := jsonx.Unmarshal(raw, resp); err != nil {
+		return nil, errors.Wrap(err, "error unmarshalling close response")
 	}
 	return resp, nil
 }
