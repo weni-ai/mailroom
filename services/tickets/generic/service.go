@@ -61,6 +61,10 @@ const (
 	// into the standard MessageResponse shape (message_external_id, status).
 	configForwardResponseTemplate = "forward_response_template"
 
+	// Optional Go text/template that renders the Close request body. When
+	// empty, the standard CloseRequest JSON contract is sent.
+	configCloseTemplate = "close_template"
+
 	// Webhook URL pattern (legacy, kept for compatibility with existing
 	// ticketer webhook handlers in Mailroom).
 	webhookBasePath = "/mr/tickets/types/" + typeGeneric + "/event_callback"
@@ -92,6 +96,7 @@ type service struct {
 	openResponseTemplate    *template.Template
 	forwardTemplate         *template.Template
 	forwardResponseTemplate *template.Template
+	closeTemplate           *template.Template
 }
 
 // NewService creates a new generic ticket service from the given config map.
@@ -155,6 +160,15 @@ func NewService(rtCfg *runtime.Config, httpClient *http.Client, httpRetries *htt
 		}
 	}
 
+	var closeTmpl *template.Template
+	if src := strings.TrimSpace(config[configCloseTemplate]); src != "" {
+		var err error
+		closeTmpl, err = parseCloseTemplate(src)
+		if err != nil {
+			return nil, err
+		}
+	}
+
 	redactArgs := []string{apiToken}
 	if webhookSecret != "" {
 		redactArgs = append(redactArgs, webhookSecret)
@@ -171,6 +185,7 @@ func NewService(rtCfg *runtime.Config, httpClient *http.Client, httpRetries *htt
 		openResponseTemplate:    openRespTmpl,
 		forwardTemplate:         forwardTmpl,
 		forwardResponseTemplate: forwardRespTmpl,
+		closeTemplate:           closeTmpl,
 	}, nil
 }
 
@@ -378,7 +393,16 @@ func (s *service) Close(tickets []*models.Ticket, logHTTP flows.HTTPLogCallback)
 		}
 		idempotencyKey := fmt.Sprintf("close-%s-%d", t.UUID(), now.UnixNano())
 
-		trace, err := s.client.CloseTicket(externalID, req, idempotencyKey)
+		var payload interface{} = req
+		if s.closeTemplate != nil {
+			templatedBody, err := renderCloseTemplate(s.closeTemplate, req)
+			if err != nil {
+				return errors.Wrapf(err, "error rendering close_template for ticket %s", t.UUID())
+			}
+			payload = json.RawMessage(templatedBody)
+		}
+
+		trace, err := s.client.closeTicketRequest(externalID, payload, idempotencyKey)
 		if trace != nil {
 			logHTTP(flows.NewHTTPLog(trace, flows.HTTPStatusFromCode, s.redactor))
 		}

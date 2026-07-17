@@ -35,6 +35,35 @@ func TestParseForwardResponseTemplate(t *testing.T) {
 	assert.Contains(t, err.Error(), "invalid forward_response_template")
 }
 
+func TestParseCloseTemplate(t *testing.T) {
+	_, err := parseCloseTemplate(`{"id":"{{.external_id}}"}`)
+	require.NoError(t, err)
+
+	_, err = parseCloseTemplate(`{{.external_id`)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "invalid close_template")
+}
+
+func TestRenderCloseTemplate(t *testing.T) {
+	tmpl, err := parseCloseTemplate(`{"id":"{{.external_id}}","by":{{json .closed_by}},"at":"{{.closed_at}}"}`)
+	require.NoError(t, err)
+
+	req := &CloseRequest{
+		TicketID:   "0f4d2c8a-2c83-4f2c-9f7d-1d4f70d50e71",
+		ExternalID: "EXT-123",
+		ClosedBy:   ActorRef{Type: "platform", ID: "system"},
+		ClosedAt:   time.Date(2026, 5, 20, 14, 50, 0, 0, time.UTC),
+	}
+
+	out, err := renderCloseTemplate(tmpl, req)
+	require.NoError(t, err)
+	assert.JSONEq(t, `{
+		"id":"EXT-123",
+		"by":{"type":"platform","id":"system"},
+		"at":"2026-05-20T14:50:00Z"
+	}`, string(out))
+}
+
 func TestMapForwardResponse(t *testing.T) {
 	tmpl, err := parseForwardResponseTemplate(`{"message_external_id":"{{.result.id}}","status":"{{.result.state}}"}`)
 	require.NoError(t, err)
