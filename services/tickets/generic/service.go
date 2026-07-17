@@ -12,6 +12,7 @@ import (
 	"fmt"
 	"net/http"
 	"strings"
+	"text/template"
 
 	"github.com/nyaruka/gocommon/dates"
 	"github.com/nyaruka/gocommon/httpx"
@@ -28,8 +29,8 @@ const (
 	typeGeneric = "generic"
 
 	// Required config
-	configBaseURL       = "base_url"
-	configAPIToken      = "api_token"
+	configBaseURL         = "base_url"
+	configAPIToken        = "api_token"
 	configWebhookSecret   = "webhook_secret"
 	configSkipWebhookHMAC = "skip_webhook_hmac"
 
@@ -43,6 +44,44 @@ const (
 	configRouteClose   = "route_close"
 	configRouteReopen  = "route_reopen"
 	configRouteHistory = "route_history"
+
+	// Optional Go text/template that renders the Open request body. When empty,
+	// the standard OpenRequest JSON contract is sent.
+	configOpenTemplate = "open_template"
+
+	// Optional Go text/template that maps the partner Open response JSON into
+	// the standard OpenResponse shape (external_id, status, created_at).
+	configOpenResponseTemplate = "open_response_template"
+
+	// Optional Go text/template that renders the Forward request body. When
+	// empty, the standard MessageRequest JSON contract is sent.
+	configForwardTemplate = "forward_template"
+
+	// Optional Go text/template that maps the partner Forward response JSON
+	// into the standard MessageResponse shape (message_external_id, status).
+	configForwardResponseTemplate = "forward_response_template"
+
+	// Optional Go text/template that renders the Close request body. When
+	// empty, the standard CloseRequest JSON contract is sent.
+	configCloseTemplate = "close_template"
+
+	// Optional Go text/template that maps the partner Close response JSON
+	// into the standard CloseResponse shape (status).
+	configCloseResponseTemplate = "close_response_template"
+
+	// Optional Go text/templates for the inbound agent-message webhook
+	// (POST .../messages). messages_template maps the partner request body into
+	// the standard agent message payload; messages_response_template maps the
+	// platform success response into the partner's expected shape.
+	configMessagesTemplate         = "messages_template"
+	configMessagesResponseTemplate = "messages_response_template"
+
+	// Optional Go text/templates for the inbound close-ticket webhook
+	// (POST .../tickets/close). tickets_close_template maps the partner request
+	// body into the standard close payload; tickets_close_response_template
+	// maps the platform success response into the partner's expected shape.
+	configTicketsCloseTemplate         = "tickets_close_template"
+	configTicketsCloseResponseTemplate = "tickets_close_response_template"
 
 	// Webhook URL pattern (legacy, kept for compatibility with existing
 	// ticketer webhook handlers in Mailroom).
@@ -65,12 +104,18 @@ func skipWebhookHMACValue(value string) bool {
 }
 
 type service struct {
-	rtConfig    *runtime.Config
-	client      *Client
-	ticketer    *flows.Ticketer
-	redactor    utils.Redactor
-	projectUUID string
-	projectName string
+	rtConfig                *runtime.Config
+	client                  *Client
+	ticketer                *flows.Ticketer
+	redactor                utils.Redactor
+	projectUUID             string
+	projectName             string
+	openTemplate            *template.Template
+	openResponseTemplate    *template.Template
+	forwardTemplate         *template.Template
+	forwardResponseTemplate *template.Template
+	closeTemplate           *template.Template
+	closeResponseTemplate   *template.Template
 }
 
 // NewService creates a new generic ticket service from the given config map.
@@ -98,18 +143,78 @@ func NewService(rtCfg *runtime.Config, httpClient *http.Client, httpRetries *htt
 		SendHistory:    config[configRouteHistory],
 	}
 
+	var openTmpl *template.Template
+	if src := strings.TrimSpace(config[configOpenTemplate]); src != "" {
+		var err error
+		openTmpl, err = parseOpenTemplate(src)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	var openRespTmpl *template.Template
+	if src := strings.TrimSpace(config[configOpenResponseTemplate]); src != "" {
+		var err error
+		openRespTmpl, err = parseOpenResponseTemplate(src)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	var forwardTmpl *template.Template
+	if src := strings.TrimSpace(config[configForwardTemplate]); src != "" {
+		var err error
+		forwardTmpl, err = parseForwardTemplate(src)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	var forwardRespTmpl *template.Template
+	if src := strings.TrimSpace(config[configForwardResponseTemplate]); src != "" {
+		var err error
+		forwardRespTmpl, err = parseForwardResponseTemplate(src)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	var closeTmpl *template.Template
+	if src := strings.TrimSpace(config[configCloseTemplate]); src != "" {
+		var err error
+		closeTmpl, err = parseCloseTemplate(src)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	var closeRespTmpl *template.Template
+	if src := strings.TrimSpace(config[configCloseResponseTemplate]); src != "" {
+		var err error
+		closeRespTmpl, err = parseCloseResponseTemplate(src)
+		if err != nil {
+			return nil, err
+		}
+	}
+
 	redactArgs := []string{apiToken}
 	if webhookSecret != "" {
 		redactArgs = append(redactArgs, webhookSecret)
 	}
 
 	return &service{
-		rtConfig:    rtCfg,
-		client:      NewClient(httpClient, httpRetries, baseURL, apiToken, WithRoutes(routes)),
-		ticketer:    ticketer,
-		redactor:    utils.NewRedactor(flows.RedactionMask, redactArgs...),
-		projectUUID: config[configProjectUUID],
-		projectName: config[configProjectName],
+		rtConfig:                rtCfg,
+		client:                  NewClient(httpClient, httpRetries, baseURL, apiToken, WithRoutes(routes)),
+		ticketer:                ticketer,
+		redactor:                utils.NewRedactor(flows.RedactionMask, redactArgs...),
+		projectUUID:             config[configProjectUUID],
+		projectName:             config[configProjectName],
+		openTemplate:            openTmpl,
+		openResponseTemplate:    openRespTmpl,
+		forwardTemplate:         forwardTmpl,
+		forwardResponseTemplate: forwardRespTmpl,
+		closeTemplate:           closeTmpl,
+		closeResponseTemplate:   closeRespTmpl,
 	}, nil
 }
 
@@ -167,7 +272,17 @@ func (s *service) Open(session flows.Session, topic *flows.Topic, body string, a
 	req.Metadata = s.buildOpenMetadata(session)
 
 	idempotencyKey := "open-" + string(ticket.UUID())
-	resp, trace, err := s.client.OpenTicket(req, idempotencyKey)
+
+	var payload interface{} = req
+	if s.openTemplate != nil {
+		templatedBody, err := renderOpenTemplate(s.openTemplate, req)
+		if err != nil {
+			return nil, errors.Wrap(err, "error rendering open_template")
+		}
+		payload = json.RawMessage(templatedBody)
+	}
+
+	trace, err := s.client.openTicketRequest(payload, idempotencyKey)
 	if trace != nil {
 		logHTTP(flows.NewHTTPLog(trace, flows.HTTPStatusFromCode, s.redactor))
 	}
@@ -188,11 +303,28 @@ func (s *service) Open(session flows.Session, topic *flows.Topic, body string, a
 		return nil, errors.Wrap(err, "error opening generic ticket")
 	}
 
+	resp, err := s.parseOpenResponse(trace.ResponseBody)
+	if err != nil {
+		return nil, err
+	}
+
 	if resp.ExternalID == "" {
 		return nil, errors.New("generic ticketer did not return an external_id")
 	}
 	ticket.SetExternalID(resp.ExternalID)
 	return ticket, nil
+}
+
+// parseOpenResponse maps or decodes the partner Open response into OpenResponse.
+func (s *service) parseOpenResponse(raw []byte) (*OpenResponse, error) {
+	if s.openResponseTemplate != nil {
+		resp, err := mapOpenResponse(s.openResponseTemplate, raw)
+		if err != nil {
+			return nil, errors.Wrap(err, "error mapping open_response_template")
+		}
+		return resp, nil
+	}
+	return decodeOpenResponse(raw)
 }
 
 // Forward delivers an inbound contact message to the partner over the
@@ -237,14 +369,39 @@ func (s *service) Forward(ticket *models.Ticket, msgUUID flows.MsgUUID, text str
 		idempotencyKey = "forward-" + string(msgUUID)
 	}
 
-	_, trace, err := s.client.ForwardMessage(externalID, req, idempotencyKey)
+	var payload interface{} = req
+	if s.forwardTemplate != nil {
+		templatedBody, err := renderForwardTemplate(s.forwardTemplate, req)
+		if err != nil {
+			return errors.Wrap(err, "error rendering forward_template")
+		}
+		payload = json.RawMessage(templatedBody)
+	}
+
+	trace, err := s.client.forwardMessageRequest(externalID, payload, idempotencyKey)
 	if trace != nil {
 		logHTTP(flows.NewHTTPLog(trace, flows.HTTPStatusFromCode, s.redactor))
 	}
 	if err != nil {
 		return errors.Wrap(err, "error forwarding message to generic ticketer")
 	}
+
+	if _, err := s.parseForwardResponse(trace.ResponseBody); err != nil {
+		return err
+	}
 	return nil
+}
+
+// parseForwardResponse maps or decodes the partner Forward response into MessageResponse.
+func (s *service) parseForwardResponse(raw []byte) (*MessageResponse, error) {
+	if s.forwardResponseTemplate != nil {
+		resp, err := mapForwardResponse(s.forwardResponseTemplate, raw)
+		if err != nil {
+			return nil, errors.Wrap(err, "error mapping forward_response_template")
+		}
+		return resp, nil
+	}
+	return decodeForwardResponse(raw)
 }
 
 // Close notifies the partner that one or more tickets were closed on the
@@ -265,7 +422,16 @@ func (s *service) Close(tickets []*models.Ticket, logHTTP flows.HTTPLogCallback)
 		}
 		idempotencyKey := fmt.Sprintf("close-%s-%d", t.UUID(), now.UnixNano())
 
-		trace, err := s.client.CloseTicket(externalID, req, idempotencyKey)
+		var payload interface{} = req
+		if s.closeTemplate != nil {
+			templatedBody, err := renderCloseTemplate(s.closeTemplate, req)
+			if err != nil {
+				return errors.Wrapf(err, "error rendering close_template for ticket %s", t.UUID())
+			}
+			payload = json.RawMessage(templatedBody)
+		}
+
+		trace, err := s.client.closeTicketRequest(externalID, payload, idempotencyKey)
 		if trace != nil {
 			logHTTP(flows.NewHTTPLog(trace, flows.HTTPStatusFromCode, s.redactor))
 		}
@@ -276,8 +442,24 @@ func (s *service) Close(tickets []*models.Ticket, logHTTP flows.HTTPLogCallback)
 			}
 			return errors.Wrapf(err, "error closing generic ticket %s", t.UUID())
 		}
+
+		if _, err := s.parseCloseResponse(trace.ResponseBody); err != nil {
+			return errors.Wrapf(err, "error parsing close response for ticket %s", t.UUID())
+		}
 	}
 	return nil
+}
+
+// parseCloseResponse maps or decodes the partner Close response into CloseResponse.
+func (s *service) parseCloseResponse(raw []byte) (*CloseResponse, error) {
+	if s.closeResponseTemplate != nil {
+		resp, err := mapCloseResponse(s.closeResponseTemplate, raw)
+		if err != nil {
+			return nil, errors.Wrap(err, "error mapping close_response_template")
+		}
+		return resp, nil
+	}
+	return decodeCloseResponse(raw)
 }
 
 // Reopen notifies the partner that one or more tickets were reopened on the

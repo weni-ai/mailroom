@@ -208,9 +208,30 @@ type OpenResponse struct {
 
 // OpenTicket creates a new ticket on the partner side.
 func (c *Client) OpenTicket(req *OpenRequest, idempotencyKey string) (*OpenResponse, *httpx.Trace, error) {
-	resp := &OpenResponse{}
-	trace, err := c.request(http.MethodPost, c.endpoint(c.routes.OpenTicket, ""), req, resp, idempotencyKey)
+	trace, err := c.openTicketRequest(req, idempotencyKey)
+	if err != nil {
+		return nil, trace, err
+	}
+	resp, err := decodeOpenResponse(trace.ResponseBody)
 	return resp, trace, err
+}
+
+// OpenTicketRaw creates a new ticket using a pre-rendered JSON body (e.g. from
+// open_template). The partner response is parsed as the standard OpenResponse
+// envelope unless the caller maps it separately.
+func (c *Client) OpenTicketRaw(body []byte, idempotencyKey string) (*OpenResponse, *httpx.Trace, error) {
+	trace, err := c.openTicketRequest(json.RawMessage(body), idempotencyKey)
+	if err != nil {
+		return nil, trace, err
+	}
+	resp, err := decodeOpenResponse(trace.ResponseBody)
+	return resp, trace, err
+}
+
+// openTicketRequest performs the Open HTTP call without parsing the response
+// body, so callers can apply open_response_template or the default decoder.
+func (c *Client) openTicketRequest(payload interface{}, idempotencyKey string) (*httpx.Trace, error) {
+	return c.request(http.MethodPost, c.endpoint(c.routes.OpenTicket, ""), payload, nil, idempotencyKey)
 }
 
 // Forward (incoming message) -----------------------------------------------
@@ -236,9 +257,31 @@ type MessageResponse struct {
 
 // ForwardMessage delivers an incoming message from the contact to the partner.
 func (c *Client) ForwardMessage(externalID string, req *MessageRequest, idempotencyKey string) (*MessageResponse, *httpx.Trace, error) {
-	resp := &MessageResponse{}
-	trace, err := c.request(http.MethodPost, c.endpoint(c.routes.ForwardMessage, externalID), req, resp, idempotencyKey)
+	trace, err := c.forwardMessageRequest(externalID, req, idempotencyKey)
+	if err != nil {
+		return nil, trace, err
+	}
+	resp, err := decodeForwardResponse(trace.ResponseBody)
 	return resp, trace, err
+}
+
+// ForwardMessageRaw delivers an incoming message using a pre-rendered JSON body
+// (e.g. from forward_template). The partner response is parsed as the standard
+// MessageResponse envelope unless the caller maps it separately.
+func (c *Client) ForwardMessageRaw(externalID string, body []byte, idempotencyKey string) (*MessageResponse, *httpx.Trace, error) {
+	trace, err := c.forwardMessageRequest(externalID, json.RawMessage(body), idempotencyKey)
+	if err != nil {
+		return nil, trace, err
+	}
+	resp, err := decodeForwardResponse(trace.ResponseBody)
+	return resp, trace, err
+}
+
+// forwardMessageRequest performs the Forward HTTP call without parsing the
+// response body, so callers can apply forward_response_template or the default
+// decoder.
+func (c *Client) forwardMessageRequest(externalID string, payload interface{}, idempotencyKey string) (*httpx.Trace, error) {
+	return c.request(http.MethodPost, c.endpoint(c.routes.ForwardMessage, externalID), payload, nil, idempotencyKey)
 }
 
 // Close --------------------------------------------------------------------
@@ -253,9 +296,24 @@ type CloseRequest struct {
 	ClosedAt   time.Time              `json:"closed_at"`
 }
 
+// CloseResponse is the partner reply to POST /v1/tickets/{external_id}/close.
+type CloseResponse struct {
+	Status string `json:"status"`
+}
+
 // CloseTicket notifies the partner that the ticket was closed on the platform.
 func (c *Client) CloseTicket(externalID string, req *CloseRequest, idempotencyKey string) (*httpx.Trace, error) {
-	return c.request(http.MethodPost, c.endpoint(c.routes.CloseTicket, externalID), req, nil, idempotencyKey)
+	return c.closeTicketRequest(externalID, req, idempotencyKey)
+}
+
+// CloseTicketRaw notifies the partner of a ticket close using a pre-rendered
+// JSON body (e.g. from close_template).
+func (c *Client) CloseTicketRaw(externalID string, body []byte, idempotencyKey string) (*httpx.Trace, error) {
+	return c.closeTicketRequest(externalID, json.RawMessage(body), idempotencyKey)
+}
+
+func (c *Client) closeTicketRequest(externalID string, payload interface{}, idempotencyKey string) (*httpx.Trace, error) {
+	return c.request(http.MethodPost, c.endpoint(c.routes.CloseTicket, externalID), payload, nil, idempotencyKey)
 }
 
 // Reopen -------------------------------------------------------------------
@@ -307,11 +365,10 @@ func (c *Client) request(method, endpoint string, payload, response interface{},
 	fullURL := c.baseURL + endpoint
 
 	headers := map[string]string{
-		"Authorization":              "Bearer " + c.apiToken,
-		"Content-Type":               "application/json",
-		"X-API-Version":              apiVersion,
-		"X-Request-Id":               string(uuids.New()),
-		"ngrok-skip-browser-warning": "1",
+		"Authorization": "Bearer " + c.apiToken,
+		"Content-Type":  "application/json",
+		"X-API-Version": apiVersion,
+		"X-Request-Id":  string(uuids.New()),
 	}
 	if idempotencyKey != "" {
 		headers["Idempotency-Key"] = idempotencyKey
@@ -319,11 +376,18 @@ func (c *Client) request(method, endpoint string, payload, response interface{},
 
 	var body io.Reader
 	if payload != nil {
-		data, err := jsonx.Marshal(payload)
-		if err != nil {
-			return nil, errors.Wrap(err, "error marshalling request payload")
+		switch p := payload.(type) {
+		case []byte:
+			body = bytes.NewReader(p)
+		case json.RawMessage:
+			body = bytes.NewReader(p)
+		default:
+			data, err := jsonx.Marshal(payload)
+			if err != nil {
+				return nil, errors.Wrap(err, "error marshalling request payload")
+			}
+			body = bytes.NewReader(data)
 		}
-		body = bytes.NewReader(data)
 	}
 
 	req, err := httpx.NewRequest(method, fullURL, body, headers)

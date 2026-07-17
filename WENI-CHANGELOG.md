@@ -1,3 +1,7 @@
+1.92.0
+----------
+* feat: add generic ticketer
+
 1.91.0
 ----------
 * feat: add product carousel support to WppBroadcastMessage and related tests

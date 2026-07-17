@@ -6,6 +6,7 @@ import (
 	"crypto/hmac"
 	"crypto/sha256"
 	"encoding/hex"
+	"encoding/json"
 	"io"
 	"net/http"
 	"strconv"
@@ -172,13 +173,16 @@ func handleAgentMessage(ctx context.Context, rt *runtime.Runtime, r *http.Reques
 		return errResp, status, nil
 	}
 
-	payload := &agentMessagePayload{}
-	if err := utils.UnmarshalAndValidateWithLimit(io.NopCloser(bytes.NewReader(body)), payload, maxWebhookBodyBytes); err != nil {
-		return errBody("invalid_payload", err.Error()), http.StatusBadRequest, nil
+	payload, errResp, status := decodeAgentMessagePayload(ticketer, body)
+	if errResp != nil {
+		return errResp, status, nil
 	}
 
 	if strings.TrimSpace(payload.Text) == "" && len(payload.Attachments) == 0 {
 		return errBody("empty_message", "text or attachments are required"), http.StatusBadRequest, nil
+	}
+	if strings.TrimSpace(payload.ExternalID) == "" {
+		return errBody("invalid_payload", "external_id is required"), http.StatusBadRequest, nil
 	}
 
 	ticket, err := models.LookupTicketByExternalID(ctx, rt.DB, ticketer.ID(), payload.ExternalID)
@@ -210,6 +214,47 @@ func handleAgentMessage(ctx context.Context, rt *runtime.Runtime, r *http.Reques
 	if msg != nil {
 		resp["message_uuid"] = msg.UUID()
 	}
+
+	return renderAgentMessageResponse(ticketer, resp)
+}
+
+// decodeAgentMessagePayload unmarshals the webhook body into the standard
+// agent message shape, optionally mapping through messages_template first.
+// HMAC verification already ran on the raw body in readWebhook.
+func decodeAgentMessagePayload(ticketer *models.Ticketer, body []byte) (*agentMessagePayload, interface{}, int) {
+	if src := strings.TrimSpace(ticketer.Config(configMessagesTemplate)); src != "" {
+		tmpl, err := parseMessagesTemplate(src)
+		if err != nil {
+			return nil, errBody("misconfigured", err.Error()), http.StatusInternalServerError
+		}
+		payload, err := mapAgentMessagePayload(tmpl, body)
+		if err != nil {
+			return nil, errBody("invalid_payload", err.Error()), http.StatusBadRequest
+		}
+		return payload, nil, 0
+	}
+
+	payload := &agentMessagePayload{}
+	if err := utils.UnmarshalAndValidateWithLimit(io.NopCloser(bytes.NewReader(body)), payload, maxWebhookBodyBytes); err != nil {
+		return nil, errBody("invalid_payload", err.Error()), http.StatusBadRequest
+	}
+	return payload, nil, 0
+}
+
+// renderAgentMessageResponse optionally maps the platform success response
+// through messages_response_template before returning it to the partner.
+func renderAgentMessageResponse(ticketer *models.Ticketer, resp map[string]interface{}) (interface{}, int, error) {
+	if src := strings.TrimSpace(ticketer.Config(configMessagesResponseTemplate)); src != "" {
+		tmpl, err := parseMessagesResponseTemplate(src)
+		if err != nil {
+			return errBody("misconfigured", err.Error()), http.StatusInternalServerError, nil
+		}
+		out, err := renderMessagesResponseTemplate(tmpl, resp)
+		if err != nil {
+			return errBody("misconfigured", err.Error()), http.StatusInternalServerError, nil
+		}
+		return json.RawMessage(out), http.StatusOK, nil
+	}
 	return resp, http.StatusOK, nil
 }
 
@@ -221,9 +266,12 @@ func handleCloseTicket(ctx context.Context, rt *runtime.Runtime, r *http.Request
 		return errResp, status, nil
 	}
 
-	payload := &closeTicketPayload{}
-	if err := utils.UnmarshalAndValidateWithLimit(io.NopCloser(bytes.NewReader(body)), payload, maxWebhookBodyBytes); err != nil {
-		return errBody("invalid_payload", err.Error()), http.StatusBadRequest, nil
+	payload, errResp, status := decodeCloseTicketPayload(ticketer, body)
+	if errResp != nil {
+		return errResp, status, nil
+	}
+	if strings.TrimSpace(payload.ExternalID) == "" {
+		return errBody("invalid_payload", "external_id is required"), http.StatusBadRequest, nil
 	}
 
 	ticket, err := models.LookupTicketByExternalID(ctx, rt.DB, ticketer.ID(), payload.ExternalID)
@@ -233,7 +281,10 @@ func handleCloseTicket(ctx context.Context, rt *runtime.Runtime, r *http.Request
 
 	if ticket.Status() == models.TicketStatusClosed {
 		// Idempotent: partner can safely retry.
-		return map[string]interface{}{"status": "closed", "ticket_uuid": ticket.UUID()}, http.StatusOK, nil
+		return renderCloseTicketResponse(ticketer, map[string]interface{}{
+			"status":      "closed",
+			"ticket_uuid": ticket.UUID(),
+		})
 	}
 
 	oa, err := models.GetOrgAssets(ctx, rt, ticket.OrgID())
@@ -247,7 +298,50 @@ func handleCloseTicket(ctx context.Context, rt *runtime.Runtime, r *http.Request
 		return errBody("close_failed", err.Error()), http.StatusInternalServerError, nil
 	}
 
-	return map[string]interface{}{"status": "closed", "ticket_uuid": ticket.UUID()}, http.StatusOK, nil
+	return renderCloseTicketResponse(ticketer, map[string]interface{}{
+		"status":      "closed",
+		"ticket_uuid": ticket.UUID(),
+	})
+}
+
+// decodeCloseTicketPayload unmarshals the webhook body into the standard close
+// ticket shape, optionally mapping through tickets_close_template first.
+// HMAC verification already ran on the raw body in readWebhook.
+func decodeCloseTicketPayload(ticketer *models.Ticketer, body []byte) (*closeTicketPayload, interface{}, int) {
+	if src := strings.TrimSpace(ticketer.Config(configTicketsCloseTemplate)); src != "" {
+		tmpl, err := parseTicketsCloseTemplate(src)
+		if err != nil {
+			return nil, errBody("misconfigured", err.Error()), http.StatusInternalServerError
+		}
+		payload, err := mapCloseTicketPayload(tmpl, body)
+		if err != nil {
+			return nil, errBody("invalid_payload", err.Error()), http.StatusBadRequest
+		}
+		return payload, nil, 0
+	}
+
+	payload := &closeTicketPayload{}
+	if err := utils.UnmarshalAndValidateWithLimit(io.NopCloser(bytes.NewReader(body)), payload, maxWebhookBodyBytes); err != nil {
+		return nil, errBody("invalid_payload", err.Error()), http.StatusBadRequest
+	}
+	return payload, nil, 0
+}
+
+// renderCloseTicketResponse optionally maps the platform success response
+// through tickets_close_response_template before returning it to the partner.
+func renderCloseTicketResponse(ticketer *models.Ticketer, resp map[string]interface{}) (interface{}, int, error) {
+	if src := strings.TrimSpace(ticketer.Config(configTicketsCloseResponseTemplate)); src != "" {
+		tmpl, err := parseTicketsCloseResponseTemplate(src)
+		if err != nil {
+			return errBody("misconfigured", err.Error()), http.StatusInternalServerError, nil
+		}
+		out, err := renderTicketsCloseResponseTemplate(tmpl, resp)
+		if err != nil {
+			return errBody("misconfigured", err.Error()), http.StatusInternalServerError, nil
+		}
+		return json.RawMessage(out), http.StatusOK, nil
+	}
+	return resp, http.StatusOK, nil
 }
 
 // handleReopenTicket reopens the ticket on the platform side after receiving

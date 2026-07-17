@@ -101,6 +101,60 @@ func TestNewServiceConfigValidation(t *testing.T) {
 	}), context.Background(), nil)
 	require.NoError(t, err)
 	require.NotNil(t, svc)
+
+	_, err = generic.NewService(rt.Config, http.DefaultClient, nil, ticketer, newModelTicketer(map[string]string{
+		"base_url":       svcBaseURL,
+		"api_token":      svcAPIToken,
+		"webhook_secret": svcWebhookSecret,
+		"open_template":  `{"id":"{{.ticket_id"`,
+	}), context.Background(), nil)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "invalid open_template")
+
+	_, err = generic.NewService(rt.Config, http.DefaultClient, nil, ticketer, newModelTicketer(map[string]string{
+		"base_url":               svcBaseURL,
+		"api_token":              svcAPIToken,
+		"webhook_secret":         svcWebhookSecret,
+		"open_response_template": `{"external_id":"{{.id"`,
+	}), context.Background(), nil)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "invalid open_response_template")
+
+	_, err = generic.NewService(rt.Config, http.DefaultClient, nil, ticketer, newModelTicketer(map[string]string{
+		"base_url":         svcBaseURL,
+		"api_token":        svcAPIToken,
+		"webhook_secret":   svcWebhookSecret,
+		"forward_template": `{"text":"{{.text"`,
+	}), context.Background(), nil)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "invalid forward_template")
+
+	_, err = generic.NewService(rt.Config, http.DefaultClient, nil, ticketer, newModelTicketer(map[string]string{
+		"base_url":                  svcBaseURL,
+		"api_token":                 svcAPIToken,
+		"webhook_secret":            svcWebhookSecret,
+		"forward_response_template": `{"message_external_id":"{{.id"`,
+	}), context.Background(), nil)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "invalid forward_response_template")
+
+	_, err = generic.NewService(rt.Config, http.DefaultClient, nil, ticketer, newModelTicketer(map[string]string{
+		"base_url":       svcBaseURL,
+		"api_token":      svcAPIToken,
+		"webhook_secret": svcWebhookSecret,
+		"close_template": `{"id":"{{.external_id"`,
+	}), context.Background(), nil)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "invalid close_template")
+
+	_, err = generic.NewService(rt.Config, http.DefaultClient, nil, ticketer, newModelTicketer(map[string]string{
+		"base_url":                svcBaseURL,
+		"api_token":               svcAPIToken,
+		"webhook_secret":          svcWebhookSecret,
+		"close_response_template": `{"status":"{{.state"`,
+	}), context.Background(), nil)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "invalid close_response_template")
 }
 
 func TestOpenAndForward(t *testing.T) {
@@ -370,6 +424,169 @@ func TestCloseAndReopen(t *testing.T) {
 	assert.Contains(t, logger.Logs[0].Request, `"reopened_by":{"type":"platform","id":"system"}`)
 }
 
+func TestCloseWithTemplate(t *testing.T) {
+	_, rt, _, _ := testsuite.Get()
+
+	defer dates.SetNowSource(dates.DefaultNowSource)
+	dates.SetNowSource(dates.NewSequentialNowSource(time.Date(2026, 5, 20, 14, 50, 0, 0, time.UTC)))
+	defer httpx.SetRequestor(httpx.DefaultRequestor)
+
+	httpx.SetRequestor(httpx.NewMockRequestor(map[string][]httpx.MockResponse{
+		svcBaseURL + "/v1/tickets/EXT-CLOSE-1/close": {
+			httpx.NewMockResponse(200, nil, `{"status":"closed"}`),
+		},
+	}))
+
+	ticketer := newTicketer()
+	svc, err := generic.NewService(rt.Config, http.DefaultClient, nil, ticketer, newModelTicketer(map[string]string{
+		"base_url":       svcBaseURL,
+		"api_token":      svcAPIToken,
+		"webhook_secret": svcWebhookSecret,
+		"close_template": `{"id":"{{.external_id}}","by":{{json .closed_by}},"at":"{{.closed_at}}"}`,
+	}), context.Background(), nil)
+	require.NoError(t, err)
+
+	ticket := models.NewTicket(
+		"88bfa1dc-be33-45c2-b469-294ecb0eba90",
+		testdata.Org1.ID,
+		testdata.Cathy.ID,
+		testdata.RocketChat.ID,
+		"EXT-CLOSE-1",
+		testdata.DefaultTopic.ID,
+		"body",
+		models.NilUserID,
+		nil,
+	)
+
+	logger := &flows.HTTPLogger{}
+	err = svc.Close([]*models.Ticket{ticket}, logger.Log)
+	require.NoError(t, err)
+	require.Equal(t, 1, len(logger.Logs))
+
+	reqBody := logger.Logs[0].Request
+	assert.Contains(t, reqBody, `"id":"EXT-CLOSE-1"`)
+	assert.Contains(t, reqBody, `"by":{"id":"system","type":"platform"}`)
+	assert.Contains(t, reqBody, `"at":"2026-05-20T14:50:00Z"`)
+	assert.NotContains(t, reqBody, `"ticket_id":`)
+	assert.NotContains(t, reqBody, `"closed_by":`)
+}
+
+func TestCloseWithTemplateInvalidJSON(t *testing.T) {
+	_, rt, _, _ := testsuite.Get()
+
+	defer httpx.SetRequestor(httpx.DefaultRequestor)
+	httpx.SetRequestor(httpx.NewMockRequestor(map[string][]httpx.MockResponse{}))
+
+	ticketer := newTicketer()
+	svc, err := generic.NewService(rt.Config, http.DefaultClient, nil, ticketer, newModelTicketer(map[string]string{
+		"base_url":       svcBaseURL,
+		"api_token":      svcAPIToken,
+		"webhook_secret": svcWebhookSecret,
+		"close_template": `not-json {{.external_id}}`,
+	}), context.Background(), nil)
+	require.NoError(t, err)
+
+	ticket := models.NewTicket(
+		"88bfa1dc-be33-45c2-b469-294ecb0eba90",
+		testdata.Org1.ID,
+		testdata.Cathy.ID,
+		testdata.RocketChat.ID,
+		"EXT-CLOSE-1",
+		testdata.DefaultTopic.ID,
+		"body",
+		models.NilUserID,
+		nil,
+	)
+
+	logger := &flows.HTTPLogger{}
+	err = svc.Close([]*models.Ticket{ticket}, logger.Log)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "close_template")
+	assert.Contains(t, err.Error(), "invalid JSON")
+	assert.Equal(t, 0, len(logger.Logs))
+}
+
+func TestCloseWithResponseTemplate(t *testing.T) {
+	_, rt, _, _ := testsuite.Get()
+
+	defer dates.SetNowSource(dates.DefaultNowSource)
+	dates.SetNowSource(dates.NewSequentialNowSource(time.Date(2026, 5, 20, 14, 50, 0, 0, time.UTC)))
+	defer httpx.SetRequestor(httpx.DefaultRequestor)
+
+	httpx.SetRequestor(httpx.NewMockRequestor(map[string][]httpx.MockResponse{
+		svcBaseURL + "/v1/tickets/EXT-CLOSE-2/close": {
+			httpx.NewMockResponse(200, nil, `{"result":{"state":"closed"}}`),
+		},
+	}))
+
+	ticketer := newTicketer()
+	svc, err := generic.NewService(rt.Config, http.DefaultClient, nil, ticketer, newModelTicketer(map[string]string{
+		"base_url":                svcBaseURL,
+		"api_token":               svcAPIToken,
+		"webhook_secret":          svcWebhookSecret,
+		"close_template":          `{"id":"{{.external_id}}"}`,
+		"close_response_template": `{"status":"{{.result.state}}"}`,
+	}), context.Background(), nil)
+	require.NoError(t, err)
+
+	ticket := models.NewTicket(
+		"88bfa1dc-be33-45c2-b469-294ecb0eba90",
+		testdata.Org1.ID,
+		testdata.Cathy.ID,
+		testdata.RocketChat.ID,
+		"EXT-CLOSE-2",
+		testdata.DefaultTopic.ID,
+		"body",
+		models.NilUserID,
+		nil,
+	)
+
+	logger := &flows.HTTPLogger{}
+	err = svc.Close([]*models.Ticket{ticket}, logger.Log)
+	require.NoError(t, err)
+	require.Equal(t, 1, len(logger.Logs))
+	assert.Contains(t, logger.Logs[0].Request, `"id":"EXT-CLOSE-2"`)
+}
+
+func TestCloseWithResponseTemplateInvalidJSON(t *testing.T) {
+	_, rt, _, _ := testsuite.Get()
+
+	defer httpx.SetRequestor(httpx.DefaultRequestor)
+	httpx.SetRequestor(httpx.NewMockRequestor(map[string][]httpx.MockResponse{
+		svcBaseURL + "/v1/tickets/EXT-CLOSE-3/close": {
+			httpx.NewMockResponse(200, nil, `{"result":{"state":"closed"}}`),
+		},
+	}))
+
+	ticketer := newTicketer()
+	svc, err := generic.NewService(rt.Config, http.DefaultClient, nil, ticketer, newModelTicketer(map[string]string{
+		"base_url":                svcBaseURL,
+		"api_token":               svcAPIToken,
+		"webhook_secret":          svcWebhookSecret,
+		"close_response_template": `not-json {{.result.state}}`,
+	}), context.Background(), nil)
+	require.NoError(t, err)
+
+	ticket := models.NewTicket(
+		"88bfa1dc-be33-45c2-b469-294ecb0eba90",
+		testdata.Org1.ID,
+		testdata.Cathy.ID,
+		testdata.RocketChat.ID,
+		"EXT-CLOSE-3",
+		testdata.DefaultTopic.ID,
+		"body",
+		models.NilUserID,
+		nil,
+	)
+
+	logger := &flows.HTTPLogger{}
+	err = svc.Close([]*models.Ticket{ticket}, logger.Log)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "close_response_template")
+	assert.Contains(t, err.Error(), "invalid JSON")
+	require.Equal(t, 1, len(logger.Logs))
+}
+
 func TestSendHistoryIsNoop(t *testing.T) {
 	_, rt, _, _ := testsuite.Get()
 
@@ -428,4 +645,322 @@ func TestCustomRoutesThroughConfig(t *testing.T) {
 	assert.Equal(t, "EXT-ROUTE-1", ticket.ExternalID())
 	require.Equal(t, 1, len(logger.Logs))
 	assert.Contains(t, logger.Logs[0].Request, "POST /api/conversations ")
+}
+
+func TestOpenWithTemplate(t *testing.T) {
+	_, rt, _, _ := testsuite.Get()
+
+	defer dates.SetNowSource(dates.DefaultNowSource)
+	dates.SetNowSource(dates.NewSequentialNowSource(time.Date(2026, 5, 20, 14, 30, 0, 0, time.UTC)))
+
+	session, _, err := test.CreateTestSession("", envs.RedactionPolicyNone)
+	require.NoError(t, err)
+
+	defer uuids.SetGenerator(uuids.DefaultGenerator)
+	uuids.SetGenerator(uuids.NewSeededGenerator(33333))
+	defer httpx.SetRequestor(httpx.DefaultRequestor)
+
+	httpx.SetRequestor(httpx.NewMockRequestor(map[string][]httpx.MockResponse{
+		svcBaseURL + "/v1/tickets": {
+			httpx.NewMockResponse(201, nil, `{"external_id":"EXT-TMPL-1","status":"open","created_at":"2026-05-20T14:30:00Z"}`),
+		},
+	}))
+
+	ticketer := newTicketer()
+	svc, err := generic.NewService(rt.Config, http.DefaultClient, nil, ticketer, newModelTicketer(map[string]string{
+		"base_url":       svcBaseURL,
+		"api_token":      svcAPIToken,
+		"webhook_secret": svcWebhookSecret,
+		"open_template":  `{"id":"{{.ticket_id}}","customer":{{json .contact}},"subject":"{{.body}}"}`,
+	}), context.Background(), nil)
+	require.NoError(t, err)
+
+	logger := &flows.HTTPLogger{}
+	ticket, err := svc.Open(session, newDefaultTopic(), "Need human help", nil, logger.Log)
+	require.NoError(t, err)
+	require.NotNil(t, ticket)
+	assert.Equal(t, "EXT-TMPL-1", ticket.ExternalID())
+	require.Equal(t, 1, len(logger.Logs))
+
+	reqBody := logger.Logs[0].Request
+	assert.Contains(t, reqBody, `"id":"`+string(ticket.UUID())+`"`)
+	assert.Contains(t, reqBody, `"subject":"Need human help"`)
+	assert.Contains(t, reqBody, `"customer":`)
+	assert.NotContains(t, reqBody, `"ticket_id":`)
+}
+
+func TestOpenWithTemplateInvalidJSON(t *testing.T) {
+	_, rt, _, _ := testsuite.Get()
+
+	session, _, err := test.CreateTestSession("", envs.RedactionPolicyNone)
+	require.NoError(t, err)
+
+	defer uuids.SetGenerator(uuids.DefaultGenerator)
+	uuids.SetGenerator(uuids.NewSeededGenerator(44444))
+	defer httpx.SetRequestor(httpx.DefaultRequestor)
+	httpx.SetRequestor(httpx.NewMockRequestor(map[string][]httpx.MockResponse{}))
+
+	ticketer := newTicketer()
+	svc, err := generic.NewService(rt.Config, http.DefaultClient, nil, ticketer, newModelTicketer(map[string]string{
+		"base_url":       svcBaseURL,
+		"api_token":      svcAPIToken,
+		"webhook_secret": svcWebhookSecret,
+		"open_template":  `not-json {{.ticket_id}}`,
+	}), context.Background(), nil)
+	require.NoError(t, err)
+
+	logger := &flows.HTTPLogger{}
+	_, err = svc.Open(session, newDefaultTopic(), "test", nil, logger.Log)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "open_template")
+	assert.Contains(t, err.Error(), "invalid JSON")
+	assert.Equal(t, 0, len(logger.Logs))
+}
+
+func TestOpenWithResponseTemplate(t *testing.T) {
+	_, rt, _, _ := testsuite.Get()
+
+	defer dates.SetNowSource(dates.DefaultNowSource)
+	dates.SetNowSource(dates.NewSequentialNowSource(time.Date(2026, 5, 20, 14, 30, 0, 0, time.UTC)))
+
+	session, _, err := test.CreateTestSession("", envs.RedactionPolicyNone)
+	require.NoError(t, err)
+
+	defer uuids.SetGenerator(uuids.DefaultGenerator)
+	uuids.SetGenerator(uuids.NewSeededGenerator(55555))
+	defer httpx.SetRequestor(httpx.DefaultRequestor)
+
+	httpx.SetRequestor(httpx.NewMockRequestor(map[string][]httpx.MockResponse{
+		svcBaseURL + "/v1/tickets": {
+			httpx.NewMockResponse(201, nil, `{"data":{"id":"EXT-MAPPED-1","state":"open","created":"2026-05-20T14:30:03Z"}}`),
+		},
+	}))
+
+	ticketer := newTicketer()
+	svc, err := generic.NewService(rt.Config, http.DefaultClient, nil, ticketer, newModelTicketer(map[string]string{
+		"base_url":               svcBaseURL,
+		"api_token":              svcAPIToken,
+		"webhook_secret":         svcWebhookSecret,
+		"open_template":          `{"id":"{{.ticket_id}}","subject":"{{.body}}"}`,
+		"open_response_template": `{"external_id":"{{.data.id}}","status":"{{.data.state}}","created_at":"{{.data.created}}"}`,
+	}), context.Background(), nil)
+	require.NoError(t, err)
+
+	logger := &flows.HTTPLogger{}
+	ticket, err := svc.Open(session, newDefaultTopic(), "Need help", nil, logger.Log)
+	require.NoError(t, err)
+	require.NotNil(t, ticket)
+	assert.Equal(t, "EXT-MAPPED-1", ticket.ExternalID())
+	require.Equal(t, 1, len(logger.Logs))
+	assert.Contains(t, logger.Logs[0].Request, `"subject":"Need help"`)
+}
+
+func TestOpenWithResponseTemplateMissingExternalID(t *testing.T) {
+	_, rt, _, _ := testsuite.Get()
+
+	session, _, err := test.CreateTestSession("", envs.RedactionPolicyNone)
+	require.NoError(t, err)
+
+	defer uuids.SetGenerator(uuids.DefaultGenerator)
+	uuids.SetGenerator(uuids.NewSeededGenerator(66666))
+	defer httpx.SetRequestor(httpx.DefaultRequestor)
+
+	httpx.SetRequestor(httpx.NewMockRequestor(map[string][]httpx.MockResponse{
+		svcBaseURL + "/v1/tickets": {
+			httpx.NewMockResponse(201, nil, `{"data":{"id":""}}`),
+		},
+	}))
+
+	ticketer := newTicketer()
+	svc, err := generic.NewService(rt.Config, http.DefaultClient, nil, ticketer, newModelTicketer(map[string]string{
+		"base_url":               svcBaseURL,
+		"api_token":              svcAPIToken,
+		"webhook_secret":         svcWebhookSecret,
+		"open_response_template": `{"external_id":"{{.data.id}}","status":"open"}`,
+	}), context.Background(), nil)
+	require.NoError(t, err)
+
+	logger := &flows.HTTPLogger{}
+	_, err = svc.Open(session, newDefaultTopic(), "test", nil, logger.Log)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "did not return an external_id")
+}
+
+func TestForwardWithTemplate(t *testing.T) {
+	_, rt, _, _ := testsuite.Get()
+
+	defer dates.SetNowSource(dates.DefaultNowSource)
+	dates.SetNowSource(dates.NewSequentialNowSource(time.Date(2026, 5, 20, 14, 30, 0, 0, time.UTC)))
+
+	defer uuids.SetGenerator(uuids.DefaultGenerator)
+	uuids.SetGenerator(uuids.NewSeededGenerator(77777))
+	defer httpx.SetRequestor(httpx.DefaultRequestor)
+
+	httpx.SetRequestor(httpx.NewMockRequestor(map[string][]httpx.MockResponse{
+		svcBaseURL + "/v1/tickets/EXT-FWD-1/messages": {
+			httpx.NewMockResponse(200, nil, `{"message_external_id":"MSG-TMPL-1","status":"received"}`),
+		},
+	}))
+
+	ticketer := newTicketer()
+	svc, err := generic.NewService(rt.Config, http.DefaultClient, nil, ticketer, newModelTicketer(map[string]string{
+		"base_url":         svcBaseURL,
+		"api_token":        svcAPIToken,
+		"webhook_secret":   svcWebhookSecret,
+		"forward_template": `{"ticket":"{{.external_id}}","from":{{json .sender}},"body":"{{.text}}","msg_id":"{{.message_id}}"}`,
+	}), context.Background(), nil)
+	require.NoError(t, err)
+
+	dbTicket := models.NewTicket(
+		flows.TicketUUID("aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee"),
+		testdata.Org1.ID,
+		testdata.Cathy.ID,
+		testdata.RocketChat.ID,
+		"EXT-FWD-1",
+		testdata.DefaultTopic.ID,
+		"body",
+		models.NilUserID,
+		map[string]interface{}{
+			"contact-uuid":    string(testdata.Cathy.UUID),
+			"contact-display": "Cathy",
+		},
+	)
+
+	logger := &flows.HTTPLogger{}
+	err = svc.Forward(dbTicket, flows.MsgUUID("4fa340ae-1fb0-4666-98db-2177fe9bf31c"), "Hello templated!", nil, nil, null.NullString, logger.Log)
+	require.NoError(t, err)
+	require.Equal(t, 1, len(logger.Logs))
+
+	reqBody := logger.Logs[0].Request
+	assert.Contains(t, reqBody, `"ticket":"EXT-FWD-1"`)
+	assert.Contains(t, reqBody, `"body":"Hello templated!"`)
+	assert.Contains(t, reqBody, `"msg_id":"4fa340ae-1fb0-4666-98db-2177fe9bf31c"`)
+	assert.Contains(t, reqBody, `"from":`)
+	assert.NotContains(t, reqBody, `"ticket_id":`)
+	assert.NotContains(t, reqBody, `"direction":`)
+}
+
+func TestForwardWithTemplateInvalidJSON(t *testing.T) {
+	_, rt, _, _ := testsuite.Get()
+
+	defer httpx.SetRequestor(httpx.DefaultRequestor)
+	httpx.SetRequestor(httpx.NewMockRequestor(map[string][]httpx.MockResponse{}))
+
+	ticketer := newTicketer()
+	svc, err := generic.NewService(rt.Config, http.DefaultClient, nil, ticketer, newModelTicketer(map[string]string{
+		"base_url":         svcBaseURL,
+		"api_token":        svcAPIToken,
+		"webhook_secret":   svcWebhookSecret,
+		"forward_template": `not-json {{.text}}`,
+	}), context.Background(), nil)
+	require.NoError(t, err)
+
+	dbTicket := models.NewTicket(
+		flows.TicketUUID("aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee"),
+		testdata.Org1.ID,
+		testdata.Cathy.ID,
+		testdata.RocketChat.ID,
+		"EXT-FWD-1",
+		testdata.DefaultTopic.ID,
+		"body",
+		models.NilUserID,
+		map[string]interface{}{
+			"contact-uuid":    string(testdata.Cathy.UUID),
+			"contact-display": "Cathy",
+		},
+	)
+
+	logger := &flows.HTTPLogger{}
+	err = svc.Forward(dbTicket, flows.MsgUUID("4fa340ae-1fb0-4666-98db-2177fe9bf31c"), "Hello", nil, nil, null.NullString, logger.Log)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "forward_template")
+	assert.Contains(t, err.Error(), "invalid JSON")
+	assert.Equal(t, 0, len(logger.Logs))
+}
+
+func TestForwardWithResponseTemplate(t *testing.T) {
+	_, rt, _, _ := testsuite.Get()
+
+	defer dates.SetNowSource(dates.DefaultNowSource)
+	dates.SetNowSource(dates.NewSequentialNowSource(time.Date(2026, 5, 20, 14, 30, 0, 0, time.UTC)))
+
+	defer httpx.SetRequestor(httpx.DefaultRequestor)
+	httpx.SetRequestor(httpx.NewMockRequestor(map[string][]httpx.MockResponse{
+		svcBaseURL + "/v1/tickets/EXT-FWD-2/messages": {
+			httpx.NewMockResponse(200, nil, `{"result":{"id":"MSG-MAPPED-1","state":"received"}}`),
+		},
+	}))
+
+	ticketer := newTicketer()
+	svc, err := generic.NewService(rt.Config, http.DefaultClient, nil, ticketer, newModelTicketer(map[string]string{
+		"base_url":                  svcBaseURL,
+		"api_token":                 svcAPIToken,
+		"webhook_secret":            svcWebhookSecret,
+		"forward_template":          `{"ticket":"{{.external_id}}","body":"{{.text}}"}`,
+		"forward_response_template": `{"message_external_id":"{{.result.id}}","status":"{{.result.state}}"}`,
+	}), context.Background(), nil)
+	require.NoError(t, err)
+
+	dbTicket := models.NewTicket(
+		flows.TicketUUID("bbbbbbbb-cccc-dddd-eeee-ffffffffffff"),
+		testdata.Org1.ID,
+		testdata.Cathy.ID,
+		testdata.RocketChat.ID,
+		"EXT-FWD-2",
+		testdata.DefaultTopic.ID,
+		"body",
+		models.NilUserID,
+		map[string]interface{}{
+			"contact-uuid":    string(testdata.Cathy.UUID),
+			"contact-display": "Cathy",
+		},
+	)
+
+	logger := &flows.HTTPLogger{}
+	err = svc.Forward(dbTicket, flows.MsgUUID("4fa340ae-1fb0-4666-98db-2177fe9bf31c"), "Hello mapped!", nil, nil, null.NullString, logger.Log)
+	require.NoError(t, err)
+	require.Equal(t, 1, len(logger.Logs))
+	assert.Contains(t, logger.Logs[0].Request, `"body":"Hello mapped!"`)
+}
+
+func TestForwardWithResponseTemplateInvalidJSON(t *testing.T) {
+	_, rt, _, _ := testsuite.Get()
+
+	defer httpx.SetRequestor(httpx.DefaultRequestor)
+	httpx.SetRequestor(httpx.NewMockRequestor(map[string][]httpx.MockResponse{
+		svcBaseURL + "/v1/tickets/EXT-FWD-3/messages": {
+			httpx.NewMockResponse(200, nil, `{"result":{"id":"MSG-1"}}`),
+		},
+	}))
+
+	ticketer := newTicketer()
+	svc, err := generic.NewService(rt.Config, http.DefaultClient, nil, ticketer, newModelTicketer(map[string]string{
+		"base_url":                  svcBaseURL,
+		"api_token":                 svcAPIToken,
+		"webhook_secret":            svcWebhookSecret,
+		"forward_response_template": `not-json {{.result.id}}`,
+	}), context.Background(), nil)
+	require.NoError(t, err)
+
+	dbTicket := models.NewTicket(
+		flows.TicketUUID("cccccccc-dddd-eeee-ffff-000000000000"),
+		testdata.Org1.ID,
+		testdata.Cathy.ID,
+		testdata.RocketChat.ID,
+		"EXT-FWD-3",
+		testdata.DefaultTopic.ID,
+		"body",
+		models.NilUserID,
+		map[string]interface{}{
+			"contact-uuid":    string(testdata.Cathy.UUID),
+			"contact-display": "Cathy",
+		},
+	)
+
+	logger := &flows.HTTPLogger{}
+	err = svc.Forward(dbTicket, flows.MsgUUID("4fa340ae-1fb0-4666-98db-2177fe9bf31c"), "Hello", nil, nil, null.NullString, logger.Log)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "forward_response_template")
+	assert.Contains(t, err.Error(), "invalid JSON")
+	require.Equal(t, 1, len(logger.Logs))
 }
