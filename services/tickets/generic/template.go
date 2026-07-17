@@ -65,6 +65,18 @@ func parseCloseResponseTemplate(src string) (*template.Template, error) {
 	return parseNamedTemplate("close_response_template", src)
 }
 
+// parseMessagesTemplate parses a Go text/template that maps a partner inbound
+// /messages webhook body into the platform agent-message payload shape.
+func parseMessagesTemplate(src string) (*template.Template, error) {
+	return parseNamedTemplate("messages_template", src)
+}
+
+// parseMessagesResponseTemplate parses a Go text/template that maps the
+// platform /messages success response into the partner's expected shape.
+func parseMessagesResponseTemplate(src string) (*template.Template, error) {
+	return parseNamedTemplate("messages_response_template", src)
+}
+
 // renderRequestTemplate marshals req to JSON map context and executes tmpl.
 func renderRequestTemplate(tmpl *template.Template, req interface{}, name string) ([]byte, error) {
 	raw, err := jsonx.Marshal(req)
@@ -139,6 +151,26 @@ func mapCloseResponse(tmpl *template.Template, raw []byte) (*CloseResponse, erro
 		return nil, errors.Wrap(err, "error decoding mapped close response")
 	}
 	return resp, nil
+}
+
+// mapAgentMessagePayload executes tmpl against a partner inbound /messages
+// body and unmarshals the result into agentMessagePayload.
+func mapAgentMessagePayload(tmpl *template.Template, raw []byte) (*agentMessagePayload, error) {
+	out, err := mapResponseBody(tmpl, raw, "messages_template")
+	if err != nil {
+		return nil, err
+	}
+	payload := &agentMessagePayload{}
+	if err := json.Unmarshal(out, payload); err != nil {
+		return nil, errors.Wrap(err, "error decoding mapped agent message payload")
+	}
+	return payload, nil
+}
+
+// renderMessagesResponseTemplate executes tmpl against the platform success
+// response for /messages and returns the rendered JSON body.
+func renderMessagesResponseTemplate(tmpl *template.Template, resp map[string]interface{}) ([]byte, error) {
+	return renderRequestTemplate(tmpl, resp, "messages_response_template")
 }
 
 func mapResponseBody(tmpl *template.Template, raw []byte, name string) ([]byte, error) {
