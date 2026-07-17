@@ -299,6 +299,66 @@ func TestRenderAgentMessageResponse_WithTemplate(t *testing.T) {
 	assert.JSONEq(t, `{"ok":true,"id":"msg-1","ticket":"ticket-1"}`, string(raw))
 }
 
+func TestHandleCloseTicket_WithTicketsCloseTemplate(t *testing.T) {
+	ctx, rt, db, _ := testsuite.Get()
+
+	const secret = "real-secret"
+	u := seedTicketerWithConfig(t, db, secret, false, map[string]string{
+		"tickets_close_template": `{"external_id":"{{.ticket}}","closed_at":"2026-05-20T14:50:00Z"}`,
+	})
+
+	body := `{"ticket":"DOES-NOT-EXIST","reason":"resolved"}`
+	sig := "sha256=" + computeSig(secret, body)
+	resp, status, err := handleCloseTicket(ctx, rt, makeReq("POST", body, u, sig, ""), &models.HTTPLogger{})
+
+	assert.NoError(t, err)
+	assert.Equal(t, http.StatusNotFound, status)
+	m := decodeResp(t, resp)
+	assert.Equal(t, "ticket_not_found", m["error"])
+}
+
+func TestHandleCloseTicket_WithTicketsCloseTemplateInvalidJSON(t *testing.T) {
+	ctx, rt, db, _ := testsuite.Get()
+
+	const secret = "real-secret"
+	u := seedTicketerWithConfig(t, db, secret, false, map[string]string{
+		"tickets_close_template": `not-json {{.ticket}}`,
+	})
+
+	body := `{"ticket":"EXT-1"}`
+	sig := "sha256=" + computeSig(secret, body)
+	resp, status, err := handleCloseTicket(ctx, rt, makeReq("POST", body, u, sig, ""), &models.HTTPLogger{})
+
+	assert.NoError(t, err)
+	assert.Equal(t, http.StatusBadRequest, status)
+	m := decodeResp(t, resp)
+	assert.Equal(t, "invalid_payload", m["error"])
+}
+
+func TestRenderCloseTicketResponse_WithTemplate(t *testing.T) {
+	ticketer := models.BuildTicketer(
+		models.TicketerID(1),
+		assets.TicketerUUID("11111111-2222-3333-4444-555555555555"),
+		1,
+		"generic",
+		"Generic",
+		map[string]string{
+			"tickets_close_response_template": `{"ok":true,"ticket":"{{.ticket_uuid}}","state":"{{.status}}"}`,
+		},
+	)
+
+	resp, status, err := renderCloseTicketResponse(ticketer, map[string]interface{}{
+		"status":      "closed",
+		"ticket_uuid": "ticket-1",
+	})
+	require.NoError(t, err)
+	assert.Equal(t, http.StatusOK, status)
+
+	raw, ok := resp.(json.RawMessage)
+	require.True(t, ok)
+	assert.JSONEq(t, `{"ok":true,"ticket":"ticket-1","state":"closed"}`, string(raw))
+}
+
 func TestHandleCloseTicket_TicketNotFound(t *testing.T) {
 	ctx, rt, db, _ := testsuite.Get()
 

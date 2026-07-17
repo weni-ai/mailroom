@@ -77,6 +77,18 @@ func parseMessagesResponseTemplate(src string) (*template.Template, error) {
 	return parseNamedTemplate("messages_response_template", src)
 }
 
+// parseTicketsCloseTemplate parses a Go text/template that maps a partner
+// inbound /tickets/close webhook body into the platform close-ticket payload.
+func parseTicketsCloseTemplate(src string) (*template.Template, error) {
+	return parseNamedTemplate("tickets_close_template", src)
+}
+
+// parseTicketsCloseResponseTemplate parses a Go text/template that maps the
+// platform /tickets/close success response into the partner's expected shape.
+func parseTicketsCloseResponseTemplate(src string) (*template.Template, error) {
+	return parseNamedTemplate("tickets_close_response_template", src)
+}
+
 // renderRequestTemplate marshals req to JSON map context and executes tmpl.
 func renderRequestTemplate(tmpl *template.Template, req interface{}, name string) ([]byte, error) {
 	raw, err := jsonx.Marshal(req)
@@ -171,6 +183,26 @@ func mapAgentMessagePayload(tmpl *template.Template, raw []byte) (*agentMessageP
 // response for /messages and returns the rendered JSON body.
 func renderMessagesResponseTemplate(tmpl *template.Template, resp map[string]interface{}) ([]byte, error) {
 	return renderRequestTemplate(tmpl, resp, "messages_response_template")
+}
+
+// mapCloseTicketPayload executes tmpl against a partner inbound /tickets/close
+// body and unmarshals the result into closeTicketPayload.
+func mapCloseTicketPayload(tmpl *template.Template, raw []byte) (*closeTicketPayload, error) {
+	out, err := mapResponseBody(tmpl, raw, "tickets_close_template")
+	if err != nil {
+		return nil, err
+	}
+	payload := &closeTicketPayload{}
+	if err := json.Unmarshal(out, payload); err != nil {
+		return nil, errors.Wrap(err, "error decoding mapped close ticket payload")
+	}
+	return payload, nil
+}
+
+// renderTicketsCloseResponseTemplate executes tmpl against the platform
+// success response for /tickets/close and returns the rendered JSON body.
+func renderTicketsCloseResponseTemplate(tmpl *template.Template, resp map[string]interface{}) ([]byte, error) {
+	return renderRequestTemplate(tmpl, resp, "tickets_close_response_template")
 }
 
 func mapResponseBody(tmpl *template.Template, raw []byte, name string) ([]byte, error) {
