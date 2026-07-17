@@ -29,8 +29,8 @@ const (
 	typeGeneric = "generic"
 
 	// Required config
-	configBaseURL       = "base_url"
-	configAPIToken      = "api_token"
+	configBaseURL         = "base_url"
+	configAPIToken        = "api_token"
 	configWebhookSecret   = "webhook_secret"
 	configSkipWebhookHMAC = "skip_webhook_hmac"
 
@@ -57,6 +57,10 @@ const (
 	// empty, the standard MessageRequest JSON contract is sent.
 	configForwardTemplate = "forward_template"
 
+	// Optional Go text/template that maps the partner Forward response JSON
+	// into the standard MessageResponse shape (message_external_id, status).
+	configForwardResponseTemplate = "forward_response_template"
+
 	// Webhook URL pattern (legacy, kept for compatibility with existing
 	// ticketer webhook handlers in Mailroom).
 	webhookBasePath = "/mr/tickets/types/" + typeGeneric + "/event_callback"
@@ -78,15 +82,16 @@ func skipWebhookHMACValue(value string) bool {
 }
 
 type service struct {
-	rtConfig             *runtime.Config
-	client               *Client
-	ticketer             *flows.Ticketer
-	redactor             utils.Redactor
-	projectUUID          string
-	projectName          string
-	openTemplate         *template.Template
-	openResponseTemplate *template.Template
-	forwardTemplate      *template.Template
+	rtConfig                *runtime.Config
+	client                  *Client
+	ticketer                *flows.Ticketer
+	redactor                utils.Redactor
+	projectUUID             string
+	projectName             string
+	openTemplate            *template.Template
+	openResponseTemplate    *template.Template
+	forwardTemplate         *template.Template
+	forwardResponseTemplate *template.Template
 }
 
 // NewService creates a new generic ticket service from the given config map.
@@ -141,21 +146,31 @@ func NewService(rtCfg *runtime.Config, httpClient *http.Client, httpRetries *htt
 		}
 	}
 
+	var forwardRespTmpl *template.Template
+	if src := strings.TrimSpace(config[configForwardResponseTemplate]); src != "" {
+		var err error
+		forwardRespTmpl, err = parseForwardResponseTemplate(src)
+		if err != nil {
+			return nil, err
+		}
+	}
+
 	redactArgs := []string{apiToken}
 	if webhookSecret != "" {
 		redactArgs = append(redactArgs, webhookSecret)
 	}
 
 	return &service{
-		rtConfig:             rtCfg,
-		client:               NewClient(httpClient, httpRetries, baseURL, apiToken, WithRoutes(routes)),
-		ticketer:             ticketer,
-		redactor:             utils.NewRedactor(flows.RedactionMask, redactArgs...),
-		projectUUID:          config[configProjectUUID],
-		projectName:          config[configProjectName],
-		openTemplate:         openTmpl,
-		openResponseTemplate: openRespTmpl,
-		forwardTemplate:      forwardTmpl,
+		rtConfig:                rtCfg,
+		client:                  NewClient(httpClient, httpRetries, baseURL, apiToken, WithRoutes(routes)),
+		ticketer:                ticketer,
+		redactor:                utils.NewRedactor(flows.RedactionMask, redactArgs...),
+		projectUUID:             config[configProjectUUID],
+		projectName:             config[configProjectName],
+		openTemplate:            openTmpl,
+		openResponseTemplate:    openRespTmpl,
+		forwardTemplate:         forwardTmpl,
+		forwardResponseTemplate: forwardRespTmpl,
 	}, nil
 }
 
@@ -319,14 +334,30 @@ func (s *service) Forward(ticket *models.Ticket, msgUUID flows.MsgUUID, text str
 		payload = json.RawMessage(templatedBody)
 	}
 
-	_, trace, err := s.client.forwardMessageRequest(externalID, payload, idempotencyKey)
+	trace, err := s.client.forwardMessageRequest(externalID, payload, idempotencyKey)
 	if trace != nil {
 		logHTTP(flows.NewHTTPLog(trace, flows.HTTPStatusFromCode, s.redactor))
 	}
 	if err != nil {
 		return errors.Wrap(err, "error forwarding message to generic ticketer")
 	}
+
+	if _, err := s.parseForwardResponse(trace.ResponseBody); err != nil {
+		return err
+	}
 	return nil
+}
+
+// parseForwardResponse maps or decodes the partner Forward response into MessageResponse.
+func (s *service) parseForwardResponse(raw []byte) (*MessageResponse, error) {
+	if s.forwardResponseTemplate != nil {
+		resp, err := mapForwardResponse(s.forwardResponseTemplate, raw)
+		if err != nil {
+			return nil, errors.Wrap(err, "error mapping forward_response_template")
+		}
+		return resp, nil
+	}
+	return decodeForwardResponse(raw)
 }
 
 // Close notifies the partner that one or more tickets were closed on the
