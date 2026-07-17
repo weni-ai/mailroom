@@ -146,6 +146,15 @@ func TestNewServiceConfigValidation(t *testing.T) {
 	}), context.Background(), nil)
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "invalid close_template")
+
+	_, err = generic.NewService(rt.Config, http.DefaultClient, nil, ticketer, newModelTicketer(map[string]string{
+		"base_url":                svcBaseURL,
+		"api_token":               svcAPIToken,
+		"webhook_secret":          svcWebhookSecret,
+		"close_response_template": `{"status":"{{.state"`,
+	}), context.Background(), nil)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "invalid close_response_template")
 }
 
 func TestOpenAndForward(t *testing.T) {
@@ -495,6 +504,87 @@ func TestCloseWithTemplateInvalidJSON(t *testing.T) {
 	assert.Contains(t, err.Error(), "close_template")
 	assert.Contains(t, err.Error(), "invalid JSON")
 	assert.Equal(t, 0, len(logger.Logs))
+}
+
+func TestCloseWithResponseTemplate(t *testing.T) {
+	_, rt, _, _ := testsuite.Get()
+
+	defer dates.SetNowSource(dates.DefaultNowSource)
+	dates.SetNowSource(dates.NewSequentialNowSource(time.Date(2026, 5, 20, 14, 50, 0, 0, time.UTC)))
+	defer httpx.SetRequestor(httpx.DefaultRequestor)
+
+	httpx.SetRequestor(httpx.NewMockRequestor(map[string][]httpx.MockResponse{
+		svcBaseURL + "/v1/tickets/EXT-CLOSE-2/close": {
+			httpx.NewMockResponse(200, nil, `{"result":{"state":"closed"}}`),
+		},
+	}))
+
+	ticketer := newTicketer()
+	svc, err := generic.NewService(rt.Config, http.DefaultClient, nil, ticketer, newModelTicketer(map[string]string{
+		"base_url":                svcBaseURL,
+		"api_token":               svcAPIToken,
+		"webhook_secret":          svcWebhookSecret,
+		"close_template":          `{"id":"{{.external_id}}"}`,
+		"close_response_template": `{"status":"{{.result.state}}"}`,
+	}), context.Background(), nil)
+	require.NoError(t, err)
+
+	ticket := models.NewTicket(
+		"88bfa1dc-be33-45c2-b469-294ecb0eba90",
+		testdata.Org1.ID,
+		testdata.Cathy.ID,
+		testdata.RocketChat.ID,
+		"EXT-CLOSE-2",
+		testdata.DefaultTopic.ID,
+		"body",
+		models.NilUserID,
+		nil,
+	)
+
+	logger := &flows.HTTPLogger{}
+	err = svc.Close([]*models.Ticket{ticket}, logger.Log)
+	require.NoError(t, err)
+	require.Equal(t, 1, len(logger.Logs))
+	assert.Contains(t, logger.Logs[0].Request, `"id":"EXT-CLOSE-2"`)
+}
+
+func TestCloseWithResponseTemplateInvalidJSON(t *testing.T) {
+	_, rt, _, _ := testsuite.Get()
+
+	defer httpx.SetRequestor(httpx.DefaultRequestor)
+	httpx.SetRequestor(httpx.NewMockRequestor(map[string][]httpx.MockResponse{
+		svcBaseURL + "/v1/tickets/EXT-CLOSE-3/close": {
+			httpx.NewMockResponse(200, nil, `{"result":{"state":"closed"}}`),
+		},
+	}))
+
+	ticketer := newTicketer()
+	svc, err := generic.NewService(rt.Config, http.DefaultClient, nil, ticketer, newModelTicketer(map[string]string{
+		"base_url":                svcBaseURL,
+		"api_token":               svcAPIToken,
+		"webhook_secret":          svcWebhookSecret,
+		"close_response_template": `not-json {{.result.state}}`,
+	}), context.Background(), nil)
+	require.NoError(t, err)
+
+	ticket := models.NewTicket(
+		"88bfa1dc-be33-45c2-b469-294ecb0eba90",
+		testdata.Org1.ID,
+		testdata.Cathy.ID,
+		testdata.RocketChat.ID,
+		"EXT-CLOSE-3",
+		testdata.DefaultTopic.ID,
+		"body",
+		models.NilUserID,
+		nil,
+	)
+
+	logger := &flows.HTTPLogger{}
+	err = svc.Close([]*models.Ticket{ticket}, logger.Log)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "close_response_template")
+	assert.Contains(t, err.Error(), "invalid JSON")
+	require.Equal(t, 1, len(logger.Logs))
 }
 
 func TestSendHistoryIsNoop(t *testing.T) {

@@ -296,6 +296,11 @@ type CloseRequest struct {
 	ClosedAt   time.Time              `json:"closed_at"`
 }
 
+// CloseResponse is the partner reply to POST /v1/tickets/{external_id}/close.
+type CloseResponse struct {
+	Status string `json:"status"`
+}
+
 // CloseTicket notifies the partner that the ticket was closed on the platform.
 func (c *Client) CloseTicket(externalID string, req *CloseRequest, idempotencyKey string) (*httpx.Trace, error) {
 	return c.closeTicketRequest(externalID, req, idempotencyKey)

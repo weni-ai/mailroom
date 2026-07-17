@@ -44,6 +44,24 @@ func TestParseCloseTemplate(t *testing.T) {
 	assert.Contains(t, err.Error(), "invalid close_template")
 }
 
+func TestParseCloseResponseTemplate(t *testing.T) {
+	_, err := parseCloseResponseTemplate(`{"status":"{{.state}}"}`)
+	require.NoError(t, err)
+
+	_, err = parseCloseResponseTemplate(`{{.state`)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "invalid close_response_template")
+}
+
+func TestMapCloseResponse(t *testing.T) {
+	tmpl, err := parseCloseResponseTemplate(`{"status":"{{.result.state}}"}`)
+	require.NoError(t, err)
+
+	resp, err := mapCloseResponse(tmpl, []byte(`{"result":{"state":"closed"}}`))
+	require.NoError(t, err)
+	assert.Equal(t, "closed", resp.Status)
+}
+
 func TestRenderCloseTemplate(t *testing.T) {
 	tmpl, err := parseCloseTemplate(`{"id":"{{.external_id}}","by":{{json .closed_by}},"at":"{{.closed_at}}"}`)
 	require.NoError(t, err)
