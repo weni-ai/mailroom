@@ -26,6 +26,25 @@ func TestParseForwardTemplate(t *testing.T) {
 	assert.Contains(t, err.Error(), "invalid forward_template")
 }
 
+func TestParseForwardResponseTemplate(t *testing.T) {
+	_, err := parseForwardResponseTemplate(`{"message_external_id":"{{.id}}"}`)
+	require.NoError(t, err)
+
+	_, err = parseForwardResponseTemplate(`{{.id`)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "invalid forward_response_template")
+}
+
+func TestMapForwardResponse(t *testing.T) {
+	tmpl, err := parseForwardResponseTemplate(`{"message_external_id":"{{.result.id}}","status":"{{.result.state}}"}`)
+	require.NoError(t, err)
+
+	resp, err := mapForwardResponse(tmpl, []byte(`{"result":{"id":"MSG-9","state":"received"}}`))
+	require.NoError(t, err)
+	assert.Equal(t, "MSG-9", resp.MessageExternalID)
+	assert.Equal(t, "received", resp.Status)
+}
+
 func TestRenderForwardTemplate(t *testing.T) {
 	tmpl, err := parseForwardTemplate(`{"ticket":"{{.external_id}}","from":{{json .sender}},"body":"{{.text}}"}`)
 	require.NoError(t, err)

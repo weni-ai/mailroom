@@ -121,13 +121,22 @@ func TestNewServiceConfigValidation(t *testing.T) {
 	assert.Contains(t, err.Error(), "invalid open_response_template")
 
 	_, err = generic.NewService(rt.Config, http.DefaultClient, nil, ticketer, newModelTicketer(map[string]string{
-		"base_url":          svcBaseURL,
-		"api_token":         svcAPIToken,
-		"webhook_secret":    svcWebhookSecret,
-		"forward_template":  `{"text":"{{.text"`,
+		"base_url":         svcBaseURL,
+		"api_token":        svcAPIToken,
+		"webhook_secret":   svcWebhookSecret,
+		"forward_template": `{"text":"{{.text"`,
 	}), context.Background(), nil)
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "invalid forward_template")
+
+	_, err = generic.NewService(rt.Config, http.DefaultClient, nil, ticketer, newModelTicketer(map[string]string{
+		"base_url":                  svcBaseURL,
+		"api_token":                 svcAPIToken,
+		"webhook_secret":            svcWebhookSecret,
+		"forward_response_template": `{"message_external_id":"{{.id"`,
+	}), context.Background(), nil)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "invalid forward_response_template")
 }
 
 func TestOpenAndForward(t *testing.T) {
@@ -686,4 +695,91 @@ func TestForwardWithTemplateInvalidJSON(t *testing.T) {
 	assert.Contains(t, err.Error(), "forward_template")
 	assert.Contains(t, err.Error(), "invalid JSON")
 	assert.Equal(t, 0, len(logger.Logs))
+}
+
+func TestForwardWithResponseTemplate(t *testing.T) {
+	_, rt, _, _ := testsuite.Get()
+
+	defer dates.SetNowSource(dates.DefaultNowSource)
+	dates.SetNowSource(dates.NewSequentialNowSource(time.Date(2026, 5, 20, 14, 30, 0, 0, time.UTC)))
+
+	defer httpx.SetRequestor(httpx.DefaultRequestor)
+	httpx.SetRequestor(httpx.NewMockRequestor(map[string][]httpx.MockResponse{
+		svcBaseURL + "/v1/tickets/EXT-FWD-2/messages": {
+			httpx.NewMockResponse(200, nil, `{"result":{"id":"MSG-MAPPED-1","state":"received"}}`),
+		},
+	}))
+
+	ticketer := newTicketer()
+	svc, err := generic.NewService(rt.Config, http.DefaultClient, nil, ticketer, newModelTicketer(map[string]string{
+		"base_url":                  svcBaseURL,
+		"api_token":                 svcAPIToken,
+		"webhook_secret":            svcWebhookSecret,
+		"forward_template":          `{"ticket":"{{.external_id}}","body":"{{.text}}"}`,
+		"forward_response_template": `{"message_external_id":"{{.result.id}}","status":"{{.result.state}}"}`,
+	}), context.Background(), nil)
+	require.NoError(t, err)
+
+	dbTicket := models.NewTicket(
+		flows.TicketUUID("bbbbbbbb-cccc-dddd-eeee-ffffffffffff"),
+		testdata.Org1.ID,
+		testdata.Cathy.ID,
+		testdata.RocketChat.ID,
+		"EXT-FWD-2",
+		testdata.DefaultTopic.ID,
+		"body",
+		models.NilUserID,
+		map[string]interface{}{
+			"contact-uuid":    string(testdata.Cathy.UUID),
+			"contact-display": "Cathy",
+		},
+	)
+
+	logger := &flows.HTTPLogger{}
+	err = svc.Forward(dbTicket, flows.MsgUUID("4fa340ae-1fb0-4666-98db-2177fe9bf31c"), "Hello mapped!", nil, nil, null.NullString, logger.Log)
+	require.NoError(t, err)
+	require.Equal(t, 1, len(logger.Logs))
+	assert.Contains(t, logger.Logs[0].Request, `"body":"Hello mapped!"`)
+}
+
+func TestForwardWithResponseTemplateInvalidJSON(t *testing.T) {
+	_, rt, _, _ := testsuite.Get()
+
+	defer httpx.SetRequestor(httpx.DefaultRequestor)
+	httpx.SetRequestor(httpx.NewMockRequestor(map[string][]httpx.MockResponse{
+		svcBaseURL + "/v1/tickets/EXT-FWD-3/messages": {
+			httpx.NewMockResponse(200, nil, `{"result":{"id":"MSG-1"}}`),
+		},
+	}))
+
+	ticketer := newTicketer()
+	svc, err := generic.NewService(rt.Config, http.DefaultClient, nil, ticketer, newModelTicketer(map[string]string{
+		"base_url":                  svcBaseURL,
+		"api_token":                 svcAPIToken,
+		"webhook_secret":            svcWebhookSecret,
+		"forward_response_template": `not-json {{.result.id}}`,
+	}), context.Background(), nil)
+	require.NoError(t, err)
+
+	dbTicket := models.NewTicket(
+		flows.TicketUUID("cccccccc-dddd-eeee-ffff-000000000000"),
+		testdata.Org1.ID,
+		testdata.Cathy.ID,
+		testdata.RocketChat.ID,
+		"EXT-FWD-3",
+		testdata.DefaultTopic.ID,
+		"body",
+		models.NilUserID,
+		map[string]interface{}{
+			"contact-uuid":    string(testdata.Cathy.UUID),
+			"contact-display": "Cathy",
+		},
+	)
+
+	logger := &flows.HTTPLogger{}
+	err = svc.Forward(dbTicket, flows.MsgUUID("4fa340ae-1fb0-4666-98db-2177fe9bf31c"), "Hello", nil, nil, null.NullString, logger.Log)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "forward_response_template")
+	assert.Contains(t, err.Error(), "invalid JSON")
+	require.Equal(t, 1, len(logger.Logs))
 }

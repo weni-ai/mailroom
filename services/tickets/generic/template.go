@@ -48,6 +48,12 @@ func parseForwardTemplate(src string) (*template.Template, error) {
 	return parseNamedTemplate("forward_template", src)
 }
 
+// parseForwardResponseTemplate parses a Go text/template that maps a partner
+// Forward response into the platform MessageResponse JSON shape.
+func parseForwardResponseTemplate(src string) (*template.Template, error) {
+	return parseNamedTemplate("forward_response_template", src)
+}
+
 // renderRequestTemplate marshals req to JSON map context and executes tmpl.
 func renderRequestTemplate(tmpl *template.Template, req interface{}, name string) ([]byte, error) {
 	raw, err := jsonx.Marshal(req)
@@ -79,25 +85,42 @@ func renderForwardTemplate(tmpl *template.Template, req *MessageRequest) ([]byte
 // unmarshals the result into OpenResponse. The template must render JSON with
 // at least external_id (status and created_at are optional).
 func mapOpenResponse(tmpl *template.Template, raw []byte) (*OpenResponse, error) {
-	ctx := make(map[string]interface{})
-	if len(bytes.TrimSpace(raw)) > 0 {
-		dec := json.NewDecoder(bytes.NewReader(raw))
-		dec.UseNumber()
-		if err := dec.Decode(&ctx); err != nil {
-			return nil, errors.Wrap(err, "unable to decode open response for template")
-		}
-	}
-
-	out, err := executeTemplate(tmpl, ctx, "open_response_template")
+	out, err := mapResponseBody(tmpl, raw, "open_response_template")
 	if err != nil {
 		return nil, err
 	}
-
 	resp := &OpenResponse{}
 	if err := json.Unmarshal(out, resp); err != nil {
 		return nil, errors.Wrap(err, "error decoding mapped open response")
 	}
 	return resp, nil
+}
+
+// mapForwardResponse executes tmpl against the partner response JSON and
+// unmarshals the result into MessageResponse.
+func mapForwardResponse(tmpl *template.Template, raw []byte) (*MessageResponse, error) {
+	out, err := mapResponseBody(tmpl, raw, "forward_response_template")
+	if err != nil {
+		return nil, err
+	}
+	resp := &MessageResponse{}
+	if err := json.Unmarshal(out, resp); err != nil {
+		return nil, errors.Wrap(err, "error decoding mapped forward response")
+	}
+	return resp, nil
+}
+
+func mapResponseBody(tmpl *template.Template, raw []byte, name string) ([]byte, error) {
+	ctx := make(map[string]interface{})
+	if len(bytes.TrimSpace(raw)) > 0 {
+		dec := json.NewDecoder(bytes.NewReader(raw))
+		dec.UseNumber()
+		if err := dec.Decode(&ctx); err != nil {
+			return nil, errors.Wrapf(err, "unable to decode %s response for template", name)
+		}
+	}
+
+	return executeTemplate(tmpl, ctx, name)
 }
 
 // decodeOpenResponse unmarshals a standard OpenResponse envelope.
@@ -108,6 +131,18 @@ func decodeOpenResponse(raw []byte) (*OpenResponse, error) {
 	}
 	if err := jsonx.Unmarshal(raw, resp); err != nil {
 		return nil, errors.Wrap(err, "error unmarshalling open response")
+	}
+	return resp, nil
+}
+
+// decodeForwardResponse unmarshals a standard MessageResponse envelope.
+func decodeForwardResponse(raw []byte) (*MessageResponse, error) {
+	resp := &MessageResponse{}
+	if len(bytes.TrimSpace(raw)) == 0 {
+		return resp, nil
+	}
+	if err := jsonx.Unmarshal(raw, resp); err != nil {
+		return nil, errors.Wrap(err, "error unmarshalling forward response")
 	}
 	return resp, nil
 }
