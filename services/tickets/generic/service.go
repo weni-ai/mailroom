@@ -69,6 +69,13 @@ const (
 	// into the standard CloseResponse shape (status).
 	configCloseResponseTemplate = "close_response_template"
 
+	// Optional Go text/templates for the inbound agent-message webhook
+	// (POST .../messages). messages_template maps the partner request body into
+	// the standard agent message payload; messages_response_template maps the
+	// platform success response into the partner's expected shape.
+	configMessagesTemplate         = "messages_template"
+	configMessagesResponseTemplate = "messages_response_template"
+
 	// Webhook URL pattern (legacy, kept for compatibility with existing
 	// ticketer webhook handlers in Mailroom).
 	webhookBasePath = "/mr/tickets/types/" + typeGeneric + "/event_callback"

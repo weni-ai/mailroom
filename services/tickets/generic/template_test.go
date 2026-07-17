@@ -53,6 +53,38 @@ func TestParseCloseResponseTemplate(t *testing.T) {
 	assert.Contains(t, err.Error(), "invalid close_response_template")
 }
 
+func TestParseMessagesTemplate(t *testing.T) {
+	_, err := parseMessagesTemplate(`{"external_id":"{{.ticket}}","text":"{{.content}}"}`)
+	require.NoError(t, err)
+
+	_, err = parseMessagesTemplate(`{{.ticket`)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "invalid messages_template")
+}
+
+func TestMapAgentMessagePayload(t *testing.T) {
+	tmpl, err := parseMessagesTemplate(`{"external_id":"{{.ticket}}","direction":"outgoing","text":"{{.content}}","sent_at":"2026-05-20T14:35:00Z"}`)
+	require.NoError(t, err)
+
+	payload, err := mapAgentMessagePayload(tmpl, []byte(`{"ticket":"EXT-1","content":"hello"}`))
+	require.NoError(t, err)
+	assert.Equal(t, "EXT-1", payload.ExternalID)
+	assert.Equal(t, "outgoing", payload.Direction)
+	assert.Equal(t, "hello", payload.Text)
+}
+
+func TestRenderMessagesResponseTemplate(t *testing.T) {
+	tmpl, err := parseMessagesResponseTemplate(`{"ok":true,"id":"{{.message_uuid}}"}`)
+	require.NoError(t, err)
+
+	out, err := renderMessagesResponseTemplate(tmpl, map[string]interface{}{
+		"status":       "sent",
+		"message_uuid": "msg-1",
+	})
+	require.NoError(t, err)
+	assert.JSONEq(t, `{"ok":true,"id":"msg-1"}`, string(out))
+}
+
 func TestMapCloseResponse(t *testing.T) {
 	tmpl, err := parseCloseResponseTemplate(`{"status":"{{.result.state}}"}`)
 	require.NoError(t, err)

@@ -3,7 +3,6 @@ package generic
 import (
 	"context"
 	"encoding/json"
-	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -32,6 +31,11 @@ import (
 // otherwise make the INSERT collide on the primary key.
 func seedTicketer(t *testing.T, db *sqlx.DB, secret string, skipWebhookHMAC bool) assets.TicketerUUID {
 	t.Helper()
+	return seedTicketerWithConfig(t, db, secret, skipWebhookHMAC, nil)
+}
+
+func seedTicketerWithConfig(t *testing.T, db *sqlx.DB, secret string, skipWebhookHMAC bool, extra map[string]string) assets.TicketerUUID {
+	t.Helper()
 	u := assets.TicketerUUID(uuids.New())
 
 	db.MustExec(`SELECT setval(
@@ -39,18 +43,26 @@ func seedTicketer(t *testing.T, db *sqlx.DB, secret string, skipWebhookHMAC bool
 		GREATEST(COALESCE((SELECT MAX(id) FROM tickets_ticketer), 1), 1)
 	)`)
 
-	config := fmt.Sprintf(
-		`{"base_url":"https://partner.example.com","api_token":"x","webhook_secret":%q`,
-		secret,
-	)
-	if skipWebhookHMAC {
-		config += `,"skip_webhook_hmac":"true"`
+	cfg := map[string]string{
+		"base_url":  "https://partner.example.com",
+		"api_token": "x",
 	}
-	config += "}"
+	if secret != "" {
+		cfg["webhook_secret"] = secret
+	}
+	if skipWebhookHMAC {
+		cfg["skip_webhook_hmac"] = "true"
+	}
+	for k, v := range extra {
+		cfg[k] = v
+	}
+	raw, err := json.Marshal(cfg)
+	require.NoError(t, err)
+
 	db.MustExec(
 		`INSERT INTO tickets_ticketer(uuid, org_id, name, ticketer_type, config, is_active, created_on, modified_on, created_by_id, modified_by_id)
 		 VALUES ($1, 1, 'Generic Test', 'generic', $2, TRUE, NOW(), NOW(), 1, 1)`,
-		u, config,
+		u, string(raw),
 	)
 	t.Cleanup(func() {
 		db.MustExec(`DELETE FROM tickets_ticketer WHERE uuid = $1`, u)
@@ -205,6 +217,86 @@ func TestHandleAgentMessage_TicketNotFound(t *testing.T) {
 	assert.Equal(t, http.StatusNotFound, status)
 	m := decodeResp(t, resp)
 	assert.Equal(t, "ticket_not_found", m["error"])
+}
+
+func TestHandleAgentMessage_WithMessagesTemplate(t *testing.T) {
+	ctx, rt, db, _ := testsuite.Get()
+
+	const secret = "real-secret"
+	u := seedTicketerWithConfig(t, db, secret, false, map[string]string{
+		"messages_template": `{"external_id":"{{.ticket}}","direction":"outgoing","text":"{{.content}}","sent_at":"2026-05-20T14:35:00Z"}`,
+	})
+
+	// Partner-shaped body: mapped via messages_template before lookup.
+	body := `{"ticket":"DOES-NOT-EXIST","content":"hi from agent"}`
+	sig := "sha256=" + computeSig(secret, body)
+	resp, status, err := handleAgentMessage(ctx, rt, makeReq("POST", body, u, sig, ""), &models.HTTPLogger{})
+
+	assert.NoError(t, err)
+	assert.Equal(t, http.StatusNotFound, status)
+	m := decodeResp(t, resp)
+	assert.Equal(t, "ticket_not_found", m["error"])
+}
+
+func TestHandleAgentMessage_WithMessagesTemplateInvalidJSON(t *testing.T) {
+	ctx, rt, db, _ := testsuite.Get()
+
+	const secret = "real-secret"
+	u := seedTicketerWithConfig(t, db, secret, false, map[string]string{
+		"messages_template": `not-json {{.ticket}}`,
+	})
+
+	body := `{"ticket":"EXT-1","content":"hi"}`
+	sig := "sha256=" + computeSig(secret, body)
+	resp, status, err := handleAgentMessage(ctx, rt, makeReq("POST", body, u, sig, ""), &models.HTTPLogger{})
+
+	assert.NoError(t, err)
+	assert.Equal(t, http.StatusBadRequest, status)
+	m := decodeResp(t, resp)
+	assert.Equal(t, "invalid_payload", m["error"])
+}
+
+func TestHandleAgentMessage_WithInvalidMessagesTemplateConfig(t *testing.T) {
+	ctx, rt, db, _ := testsuite.Get()
+
+	const secret = "real-secret"
+	u := seedTicketerWithConfig(t, db, secret, false, map[string]string{
+		"messages_template": `{"external_id":"{{.ticket"`,
+	})
+
+	body := `{"ticket":"EXT-1","content":"hi"}`
+	sig := "sha256=" + computeSig(secret, body)
+	resp, status, err := handleAgentMessage(ctx, rt, makeReq("POST", body, u, sig, ""), &models.HTTPLogger{})
+
+	assert.NoError(t, err)
+	assert.Equal(t, http.StatusInternalServerError, status)
+	m := decodeResp(t, resp)
+	assert.Equal(t, "misconfigured", m["error"])
+}
+
+func TestRenderAgentMessageResponse_WithTemplate(t *testing.T) {
+	ticketer := models.BuildTicketer(
+		models.TicketerID(1),
+		assets.TicketerUUID("11111111-2222-3333-4444-555555555555"),
+		1,
+		"generic",
+		"Generic",
+		map[string]string{
+			"messages_response_template": `{"ok":true,"id":"{{.message_uuid}}","ticket":"{{.ticket_uuid}}"}`,
+		},
+	)
+
+	resp, status, err := renderAgentMessageResponse(ticketer, map[string]interface{}{
+		"status":       "sent",
+		"ticket_uuid":  "ticket-1",
+		"message_uuid": "msg-1",
+	})
+	require.NoError(t, err)
+	assert.Equal(t, http.StatusOK, status)
+
+	raw, ok := resp.(json.RawMessage)
+	require.True(t, ok)
+	assert.JSONEq(t, `{"ok":true,"id":"msg-1","ticket":"ticket-1"}`, string(raw))
 }
 
 func TestHandleCloseTicket_TicketNotFound(t *testing.T) {
