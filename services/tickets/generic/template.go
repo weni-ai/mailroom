@@ -54,6 +54,11 @@ func parseForwardResponseTemplate(src string) (*template.Template, error) {
 	return parseNamedTemplate("forward_response_template", src)
 }
 
+// parseCloseTemplate parses a Go text/template used to render the Close request body.
+func parseCloseTemplate(src string) (*template.Template, error) {
+	return parseNamedTemplate("close_template", src)
+}
+
 // renderRequestTemplate marshals req to JSON map context and executes tmpl.
 func renderRequestTemplate(tmpl *template.Template, req interface{}, name string) ([]byte, error) {
 	raw, err := jsonx.Marshal(req)
@@ -79,6 +84,12 @@ func renderOpenTemplate(tmpl *template.Template, req *OpenRequest) ([]byte, erro
 // returns the rendered body. The output must be valid JSON.
 func renderForwardTemplate(tmpl *template.Template, req *MessageRequest) ([]byte, error) {
 	return renderRequestTemplate(tmpl, req, "forward_template")
+}
+
+// renderCloseTemplate executes tmpl against the CloseRequest JSON shape and
+// returns the rendered body. The output must be valid JSON.
+func renderCloseTemplate(tmpl *template.Template, req *CloseRequest) ([]byte, error) {
+	return renderRequestTemplate(tmpl, req, "close_template")
 }
 
 // mapOpenResponse executes tmpl against the partner response JSON and

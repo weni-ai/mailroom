@@ -234,6 +234,25 @@ func TestCloseTicket(t *testing.T) {
 	assert.Equal(t, "ticket_already_closed", clientErr.Code)
 }
 
+func TestCloseTicketRaw(t *testing.T) {
+	resetGlobals(t)
+
+	endpoint := testBaseURL + "/v1/tickets/" + sampleExternalID + "/close"
+	httpx.SetRequestor(httpx.NewMockRequestor(map[string][]httpx.MockResponse{
+		endpoint: {
+			httpx.NewMockResponse(200, nil, `{"status":"closed"}`),
+		},
+	}))
+
+	client := newTestClient()
+	body := []byte(`{"id":"` + sampleExternalID + `","by":{"type":"platform","id":"system"}}`)
+	trace, err := client.CloseTicketRaw(sampleExternalID, body, "close-raw-1")
+	require.NoError(t, err)
+	assert.Equal(t, "close-raw-1", trace.Request.Header.Get("Idempotency-Key"))
+	assert.Contains(t, string(trace.RequestTrace), `"id":"`+sampleExternalID+`"`)
+	assert.NotContains(t, string(trace.RequestTrace), `"ticket_id":`)
+}
+
 func TestReopenTicket(t *testing.T) {
 	resetGlobals(t)
 

@@ -298,7 +298,17 @@ type CloseRequest struct {
 
 // CloseTicket notifies the partner that the ticket was closed on the platform.
 func (c *Client) CloseTicket(externalID string, req *CloseRequest, idempotencyKey string) (*httpx.Trace, error) {
-	return c.request(http.MethodPost, c.endpoint(c.routes.CloseTicket, externalID), req, nil, idempotencyKey)
+	return c.closeTicketRequest(externalID, req, idempotencyKey)
+}
+
+// CloseTicketRaw notifies the partner of a ticket close using a pre-rendered
+// JSON body (e.g. from close_template).
+func (c *Client) CloseTicketRaw(externalID string, body []byte, idempotencyKey string) (*httpx.Trace, error) {
+	return c.closeTicketRequest(externalID, json.RawMessage(body), idempotencyKey)
+}
+
+func (c *Client) closeTicketRequest(externalID string, payload interface{}, idempotencyKey string) (*httpx.Trace, error) {
+	return c.request(http.MethodPost, c.endpoint(c.routes.CloseTicket, externalID), payload, nil, idempotencyKey)
 }
 
 // Reopen -------------------------------------------------------------------
