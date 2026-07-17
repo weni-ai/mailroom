@@ -85,6 +85,37 @@ func TestRenderMessagesResponseTemplate(t *testing.T) {
 	assert.JSONEq(t, `{"ok":true,"id":"msg-1"}`, string(out))
 }
 
+func TestParseTicketsCloseTemplate(t *testing.T) {
+	_, err := parseTicketsCloseTemplate(`{"external_id":"{{.ticket}}"}`)
+	require.NoError(t, err)
+
+	_, err = parseTicketsCloseTemplate(`{{.ticket`)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "invalid tickets_close_template")
+}
+
+func TestMapCloseTicketPayload(t *testing.T) {
+	tmpl, err := parseTicketsCloseTemplate(`{"external_id":"{{.ticket}}","reason":"{{.reason}}","closed_at":"{{.closed_at}}"}`)
+	require.NoError(t, err)
+
+	payload, err := mapCloseTicketPayload(tmpl, []byte(`{"ticket":"EXT-1","reason":"resolved","closed_at":"2026-05-20T14:50:00Z"}`))
+	require.NoError(t, err)
+	assert.Equal(t, "EXT-1", payload.ExternalID)
+	assert.Equal(t, "resolved", payload.Reason)
+}
+
+func TestRenderTicketsCloseResponseTemplate(t *testing.T) {
+	tmpl, err := parseTicketsCloseResponseTemplate(`{"ok":true,"ticket":"{{.ticket_uuid}}"}`)
+	require.NoError(t, err)
+
+	out, err := renderTicketsCloseResponseTemplate(tmpl, map[string]interface{}{
+		"status":      "closed",
+		"ticket_uuid": "ticket-1",
+	})
+	require.NoError(t, err)
+	assert.JSONEq(t, `{"ok":true,"ticket":"ticket-1"}`, string(out))
+}
+
 func TestMapCloseResponse(t *testing.T) {
 	tmpl, err := parseCloseResponseTemplate(`{"status":"{{.result.state}}"}`)
 	require.NoError(t, err)
