@@ -87,6 +87,7 @@ const (
 	MsgFailedTooOld          = MsgFailedReason("O")
 	MsgFailedNoDestination   = MsgFailedReason("D")
 	MsgFailedSuspendTemplate = MsgFailedReason("T")
+	MsgFailedMarketingOptOut = MsgFailedReason("M")
 )
 
 // BroadcastID is our internal type for broadcast ids, which can be null/0
@@ -357,7 +358,7 @@ func NewOutgoingFlowMsgCatalog(rt *runtime.Runtime, org *Org, channel *Channel, 
 
 // NewOutgoingFlowMsgWpp creates an outgoing message for the passed in flow message
 func NewOutgoingFlowMsgWpp(rt *runtime.Runtime, org *Org, channel *Channel, session *Session, out *flows.MsgWppOut, createdOn time.Time) (*Msg, error) {
-	return newOutgoingMsgWpp(rt, org, channel, session.ContactID(), out, createdOn, session, NilBroadcastID, true, nil)
+	return newOutgoingMsgWpp(rt, org, channel, session.ContactID(), out, createdOn, session, NilBroadcastID, true, nil, nil)
 }
 
 // NewOutgoingBroadcastMsg creates an outgoing message which is part of a broadcast
@@ -365,8 +366,8 @@ func NewOutgoingBroadcastMsg(rt *runtime.Runtime, org *Org, channel *Channel, co
 	return newOutgoingMsg(rt, org, channel, contactID, out, createdOn, nil, broadcastID, extraMetadata)
 }
 
-func NewOutgoingWppBroadcastMsg(rt *runtime.Runtime, org *Org, channel *Channel, contactID ContactID, out *flows.MsgWppOut, createdOn time.Time, broadcastID BroadcastID, highPriority bool, extraMetadata map[string]interface{}) (*Msg, error) {
-	return newOutgoingMsgWpp(rt, org, channel, contactID, out, createdOn, nil, broadcastID, highPriority, extraMetadata)
+func NewOutgoingWppBroadcastMsg(rt *runtime.Runtime, org *Org, channel *Channel, contact *Contact, out *flows.MsgWppOut, createdOn time.Time, broadcastID BroadcastID, highPriority bool, extraMetadata map[string]interface{}) (*Msg, error) {
+	return newOutgoingMsgWpp(rt, org, channel, contact.ID(), out, createdOn, nil, broadcastID, highPriority, extraMetadata, contact)
 }
 
 // NewOutgoingMsg creates an outgoing message that does not belong to any flow or broadcast, it's used to the a direct message to the contact
@@ -481,6 +482,10 @@ func newOutgoingMsg(rt *runtime.Runtime, org *Org, channel *Channel, contactID C
 				m.FailedReason = MsgFailedSuspendTemplate // Suspend Template
 				logrus.WithFields(logrus.Fields{"org_id": org.ID()}).Debug("suspend template, failing message")
 			}
+			if err := applyMarketingOptOutFailure(context.Background(), rt, org, msg, out.Templating().Template().Category, nil); err != nil {
+				return nil, err
+			}
+
 		}
 		if out.Topic() != flows.NilMsgTopic {
 			metadata["topic"] = string(out.Topic())
@@ -615,7 +620,7 @@ func newOutgoingMsgCatalog(rt *runtime.Runtime, org *Org, channel *Channel, cont
 	return msg, nil
 }
 
-func newOutgoingMsgWpp(rt *runtime.Runtime, org *Org, channel *Channel, contactID ContactID, msgWpp *flows.MsgWppOut, createdOn time.Time, session *Session, broadcastID BroadcastID, highPriority bool, extraMetadata map[string]interface{}) (*Msg, error) {
+func newOutgoingMsgWpp(rt *runtime.Runtime, org *Org, channel *Channel, contactID ContactID, msgWpp *flows.MsgWppOut, createdOn time.Time, session *Session, broadcastID BroadcastID, highPriority bool, extraMetadata map[string]interface{}, contact *Contact) (*Msg, error) {
 	msg := &Msg{}
 	m := &msg.m
 	m.UUID = msgWpp.UUID()
@@ -754,6 +759,9 @@ func newOutgoingMsgWpp(rt *runtime.Runtime, org *Org, channel *Channel, contactI
 				m.Status = MsgStatusFailed
 				m.FailedReason = MsgFailedSuspendTemplate // Suspend Template
 				logrus.WithFields(logrus.Fields{"org_id": org.ID()}).Debug("suspend template, failing message")
+			}
+			if err := applyMarketingOptOutFailure(context.Background(), rt, org, msg, msgWpp.Templating().Template().Category, contact); err != nil {
+				return nil, err
 			}
 
 		}
@@ -2107,7 +2115,7 @@ func CreateWppBroadcastMessages(ctx context.Context, rt *runtime.Runtime, oa *Or
 			extraMetadata["product_carousel"] = carousel
 		}
 
-		msg, err := NewOutgoingWppBroadcastMsg(rt, oa.Org(), channel, c.ID(), out, time.Now(), bcast.BroadcastID(), highPriority, extraMetadata)
+		msg, err := NewOutgoingWppBroadcastMsg(rt, oa.Org(), channel, c, out, time.Now(), bcast.BroadcastID(), highPriority, extraMetadata)
 		if err != nil {
 			return nil, errors.Wrapf(err, "error creating outgoing message")
 		}
