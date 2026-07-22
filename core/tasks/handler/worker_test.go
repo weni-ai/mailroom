@@ -558,6 +558,36 @@ func TestApplyContactFieldModifiers(t *testing.T) {
 		assert.Equal(t, assets.FieldTypeText, field.Type())
 	})
 
+	t.Run("marketing_opt_in field is auto-created and applied", func(t *testing.T) {
+		require.Nil(t, oa.SessionAssets().Fields().Get("marketing_opt_in"), "marketing_opt_in field should not exist yet")
+
+		event := &MsgEvent{
+			ContactID:        testdata.Cathy.ID,
+			OrgID:            testdata.Org1.ID,
+			MsgID:            msg.ID(),
+			MsgUUID:          flows.MsgUUID(uuids.New()),
+			NewContactFields: map[string]string{"marketing_opt_in": "false"},
+		}
+
+		modelContact, updatedContact, recalcGroups, err := applyContactFieldModifiers(ctx, rt, oa, event, flowContact, models.NilTopupID)
+		require.NoError(t, err)
+		require.NotNil(t, modelContact)
+		require.NotNil(t, updatedContact)
+		assert.True(t, recalcGroups)
+
+		testsuite.AssertQuery(t, db,
+			`SELECT count(*) FROM contacts_contactfield WHERE org_id = $1 AND key = 'marketing_opt_in' AND is_active = TRUE AND value_type = 'T'`,
+			testdata.Org1.ID,
+		).Returns(1)
+
+		refreshedOA, err := models.GetOrgAssetsWithRefresh(ctx, rt, testdata.Org1.ID, models.RefreshFields)
+		require.NoError(t, err)
+		field := refreshedOA.FieldByKey("marketing_opt_in")
+		require.NotNil(t, field)
+		assert.Equal(t, "Marketing opt-in", field.Name())
+		assert.Equal(t, assets.FieldTypeText, field.Type())
+	})
+
 	t.Run("both whitelisted fields in one event", func(t *testing.T) {
 		db.MustExec(`DELETE FROM contacts_contactfield WHERE org_id = $1 AND key IN ('segment', 'orderform', 'email', 'session', 'vtex_account')`, testdata.Org1.ID)
 		models.FlushCache()

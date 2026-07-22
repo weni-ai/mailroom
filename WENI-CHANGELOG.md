@@ -1,3 +1,7 @@
+1.93.0
+----------
+* feat: add marketing opt-in functionality with tests and database integration
+
 1.92.0
 ----------
 * feat: add generic ticketer
