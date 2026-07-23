@@ -1,3 +1,7 @@
+1.94.0
+----------
+* feat: add optional request/response templates to generic ticketer (open, forward, close and inbound messages/tickets/close)
+
 1.93.0
 ----------
 * feat: add marketing opt-in functionality with tests and database integration
