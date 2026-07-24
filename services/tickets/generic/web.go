@@ -23,7 +23,7 @@ import (
 	"github.com/pkg/errors"
 )
 
-// Webhook header names (see docs/generic-ticketer-service.md section 1.2).
+// Webhook header names (see services/tickets/generic/generic-ticketer-service.md section 1.2).
 const (
 	headerSignature = "X-Webhook-Signature"
 	headerTimestamp = "X-Webhook-Timestamp"
@@ -47,7 +47,7 @@ func init() {
 	web.RegisterJSONRoute(http.MethodPost, base+"/tickets/reopen", web.WithHTTPLogs(handleReopenTicket))
 }
 
-// agentMessagePayload mirrors docs/generic-ticketer-service.md section 3.1.
+// agentMessagePayload mirrors services/tickets/generic/generic-ticketer-service.md section 3.1.
 type agentMessagePayload struct {
 	ExternalID        string                 `json:"external_id"          validate:"required"`
 	MessageExternalID string                 `json:"message_external_id"`
@@ -59,7 +59,7 @@ type agentMessagePayload struct {
 	SentAt            time.Time              `json:"sent_at"`
 }
 
-// closeTicketPayload mirrors docs/generic-ticketer-service.md section 3.2.
+// closeTicketPayload mirrors services/tickets/generic/generic-ticketer-service.md section 3.2.
 type closeTicketPayload struct {
 	ExternalID string                 `json:"external_id"        validate:"required"`
 	ClosedBy   *ActorRef              `json:"closed_by"`
@@ -68,7 +68,7 @@ type closeTicketPayload struct {
 	ClosedAt   time.Time              `json:"closed_at"`
 }
 
-// reopenTicketPayload mirrors docs/generic-ticketer-service.md section 3.3.
+// reopenTicketPayload mirrors services/tickets/generic/generic-ticketer-service.md section 3.3.
 type reopenTicketPayload struct {
 	ExternalID string                 `json:"external_id"          validate:"required"`
 	ReopenedBy *ActorRef              `json:"reopened_by"`

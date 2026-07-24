@@ -587,8 +587,9 @@ func TestCloseWithResponseTemplateInvalidJSON(t *testing.T) {
 	require.Equal(t, 1, len(logger.Logs))
 }
 
-func TestSendHistoryIsNoop(t *testing.T) {
-	_, rt, _, _ := testsuite.Get()
+func TestSendHistoryEmptyIsNoop(t *testing.T) {
+	ctx, rt, db, _ := testsuite.Get()
+	defer testsuite.Reset(testsuite.ResetData)
 
 	defer httpx.SetRequestor(httpx.DefaultRequestor)
 	httpx.SetRequestor(httpx.NewMockRequestor(nil))
@@ -598,7 +599,7 @@ func TestSendHistoryIsNoop(t *testing.T) {
 		"base_url":       svcBaseURL,
 		"api_token":      svcAPIToken,
 		"webhook_secret": svcWebhookSecret,
-	}), context.Background(), nil)
+	}), ctx, db)
 	require.NoError(t, err)
 
 	dbTicket := models.NewTicket("88bfa1dc-be33-45c2-b469-294ecb0eba90", testdata.Org1.ID, testdata.Cathy.ID, testdata.RocketChat.ID, "EXT-X", testdata.DefaultTopic.ID, "x", models.NilUserID, nil)
@@ -606,6 +607,247 @@ func TestSendHistoryIsNoop(t *testing.T) {
 	err = svc.SendHistory(dbTicket, testdata.Cathy.ID, nil, logger.Log)
 	assert.NoError(t, err)
 	assert.Equal(t, 0, len(logger.Logs))
+}
+
+func TestSendHistoryBatchDefault(t *testing.T) {
+	ctx, rt, db, _ := testsuite.Get()
+	defer testsuite.Reset(testsuite.ResetData)
+
+	historyAfter := time.Now().Add(-time.Minute).Format("2006-01-02 15:04:05")
+	testdata.InsertIncomingMsg(db, testdata.Org1, testdata.TwilioChannel, testdata.Cathy, "history in", models.MsgStatusHandled)
+	testdata.InsertOutgoingMsg(db, testdata.Org1, testdata.TwilioChannel, testdata.Cathy, "history out", nil, models.MsgStatusSent, false)
+
+	endpoint := svcBaseURL + "/v1/tickets/EXT-HIST/history"
+	defer httpx.SetRequestor(httpx.DefaultRequestor)
+	httpx.SetRequestor(httpx.NewMockRequestor(map[string][]httpx.MockResponse{
+		endpoint: {
+			httpx.NewMockResponse(200, nil, `{"status":"history_received","messages_received":2}`),
+		},
+	}))
+
+	ticketer := newTicketer()
+	svc, err := generic.NewService(rt.Config, http.DefaultClient, nil, ticketer, newModelTicketer(map[string]string{
+		"base_url":       svcBaseURL,
+		"api_token":      svcAPIToken,
+		"webhook_secret": svcWebhookSecret,
+	}), ctx, db)
+	require.NoError(t, err)
+
+	dbTicket := models.NewTicket(
+		"88bfa1dc-be33-45c2-b469-294ecb0eba90",
+		testdata.Org1.ID,
+		testdata.Cathy.ID,
+		testdata.RocketChat.ID,
+		"EXT-HIST",
+		testdata.DefaultTopic.ID,
+		`{"history_after":"`+historyAfter+`"}`,
+		models.NilUserID,
+		map[string]interface{}{
+			"contact-uuid":    string(testdata.Cathy.UUID),
+			"contact-display": "Cathy",
+		},
+	)
+
+	logger := &flows.HTTPLogger{}
+	err = svc.SendHistory(dbTicket, testdata.Cathy.ID, nil, logger.Log)
+	require.NoError(t, err)
+	require.Equal(t, 1, len(logger.Logs))
+	assert.Contains(t, logger.Logs[0].Request, "POST /v1/tickets/EXT-HIST/history ")
+	assert.Contains(t, logger.Logs[0].Request, `"messages":[`)
+	assert.Contains(t, logger.Logs[0].Request, `"direction":"incoming"`)
+	assert.Contains(t, logger.Logs[0].Request, `"direction":"outgoing"`)
+}
+
+func TestSendHistoryOneByOneDefault(t *testing.T) {
+	ctx, rt, db, _ := testsuite.Get()
+	defer testsuite.Reset(testsuite.ResetData)
+
+	historyAfter := time.Now().Add(-time.Minute).Format("2006-01-02 15:04:05")
+	testdata.InsertIncomingMsg(db, testdata.Org1, testdata.TwilioChannel, testdata.Cathy, "one in", models.MsgStatusHandled)
+	testdata.InsertOutgoingMsg(db, testdata.Org1, testdata.TwilioChannel, testdata.Cathy, "one out", nil, models.MsgStatusSent, false)
+
+	msgEndpoint := svcBaseURL + "/v1/tickets/EXT-ONE/messages"
+	defer httpx.SetRequestor(httpx.DefaultRequestor)
+	httpx.SetRequestor(httpx.NewMockRequestor(map[string][]httpx.MockResponse{
+		msgEndpoint: {
+			httpx.NewMockResponse(200, nil, `{"message_external_id":"x","status":"received"}`),
+			httpx.NewMockResponse(200, nil, `{"message_external_id":"y","status":"received"}`),
+		},
+	}))
+
+	ticketer := newTicketer()
+	svc, err := generic.NewService(rt.Config, http.DefaultClient, nil, ticketer, newModelTicketer(map[string]string{
+		"base_url":       svcBaseURL,
+		"api_token":      svcAPIToken,
+		"webhook_secret": svcWebhookSecret,
+		"history_mode":   "one_by_one",
+	}), ctx, db)
+	require.NoError(t, err)
+
+	dbTicket := models.NewTicket(
+		"88bfa1dc-be33-45c2-b469-294ecb0eba90",
+		testdata.Org1.ID,
+		testdata.Cathy.ID,
+		testdata.RocketChat.ID,
+		"EXT-ONE",
+		testdata.DefaultTopic.ID,
+		`{"history_after":"`+historyAfter+`"}`,
+		models.NilUserID,
+		map[string]interface{}{
+			"contact-uuid":    string(testdata.Cathy.UUID),
+			"contact-display": "Cathy",
+		},
+	)
+
+	logger := &flows.HTTPLogger{}
+	err = svc.SendHistory(dbTicket, testdata.Cathy.ID, nil, logger.Log)
+	require.NoError(t, err)
+	require.Equal(t, 2, len(logger.Logs))
+	assert.Contains(t, logger.Logs[0].Request, "POST /v1/tickets/EXT-ONE/messages ")
+	assert.Contains(t, logger.Logs[0].Request, `"text":"one in"`)
+	assert.Contains(t, logger.Logs[1].Request, `"text":"one out"`)
+	assert.Contains(t, logger.Logs[1].Request, `"direction":"outgoing"`)
+}
+
+func TestSendHistoryBatchSize(t *testing.T) {
+	ctx, rt, db, _ := testsuite.Get()
+	defer testsuite.Reset(testsuite.ResetData)
+
+	historyAfter := time.Now().Add(-time.Minute).Format("2006-01-02 15:04:05")
+	testdata.InsertIncomingMsg(db, testdata.Org1, testdata.TwilioChannel, testdata.Cathy, "batch 1", models.MsgStatusHandled)
+	testdata.InsertOutgoingMsg(db, testdata.Org1, testdata.TwilioChannel, testdata.Cathy, "batch 2", nil, models.MsgStatusSent, false)
+
+	endpoint := svcBaseURL + "/v1/tickets/EXT-BATCH/history"
+	defer httpx.SetRequestor(httpx.DefaultRequestor)
+	httpx.SetRequestor(httpx.NewMockRequestor(map[string][]httpx.MockResponse{
+		endpoint: {
+			httpx.NewMockResponse(200, nil, `{"status":"history_received","messages_received":1}`),
+			httpx.NewMockResponse(200, nil, `{"status":"history_received","messages_received":1}`),
+		},
+	}))
+
+	ticketer := newTicketer()
+	svc, err := generic.NewService(rt.Config, http.DefaultClient, nil, ticketer, newModelTicketer(map[string]string{
+		"base_url":           svcBaseURL,
+		"api_token":          svcAPIToken,
+		"webhook_secret":     svcWebhookSecret,
+		"history_batch_size": "1",
+	}), ctx, db)
+	require.NoError(t, err)
+
+	dbTicket := models.NewTicket(
+		"88bfa1dc-be33-45c2-b469-294ecb0eba90",
+		testdata.Org1.ID,
+		testdata.Cathy.ID,
+		testdata.RocketChat.ID,
+		"EXT-BATCH",
+		testdata.DefaultTopic.ID,
+		`{"history_after":"`+historyAfter+`"}`,
+		models.NilUserID,
+		map[string]interface{}{
+			"contact-uuid":    string(testdata.Cathy.UUID),
+			"contact-display": "Cathy",
+		},
+	)
+
+	logger := &flows.HTTPLogger{}
+	err = svc.SendHistory(dbTicket, testdata.Cathy.ID, nil, logger.Log)
+	require.NoError(t, err)
+	require.Equal(t, 2, len(logger.Logs))
+}
+
+func TestSendHistoryWithTemplate(t *testing.T) {
+	ctx, rt, db, _ := testsuite.Get()
+	defer testsuite.Reset(testsuite.ResetData)
+
+	historyAfter := time.Now().Add(-time.Minute).Format("2006-01-02 15:04:05")
+	testdata.InsertIncomingMsg(db, testdata.Org1, testdata.TwilioChannel, testdata.Cathy, "tmpl in", models.MsgStatusHandled)
+
+	endpoint := svcBaseURL + "/v1/tickets/EXT-TMPL/history"
+	defer httpx.SetRequestor(httpx.DefaultRequestor)
+	httpx.SetRequestor(httpx.NewMockRequestor(map[string][]httpx.MockResponse{
+		endpoint: {
+			httpx.NewMockResponse(200, nil, `{"status":"history_received","messages_received":1}`),
+		},
+	}))
+
+	ticketer := newTicketer()
+	svc, err := generic.NewService(rt.Config, http.DefaultClient, nil, ticketer, newModelTicketer(map[string]string{
+		"base_url":         svcBaseURL,
+		"api_token":        svcAPIToken,
+		"webhook_secret":   svcWebhookSecret,
+		"history_template": `{"ticket":"{{.ticket_id}}","items":{{len .messages}}}`,
+	}), ctx, db)
+	require.NoError(t, err)
+
+	dbTicket := models.NewTicket(
+		"88bfa1dc-be33-45c2-b469-294ecb0eba90",
+		testdata.Org1.ID,
+		testdata.Cathy.ID,
+		testdata.RocketChat.ID,
+		"EXT-TMPL",
+		testdata.DefaultTopic.ID,
+		`{"history_after":"`+historyAfter+`"}`,
+		models.NilUserID,
+		map[string]interface{}{
+			"contact-uuid":    string(testdata.Cathy.UUID),
+			"contact-display": "Cathy",
+		},
+	)
+
+	logger := &flows.HTTPLogger{}
+	err = svc.SendHistory(dbTicket, testdata.Cathy.ID, nil, logger.Log)
+	require.NoError(t, err)
+	require.Equal(t, 1, len(logger.Logs))
+	assert.Contains(t, logger.Logs[0].Request, `"ticket":"88bfa1dc-be33-45c2-b469-294ecb0eba90"`)
+	assert.Contains(t, logger.Logs[0].Request, `"items":1`)
+}
+
+func TestSendHistoryCustomRouteMessage(t *testing.T) {
+	ctx, rt, db, _ := testsuite.Get()
+	defer testsuite.Reset(testsuite.ResetData)
+
+	historyAfter := time.Now().Add(-time.Minute).Format("2006-01-02 15:04:05")
+	testdata.InsertIncomingMsg(db, testdata.Org1, testdata.TwilioChannel, testdata.Cathy, "custom in", models.MsgStatusHandled)
+
+	customEndpoint := svcBaseURL + "/api/conversations/EXT-CUSTOM/history-msg"
+	defer httpx.SetRequestor(httpx.DefaultRequestor)
+	httpx.SetRequestor(httpx.NewMockRequestor(map[string][]httpx.MockResponse{
+		customEndpoint: {
+			httpx.NewMockResponse(200, nil, `{"message_external_id":"x","status":"received"}`),
+		},
+	}))
+
+	ticketer := newTicketer()
+	svc, err := generic.NewService(rt.Config, http.DefaultClient, nil, ticketer, newModelTicketer(map[string]string{
+		"base_url":              svcBaseURL,
+		"api_token":             svcAPIToken,
+		"webhook_secret":        svcWebhookSecret,
+		"history_mode":          "one_by_one",
+		"route_history_message": "/api/conversations/{external_id}/history-msg",
+	}), ctx, db)
+	require.NoError(t, err)
+
+	dbTicket := models.NewTicket(
+		"88bfa1dc-be33-45c2-b469-294ecb0eba90",
+		testdata.Org1.ID,
+		testdata.Cathy.ID,
+		testdata.RocketChat.ID,
+		"EXT-CUSTOM",
+		testdata.DefaultTopic.ID,
+		`{"history_after":"`+historyAfter+`"}`,
+		models.NilUserID,
+		map[string]interface{}{
+			"contact-uuid":    string(testdata.Cathy.UUID),
+			"contact-display": "Cathy",
+		},
+	)
+
+	logger := &flows.HTTPLogger{}
+	err = svc.SendHistory(dbTicket, testdata.Cathy.ID, nil, logger.Log)
+	require.NoError(t, err)
+	require.Equal(t, 1, len(logger.Logs))
+	assert.Contains(t, logger.Logs[0].Request, "POST /api/conversations/EXT-CUSTOM/history-msg ")
 }
 
 func TestCustomRoutesThroughConfig(t *testing.T) {

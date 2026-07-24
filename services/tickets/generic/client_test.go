@@ -328,6 +328,67 @@ func TestSendHistory(t *testing.T) {
 	assert.Contains(t, string(trace.RequestTrace), `"message_id":"msg-002"`)
 }
 
+func TestSendHistoryRaw(t *testing.T) {
+	resetGlobals(t)
+
+	endpoint := testBaseURL + "/v1/tickets/" + sampleExternalID + "/history"
+	httpx.SetRequestor(httpx.NewMockRequestor(map[string][]httpx.MockResponse{
+		endpoint: {
+			httpx.NewMockResponse(200, nil, `{"status":"history_received","messages_received":1}`),
+		},
+	}))
+
+	client := newTestClient()
+	body := []byte(`{"ticket_id":"` + sampleTicketUUID + `","external_id":"` + sampleExternalID + `","messages":[]}`)
+	trace, err := client.SendHistoryRaw(sampleExternalID, body, "history-raw-1")
+	require.NoError(t, err)
+	assert.Contains(t, string(trace.RequestTrace), `"ticket_id":"`+sampleTicketUUID+`"`)
+}
+
+func TestSendHistoryMessage(t *testing.T) {
+	resetGlobals(t)
+
+	endpoint := testBaseURL + "/v1/tickets/" + sampleExternalID + "/messages"
+	httpx.SetRequestor(httpx.NewMockRequestor(map[string][]httpx.MockResponse{
+		endpoint: {
+			httpx.NewMockResponse(200, nil, `{"message_external_id":"x","status":"received"}`),
+		},
+	}))
+
+	client := newTestClient()
+	req := &generic.MessageRequest{
+		TicketID:   sampleTicketUUID,
+		ExternalID: sampleExternalID,
+		Direction:  "incoming",
+		Sender:     generic.Sender{Type: "contact", ID: sampleContactUUID},
+		Text:       "history msg",
+		SentAt:     time.Date(2026, 5, 20, 14, 20, 0, 0, time.UTC),
+	}
+
+	trace, err := client.SendHistoryMessage(sampleExternalID, req, "history-msg-1")
+	require.NoError(t, err)
+	assert.Contains(t, string(trace.RequestTrace), `"text":"history msg"`)
+}
+
+func TestSendHistoryMessageRawCustomRoute(t *testing.T) {
+	resetGlobals(t)
+
+	customEndpoint := testBaseURL + "/api/conversations/" + sampleExternalID + "/history-msg"
+	httpx.SetRequestor(httpx.NewMockRequestor(map[string][]httpx.MockResponse{
+		customEndpoint: {
+			httpx.NewMockResponse(200, nil, `{"message_external_id":"x","status":"received"}`),
+		},
+	}))
+
+	client := generic.NewClient(http.DefaultClient, nil, testBaseURL, testAPIToken, generic.WithRoutes(generic.Routes{
+		SendHistoryMessage: "/api/conversations/{external_id}/history-msg",
+	}))
+	body := []byte(`{"text":"custom history"}`)
+	trace, err := client.SendHistoryMessageRaw(sampleExternalID, body, "history-msg-raw-1")
+	require.NoError(t, err)
+	assert.Contains(t, string(trace.RequestTrace), `"text":"custom history"`)
+}
+
 func TestRequestWithoutIdempotencyKey(t *testing.T) {
 	resetGlobals(t)
 
@@ -374,6 +435,7 @@ func TestDefaultRoutes(t *testing.T) {
 	assert.Equal(t, "/v1/tickets/{external_id}/close", routes.CloseTicket)
 	assert.Equal(t, "/v1/tickets/{external_id}/reopen", routes.ReopenTicket)
 	assert.Equal(t, "/v1/tickets/{external_id}/history", routes.SendHistory)
+	assert.Equal(t, "/v1/tickets/{external_id}/messages", routes.SendHistoryMessage)
 
 	defaults := generic.DefaultRoutes()
 	defaults.OpenTicket = "mutated"
