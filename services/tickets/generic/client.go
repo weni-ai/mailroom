@@ -17,7 +17,7 @@ import (
 )
 
 // apiVersion is the contract version emitted in the X-API-Version header on
-// every platform-to-ticketer request. See docs/generic-ticketer-service.md.
+// every platform-to-ticketer request. See services/tickets/generic/generic-ticketer-service.md.
 const apiVersion = "1"
 
 // externalIDPlaceholder is the token replaced in route templates by the
@@ -29,23 +29,26 @@ const externalIDPlaceholder = "{external_id}"
 // just the routes they need. Templates may contain the {external_id}
 // placeholder, which is URL-escaped at request time.
 type Routes struct {
-	OpenTicket     string
-	ForwardMessage string
-	CloseTicket    string
-	ReopenTicket   string
-	SendHistory    string
+	OpenTicket         string
+	ForwardMessage     string
+	CloseTicket        string
+	ReopenTicket       string
+	SendHistory        string
+	SendHistoryMessage string
 }
 
 // DefaultRoutes returns the opinionated route templates that match the
-// generic ticketer contract documented in docs/generic-ticketer-service.md.
+// generic ticketer contract documented in services/tickets/generic/generic-ticketer-service.md.
 func DefaultRoutes() Routes {
-	return Routes{
+	r := Routes{
 		OpenTicket:     "/v1/tickets",
 		ForwardMessage: "/v1/tickets/" + externalIDPlaceholder + "/messages",
 		CloseTicket:    "/v1/tickets/" + externalIDPlaceholder + "/close",
 		ReopenTicket:   "/v1/tickets/" + externalIDPlaceholder + "/reopen",
 		SendHistory:    "/v1/tickets/" + externalIDPlaceholder + "/history",
 	}
+	r.SendHistoryMessage = r.ForwardMessage
+	return r
 }
 
 // WithDefaults returns a copy of r where empty fields are filled in from d.
@@ -65,6 +68,12 @@ func (r Routes) WithDefaults(d Routes) Routes {
 	if r.SendHistory == "" {
 		r.SendHistory = d.SendHistory
 	}
+	if r.SendHistoryMessage == "" {
+		r.SendHistoryMessage = r.ForwardMessage
+		if r.SendHistoryMessage == "" {
+			r.SendHistoryMessage = d.SendHistoryMessage
+		}
+	}
 	return r
 }
 
@@ -82,7 +91,7 @@ func WithRoutes(r Routes) ClientOption {
 }
 
 // Client is the HTTP client used by the generic ticketer service to call the
-// partner endpoints documented in docs/generic-ticketer-service.md.
+// partner endpoints documented in services/tickets/generic/generic-ticketer-service.md.
 type Client struct {
 	httpClient  *http.Client
 	httpRetries *httpx.RetryConfig
@@ -354,9 +363,42 @@ type HistoryRequest struct {
 	Metadata   map[string]interface{} `json:"metadata,omitempty"`
 }
 
+// HistoryResponse is the partner reply to POST /v1/tickets/{external_id}/history.
+type HistoryResponse struct {
+	Status           string `json:"status"`
+	MessagesReceived int    `json:"messages_received,omitempty"`
+}
+
 // SendHistory delivers the conversation history that preceded the ticket open.
 func (c *Client) SendHistory(externalID string, req *HistoryRequest, idempotencyKey string) (*httpx.Trace, error) {
-	return c.request(http.MethodPost, c.endpoint(c.routes.SendHistory, externalID), req, nil, idempotencyKey)
+	return c.sendHistoryRequest(externalID, req, idempotencyKey)
+}
+
+// SendHistoryRaw delivers history using a pre-rendered JSON body (e.g. from
+// history_template).
+func (c *Client) SendHistoryRaw(externalID string, body []byte, idempotencyKey string) (*httpx.Trace, error) {
+	return c.sendHistoryRequest(externalID, json.RawMessage(body), idempotencyKey)
+}
+
+func (c *Client) sendHistoryRequest(externalID string, payload interface{}, idempotencyKey string) (*httpx.Trace, error) {
+	return c.request(http.MethodPost, c.endpoint(c.routes.SendHistory, externalID), payload, nil, idempotencyKey)
+}
+
+// SendHistoryMessage delivers a single history message using the forward-style
+// MessageRequest contract on the history-message route (defaults to the forward
+// route when route_history_message is not set).
+func (c *Client) SendHistoryMessage(externalID string, req *MessageRequest, idempotencyKey string) (*httpx.Trace, error) {
+	return c.sendHistoryMessageRequest(externalID, req, idempotencyKey)
+}
+
+// SendHistoryMessageRaw delivers a single history message using a pre-rendered
+// JSON body (e.g. from history_template in one_by_one mode).
+func (c *Client) SendHistoryMessageRaw(externalID string, body []byte, idempotencyKey string) (*httpx.Trace, error) {
+	return c.sendHistoryMessageRequest(externalID, json.RawMessage(body), idempotencyKey)
+}
+
+func (c *Client) sendHistoryMessageRequest(externalID string, payload interface{}, idempotencyKey string) (*httpx.Trace, error) {
+	return c.request(http.MethodPost, c.endpoint(c.routes.SendHistoryMessage, externalID), payload, nil, idempotencyKey)
 }
 
 // Internal -----------------------------------------------------------------
