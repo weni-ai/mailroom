@@ -69,9 +69,13 @@ func (r Routes) WithDefaults(d Routes) Routes {
 		r.SendHistory = d.SendHistory
 	}
 	if r.SendHistoryMessage == "" {
-		r.SendHistoryMessage = r.ForwardMessage
-		if r.SendHistoryMessage == "" {
+		if d.SendHistoryMessage != "" {
 			r.SendHistoryMessage = d.SendHistoryMessage
+		} else {
+			r.SendHistoryMessage = r.ForwardMessage
+			if r.SendHistoryMessage == "" {
+				r.SendHistoryMessage = d.ForwardMessage
+			}
 		}
 	}
 	return r
