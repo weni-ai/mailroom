@@ -257,3 +257,56 @@ func TestRenderOpenTemplateEmpty(t *testing.T) {
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "empty body")
 }
+
+func TestParseHistoryTemplate(t *testing.T) {
+	_, err := parseHistoryTemplate(`{"ticket":"{{.ticket_id}}"}`)
+	require.NoError(t, err)
+
+	_, err = parseHistoryTemplate(`{{.ticket_id`)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "invalid history_template")
+}
+
+func TestRenderHistoryTemplateBatch(t *testing.T) {
+	tmpl, err := parseHistoryTemplate(`{"ticket":"{{.ticket_id}}","items":{{len .messages}}}`)
+	require.NoError(t, err)
+
+	out, err := renderHistoryTemplate(tmpl, &HistoryRequest{
+		TicketID:   "ticket-1",
+		ExternalID: "EXT-1",
+		Contact:    Contact{UUID: "c-1", URN: "whatsapp:+551199"},
+		Messages: []HistoryMessage{
+			{MessageID: "m-1", Direction: "incoming", Sender: Sender{Type: "contact"}, Text: "hi"},
+		},
+	})
+	require.NoError(t, err)
+	assert.JSONEq(t, `{"ticket":"ticket-1","items":1}`, string(out))
+}
+
+func TestRenderHistoryTemplateOneByOne(t *testing.T) {
+	tmpl, err := parseHistoryTemplate(`{"ticket":"{{.ticket_id}}","msg":"{{.message_id}}","text":"{{.text}}"}`)
+	require.NoError(t, err)
+
+	out, err := renderHistoryTemplate(tmpl, historyOneByOneTemplateContext{
+		TicketID:   "ticket-1",
+		ExternalID: "EXT-1",
+		Contact:    Contact{UUID: "c-1", URN: "whatsapp:+551199"},
+		MessageID:  "m-1",
+		Direction:  "incoming",
+		Sender:     Sender{Type: "contact", ID: "c-1"},
+		Text:       "hello",
+		SentAt:     time.Date(2026, 5, 20, 14, 20, 0, 0, time.UTC),
+	})
+	require.NoError(t, err)
+	assert.JSONEq(t, `{"ticket":"ticket-1","msg":"m-1","text":"hello"}`, string(out))
+}
+
+func TestMapHistoryResponse(t *testing.T) {
+	tmpl, err := parseHistoryResponseTemplate(`{"status":"{{.result}}","messages_received":{{.count}}}`)
+	require.NoError(t, err)
+
+	resp, err := mapHistoryResponse(tmpl, []byte(`{"result":"ok","count":3}`))
+	require.NoError(t, err)
+	assert.Equal(t, "ok", resp.Status)
+	assert.Equal(t, 3, resp.MessagesReceived)
+}

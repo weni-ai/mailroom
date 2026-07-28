@@ -1,7 +1,7 @@
 // Package generic implements a generic HTTP-based ticketer service.
 //
 // The contract spoken by this ticketer is documented in
-// docs/generic-ticketer-service.md. Any partner that implements the documented
+// services/tickets/generic/generic-ticketer-service.md. Any partner that implements the documented
 // HTTP endpoints can plug into the platform as a ticketer without requiring
 // custom code in Mailroom.
 package generic
@@ -13,6 +13,7 @@ import (
 	"net/http"
 	"strings"
 	"text/template"
+	"time"
 
 	"github.com/nyaruka/gocommon/dates"
 	"github.com/nyaruka/gocommon/httpx"
@@ -39,11 +40,26 @@ const (
 	configProjectName = "project_name"
 
 	// Optional per-endpoint route overrides. When empty, DefaultRoutes is used.
-	configRouteOpen    = "route_open"
-	configRouteForward = "route_forward"
-	configRouteClose   = "route_close"
-	configRouteReopen  = "route_reopen"
-	configRouteHistory = "route_history"
+	configRouteOpen           = "route_open"
+	configRouteForward        = "route_forward"
+	configRouteClose          = "route_close"
+	configRouteReopen         = "route_reopen"
+	configRouteHistory        = "route_history"
+	configRouteHistoryMessage = "route_history_message"
+
+	// history_mode controls how conversation history is delivered: "batch"
+	// (default) sends HistoryRequest chunks to route_history; "one_by_one"
+	// sends MessageRequest payloads to route_history_message (or route_forward).
+	configHistoryMode      = "history_mode"
+	configHistoryBatchSize = "history_batch_size"
+
+	// Optional Go text/template that renders the History request body for both
+	// batch and one_by_one modes. When empty, the standard contracts are sent.
+	configHistoryTemplate = "history_template"
+
+	// Optional Go text/template that maps the partner History response JSON
+	// into the standard HistoryResponse shape.
+	configHistoryResponseTemplate = "history_response_template"
 
 	// Optional Go text/template that renders the Open request body. When empty,
 	// the standard OpenRequest JSON contract is sent.
@@ -105,17 +121,22 @@ func skipWebhookHMACValue(value string) bool {
 
 type service struct {
 	rtConfig                *runtime.Config
+	db                      models.Queryer
 	client                  *Client
 	ticketer                *flows.Ticketer
 	redactor                utils.Redactor
 	projectUUID             string
 	projectName             string
+	historyMode             string
+	historyBatchSize        int
 	openTemplate            *template.Template
 	openResponseTemplate    *template.Template
 	forwardTemplate         *template.Template
 	forwardResponseTemplate *template.Template
 	closeTemplate           *template.Template
 	closeResponseTemplate   *template.Template
+	historyTemplate         *template.Template
+	historyResponseTemplate *template.Template
 }
 
 // NewService creates a new generic ticket service from the given config map.
@@ -136,11 +157,12 @@ func NewService(rtCfg *runtime.Config, httpClient *http.Client, httpRetries *htt
 	}
 
 	routes := Routes{
-		OpenTicket:     config[configRouteOpen],
-		ForwardMessage: config[configRouteForward],
-		CloseTicket:    config[configRouteClose],
-		ReopenTicket:   config[configRouteReopen],
-		SendHistory:    config[configRouteHistory],
+		OpenTicket:         config[configRouteOpen],
+		ForwardMessage:     config[configRouteForward],
+		CloseTicket:        config[configRouteClose],
+		ReopenTicket:       config[configRouteReopen],
+		SendHistory:        config[configRouteHistory],
+		SendHistoryMessage: config[configRouteHistoryMessage],
 	}
 
 	var openTmpl *template.Template
@@ -197,6 +219,24 @@ func NewService(rtCfg *runtime.Config, httpClient *http.Client, httpRetries *htt
 		}
 	}
 
+	var historyTmpl *template.Template
+	if src := strings.TrimSpace(config[configHistoryTemplate]); src != "" {
+		var err error
+		historyTmpl, err = parseHistoryTemplate(src)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	var historyRespTmpl *template.Template
+	if src := strings.TrimSpace(config[configHistoryResponseTemplate]); src != "" {
+		var err error
+		historyRespTmpl, err = parseHistoryResponseTemplate(src)
+		if err != nil {
+			return nil, err
+		}
+	}
+
 	redactArgs := []string{apiToken}
 	if webhookSecret != "" {
 		redactArgs = append(redactArgs, webhookSecret)
@@ -204,17 +244,22 @@ func NewService(rtCfg *runtime.Config, httpClient *http.Client, httpRetries *htt
 
 	return &service{
 		rtConfig:                rtCfg,
+		db:                      db,
 		client:                  NewClient(httpClient, httpRetries, baseURL, apiToken, WithRoutes(routes)),
 		ticketer:                ticketer,
 		redactor:                utils.NewRedactor(flows.RedactionMask, redactArgs...),
 		projectUUID:             config[configProjectUUID],
 		projectName:             config[configProjectName],
+		historyMode:             parseHistoryMode(config[configHistoryMode]),
+		historyBatchSize:        parseHistoryBatchSize(config[configHistoryBatchSize]),
 		openTemplate:            openTmpl,
 		openResponseTemplate:    openRespTmpl,
 		forwardTemplate:         forwardTmpl,
 		forwardResponseTemplate: forwardRespTmpl,
 		closeTemplate:           closeTmpl,
 		closeResponseTemplate:   closeRespTmpl,
+		historyTemplate:         historyTmpl,
+		historyResponseTemplate: historyRespTmpl,
 	}, nil
 }
 
@@ -490,12 +535,131 @@ func (s *service) Reopen(tickets []*models.Ticket, logHTTP flows.HTTPLogCallback
 	return nil
 }
 
-// SendHistory is a no-op in this stage. The optional history endpoint is part
-// of the spec (section 2.5) but DB-backed population of past contact messages
-// is deferred to a follow-up to keep this stage focused on the synchronous
-// open / forward / close / reopen flow.
+// SendHistory delivers past contact messages to the partner using the configured
+// history_mode. With no matching messages, it is a no-op.
 func (s *service) SendHistory(ticket *models.Ticket, contactID models.ContactID, runs []*models.FlowRun, logHTTP flows.HTTPLogCallback) error {
+	externalID := string(ticket.ExternalID())
+	if externalID == "" {
+		return errors.New("cannot send history: ticket has no external_id")
+	}
+
+	since := resolveHistorySince(ticket, runs)
+
+	cx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+	defer cancel()
+
+	msgs, err := models.SelectContactMessages(cx, s.db, int(contactID), since)
+	if err != nil {
+		return errors.Wrap(err, "failed to get history messages")
+	}
+	if len(msgs) == 0 {
+		return nil
+	}
+
+	contactDTO, err := s.buildHistoryContact(cx, ticket, contactID, msgs)
+	if err != nil {
+		return err
+	}
+
+	historyMsgs := make([]HistoryMessage, 0, len(msgs))
+	for _, msg := range msgs {
+		historyMsgs = append(historyMsgs, historyMessageFromMsg(msg, contactDTO.UUID))
+	}
+
+	baseReq := &HistoryRequest{
+		TicketID:   string(ticket.UUID()),
+		ExternalID: externalID,
+		Contact:    contactDTO,
+		Metadata:   s.buildHistoryMetadata(),
+	}
+
+	if s.historyMode == historyModeOneByOne {
+		return s.sendHistoryOneByOne(ticket, externalID, baseReq, msgs, historyMsgs, logHTTP)
+	}
+	return s.sendHistoryBatch(externalID, baseReq, historyMsgs, logHTTP)
+}
+
+func (s *service) sendHistoryBatch(externalID string, baseReq *HistoryRequest, historyMsgs []HistoryMessage, logHTTP flows.HTTPLogCallback) error {
+	batches := chunkHistoryMessages(historyMsgs, s.historyBatchSize)
+	for i, batch := range batches {
+		req := *baseReq
+		req.Messages = batch
+
+		idempotencyKey := fmt.Sprintf("history-%s-%d", baseReq.TicketID, i)
+
+		var trace *httpx.Trace
+		var err error
+		if s.historyTemplate != nil {
+			body, renderErr := renderHistoryTemplate(s.historyTemplate, &req)
+			if renderErr != nil {
+				return errors.Wrap(renderErr, "error rendering history_template")
+			}
+			trace, err = s.client.SendHistoryRaw(externalID, body, idempotencyKey)
+		} else {
+			trace, err = s.client.SendHistory(externalID, &req, idempotencyKey)
+		}
+
+		if trace != nil {
+			logHTTP(flows.NewHTTPLog(trace, flows.HTTPStatusFromCode, s.redactor))
+		}
+		if err != nil {
+			return errors.Wrapf(err, "error sending history batch %d to generic ticketer", i)
+		}
+
+		if _, err := s.parseHistoryResponse(trace.ResponseBody); err != nil {
+			return errors.Wrapf(err, "error parsing history response for batch %d", i)
+		}
+	}
 	return nil
+}
+
+func (s *service) sendHistoryOneByOne(ticket *models.Ticket, externalID string, baseReq *HistoryRequest, msgs []*models.Msg, historyMsgs []HistoryMessage, logHTTP flows.HTTPLogCallback) error {
+	contactUUID := baseReq.Contact.UUID
+	contactName := baseReq.Contact.Name
+
+	for i, msg := range msgs {
+		historyMsg := historyMsgs[i]
+		idempotencyKey := fmt.Sprintf("history-%s-%s", baseReq.TicketID, historyMsg.MessageID)
+
+		var trace *httpx.Trace
+		var err error
+
+		if s.historyTemplate != nil {
+			ctx := historyOneByOneTemplateContextFrom(baseReq, historyMsg)
+			body, renderErr := renderHistoryTemplate(s.historyTemplate, ctx)
+			if renderErr != nil {
+				return errors.Wrap(renderErr, "error rendering history_template")
+			}
+			trace, err = s.client.SendHistoryMessageRaw(externalID, body, idempotencyKey)
+		} else {
+			req := messageRequestFromMsg(ticket, externalID, msg, contactUUID, contactName)
+			trace, err = s.client.SendHistoryMessage(externalID, req, idempotencyKey)
+		}
+
+		if trace != nil {
+			logHTTP(flows.NewHTTPLog(trace, flows.HTTPStatusFromCode, s.redactor))
+		}
+		if err != nil {
+			return errors.Wrapf(err, "error sending history message %s to generic ticketer", historyMsg.MessageID)
+		}
+
+		if _, err := s.parseHistoryResponse(trace.ResponseBody); err != nil {
+			return errors.Wrapf(err, "error parsing history response for message %s", historyMsg.MessageID)
+		}
+	}
+	return nil
+}
+
+// parseHistoryResponse maps or decodes the partner History response into HistoryResponse.
+func (s *service) parseHistoryResponse(raw []byte) (*HistoryResponse, error) {
+	if s.historyResponseTemplate != nil {
+		resp, err := mapHistoryResponse(s.historyResponseTemplate, raw)
+		if err != nil {
+			return nil, errors.Wrap(err, "error mapping history_response_template")
+		}
+		return resp, nil
+	}
+	return decodeHistoryResponse(raw)
 }
 
 // buildOpenMetadata gathers the optional metadata block sent on Open. All

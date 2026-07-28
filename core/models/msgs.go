@@ -945,33 +945,37 @@ func loadMessages(ctx context.Context, db Queryer, sql string, params ...interfa
 
 var selectContactMessagesSQL = `
 SELECT 
-	id,
-	broadcast_id,
-	uuid,
-	text,
-	created_on,
-	direction,
-	status,
-	visibility,
-	msg_count,
-	error_count,
-	next_attempt,
-	external_id,
-	attachments,
-	metadata,
-	channel_id,
-	contact_id,
-	contact_urn_id,
-	org_id,
-	topup_id
+	m.id,
+	m.broadcast_id,
+	m.uuid,
+	m.text,
+	m.created_on,
+	m.direction,
+	m.status,
+	m.visibility,
+	m.msg_count,
+	m.error_count,
+	m.next_attempt,
+	m.external_id,
+	m.attachments,
+	m.metadata,
+	m.channel_id,
+	m.contact_id,
+	m.contact_urn_id,
+	m.org_id,
+	m.topup_id,
+	u.identity AS "urn_urn",
+	u.auth AS "urn_auth"
 FROM
-	msgs_msg
+	msgs_msg m
+LEFT JOIN
+	contacts_contacturn u ON u.id = m.contact_urn_id
 WHERE
-	contact_id = $1 AND
-	created_on >= $2 AND
-	status != 'F'
+	m.contact_id = $1 AND
+	m.created_on >= $2 AND
+	m.status != 'F'
 ORDER BY
-	id ASC`
+	m.id ASC`
 
 // SelectContactMessages loads the given messages for the passed in contact, created after the passed in time
 func SelectContactMessages(ctx context.Context, db Queryer, contactID int, after time.Time) ([]*Msg, error) {

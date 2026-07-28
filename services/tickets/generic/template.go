@@ -65,6 +65,18 @@ func parseCloseResponseTemplate(src string) (*template.Template, error) {
 	return parseNamedTemplate("close_response_template", src)
 }
 
+// parseHistoryTemplate parses a Go text/template used to render the History
+// request body in batch or one_by_one mode.
+func parseHistoryTemplate(src string) (*template.Template, error) {
+	return parseNamedTemplate("history_template", src)
+}
+
+// parseHistoryResponseTemplate parses a Go text/template that maps a partner
+// History response into the platform HistoryResponse JSON shape.
+func parseHistoryResponseTemplate(src string) (*template.Template, error) {
+	return parseNamedTemplate("history_response_template", src)
+}
+
 // parseMessagesTemplate parses a Go text/template that maps a partner inbound
 // /messages webhook body into the platform agent-message payload shape.
 func parseMessagesTemplate(src string) (*template.Template, error) {
@@ -122,6 +134,12 @@ func renderCloseTemplate(tmpl *template.Template, req *CloseRequest) ([]byte, er
 	return renderRequestTemplate(tmpl, req, "close_template")
 }
 
+// renderHistoryTemplate executes tmpl against a History request context and
+// returns the rendered body. The output must be valid JSON.
+func renderHistoryTemplate(tmpl *template.Template, ctx interface{}) ([]byte, error) {
+	return renderRequestTemplate(tmpl, ctx, "history_template")
+}
+
 // mapOpenResponse executes tmpl against the partner response JSON and
 // unmarshals the result into OpenResponse. The template must render JSON with
 // at least external_id (status and created_at are optional).
@@ -161,6 +179,20 @@ func mapCloseResponse(tmpl *template.Template, raw []byte) (*CloseResponse, erro
 	resp := &CloseResponse{}
 	if err := json.Unmarshal(out, resp); err != nil {
 		return nil, errors.Wrap(err, "error decoding mapped close response")
+	}
+	return resp, nil
+}
+
+// mapHistoryResponse executes tmpl against the partner response JSON and
+// unmarshals the result into HistoryResponse.
+func mapHistoryResponse(tmpl *template.Template, raw []byte) (*HistoryResponse, error) {
+	out, err := mapResponseBody(tmpl, raw, "history_response_template")
+	if err != nil {
+		return nil, err
+	}
+	resp := &HistoryResponse{}
+	if err := json.Unmarshal(out, resp); err != nil {
+		return nil, errors.Wrap(err, "error decoding mapped history response")
 	}
 	return resp, nil
 }

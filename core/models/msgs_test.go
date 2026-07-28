@@ -637,6 +637,9 @@ func TestSelectContactMessages(t *testing.T) {
 	// shoud only return messages for testdata.Cathy
 	assert.NoError(t, err)
 	assert.Equal(t, 3, len(msgs))
+	for _, msg := range msgs {
+		assert.Equal(t, testdata.Cathy.URN, msg.URN())
+	}
 }
 
 func TestWppBroadcastCarouselTemplateEvaluation(t *testing.T) {
