@@ -1,58 +1,58 @@
-# Documentação externa para integração como Ticketer
+# External documentation for Generic Ticketer integration
 
-## Visão geral
+## Overview
 
-O **Ticketer** é um sistema externo de transbordo de atendimento.
+The **Ticketer** is an external human-handoff system.
 
-Quando uma conversa precisa ser transferida para atendimento humano, a plataforma cria um ticket em um sistema externo, como helpdesk, CRM, contact center ou ferramenta de chat. A partir desse momento, a plataforma e o Ticketer trocam eventos para manter o atendimento sincronizado.
+When a conversation needs to be transferred to human agents, the platform creates a ticket in an external system such as a helpdesk, CRM, contact center, or chat tool. From that point on, the platform and the Ticketer exchange events to keep the conversation in sync.
 
-Esta documentação descreve o contrato HTTP que o parceiro precisa implementar para ser compatível como Ticketer, sem depender de detalhes internos da plataforma.
+This documentation describes the HTTP contract that a partner must implement to be compatible as a Ticketer, without relying on internal platform details.
 
-> **Nota:** este documento descreve o **contrato proposto** (`v1`). A implementação atual do Mailroom expõe os webhooks de retorno em `/mr/tickets/types/{ticketer_type}/event_callback/{ticketer_uuid}` — durante o período de transição, a URL final pode variar por integração e será informada no provisionamento. Itens marcados com **(roadmap)** ainda não estão suportados pela plataforma.
-
----
-
-## 0. Provisionamento de credenciais
-
-Antes do primeiro tráfego, plataforma e parceiro trocam credenciais:
-
-| Sentido | Credencial / config | Quem define | Onde fica |
-|---------|---------------------|-------------|-----------|
-| Plataforma → Ticketer | `api_token` | Parceiro | Campo `config.api_token` do ticketer |
-| Ticketer → Plataforma | `webhook_secret` | Plataforma | Campo `config.webhook_secret` do ticketer (compartilhado com o parceiro no provisionamento) |
-| Ticketer → Plataforma | `skip_webhook_hmac` | Plataforma | Campo `config.skip_webhook_hmac` do ticketer (ver [Seção 1.2](#12-ticketer--plataforma-hmac)) |
-| URL base do Ticketer | — | Parceiro | Campo `config.base_url` |
-| Plataforma → Ticketer | `open_template` | Plataforma / Parceiro | Campo `config.open_template` opcional (ver [Seção 2.1.1](#211-payload-customizado-com-open_template)) |
-| Plataforma → Ticketer | `open_response_template` | Plataforma / Parceiro | Campo `config.open_response_template` opcional (ver [Seção 2.1.2](#212-resposta-customizada-com-open_response_template)) |
-| Plataforma → Ticketer | `forward_template` | Plataforma / Parceiro | Campo `config.forward_template` opcional (ver [Seção 2.2.1](#221-payload-customizado-com-forward_template)) |
-| Plataforma → Ticketer | `forward_response_template` | Plataforma / Parceiro | Campo `config.forward_response_template` opcional (ver [Seção 2.2.2](#222-resposta-customizada-com-forward_response_template)) |
-| Plataforma → Ticketer | `close_template` | Plataforma / Parceiro | Campo `config.close_template` opcional (ver [Seção 2.3.1](#231-payload-customizado-com-close_template)) |
-| Plataforma → Ticketer | `close_response_template` | Plataforma / Parceiro | Campo `config.close_response_template` opcional (ver [Seção 2.3.2](#232-resposta-customizada-com-close_response_template)) |
-| Plataforma → Ticketer | `history_mode` | Plataforma / Parceiro | Campo `config.history_mode` opcional: `batch` (default) ou `one_by_one` (ver [Seção 2.5](#25-enviar-histórico-da-conversa-opcional)) |
-| Plataforma → Ticketer | `history_batch_size` | Plataforma / Parceiro | Campo `config.history_batch_size` opcional; default `50` no modo `batch` |
-| Plataforma → Ticketer | `route_history` | Plataforma / Parceiro | Override da rota de histórico em batch; default `/v1/tickets/{external_id}/history` |
-| Plataforma → Ticketer | `route_history_message` | Plataforma / Parceiro | Override da rota no modo `one_by_one`; default igual a `route_forward` (`/v1/tickets/{external_id}/messages`) |
-| Plataforma → Ticketer | `history_template` | Plataforma / Parceiro | Campo `config.history_template` opcional (ver [Seção 2.5.1](#251-payload-customizado-com-history_template)) |
-| Plataforma → Ticketer | `history_response_template` | Plataforma / Parceiro | Campo `config.history_response_template` opcional (ver [Seção 2.5.2](#252-resposta-customizada-com-history_response_template)) |
-| Ticketer → Plataforma | `messages_template` | Plataforma / Parceiro | Campo `config.messages_template` opcional (ver [Seção 3.1.1](#311-payload-customizado-com-messages_template)) |
-| Ticketer → Plataforma | `messages_response_template` | Plataforma / Parceiro | Campo `config.messages_response_template` opcional (ver [Seção 3.1.2](#312-resposta-customizada-com-messages_response_template)) |
-| Ticketer → Plataforma | `tickets_close_template` | Plataforma / Parceiro | Campo `config.tickets_close_template` opcional (ver [Seção 3.2.1](#321-payload-customizado-com-tickets_close_template)) |
-| Ticketer → Plataforma | `tickets_close_response_template` | Plataforma / Parceiro | Campo `config.tickets_close_response_template` opcional (ver [Seção 3.2.2](#322-resposta-customizada-com-tickets_close_response_template)) |
-| `ticketer_uuid` | — | Plataforma | Identifica o ticketer nos webhooks de retorno |
-
-Por padrão, `webhook_secret` é **obrigatório** e os webhooks inbound exigem HMAC. Quando a plataforma define `skip_webhook_hmac=true` no ticketer, o `webhook_secret` torna-se opcional e a verificação HMAC é desligada — use apenas em homologação ou integrações temporárias.
-
-O parceiro deve aceitar rotação de credenciais sem downtime (validar versão atual e anterior por uma janela curta).
+> **Note:** this document describes the **proposed contract** (`v1`). The current Mailroom implementation exposes return webhooks at `/mr/tickets/types/{ticketer_type}/event_callback/{ticketer_uuid}` — during the transition period, the final URL may vary by integration and will be provided during provisioning. Items marked **(roadmap)** are not yet supported by the platform.
 
 ---
 
-## 1. Autenticação
+## 0. Credential provisioning
 
-Por padrão, todas as requisições entre a plataforma e o Ticketer devem ser autenticadas. A exceção são os webhooks inbound quando a plataforma configura `skip_webhook_hmac=true` no ticketer (ver [Seção 1.2](#12-ticketer--plataforma-hmac)).
+Before the first traffic, the platform and the partner exchange credentials:
 
-### 1.1 Plataforma → Ticketer (Bearer)
+| Direction | Credential / config | Who defines | Where it lives |
+|-----------|---------------------|-------------|----------------|
+| Platform → Ticketer | `api_token` | Partner | Ticketer `config.api_token` field |
+| Ticketer → Platform | `webhook_secret` | Platform | Ticketer `config.webhook_secret` field (shared with the partner during provisioning) |
+| Ticketer → Platform | `skip_webhook_hmac` | Platform | Ticketer `config.skip_webhook_hmac` field (see [Section 1.2](#12-ticketer--platform-hmac)) |
+| Ticketer base URL | — | Partner | `config.base_url` field |
+| Platform → Ticketer | `open_template` | Platform / Partner | Optional `config.open_template` field (see [Section 2.1.1](#211-custom-payload-with-open_template)) |
+| Platform → Ticketer | `open_response_template` | Platform / Partner | Optional `config.open_response_template` field (see [Section 2.1.2](#212-custom-response-with-open_response_template)) |
+| Platform → Ticketer | `forward_template` | Platform / Partner | Optional `config.forward_template` field (see [Section 2.2.1](#221-custom-payload-with-forward_template)) |
+| Platform → Ticketer | `forward_response_template` | Platform / Partner | Optional `config.forward_response_template` field (see [Section 2.2.2](#222-custom-response-with-forward_response_template)) |
+| Platform → Ticketer | `close_template` | Platform / Partner | Optional `config.close_template` field (see [Section 2.3.1](#231-custom-payload-with-close_template)) |
+| Platform → Ticketer | `close_response_template` | Platform / Partner | Optional `config.close_response_template` field (see [Section 2.3.2](#232-custom-response-with-close_response_template)) |
+| Platform → Ticketer | `history_mode` | Platform / Partner | Optional `config.history_mode` field: `batch` (default) or `one_by_one` (see [Section 2.5](#25-send-conversation-history-optional)) |
+| Platform → Ticketer | `history_batch_size` | Platform / Partner | Optional `config.history_batch_size` field; default `50` in `batch` mode |
+| Platform → Ticketer | `route_history` | Platform / Partner | Override for the batch history route; default `/v1/tickets/{external_id}/history` |
+| Platform → Ticketer | `route_history_message` | Platform / Partner | Override for the route in `one_by_one` mode; default same as `route_forward` (`/v1/tickets/{external_id}/messages`) |
+| Platform → Ticketer | `history_template` | Platform / Partner | Optional `config.history_template` field (see [Section 2.5.1](#251-custom-payload-with-history_template)) |
+| Platform → Ticketer | `history_response_template` | Platform / Partner | Optional `config.history_response_template` field (see [Section 2.5.2](#252-custom-response-with-history_response_template)) |
+| Ticketer → Platform | `messages_template` | Platform / Partner | Optional `config.messages_template` field (see [Section 3.1.1](#311-custom-payload-with-messages_template)) |
+| Ticketer → Platform | `messages_response_template` | Platform / Partner | Optional `config.messages_response_template` field (see [Section 3.1.2](#312-custom-response-with-messages_response_template)) |
+| Ticketer → Platform | `tickets_close_template` | Platform / Partner | Optional `config.tickets_close_template` field (see [Section 3.2.1](#321-custom-payload-with-tickets_close_template)) |
+| Ticketer → Platform | `tickets_close_response_template` | Platform / Partner | Optional `config.tickets_close_response_template` field (see [Section 3.2.2](#322-custom-response-with-tickets_close_response_template)) |
+| `ticketer_uuid` | — | Platform | Identifies the ticketer in return webhooks |
 
-A plataforma envia o token configurado no campo `api_token`:
+By default, `webhook_secret` is **required** and inbound webhooks require HMAC. When the platform sets `skip_webhook_hmac=true` on the ticketer, `webhook_secret` becomes optional and HMAC verification is disabled — use only in staging or temporary integrations.
+
+The partner must accept credential rotation without downtime (validate current and previous versions for a short window).
+
+---
+
+## 1. Authentication
+
+By default, all requests between the platform and the Ticketer must be authenticated. The exception is inbound webhooks when the platform configures `skip_webhook_hmac=true` on the ticketer (see [Section 1.2](#12-ticketer--platform-hmac)).
+
+### 1.1 Platform → Ticketer (Bearer)
+
+The platform sends the token configured in the `api_token` field:
 
 ```http
 Authorization: Bearer <api_token>
@@ -61,9 +61,9 @@ X-Request-Id: 9d81b7e2-5a4e-4fc2-b2e7-4f671e6c7770
 X-API-Version: 1
 ```
 
-### 1.2 Ticketer → Plataforma (HMAC)
+### 1.2 Ticketer → Platform (HMAC)
 
-Por padrão, os webhooks de retorno são autenticados via HMAC-SHA256 sobre o corpo bruto da requisição:
+By default, return webhooks are authenticated via HMAC-SHA256 over the raw request body:
 
 ```http
 Content-Type: application/json
@@ -72,17 +72,17 @@ X-Webhook-Timestamp: 2026-05-20T14:35:00Z
 X-Request-Id: f6a22a5a-d111-4d8a-9c44-2f9f4e0b0d65
 ```
 
-Regras de verificação (quando HMAC está **habilitado**, comportamento padrão):
+Verification rules (when HMAC is **enabled**, default behavior):
 
-- O corpo deve ser o **bytes exatos** recebidos, sem normalização de JSON.
-- O timestamp é em RFC3339 UTC (ou unix seconds em base-10, aceito como fallback).
-- `X-Webhook-Signature` é **obrigatório**. Aceita as formas `sha256=<hex>` (recomendada) e `<hex>` puro.
-- `X-Webhook-Timestamp` é **fortemente recomendado**. Quando enviado, requisições com mais de **5 minutos** de diferença do relógio atual são rejeitadas (proteção contra replay). A plataforma tolera ausência do header em v1 para facilitar migração, mas partners devem sempre enviá-lo.
-- Comparação de assinatura deve usar `hmac.Equal` ou equivalente (constant-time).
+- The body must be the **exact bytes** received, with no JSON normalization.
+- The timestamp is RFC3339 UTC (or unix seconds in base-10, accepted as a fallback).
+- `X-Webhook-Signature` is **required**. Accepts the forms `sha256=<hex>` (recommended) and plain `<hex>`.
+- `X-Webhook-Timestamp` is **strongly recommended**. When sent, requests more than **5 minutes** off the current clock are rejected (replay protection). The platform tolerates a missing header in v1 to ease migration, but partners should always send it.
+- Signature comparison must use `hmac.equal` or an equivalent (constant-time).
 
-#### Desabilitar HMAC (`skip_webhook_hmac`)
+#### Disable HMAC (`skip_webhook_hmac`)
 
-A plataforma pode desligar a verificação HMAC **por ticketer**, definindo na configuração:
+The platform can turn off HMAC verification **per ticketer** by setting in the configuration:
 
 ```json
 {
@@ -90,36 +90,36 @@ A plataforma pode desligar a verificação HMAC **por ticketer**, definindo na c
 }
 ```
 
-Valores aceitos: `"true"`, `"1"` ou `"yes"` (case-insensitive). Default: HMAC **habilitado** (flag ausente ou qualquer outro valor).
+Accepted values: `"true"`, `"1"`, or `"yes"` (case-insensitive). Default: HMAC **enabled** (flag absent or any other value).
 
-| `skip_webhook_hmac` | `webhook_secret` | Headers exigidos nos webhooks |
-|---------------------|------------------|-------------------------------|
-| ausente / `false` | obrigatório | `X-Webhook-Signature` (+ `X-Webhook-Timestamp` recomendado) |
-| `true` | opcional | nenhum header de autenticação |
+| `skip_webhook_hmac` | `webhook_secret` | Required headers on webhooks |
+|---------------------|------------------|------------------------------|
+| absent / `false` | required | `X-Webhook-Signature` (+ `X-Webhook-Timestamp` recommended) |
+| `true` | optional | no authentication headers |
 
-Quando a flag está ativa, a plataforma aceita o webhook após validar o ticketer e o payload — **sem** verificar assinatura ou timestamp. O parceiro ainda deve enviar `Content-Type: application/json` e um body válido.
+When the flag is active, the platform accepts the webhook after validating the ticketer and payload — **without** verifying signature or timestamp. The partner must still send `Content-Type: application/json` and a valid body.
 
-> **Segurança:** use `skip_webhook_hmac=true` apenas em homologação ou enquanto o parceiro implementa HMAC. Em produção, mantenha HMAC habilitado (default).
+> **Security:** use `skip_webhook_hmac=true` only in staging or while the partner implements HMAC. In production, keep HMAC enabled (default).
 
-### 1.3 Modelos aceitos (Plataforma → Ticketer)
+### 1.3 Accepted models (Platform → Ticketer)
 
-| Modelo | Uso |
-|--------|-----|
-| Bearer Token | Padrão recomendado |
-| API Key em header | Aceitável, se enviada via header dedicado (ex.: `X-API-Key`) |
-| OAuth 2.0 | Suportado mediante alinhamento prévio |
-
----
-
-## 2. Plataforma → Ticketer
-
-Endpoints que o sistema externo expõe para receber eventos da plataforma. A URL base é a registrada em `config.base_url`.
+| Model | Usage |
+|-------|-------|
+| Bearer Token | Recommended default |
+| API Key in header | Acceptable if sent via a dedicated header (e.g. `X-API-Key`) |
+| OAuth 2.0 | Supported with prior alignment |
 
 ---
 
-### 2.1 Abrir ticket
+## 2. Platform → Ticketer
 
-Cria um novo atendimento no sistema externo.
+Endpoints that the external system exposes to receive events from the platform. The base URL is the one registered in `config.base_url`.
+
+---
+
+### 2.1 Open ticket
+
+Creates a new conversation in the external system.
 
 ```http
 POST /v1/tickets
@@ -142,7 +142,7 @@ Idempotency-Key: open-0f4d2c8a-2c83-4f2c-9f7d-1d4f70d50e71
   "ticket_id": "0f4d2c8a-2c83-4f2c-9f7d-1d4f70d50e71",
   "topic": {
     "uuid": "a1d2b8c3-9e4f-4a5b-8c6d-7e8f9a0b1c2d",
-    "name": "Vendas",
+    "name": "Sales",
     "queue_uuid": "c4d5e6f7-8a9b-4c0d-1e2f-3a4b5c6d7e8f"
   },
   "contact": {
@@ -155,10 +155,10 @@ Idempotency-Key: open-0f4d2c8a-2c83-4f2c-9f7d-1d4f70d50e71
     ],
     "language": "por"
   },
-  "body": "Cliente pediu atendimento humano.",
+  "body": "Customer requested human support.",
   "assignee": {
     "email": "maria@example.com",
-    "name": "Maria Atendente"
+    "name": "Maria Agent"
   },
   "metadata": {
     "project_uuid": "f1e2d3c4-b5a6-4978-8c9d-0a1b2c3d4e5f",
@@ -170,7 +170,7 @@ Idempotency-Key: open-0f4d2c8a-2c83-4f2c-9f7d-1d4f70d50e71
     },
     "flow": {
       "uuid": "8c7b6a5d-4e3f-4201-9a8b-7c6d5e4f3a2b",
-      "name": "Fluxo de vendas"
+      "name": "Sales flow"
     },
     "priority": "normal"
   },
@@ -178,53 +178,53 @@ Idempotency-Key: open-0f4d2c8a-2c83-4f2c-9f7d-1d4f70d50e71
 }
 ```
 
-#### Campos
+#### Fields
 
-| Campo | Tipo | Obrigatório | Descrição |
-|-------|------|-------------|-----------|
-| `ticket_id` | uuid | Sim | ID do ticket na plataforma |
-| `topic` | object | Não | Fila, assunto ou tópico do atendimento |
-| `topic.uuid` | uuid | Sim, se `topic` presente | Identificador do tópico |
-| `topic.queue_uuid` | uuid | Não | Fila/setor associado ao tópico |
-| `contact` | object | Sim | Dados do contato |
-| `contact.uuid` | uuid | Sim | Identificador do contato na plataforma |
-| `contact.urn` | string | Sim | URN preferida do contato |
-| `contact.urns` | array<string> | Não | Lista completa de URNs |
-| `contact.language` | string | Não | ISO 639-3 (ex.: `por`, `eng`, `spa`) |
-| `body` | string | Não | Mensagem inicial ou descrição |
-| `assignee` | object | Não | Agente sugerido |
-| `assignee.email` | string | Sim, se `assignee` presente | Identificador primário do agente |
-| `assignee.uuid` | uuid | Não (roadmap) | UUID do agente |
-| `metadata` | object | Não | Dados adicionais — ver [chaves padrão](#metadata-chaves-padrão) |
-| `opened_at` | string | Sim | Data de abertura em RFC3339 UTC |
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `ticket_id` | uuid | Yes | Ticket ID on the platform |
+| `topic` | object | No | Queue, subject, or topic for the conversation |
+| `topic.uuid` | uuid | Yes, if `topic` present | Topic identifier |
+| `topic.queue_uuid` | uuid | No | Queue/team associated with the topic |
+| `contact` | object | Yes | Contact data |
+| `contact.uuid` | uuid | Yes | Contact identifier on the platform |
+| `contact.urn` | string | Yes | Contact's preferred URN |
+| `contact.urns` | array<string> | No | Full list of URNs |
+| `contact.language` | string | No | ISO 639-3 (e.g. `por`, `eng`, `spa`) |
+| `body` | string | No | Initial message or description |
+| `assignee` | object | No | Suggested agent |
+| `assignee.email` | string | Yes, if `assignee` present | Primary agent identifier |
+| `assignee.uuid` | uuid | No (roadmap) | Agent UUID |
+| `metadata` | object | No | Additional data — see [standard keys](#10-metadata-standard-keys) |
+| `opened_at` | string | Yes | Open date in RFC3339 UTC |
 
-#### 2.1.1 Payload customizado com `open_template`
+#### 2.1.1 Custom payload with `open_template`
 
-Por padrão, a plataforma envia o body documentado acima. Quando o ticketer define `config.open_template`, esse body é **substituído** pelo resultado de um [Go `text/template`](https://pkg.go.dev/text/template) executado sobre o mesmo conjunto de dados.
+By default, the platform sends the body documented above. When the ticketer defines `config.open_template`, that body is **replaced** by the result of a [Go `text/template`](https://pkg.go.dev/text/template) executed over the same data set.
 
-- Config opcional: se `open_template` estiver ausente ou vazio, o contrato padrão é usado.
-- O template deve renderizar JSON válido; caso contrário a abertura falha antes da chamada HTTP.
+- Optional config: if `open_template` is absent or empty, the standard contract is used.
+- The template must render valid JSON; otherwise opening fails before the HTTP call.
 
-**Contexto disponível** (mesmas chaves do body padrão, após serialização JSON):
+**Available context** (same keys as the standard body, after JSON serialization):
 
-| Variável | Descrição |
-|----------|-----------|
-| `.ticket_id` | UUID do ticket na plataforma |
-| `.body` | Descrição / mensagem inicial |
-| `.opened_at` | Data de abertura (RFC3339) |
-| `.contact` | Objeto do contato (`uuid`, `name`, `urn`, `urns`, `language`) |
-| `.topic` | Objeto do tópico (quando houver) |
-| `.assignee` | Objeto do agente sugerido (quando houver) |
-| `.metadata` | Metadados opcionais (project, flow, channel, webhook_base_url, etc.) |
+| Variable | Description |
+|----------|-------------|
+| `.ticket_id` | Ticket UUID on the platform |
+| `.body` | Description / initial message |
+| `.opened_at` | Open date (RFC3339) |
+| `.contact` | Contact object (`uuid`, `name`, `urn`, `urns`, `language`) |
+| `.topic` | Topic object (when present) |
+| `.assignee` | Suggested agent object (when present) |
+| `.metadata` | Optional metadata (project, flow, channel, webhook_base_url, etc.) |
 
-**Funções auxiliares:**
+**Helper functions:**
 
-| Função | Uso |
-|--------|-----|
-| `json` | Serializa um valor aninhado como JSON (`{{json .contact}}`) |
-| `toString` | Converte um valor para string |
+| Function | Usage |
+|----------|-------|
+| `json` | Serializes a nested value as JSON (`{{json .contact}}`) |
+| `toString` | Converts a value to string |
 
-**Exemplo de config (request):**
+**Config example (request):**
 
 ```json
 {
@@ -235,7 +235,7 @@ Por padrão, a plataforma envia o body documentado acima. Quando o ticketer defi
 }
 ```
 
-**Body enviado nesse exemplo:**
+**Body sent in this example:**
 
 ```json
 {
@@ -245,22 +245,22 @@ Por padrão, a plataforma envia o body documentado acima. Quando o ticketer defi
     "name": "João Silva",
     "urn": "whatsapp:+5511999999999"
   },
-  "subject": "Cliente pediu atendimento humano."
+  "subject": "Customer requested human support."
 }
 ```
 
-> **Atenção:** ao interpolar strings dentro de JSON (`"{{.body}}"`), caracteres especiais no valor podem invalidar o JSON. Prefira `{{json .body}}` (ou `{{json .contact}}` para objetos) quando o conteúdo puder conter aspas ou quebras de linha.
+> **Warning:** when interpolating strings inside JSON (`"{{.body}}"`), special characters in the value can invalidate the JSON. Prefer `{{json .body}}` (or `{{json .contact}}` for objects) when the content may contain quotes or line breaks.
 
-#### 2.1.2 Resposta customizada com `open_response_template`
+#### 2.1.2 Custom response with `open_response_template`
 
-Por padrão, a plataforma espera a resposta no envelope documentado abaixo (`external_id`, `status`, `created_at`). Quando o parceiro responde em outro formato, configure `config.open_response_template` para mapear o JSON recebido para esse envelope.
+By default, the platform expects the response in the envelope documented below (`external_id`, `status`, `created_at`). When the partner responds in another format, configure `config.open_response_template` to map the received JSON to that envelope.
 
-- Config opcional: se `open_response_template` estiver ausente ou vazio, o body da resposta é parseado diretamente como o envelope padrão.
-- O template recebe o JSON da resposta do parceiro como contexto e deve renderizar JSON válido no formato padrão.
-- `external_id` é obrigatório após o mapeamento; `status` e `created_at` são opcionais.
-- Erros HTTP (4xx/5xx) **não** passam pelo template de resposta — continuam no envelope de erro da [seção de erros](#resposta-de-erro).
+- Optional config: if `open_response_template` is absent or empty, the response body is parsed directly as the standard envelope.
+- The template receives the partner's response JSON as context and must render valid JSON in the standard format.
+- `external_id` is required after mapping; `status` and `created_at` are optional.
+- HTTP errors (4xx/5xx) do **not** go through the response template — they continue in the error envelope from the [error response](#error-response) section.
 
-**Exemplo:** o parceiro responde:
+**Example:** the partner responds:
 
 ```json
 {
@@ -280,7 +280,7 @@ Config:
 }
 ```
 
-Resultado interpretado pela plataforma:
+Result interpreted by the platform:
 
 ```json
 {
@@ -290,9 +290,9 @@ Resultado interpretado pela plataforma:
 }
 ```
 
-`open_template` e `open_response_template` são independentes: podem ser usados juntos ou isoladamente.
+`open_template` and `open_response_template` are independent: they can be used together or separately.
 
-#### Resposta de sucesso
+#### Success response
 
 ```http
 201 Created
@@ -306,7 +306,7 @@ Resultado interpretado pela plataforma:
 }
 ```
 
-#### Resposta de erro
+#### Error response
 
 ```http
 400 Bad Request
@@ -319,9 +319,9 @@ Resultado interpretado pela plataforma:
 }
 ```
 
-#### Ticket já existente (resposta idempotente)
+#### Ticket already exists (idempotent response)
 
-Se a mesma `Idempotency-Key` chegar novamente, retornar `201 Created` com o mesmo `external_id`, sem criar duplicata. Caso seja reaberto, ver `409`:
+If the same `Idempotency-Key` arrives again, return `201 Created` with the same `external_id`, without creating a duplicate. If it is a reopen conflict, see `409`:
 
 ```http
 409 Conflict
@@ -337,15 +337,15 @@ Se a mesma `Idempotency-Key` chegar novamente, retornar `201 Created` com o mesm
 
 ---
 
-### 2.2 Encaminhar mensagem do contato
+### 2.2 Forward contact message
 
-Envia ao Ticketer uma nova mensagem enviada pelo contato enquanto o ticket está aberto.
+Sends the Ticketer a new message from the contact while the ticket is open.
 
 ```http
 POST /v1/tickets/{external_id}/messages
 ```
 
-#### Exemplo
+#### Example
 
 ```http
 POST /v1/tickets/EXT-123456/messages
@@ -364,7 +364,7 @@ POST /v1/tickets/EXT-123456/messages
     "id": "7ad9d98e-321f-4c61-9a50-79b1c7d7f621",
     "name": "João Silva"
   },
-  "text": "Olá, preciso de ajuda com meu pedido.",
+  "text": "Hi, I need help with my order.",
   "attachments": [
     {
       "id": "att-001",
@@ -384,44 +384,44 @@ POST /v1/tickets/EXT-123456/messages
 }
 ```
 
-#### Campos
+#### Fields
 
-| Campo | Tipo | Obrigatório | Descrição |
-|-------|------|-------------|-----------|
-| `ticket_id` | uuid | Sim | ID do ticket na plataforma |
-| `external_id` | string | Sim | ID do ticket no sistema externo |
-| `message_id` | string | Recomendado | ID da mensagem na plataforma (presente quando a mensagem origina de um inbound) |
-| `direction` | enum | Sim | Sempre `incoming` |
-| `sender` | object | Sim | Ver [objeto `sender`](#objeto-sender) |
-| `text` | string | Condicional | Obrigatório se `attachments` estiver vazio |
-| `attachments` | array | Condicional | Obrigatório se `text` estiver vazio |
-| `metadata` | object | Não | Dados adicionais |
-| `sent_at` | string | Sim | RFC3339 UTC |
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `ticket_id` | uuid | Yes | Ticket ID on the platform |
+| `external_id` | string | Yes | Ticket ID in the external system |
+| `message_id` | string | Recommended | Message ID on the platform (present when the message originates from an inbound) |
+| `direction` | enum | Yes | Always `incoming` |
+| `sender` | object | Yes | See [`sender` object](#5-sender-object) |
+| `text` | string | Conditional | Required if `attachments` is empty |
+| `attachments` | array | Conditional | Required if `text` is empty |
+| `metadata` | object | No | Additional data |
+| `sent_at` | string | Yes | RFC3339 UTC |
 
-#### 2.2.1 Payload customizado com `forward_template`
+#### 2.2.1 Custom payload with `forward_template`
 
-Por padrão, a plataforma envia o body documentado acima. Quando o ticketer define `config.forward_template`, esse body é **substituído** pelo resultado de um Go `text/template` executado sobre o mesmo conjunto de dados.
+By default, the platform sends the body documented above. When the ticketer defines `config.forward_template`, that body is **replaced** by the result of a Go `text/template` executed over the same data set.
 
-- Config opcional: se `forward_template` estiver ausente ou vazio, o contrato padrão é usado.
-- O template deve renderizar JSON válido; caso contrário o forward falha antes da chamada HTTP.
+- Optional config: if `forward_template` is absent or empty, the standard contract is used.
+- The template must render valid JSON; otherwise the forward fails before the HTTP call.
 
-**Contexto disponível** (mesmas chaves do body padrão):
+**Available context** (same keys as the standard body):
 
-| Variável | Descrição |
-|----------|-----------|
-| `.ticket_id` | UUID do ticket na plataforma |
-| `.external_id` | ID do ticket no sistema externo |
-| `.message_id` | ID da mensagem na plataforma (quando houver) |
-| `.direction` | Sempre `incoming` |
-| `.sender` | Objeto do remetente (`type`, `id`, `name`, …) |
-| `.text` | Texto da mensagem |
-| `.attachments` | Lista de anexos |
-| `.metadata` | Metadados opcionais |
-| `.sent_at` | Data/hora do envio (RFC3339) |
+| Variable | Description |
+|----------|-------------|
+| `.ticket_id` | Ticket UUID on the platform |
+| `.external_id` | Ticket ID in the external system |
+| `.message_id` | Message ID on the platform (when present) |
+| `.direction` | Always `incoming` |
+| `.sender` | Sender object (`type`, `id`, `name`, …) |
+| `.text` | Message text |
+| `.attachments` | Attachment list |
+| `.metadata` | Optional metadata |
+| `.sent_at` | Send date/time (RFC3339) |
 
-As mesmas funções auxiliares de `open_template` estão disponíveis (`json`, `toString`).
+The same helper functions as `open_template` are available (`json`, `toString`).
 
-**Exemplo de config:**
+**Config example:**
 
 ```json
 {
@@ -429,7 +429,7 @@ As mesmas funções auxiliares de `open_template` estão disponíveis (`json`, `
 }
 ```
 
-**Body enviado nesse exemplo:**
+**Body sent in this example:**
 
 ```json
 {
@@ -439,21 +439,21 @@ As mesmas funções auxiliares de `open_template` estão disponíveis (`json`, `
     "id": "7ad9d98e-321f-4c61-9a50-79b1c7d7f621",
     "name": "João Silva"
   },
-  "body": "Olá, preciso de ajuda com meu pedido.",
+  "body": "Hi, I need help with my order.",
   "msg_id": "msg-789"
 }
 ```
 
-#### 2.2.2 Resposta customizada com `forward_response_template`
+#### 2.2.2 Custom response with `forward_response_template`
 
-Por padrão, a plataforma espera a resposta no envelope documentado abaixo (`message_external_id`, `status`). Quando o parceiro responde em outro formato, configure `config.forward_response_template` para mapear o JSON recebido para esse envelope.
+By default, the platform expects the response in the envelope documented below (`message_external_id`, `status`). When the partner responds in another format, configure `config.forward_response_template` to map the received JSON to that envelope.
 
-- Config opcional: se `forward_response_template` estiver ausente ou vazio, o body da resposta é parseado diretamente como o envelope padrão.
-- O template recebe o JSON da resposta do parceiro como contexto e deve renderizar JSON válido no formato padrão.
-- `message_external_id` e `status` são opcionais após o mapeamento (o forward não exige `message_external_id` para sucesso).
-- Erros HTTP (4xx/5xx) **não** passam pelo template de resposta.
+- Optional config: if `forward_response_template` is absent or empty, the response body is parsed directly as the standard envelope.
+- The template receives the partner's response JSON as context and must render valid JSON in the standard format.
+- `message_external_id` and `status` are optional after mapping (forward does not require `message_external_id` for success).
+- HTTP errors (4xx/5xx) do **not** go through the response template.
 
-**Exemplo:** o parceiro responde:
+**Example:** the partner responds:
 
 ```json
 {
@@ -472,7 +472,7 @@ Config:
 }
 ```
 
-Resultado interpretado pela plataforma:
+Result interpreted by the platform:
 
 ```json
 {
@@ -481,9 +481,9 @@ Resultado interpretado pela plataforma:
 }
 ```
 
-`forward_template` e `forward_response_template` são independentes: podem ser usados juntos ou isoladamente.
+`forward_template` and `forward_response_template` are independent: they can be used together or separately.
 
-#### Resposta de sucesso
+#### Success response
 
 ```http
 200 OK
@@ -498,9 +498,9 @@ Resultado interpretado pela plataforma:
 
 ---
 
-### 2.3 Fechar ticket
+### 2.3 Close ticket
 
-Notifica o Ticketer que o atendimento foi fechado na plataforma.
+Notifies the Ticketer that the conversation was closed on the platform.
 
 ```http
 POST /v1/tickets/{external_id}/close
@@ -528,46 +528,46 @@ POST /v1/tickets/{external_id}/close
 
 `closed_by.type`:
 
-| Valor | Significado |
-|-------|-------------|
-| `platform` | Fechado por sistema da plataforma |
-| `agent` | Fechado por agente humano |
-| `contact` | Fechado pelo próprio contato |
-| `flow` | Fechado por um flow automatizado |
-| `system` | Fechamento automático (timeout, manutenção) |
+| Value | Meaning |
+|-------|---------|
+| `platform` | Closed by a platform system |
+| `agent` | Closed by a human agent |
+| `contact` | Closed by the contact |
+| `flow` | Closed by an automated flow |
+| `system` | Automatic close (timeout, maintenance) |
 
 `reason`:
 
-| Valor | Significado |
-|-------|-------------|
-| `resolved` | Atendimento concluído |
-| `abandoned` | Contato não respondeu |
-| `transferred` | Transferido para outro canal/equipe |
-| `expired` | Timeout/inatividade |
-| `cancelled` | Cancelado antes do início efetivo |
-| `other` | Outro motivo (usar `details.reason_text` se necessário) |
+| Value | Meaning |
+|-------|---------|
+| `resolved` | Conversation completed |
+| `abandoned` | Contact did not reply |
+| `transferred` | Transferred to another channel/team |
+| `expired` | Timeout/inactivity |
+| `cancelled` | Cancelled before effective start |
+| `other` | Other reason (use `details.reason_text` if needed) |
 
-#### 2.3.1 Payload customizado com `close_template`
+#### 2.3.1 Custom payload with `close_template`
 
-Por padrão, a plataforma envia o body documentado acima. Quando o ticketer define `config.close_template`, esse body é **substituído** pelo resultado de um Go `text/template` executado sobre o mesmo conjunto de dados.
+By default, the platform sends the body documented above. When the ticketer defines `config.close_template`, that body is **replaced** by the result of a Go `text/template` executed over the same data set.
 
-- Config opcional: se `close_template` estiver ausente ou vazio, o contrato padrão é usado.
-- O template deve renderizar JSON válido; caso contrário o close falha antes da chamada HTTP.
+- Optional config: if `close_template` is absent or empty, the standard contract is used.
+- The template must render valid JSON; otherwise the close fails before the HTTP call.
 
-**Contexto disponível** (mesmas chaves do body padrão):
+**Available context** (same keys as the standard body):
 
-| Variável | Descrição |
-|----------|-----------|
-| `.ticket_id` | UUID do ticket na plataforma |
-| `.external_id` | ID do ticket no sistema externo |
-| `.closed_by` | Ator que fechou (`type`, `id`, `name`) |
-| `.reason` | Motivo do fechamento (quando houver) |
-| `.metadata` | Metadados opcionais |
-| `.closed_at` | Data/hora do fechamento (RFC3339) |
+| Variable | Description |
+|----------|-------------|
+| `.ticket_id` | Ticket UUID on the platform |
+| `.external_id` | Ticket ID in the external system |
+| `.closed_by` | Actor who closed (`type`, `id`, `name`) |
+| `.reason` | Close reason (when present) |
+| `.metadata` | Optional metadata |
+| `.closed_at` | Close date/time (RFC3339) |
 
-As mesmas funções auxiliares de `open_template` estão disponíveis (`json`, `toString`).
+The same helper functions as `open_template` are available (`json`, `toString`).
 
-**Exemplo de config:**
+**Config example:**
 
 ```json
 {
@@ -575,7 +575,7 @@ As mesmas funções auxiliares de `open_template` estão disponíveis (`json`, `
 }
 ```
 
-**Body enviado nesse exemplo:**
+**Body sent in this example:**
 
 ```json
 {
@@ -588,16 +588,16 @@ As mesmas funções auxiliares de `open_template` estão disponíveis (`json`, `
 }
 ```
 
-#### 2.3.2 Resposta customizada com `close_response_template`
+#### 2.3.2 Custom response with `close_response_template`
 
-Por padrão, a plataforma espera a resposta no envelope documentado abaixo (`status`). Quando o parceiro responde em outro formato, configure `config.close_response_template` para mapear o JSON recebido para esse envelope.
+By default, the platform expects the response in the envelope documented below (`status`). When the partner responds in another format, configure `config.close_response_template` to map the received JSON to that envelope.
 
-- Config opcional: se `close_response_template` estiver ausente ou vazio, o body da resposta é parseado diretamente como o envelope padrão (body vazio em 2xx/204 continua aceito).
-- O template recebe o JSON da resposta do parceiro como contexto e deve renderizar JSON válido no formato padrão.
-- `status` é opcional após o mapeamento (o close não exige `status: closed` para sucesso — o HTTP 2xx já basta).
-- Erros HTTP (4xx/5xx) **não** passam pelo template de resposta — o 409 continua tratado como já fechado.
+- Optional config: if `close_response_template` is absent or empty, the response body is parsed directly as the standard envelope (empty body on 2xx/204 is still accepted).
+- The template receives the partner's response JSON as context and must render valid JSON in the standard format.
+- `status` is optional after mapping (close does not require `status: closed` for success — HTTP 2xx is enough).
+- HTTP errors (4xx/5xx) do **not** go through the response template — 409 continues to be treated as already closed.
 
-**Exemplo:** o parceiro responde:
+**Example:** the partner responds:
 
 ```json
 {
@@ -615,7 +615,7 @@ Config:
 }
 ```
 
-Resultado interpretado pela plataforma:
+Result interpreted by the platform:
 
 ```json
 {
@@ -623,9 +623,9 @@ Resultado interpretado pela plataforma:
 }
 ```
 
-`close_template` e `close_response_template` são independentes: podem ser usados juntos ou isoladamente.
+`close_template` and `close_response_template` are independent: they can be used together or separately.
 
-#### Resposta de sucesso
+#### Success response
 
 ```http
 200 OK
@@ -637,7 +637,7 @@ Resultado interpretado pela plataforma:
 }
 ```
 
-#### Caso o ticket já esteja fechado
+#### If the ticket is already closed
 
 ```http
 409 Conflict
@@ -652,9 +652,9 @@ Resultado interpretado pela plataforma:
 
 ---
 
-### 2.4 Reabrir ticket
+### 2.4 Reopen ticket
 
-Notifica o Ticketer que o atendimento foi reaberto na plataforma.
+Notifies the Ticketer that the conversation was reopened on the platform.
 
 ```http
 POST /v1/tickets/{external_id}/reopen
@@ -677,9 +677,9 @@ POST /v1/tickets/{external_id}/reopen
 }
 ```
 
-`reopened_by.type` aceita os mesmos valores de `closed_by.type`.
+`reopened_by.type` accepts the same values as `closed_by.type`.
 
-#### Resposta de sucesso
+#### Success response
 
 ```http
 200 OK
@@ -691,7 +691,7 @@ POST /v1/tickets/{external_id}/reopen
 }
 ```
 
-#### Caso o parceiro não suporte reabertura
+#### If the partner does not support reopening
 
 ```http
 422 Unprocessable Entity
@@ -706,20 +706,20 @@ POST /v1/tickets/{external_id}/reopen
 
 ---
 
-### 2.5 Enviar histórico da conversa (opcional)
+### 2.5 Send conversation history (optional)
 
-Envia ao Ticketer o histórico anterior da conversa após a abertura do ticket. A plataforma carrega mensagens do contato a partir de `history_after` no body do ticket (quando informado), senão usa a janela padrão de **24 horas**.
+Sends the Ticketer the previous conversation history after the ticket is opened. The platform loads contact messages from `history_after` in the ticket body (when provided); otherwise it uses the default window of **24 hours**.
 
-> **Ordering:** o histórico é enviado **após** `2.1` e pode chegar **depois** das primeiras mensagens novas via `2.2`. O parceiro deve ordenar internamente por `sent_at`.
+> **Ordering:** history is sent **after** `2.1` and may arrive **after** the first new messages via `2.2`. The partner must order internally by `sent_at`.
 
-#### Modos de envio (`history_mode`)
+#### Send modes (`history_mode`)
 
-| Modo | Config | Endpoint padrão | Payload padrão |
-|------|--------|-----------------|----------------|
-| `batch` (default) | `history_mode=batch` ou ausente | `POST /v1/tickets/{external_id}/history` (`route_history`) | `HistoryRequest` com array `messages` (em lotes de até `history_batch_size`, default 50) |
-| `one_by_one` | `history_mode=one_by_one` | `POST /v1/tickets/{external_id}/messages` (`route_history_message` ou `route_forward`) | `MessageRequest` por mensagem (mesmo contrato de [2.2](#22-encaminhar-mensagem-do-contato)) |
+| Mode | Config | Default endpoint | Default payload |
+|------|--------|------------------|-----------------|
+| `batch` (default) | `history_mode=batch` or absent | `POST /v1/tickets/{external_id}/history` (`route_history`) | `HistoryRequest` with `messages` array (in batches of up to `history_batch_size`, default 50) |
+| `one_by_one` | `history_mode=one_by_one` | `POST /v1/tickets/{external_id}/messages` (`route_history_message` or `route_forward`) | `MessageRequest` per message (same contract as [2.2](#22-forward-contact-message)) |
 
-Ambos os modos aceitam rota customizada e payload via `history_template`.
+Both modes accept a custom route and payload via `history_template`.
 
 #### Batch (default)
 
@@ -743,7 +743,7 @@ POST /v1/tickets/{external_id}/history
       "message_id": "msg-001",
       "direction": "outgoing",
       "sender": { "type": "bot" },
-      "text": "Olá! Como posso ajudar?",
+      "text": "Hi! How can I help?",
       "attachments": [],
       "sent_at": "2026-05-20T14:20:00Z"
     },
@@ -751,7 +751,7 @@ POST /v1/tickets/{external_id}/history
       "message_id": "msg-002",
       "direction": "incoming",
       "sender": { "type": "contact", "id": "7ad9d98e-321f-4c61-9a50-79b1c7d7f621" },
-      "text": "Quero falar com um atendente.",
+      "text": "I want to talk to an agent.",
       "attachments": [],
       "sent_at": "2026-05-20T14:21:00Z"
     }
@@ -764,21 +764,21 @@ POST /v1/tickets/{external_id}/history
 
 #### One-by-one (`history_mode=one_by_one`)
 
-Cada mensagem do histórico é enviada individualmente para `route_history_message` (ou `route_forward` quando não configurado), usando o contrato de [2.2](#22-encaminhar-mensagem-do-contato) — inclusive mensagens `outgoing` com `sender.type=bot`.
+Each history message is sent individually to `route_history_message` (or `route_forward` when not configured), using the [2.2](#22-forward-contact-message) contract — including `outgoing` messages with `sender.type=bot`.
 
 ```http
 POST /v1/tickets/{external_id}/messages
 ```
 
-#### 2.5.1 Payload customizado com `history_template`
+#### 2.5.1 Custom payload with `history_template`
 
-Config opcional compartilhada pelos dois modos. Quando ausente, a plataforma envia o contrato padrão do modo ativo.
+Optional config shared by both modes. When absent, the platform sends the standard contract for the active mode.
 
-- No modo **batch**, o contexto inclui `.ticket_id`, `.external_id`, `.contact`, `.messages` (slice) e `.metadata`.
-- No modo **one_by_one**, o contexto inclui os mesmos campos de ticket/contato **mais** os campos da mensagem atual no topo: `.message_id`, `.direction`, `.sender`, `.text`, `.attachments`, `.sent_at`.
-- O template deve renderizar JSON válido.
+- In **batch** mode, the context includes `.ticket_id`, `.external_id`, `.contact`, `.messages` (slice), and `.metadata`.
+- In **one_by_one** mode, the context includes the same ticket/contact fields **plus** the current message fields at the top level: `.message_id`, `.direction`, `.sender`, `.text`, `.attachments`, `.sent_at`.
+- The template must render valid JSON.
 
-**Exemplo (batch):**
+**Example (batch):**
 
 ```json
 {
@@ -786,9 +786,9 @@ Config opcional compartilhada pelos dois modos. Quando ausente, a plataforma env
 }
 ```
 
-#### 2.5.2 Resposta customizada com `history_response_template`
+#### 2.5.2 Custom response with `history_response_template`
 
-Por padrão, a plataforma interpreta a resposta como:
+By default, the platform interprets the response as:
 
 ```json
 {
@@ -797,11 +797,11 @@ Por padrão, a plataforma interpreta a resposta como:
 }
 ```
 
-Configure `history_response_template` para mapear o JSON do parceiro para esse envelope. No modo `one_by_one`, a resposta costuma seguir o formato de mensagem (`message_external_id`, `status`) — o template pode adaptá-la.
+Configure `history_response_template` to map the partner's JSON to that envelope. In `one_by_one` mode, the response usually follows the message format (`message_external_id`, `status`) — the template can adapt it.
 
-Erros HTTP (4xx/5xx) **não** passam pelo template de resposta.
+HTTP errors (4xx/5xx) do **not** go through the response template.
 
-#### Resposta de sucesso
+#### Success response
 
 ```http
 200 OK
@@ -814,37 +814,37 @@ Erros HTTP (4xx/5xx) **não** passam pelo template de resposta.
 }
 ```
 
-#### Observação
+#### Note
 
-Endpoint opcional. Caso o parceiro não queira receber histórico, pode não implementá-lo ou retornar `200 OK` sem executar nenhuma ação. Sem mensagens na janela configurada, a plataforma não faz chamadas HTTP.
+Optional endpoint. If the partner does not want to receive history, they may not implement it or return `200 OK` without performing any action. With no messages in the configured window, the platform makes no HTTP calls.
 
 ---
 
-## 3. Ticketer → Plataforma
+## 3. Ticketer → Platform
 
-Webhooks que o parceiro deve chamar para enviar eventos do sistema externo de volta para a plataforma.
+Webhooks that the partner must call to send events from the external system back to the platform.
 
-A URL base do Mailroom e o `ticketer_uuid` são informados no provisionamento (ver [Seção 0](#0-provisionamento-de-credenciais)). Exemplo:
+The Mailroom base URL and `ticketer_uuid` are provided during provisioning (see [Section 0](#0-credential-provisioning)). Example:
 
 ```
 https://platform.example.com/webhooks/ticketer/{ticketer_uuid}
 ```
 
-> **Compatibilidade:** na implementação atual, esses webhooks são expostos sob `https://platform.example.com/mr/tickets/types/{ticketer_type}/event_callback/{ticketer_uuid}` — a plataforma fornecerá a URL exata no provisionamento.
+> **Compatibility:** in the current implementation, these webhooks are exposed under `https://platform.example.com/mr/tickets/types/{ticketer_type}/event_callback/{ticketer_uuid}` — the platform will provide the exact URL during provisioning.
 
-Por padrão, todos os webhooks devem ser autenticados via HMAC (ver [Seção 1.2](#12-ticketer--plataforma-hmac)). Se a plataforma tiver configurado `skip_webhook_hmac=true` para o ticketer, os headers de assinatura não são exigidos — consulte o time de integração para confirmar o modo do seu ambiente.
+By default, all webhooks must be authenticated via HMAC (see [Section 1.2](#12-ticketer--platform-hmac)). If the platform has configured `skip_webhook_hmac=true` for the ticketer, signature headers are not required — check with the integration team to confirm the mode for your environment.
 
 ---
 
-### 3.1 Enviar mensagem do agente ao contato
+### 3.1 Send agent message to contact
 
-Quando um agente responder no sistema externo, o Ticketer deve chamar a plataforma para entregar essa mensagem ao contato.
+When an agent replies in the external system, the Ticketer must call the platform to deliver that message to the contact.
 
 ```http
 POST /webhooks/ticketer/{ticketer_uuid}/messages
 ```
 
-#### Exemplo
+#### Example
 
 ```http
 POST /webhooks/ticketer/67dc9f8d-bd4d-4a97-8f8a-4d62625ff9e7/messages
@@ -852,7 +852,7 @@ POST /webhooks/ticketer/67dc9f8d-bd4d-4a97-8f8a-4d62625ff9e7/messages
 
 #### Headers
 
-Obrigatórios quando HMAC está habilitado (default). Omitidos quando a plataforma configurou `skip_webhook_hmac=true` para o ticketer.
+Required when HMAC is enabled (default). Omitted when the platform configured `skip_webhook_hmac=true` for the ticketer.
 
 ```http
 Content-Type: application/json
@@ -871,10 +871,10 @@ X-Request-Id: f6a22a5a-d111-4d8a-9c44-2f9f4e0b0d65
   "sender": {
     "type": "agent",
     "id": "agent-1",
-    "name": "Maria Atendente",
+    "name": "Maria Agent",
     "email": "maria@example.com"
   },
-  "text": "Olá, João. Vou te ajudar com seu pedido.",
+  "text": "Hi, João. I'll help you with your order.",
   "attachments": [],
   "metadata": {
     "department": "support"
@@ -883,35 +883,35 @@ X-Request-Id: f6a22a5a-d111-4d8a-9c44-2f9f4e0b0d65
 }
 ```
 
-#### Campos
+#### Fields
 
-| Campo | Tipo | Obrigatório | Descrição |
-|-------|------|-------------|-----------|
-| `external_id` | string | Sim | ID do ticket no sistema externo |
-| `message_external_id` | string | Recomendado | ID da mensagem no sistema externo |
-| `direction` | enum | Sim | Sempre `outgoing` |
-| `sender` | object | Sim | Tipicamente `sender.type = "agent"` |
-| `text` | string | Condicional | Obrigatório se `attachments` estiver vazio |
-| `attachments` | array | Condicional | Obrigatório se `text` estiver vazio |
-| `metadata` | object | Não | Dados adicionais |
-| `sent_at` | string | Sim | RFC3339 UTC |
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `external_id` | string | Yes | Ticket ID in the external system |
+| `message_external_id` | string | Recommended | Message ID in the external system |
+| `direction` | enum | Yes | Always `outgoing` |
+| `sender` | object | Yes | Typically `sender.type = "agent"` |
+| `text` | string | Conditional | Required if `attachments` is empty |
+| `attachments` | array | Conditional | Required if `text` is empty |
+| `metadata` | object | No | Additional data |
+| `sent_at` | string | Yes | RFC3339 UTC |
 
-#### 3.1.1 Payload customizado com `messages_template`
+#### 3.1.1 Custom payload with `messages_template`
 
-Por padrão, a plataforma espera o body documentado acima. Quando o ticketer define `config.messages_template`, o body recebido do parceiro é **mapeado** por um Go `text/template` para esse envelope antes do processamento.
+By default, the platform expects the body documented above. When the ticketer defines `config.messages_template`, the body received from the partner is **mapped** by a Go `text/template` to that envelope before processing.
 
-- Config opcional: se `messages_template` estiver ausente ou vazio, o body é parseado diretamente.
-- O HMAC (quando habilitado) é calculado sobre o **body bruto** enviado pelo parceiro, antes do mapeamento.
-- O template deve renderizar JSON válido no formato padrão (`external_id`, `text`/`attachments`, etc.).
-- `external_id` continua obrigatório após o mapeamento; `text` ou `attachments` também.
+- Optional config: if `messages_template` is absent or empty, the body is parsed directly.
+- HMAC (when enabled) is computed over the **raw body** sent by the partner, before mapping.
+- The template must render valid JSON in the standard format (`external_id`, `text`/`attachments`, etc.).
+- `external_id` remains required after mapping; `text` or `attachments` as well.
 
-**Exemplo:** o parceiro envia:
+**Example:** the partner sends:
 
 ```json
 {
   "ticket": "EXT-123456",
-  "content": "Olá, João. Vou te ajudar com seu pedido.",
-  "agent": { "name": "Maria Atendente" }
+  "content": "Hi, João. I'll help you with your order.",
+  "agent": { "name": "Maria Agent" }
 }
 ```
 
@@ -923,25 +923,25 @@ Config:
 }
 ```
 
-> Se o parceiro não envia `sent_at`, inclua um valor fixo no template ou um campo equivalente do payload.
+> If the partner does not send `sent_at`, include a fixed value in the template or an equivalent field from the payload.
 
-#### 3.1.2 Resposta customizada com `messages_response_template`
+#### 3.1.2 Custom response with `messages_response_template`
 
-Por padrão, a plataforma responde com o envelope de sucesso abaixo. Quando o ticketer define `config.messages_response_template`, essa resposta é **substituída** pelo resultado do template.
+By default, the platform responds with the success envelope below. When the ticketer defines `config.messages_response_template`, that response is **replaced** by the template result.
 
-- Config opcional: se `messages_response_template` estiver ausente ou vazio, a resposta padrão é usada.
-- O template recebe o JSON da resposta padrão como contexto (`status`, `ticket_uuid`, `message_uuid` quando houver).
-- Erros (4xx/5xx) **não** passam pelo template — continuam no envelope `{error, message}`.
+- Optional config: if `messages_response_template` is absent or empty, the standard response is used.
+- The template receives the standard response JSON as context (`status`, `ticket_uuid`, `message_uuid` when present).
+- Errors (4xx/5xx) do **not** go through the template — they continue in the `{error, message}` envelope.
 
-**Contexto disponível na resposta padrão:**
+**Available context in the standard response:**
 
-| Variável | Descrição |
-|----------|-----------|
-| `.status` | Sempre `sent` em sucesso |
-| `.ticket_uuid` | UUID do ticket na plataforma |
-| `.message_uuid` | UUID da mensagem enviada (quando disponível) |
+| Variable | Description |
+|----------|-------------|
+| `.status` | Always `sent` on success |
+| `.ticket_uuid` | Ticket UUID on the platform |
+| `.message_uuid` | Sent message UUID (when available) |
 
-**Exemplo de config:**
+**Config example:**
 
 ```json
 {
@@ -949,7 +949,7 @@ Por padrão, a plataforma responde com o envelope de sucesso abaixo. Quando o ti
 }
 ```
 
-#### Resposta de sucesso
+#### Success response
 
 ```http
 200 OK
@@ -965,9 +965,9 @@ Por padrão, a plataforma responde com o envelope de sucesso abaixo. Quando o ti
 
 ---
 
-### 3.2 Fechar ticket a partir do Ticketer
+### 3.2 Close ticket from the Ticketer
 
-Quando o atendimento for fechado no sistema externo, o parceiro pode notificar a plataforma.
+When the conversation is closed in the external system, the partner can notify the platform.
 
 ```http
 POST /webhooks/ticketer/{ticketer_uuid}/tickets/close
@@ -981,7 +981,7 @@ POST /webhooks/ticketer/{ticketer_uuid}/tickets/close
   "closed_by": {
     "type": "agent",
     "id": "agent-1",
-    "name": "Maria Atendente"
+    "name": "Maria Agent"
   },
   "reason": "resolved",
   "metadata": {
@@ -991,18 +991,18 @@ POST /webhooks/ticketer/{ticketer_uuid}/tickets/close
 }
 ```
 
-Enums `closed_by.type` e `reason` seguem [Seção 2.3](#23-fechar-ticket).
+`closed_by.type` and `reason` enums follow [Section 2.3](#23-close-ticket).
 
-#### 3.2.1 Payload customizado com `tickets_close_template`
+#### 3.2.1 Custom payload with `tickets_close_template`
 
-Por padrão, a plataforma espera o body documentado acima. Quando o ticketer define `config.tickets_close_template`, o body recebido do parceiro é **mapeado** por um Go `text/template` para esse envelope antes do processamento.
+By default, the platform expects the body documented above. When the ticketer defines `config.tickets_close_template`, the body received from the partner is **mapped** by a Go `text/template` to that envelope before processing.
 
-- Config opcional: se `tickets_close_template` estiver ausente ou vazio, o body é parseado diretamente.
-- O HMAC (quando habilitado) é calculado sobre o **body bruto** enviado pelo parceiro, antes do mapeamento.
-- O template deve renderizar JSON válido no formato padrão.
-- `external_id` continua obrigatório após o mapeamento.
+- Optional config: if `tickets_close_template` is absent or empty, the body is parsed directly.
+- HMAC (when enabled) is computed over the **raw body** sent by the partner, before mapping.
+- The template must render valid JSON in the standard format.
+- `external_id` remains required after mapping.
 
-**Exemplo:** o parceiro envia:
+**Example:** the partner sends:
 
 ```json
 {
@@ -1020,17 +1020,17 @@ Config:
 }
 ```
 
-> **Nota:** `close_template` / `close_response_template` (seções 2.3.1–2.3.2) aplicam-se ao fechamento **plataforma → parceiro**. `tickets_close_*` aplicam-se ao webhook **parceiro → plataforma** (`POST .../tickets/close`).
+> **Note:** `close_template` / `close_response_template` (sections 2.3.1–2.3.2) apply to **platform → partner** close. `tickets_close_*` apply to the **partner → platform** webhook (`POST .../tickets/close`).
 
-#### 3.2.2 Resposta customizada com `tickets_close_response_template`
+#### 3.2.2 Custom response with `tickets_close_response_template`
 
-Por padrão, a plataforma responde com o envelope de sucesso abaixo. Quando o ticketer define `config.tickets_close_response_template`, essa resposta é **substituída** pelo resultado do template.
+By default, the platform responds with the success envelope below. When the ticketer defines `config.tickets_close_response_template`, that response is **replaced** by the template result.
 
-- Config opcional: se `tickets_close_response_template` estiver ausente ou vazio, a resposta padrão é usada.
-- O template recebe o JSON da resposta padrão como contexto (`status`, `ticket_uuid`).
-- Erros (4xx/5xx) **não** passam pelo template.
+- Optional config: if `tickets_close_response_template` is absent or empty, the standard response is used.
+- The template receives the standard response JSON as context (`status`, `ticket_uuid`).
+- Errors (4xx/5xx) do **not** go through the template.
 
-**Exemplo de config:**
+**Config example:**
 
 ```json
 {
@@ -1038,7 +1038,7 @@ Por padrão, a plataforma responde com o envelope de sucesso abaixo. Quando o ti
 }
 ```
 
-#### Resposta de sucesso
+#### Success response
 
 ```http
 200 OK
@@ -1053,9 +1053,9 @@ Por padrão, a plataforma responde com o envelope de sucesso abaixo. Quando o ti
 
 ---
 
-### 3.3 Reabrir ticket a partir do Ticketer
+### 3.3 Reopen ticket from the Ticketer
 
-Quando o atendimento for reaberto no sistema externo, o parceiro pode notificar a plataforma.
+When the conversation is reopened in the external system, the partner can notify the platform.
 
 ```http
 POST /webhooks/ticketer/{ticketer_uuid}/tickets/reopen
@@ -1069,7 +1069,7 @@ POST /webhooks/ticketer/{ticketer_uuid}/tickets/reopen
   "reopened_by": {
     "type": "agent",
     "id": "agent-1",
-    "name": "Maria Atendente"
+    "name": "Maria Agent"
   },
   "metadata": {
     "source": "ticketer"
@@ -1078,7 +1078,7 @@ POST /webhooks/ticketer/{ticketer_uuid}/tickets/reopen
 }
 ```
 
-#### Resposta de sucesso
+#### Success response
 
 ```http
 200 OK
@@ -1092,23 +1092,23 @@ POST /webhooks/ticketer/{ticketer_uuid}/tickets/reopen
 
 ---
 
-## 4. Consulta de ticket (opcional, roadmap)
+## 4. Ticket lookup (optional, roadmap)
 
-O parceiro pode oferecer um endpoint para a plataforma consultar o estado atual de um ticket.
+The partner may offer an endpoint for the platform to query the current state of a ticket.
 
 ```http
 GET /v1/tickets/{external_id}
 ```
 
-> **Atenção:** a plataforma **não consome** este endpoint em runtime hoje. Ele é útil para auditoria, diagnóstico e ferramentas externas; está documentado como roadmap caso a plataforma passe a usá-lo no futuro.
+> **Warning:** the platform does **not** consume this endpoint at runtime today. It is useful for audit, diagnostics, and external tools; it is documented as roadmap in case the platform starts using it in the future.
 
-#### Exemplo
+#### Example
 
 ```http
 GET /v1/tickets/EXT-123456
 ```
 
-#### Resposta
+#### Response
 
 ```json
 {
@@ -1124,7 +1124,7 @@ GET /v1/tickets/EXT-123456
 
 ---
 
-## 5. Objeto `sender`
+## 5. `sender` object
 
 ```json
 {
@@ -1135,18 +1135,18 @@ GET /v1/tickets/EXT-123456
 }
 ```
 
-| Campo | Tipo | Obrigatório | Descrição |
-|-------|------|-------------|-----------|
-| `type` | enum | Sim | `contact`, `agent`, `bot`, `system` |
-| `id` | string | Recomendado | ID do remetente no sistema de origem |
-| `name` | string | Não | Nome exibível |
-| `email` | string | Recomendado para `agent` | Identificador primário do agente |
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `type` | enum | Yes | `contact`, `agent`, `bot`, `system` |
+| `id` | string | Recommended | Sender ID in the origin system |
+| `name` | string | No | Display name |
+| `email` | string | Recommended for `agent` | Primary agent identifier |
 
 ---
 
-## 6. Formato dos anexos
+## 6. Attachment format
 
-Sempre que uma mensagem tiver anexos, eles devem seguir este formato.
+Whenever a message has attachments, they must follow this format.
 
 ```json
 {
@@ -1156,77 +1156,77 @@ Sempre que uma mensagem tiver anexos, eles devem seguir este formato.
   "filename": "document.pdf",
   "size": 512000,
   "metadata": {
-    "caption": "Comprovante enviado pelo cliente"
+    "caption": "Receipt sent by the customer"
   }
 }
 ```
 
-| Campo | Tipo | Obrigatório | Descrição |
-|-------|------|-------------|-----------|
-| `id` | string | Não | ID do anexo |
-| `url` | string | Sim | URL para download (HTTPS) |
-| `content_type` | string | Não | MIME type. Se ausente, a plataforma usa o `Content-Type` retornado pela própria URL ao baixar o arquivo |
-| `filename` | string | Recomendado | Nome do arquivo |
-| `size` | number | Não | Tamanho em bytes |
-| `metadata` | object | Não | Dados adicionais (ex.: `caption`) |
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `id` | string | No | Attachment ID |
+| `url` | string | Yes | Download URL (HTTPS) |
+| `content_type` | string | No | MIME type. If absent, the platform uses the `Content-Type` returned by the URL itself when downloading the file |
+| `filename` | string | Recommended | File name |
+| `size` | number | No | Size in bytes |
+| `metadata` | object | No | Additional data (e.g. `caption`) |
 
-Limites atuais ao baixar anexos do parceiro: até **10 MB** por arquivo em endpoints genéricos, com exceções por tipo de mídia documentadas na integração.
+Current limits when downloading partner attachments: up to **10 MB** per file on generic endpoints, with media-type exceptions documented in the integration.
 
 ---
 
-## 7. Idempotência e retries
+## 7. Idempotency and retries
 
-A plataforma pode reenviar requisições em caso de timeout, erro temporário ou falha de rede.
+The platform may resend requests on timeout, temporary error, or network failure.
 
-O parceiro deve tratar as operações como idempotentes sempre que possível.
+The partner should treat operations as idempotent whenever possible.
 
 ### Headers
 
 ```http
-X-Request-Id: <uuid_da_requisicao>
-Idempotency-Key: <chave_unica_da_operacao>
+X-Request-Id: <request_uuid>
+Idempotency-Key: <unique_operation_key>
 ```
 
-> **Status atual:** o envio de `Idempotency-Key` é parte do contrato `v1` mas ainda **não é emitido por todos os caminhos da plataforma** (roadmap). O parceiro deve tratar idempotência por (`X-Request-Id`, `external_id`, `message_id`) enquanto isso.
+> **Current status:** sending `Idempotency-Key` is part of the `v1` contract but is still **not emitted on all platform paths** (roadmap). The partner should handle idempotency by (`X-Request-Id`, `external_id`, `message_id`) in the meantime.
 
-### Política de retry
+### Retry policy
 
-- Erros `5xx` e `429`: até **3 tentativas** com backoff exponencial.
-- Erros `4xx` (exceto `408`/`429`): sem retry.
-- O parceiro pode sinalizar pausa retornando `Retry-After` em `429` ou `503` (segundos ou data HTTP). A plataforma respeita o header.
+- `5xx` and `429` errors: up to **3 attempts** with exponential backoff.
+- `4xx` errors (except `408`/`429`): no retry.
+- The partner can signal a pause by returning `Retry-After` on `429` or `503` (seconds or HTTP date). The platform respects the header.
 
-### Exemplo
+### Example
 
 ```http
 POST /v1/tickets
 Idempotency-Key: open-ticket-0f4d2c8a-2c83-4f2c-9f7d-1d4f70d50e71
 ```
 
-Se a mesma requisição for recebida novamente, o parceiro deve retornar o mesmo `external_id`, sem criar um ticket duplicado.
+If the same request is received again, the partner must return the same `external_id`, without creating a duplicate ticket.
 
 ---
 
-## 8. Códigos HTTP esperados
+## 8. Expected HTTP status codes
 
-| Código | Uso |
-|--------|-----|
-| `200 OK` | Operação executada com sucesso |
-| `201 Created` | Recurso criado com sucesso |
-| `400 Bad Request` | Payload inválido |
-| `401 Unauthorized` | Credencial ausente ou inválida |
-| `403 Forbidden` | Credencial válida, mas sem permissão |
-| `404 Not Found` | Ticket ou recurso não encontrado |
-| `409 Conflict` | Operação incompatível com o estado atual |
-| `422 Unprocessable Entity` | Operação não suportada ou dados não processáveis |
-| `429 Too Many Requests` | Limite de requisições excedido (usar `Retry-After`) |
-| `500 Internal Server Error` | Erro interno |
-| `503 Service Unavailable` | Serviço temporariamente indisponível (usar `Retry-After`) |
+| Code | Usage |
+|------|-------|
+| `200 OK` | Operation completed successfully |
+| `201 Created` | Resource created successfully |
+| `400 Bad Request` | Invalid payload |
+| `401 Unauthorized` | Missing or invalid credential |
+| `403 Forbidden` | Valid credential, but no permission |
+| `404 Not Found` | Ticket or resource not found |
+| `409 Conflict` | Operation incompatible with current state |
+| `422 Unprocessable Entity` | Operation not supported or data not processable |
+| `429 Too Many Requests` | Request limit exceeded (use `Retry-After`) |
+| `500 Internal Server Error` | Internal error |
+| `503 Service Unavailable` | Service temporarily unavailable (use `Retry-After`) |
 
 ---
 
-## 9. Formato padrão de erro
+## 9. Standard error format
 
-Todos os erros devem retornar JSON.
+All errors must return JSON.
 
 ```json
 {
@@ -1238,127 +1238,127 @@ Todos os erros devem retornar JSON.
 }
 ```
 
-| Campo | Tipo | Obrigatório | Descrição |
-|-------|------|-------------|-----------|
-| `error` | string | Sim | Código legível por máquina (snake_case) |
-| `message` | string | Sim | Mensagem legível por humano |
-| `details` | object | Não | Dados adicionais para diagnóstico |
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `error` | string | Yes | Machine-readable code (snake_case) |
+| `message` | string | Yes | Human-readable message |
+| `details` | object | No | Additional diagnostic data |
 
 ---
 
-## 10. Metadata: chaves padrão
+## 10. Metadata: standard keys
 
-Sempre que a plataforma enviar `metadata`, as seguintes chaves podem estar presentes (e parceiros multi-tenant devem persisti-las):
+Whenever the platform sends `metadata`, the following keys may be present (and multi-tenant partners should persist them):
 
-| Chave | Tipo | Origem | Descrição |
-|-------|------|--------|-----------|
-| `project_uuid` | uuid | Plataforma → Ticketer (`POST /v1/tickets`) | Projeto Weni que originou o ticket |
-| `project_name` | string | Plataforma → Ticketer | Nome do projeto (somente quando configurado) |
-| `org_uuid` | uuid | Plataforma → Ticketer | Organização |
-| `org_id` | number | Plataforma → Ticketer | ID numérico legado da organização |
-| `channel` | object | Plataforma → Ticketer | `{ uuid, name, address }` do canal preferido do contato |
-| `flow` | object | Plataforma → Ticketer | `{ uuid, name }` do flow que abriu o ticket, se aplicável |
-| `webhook_base_url` | string | Plataforma → Ticketer (`POST /v1/tickets`) | URL base que o parceiro deve usar para chamar os webhooks da [Seção 3](#3-ticketer--plataforma). Equivale a `<plataforma>/webhooks/ticketer/{ticketer_uuid}` no contrato canônico — partners pré-configurados podem ignorar este campo |
-| `source_message_external_id` | string | Plataforma → Ticketer (`POST /v1/tickets/{external_id}/messages`) | ID da mensagem original no canal upstream (ex.: WhatsApp WAMID), repassado quando disponível para correlação |
-| `contact_uuid` | uuid | Plataforma → Ticketer | Redundante com `contact.uuid`, mantido por compatibilidade |
-| `priority` | enum | Plataforma → Ticketer | `low`, `normal`, `high`, `urgent` |
+| Key | Type | Origin | Description |
+|-----|------|--------|-------------|
+| `project_uuid` | uuid | Platform → Ticketer (`POST /v1/tickets`) | Weni project that originated the ticket |
+| `project_name` | string | Platform → Ticketer | Project name (only when configured) |
+| `org_uuid` | uuid | Platform → Ticketer | Organization |
+| `org_id` | number | Platform → Ticketer | Legacy numeric organization ID |
+| `channel` | object | Platform → Ticketer | `{ uuid, name, address }` of the contact's preferred channel |
+| `flow` | object | Platform → Ticketer | `{ uuid, name }` of the flow that opened the ticket, if applicable |
+| `webhook_base_url` | string | Platform → Ticketer (`POST /v1/tickets`) | Base URL the partner should use to call the webhooks in [Section 3](#3-ticketer--platform). Equivalent to `<platform>/webhooks/ticketer/{ticketer_uuid}` in the canonical contract — pre-configured partners may ignore this field |
+| `source_message_external_id` | string | Platform → Ticketer (`POST /v1/tickets/{external_id}/messages`) | Original message ID on the upstream channel (e.g. WhatsApp WAMID), forwarded when available for correlation |
+| `contact_uuid` | uuid | Platform → Ticketer | Redundant with `contact.uuid`, kept for compatibility |
+| `priority` | enum | Platform → Ticketer | `low`, `normal`, `high`, `urgent` |
 
-Parceiros podem incluir chaves próprias em `metadata` nos webhooks de retorno — a plataforma armazena sem interpretar.
-
----
-
-## 11. Limites operacionais
-
-| Limite | Valor |
-|--------|-------|
-| Tamanho máximo de body (request) | **32 MB** |
-| Tamanho máximo de anexo (download) | **10 MB** padrão; até 100 MB para tipos específicos |
-| Timeout por requisição | **30 s** |
-| Janela de validade do `X-Webhook-Timestamp` | **5 min** |
-| Tentativas de retry | até **3** com backoff exponencial |
+Partners may include their own keys in `metadata` on return webhooks — the platform stores them without interpreting.
 
 ---
 
-## 12. Versionamento
+## 11. Operational limits
 
-O contrato segue versionamento explícito via prefixo de URL e header:
+| Limit | Value |
+|-------|-------|
+| Max body size (request) | **32 MB** |
+| Max attachment size (download) | **10 MB** default; up to 100 MB for specific types |
+| Timeout per request | **30 s** |
+| `X-Webhook-Timestamp` validity window | **5 min** |
+| Retry attempts | up to **3** with exponential backoff |
+
+---
+
+## 12. Versioning
+
+The contract uses explicit versioning via URL prefix and header:
 
 - **URL:** `/v1/tickets`, `/v1/tickets/{external_id}/messages`, etc.
 - **Header:** `X-API-Version: 1`
 
-Mudanças breaking só ocorrem entre versões maiores (`/v2/...`). Adições de campos opcionais são compatíveis e não exigem nova versão.
+Breaking changes only occur between major versions (`/v2/...`). Optional field additions are compatible and do not require a new version.
 
 ---
 
-## 13. Sequência principal da integração
+## 13. Main integration sequence
 
 ```
-0. Provisionamento (uma vez)
-   - Parceiro gera api_token, plataforma gera webhook_secret e ticketer_uuid
+0. Provisioning (once)
+   - Partner generates api_token, platform generates webhook_secret and ticketer_uuid
 
-1. Plataforma abre ticket
+1. Platform opens ticket
    POST /v1/tickets
 
-2. Ticketer retorna o ID externo
+2. Ticketer returns the external ID
    201 Created { "external_id": "EXT-123456" }
 
-3. (opcional) Plataforma envia histórico
+3. (optional) Platform sends history
    POST /v1/tickets/EXT-123456/history
 
-4. Contato envia mensagem
+4. Contact sends message
    POST /v1/tickets/EXT-123456/messages
 
-5. Agente responde no Ticketer
+5. Agent replies in the Ticketer
    POST /webhooks/ticketer/{ticketer_uuid}/messages
 
-6. Plataforma entrega a resposta ao contato
+6. Platform delivers the reply to the contact
 
-7. Plataforma ou Ticketer fecha o atendimento
+7. Platform or Ticketer closes the conversation
    POST /v1/tickets/EXT-123456/close
-   ou
+   or
    POST /webhooks/ticketer/{ticketer_uuid}/tickets/close
 ```
 
 ---
 
-## 14. Checklist de implementação do parceiro
+## 14. Partner implementation checklist
 
-### 14.1 Endpoints Plataforma → Ticketer
+### 14.1 Platform → Ticketer endpoints
 
-| Item | Obrigatório |
-|------|-------------|
-| `POST /v1/tickets` — abertura | Sim |
-| `POST /v1/tickets/{external_id}/messages` — mensagens do contato | Sim |
-| `POST /v1/tickets/{external_id}/close` — fechamento | Sim |
-| `POST /v1/tickets/{external_id}/reopen` — reabertura | Opcional |
-| `POST /v1/tickets/{external_id}/history` — histórico | Opcional |
-| `GET /v1/tickets/{external_id}` — consulta | Opcional (roadmap) |
+| Item | Required |
+|------|----------|
+| `POST /v1/tickets` — open | Yes |
+| `POST /v1/tickets/{external_id}/messages` — contact messages | Yes |
+| `POST /v1/tickets/{external_id}/close` — close | Yes |
+| `POST /v1/tickets/{external_id}/reopen` — reopen | Optional |
+| `POST /v1/tickets/{external_id}/history` — history | Optional |
+| `GET /v1/tickets/{external_id}` — lookup | Optional (roadmap) |
 
-### 14.2 Webhooks Ticketer → Plataforma
+### 14.2 Ticketer → Platform webhooks
 
-| Item | Obrigatório |
-|------|-------------|
-| `POST /webhooks/ticketer/{ticketer_uuid}/messages` — resposta do agente | Sim |
-| `POST /webhooks/ticketer/{ticketer_uuid}/tickets/close` — fechamento externo | Recomendado |
-| `POST /webhooks/ticketer/{ticketer_uuid}/tickets/reopen` — reabertura externa | Opcional |
+| Item | Required |
+|------|----------|
+| `POST /webhooks/ticketer/{ticketer_uuid}/messages` — agent reply | Yes |
+| `POST /webhooks/ticketer/{ticketer_uuid}/tickets/close` — external close | Recommended |
+| `POST /webhooks/ticketer/{ticketer_uuid}/tickets/reopen` — external reopen | Optional |
 
-### 14.3 Operacional
+### 14.3 Operational
 
-| Item | Obrigatório |
-|------|-------------|
-| Bearer Token na entrada (Plataforma → Ticketer) | Sim |
-| HMAC-SHA256 na saída (Ticketer → Plataforma) | Sim (default); dispensável quando a plataforma define `skip_webhook_hmac=true` |
-| Suporte a anexos via URL HTTPS | Recomendado |
-| Idempotência em abertura e envio de mensagens | Recomendado |
-| Erros em JSON com códigos claros | Sim |
-| Respeitar `Retry-After` em respostas `429`/`503` | Sim |
-| Header `X-API-Version: 1` | Sim |
+| Item | Required |
+|------|----------|
+| Bearer Token on inbound (Platform → Ticketer) | Yes |
+| HMAC-SHA256 on outbound (Ticketer → Platform) | Yes (default); skippable when the platform sets `skip_webhook_hmac=true` |
+| Attachment support via HTTPS URL | Recommended |
+| Idempotency on open and message send | Recommended |
+| Errors in JSON with clear codes | Yes |
+| Respect `Retry-After` on `429`/`503` responses | Yes |
+| `X-API-Version: 1` header | Yes |
 
 ---
 
-## 15. Contrato mínimo para homologação
+## 15. Minimum contract for staging
 
-Para uma primeira versão funcional, o parceiro precisa implementar no mínimo:
+For a first working version, the partner needs to implement at least:
 
 ```
 POST /v1/tickets
@@ -1367,14 +1367,14 @@ POST /v1/tickets/{external_id}/close
 POST /webhooks/ticketer/{ticketer_uuid}/messages
 ```
 
-Mais:
+Plus:
 
-- Autenticação Bearer na entrada
-- Verificação HMAC na saída (ou confirmação com o time de integração de que `skip_webhook_hmac=true` está ativo no ambiente de homologação)
-- Resposta de erro em JSON conforme [Seção 9](#9-formato-padrão-de-erro)
+- Bearer authentication on inbound
+- HMAC verification on outbound (or confirmation with the integration team that `skip_webhook_hmac=true` is active in the staging environment)
+- JSON error response per [Section 9](#9-standard-error-format)
 
-Com isso, a integração cobre o ciclo básico:
+With that, the integration covers the basic cycle:
 
 ```
-abrir atendimento → encaminhar mensagens do contato → agente responder → fechar atendimento
+open conversation → forward contact messages → agent replies → close conversation
 ```
