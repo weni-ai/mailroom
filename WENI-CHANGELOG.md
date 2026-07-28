@@ -1,3 +1,10 @@
+1.94.1
+----------
+
+* feat: implementing contact history send for generic ticketer, include default payload and optional template for request/response
+
+* doc: add doc for generic ticketer integrations
+
 1.94.0
 ----------
 * feat: add optional request/response templates to generic ticketer (open, forward, close and inbound messages/tickets/close)
