@@ -157,7 +157,7 @@ func (s *service) buildHistoryContact(ctx context.Context, ticket *models.Ticket
 		}
 	}
 	if urn == "" {
-		return Contact{}, errors.New("cannot send history: contact has no URN on loaded messages")
+		return Contact{}, fmt.Errorf("cannot send history: contact %d has no URN on %d loaded messages", contactID, len(msgs))
 	}
 
 	return Contact{
