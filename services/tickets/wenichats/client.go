@@ -272,6 +272,9 @@ type MessageResponse struct {
 	Seen      bool         `json:"seen"`
 	Media     []Attachment `json:"media"`
 	CreatedOn string       `json:"created_on"`
+	ReplyTo   *struct {
+		ExternalID string `json:"external_id"`
+	} `json:"reply_to,omitempty"`
 }
 
 type Attachment struct {
