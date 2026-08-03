@@ -116,6 +116,12 @@ func TestGetOrCreateContactField(t *testing.T) {
 		err = models.GetOrCreateContactField(ctx, db, orgID, "whatsapp_username", "WhatsApp username")
 		require.NoError(t, err)
 
+		err = models.GetOrCreateContactField(ctx, db, orgID, "instagram_username", "Instagram username")
+		require.NoError(t, err)
+
+		err = models.GetOrCreateContactField(ctx, db, orgID, "ctwa_clid", "CTWA CLID")
+		require.NoError(t, err)
+
 		testsuite.AssertQuery(t, db,
 			`SELECT count(*) FROM contacts_contactfield WHERE org_id = $1 AND key = 'orderform' AND is_active = TRUE`,
 			orgID,
@@ -146,5 +152,7 @@ func TestGetOrCreateContactField(t *testing.T) {
 		assert.NotNil(t, oa.FieldByKey("vtex_account"))
 		assert.NotNil(t, oa.FieldByKey("marketing_opt_in"))
 		assert.NotNil(t, oa.FieldByKey("whatsapp_username"))
+		assert.NotNil(t, oa.FieldByKey("instagram_username"))
+		assert.NotNil(t, oa.FieldByKey("ctwa_clid"))
 	})
 }
