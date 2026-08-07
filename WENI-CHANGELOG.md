@@ -1,3 +1,7 @@
+1.95.0
+----------
+* feat: add whatsapp_username, instagram_username and ctwa_clid field with auto-creation and validation in tests
+
 1.94.1
 ----------
 
