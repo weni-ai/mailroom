@@ -781,6 +781,9 @@ var autoCreateFieldKeys = map[string]string{
 	"session":          "Session",
 	"vtex_account":     "Vtex account",
 	"marketing_opt_in": "Marketing opt-in",
+	"whatsapp_username": "WhatsApp username",
+	"instagram_username": "Instagram username",
+	"ctwa_clid":          "CTWA CLID",
 }
 
 // applyContactFieldModifiers creates and applies field modifiers from the event's new contact fields.

@@ -95,4 +95,6 @@ go 1.23
 
 replace github.com/nyaruka/gocommon => github.com/weni-ai/gocommon v1.17.0
 
-replace github.com/nyaruka/goflow => github.com/weni-ai/goflow v1.20.3
+// goflow with whatsapp_bsuid (commit on feat/whatsapp-bsuid-query).
+// After goflow is merged and tagged, prefer: github.com/weni-ai/goflow v1.20.4
+replace github.com/nyaruka/goflow => github.com/weni-ai/goflow v1.20.4-0.20260812001703-494a6ebf536a
