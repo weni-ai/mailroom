@@ -1,3 +1,7 @@
+1.96.0
+----------
+* feat: depend on goflow whatsapp_bsuid and whatsapp_phone contact query attributes (goflow v1.20.4)
+
 1.95.0
 ----------
 * feat: add whatsapp_username, instagram_username and ctwa_clid field with auto-creation and validation in tests
