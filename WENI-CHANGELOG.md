@@ -1,3 +1,7 @@
+1.96.0
+----------
+* feat: depend on goflow whatsapp_bsuid contact query attribute (goflow v1.20.4-staging)
+
 1.94.1
 ----------
 
