@@ -6,213 +6,35 @@ on:
       - '*.*.*-develop'
       - '*.*.*-staging'
       - '*.*.*'
-
 jobs:
   docker:
     runs-on: ubuntu-latest
-    strategy:
-      fail-fast: false
-      matrix:
-        platform:
-          - linux/amd64
-          - linux/arm64
+    outputs:
+      repository_name: ${{ steps.setup.outputs.repository_name }}
     steps:
-      - name: Check out the repo
-        uses: actions/checkout@v4
-        if: github.event_name != 'pull_request'
-        with:
-          ref: "${{env.GITHUB_SHA}}"
-          token: ${{ secrets.DEVOPS_GITHUB_PERMANENT_TOKEN }}
-
-      - name: Set variables
+      - name: Setup outputs
+        id: setup
         run: |
-            TAG="$( echo "${GITHUB_REF}" | cut -d'/' -f3 )"
-            if grep -qs -e '^.*.*-develop' <<< "${TAG}" ; then
-              echo "Found environment: DEVELOP - ${TAG}"
-              echo "MANIFESTS_ENVIRONMENT=develop" | tee -a "${GITHUB_ENV}"
-            elif grep -qs -e '^.*.*-staging' <<< "${TAG}" ; then
-              echo "Found environment: STAGING - ${TAG}"
-              echo "MANIFESTS_ENVIRONMENT=staging" | tee -a "${GITHUB_ENV}"
-            elif grep -qs -e '^.*.*' <<< "${TAG}" ; then
-              echo "No environment found, assuming: PRODUCTION - ${TAG}"
-              echo "MANIFESTS_ENVIRONMENT=production" | tee -a "${GITHUB_ENV}"
-            else
-              echo 'Not a valid tag. Skipping...'
-              exit 1
-            fi
-            echo "TAG=$TAG" | tee -a "${GITHUB_ENV}"
-            VERSION="${TAG}"
-            echo "VERSION=${VERSION}" | tee -a "${GITHUB_ENV}"
-            echo "COMMIT_SHA=$GITHUB_SHA" | tee -a "${GITHUB_ENV}"
-            echo "IMAGE_TAG=${{ secrets.ECR_SHARED }}/mailroom:${TAG}" | tee -a "${GITHUB_ENV}"
-            echo "IMAGE_SOURCE_URL=https://github.com/weni-ai/mailroom" | tee -a "${GITHUB_ENV}"
-            echo "MANIFESTS_REPOSITORY=weni-ai/kubernetes-manifests-platform" | tee -a "${GITHUB_ENV}"
-            echo "MANIFESTS_APPLICATION=weni-flows/mailroom" | tee -a "${GITHUB_ENV}"
-            echo "MANIFESTS_PATCH_TARGET=deployment.json" | tee -a "${GITHUB_ENV}"
-            platform=${{ matrix.platform }}
-            echo "PLATFORM_PAIR=${platform//\//-}" | tee -a "${GITHUB_ENV}"
+          export GITHUB_REPOSITORY_NAME="${GITHUB_REPOSITORY#$GITHUB_REPOSITORY_OWNER/}"
+          {
+            echo "repository_name=${GITHUB_REPOSITORY_NAME}"
+          } | tee -a "${GITHUB_OUTPUT}"
 
-      - name: Check out the repo
-        uses: actions/checkout@v3
-        with:
-          ref: "${{env.GITHUB_SHA}}"
+          {
+            echo "### Workflow Outputs"
+            echo "| Variable          | Description     |"
+            echo "| ----------------- | --------------- |"
+            echo "| repository_name   | Repository name |"
+          } | tee -a "${GITHUB_STEP_SUMMARY}"
 
-      - name: Set up QEMU
-        uses: docker/setup-qemu-action@v3
-
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
-
-      - name: Login to Registry
-        uses: docker/login-action@v3
-        with:
-          registry: ${{ secrets.ECR_SHARED }}
-          username: ${{ secrets.AWS_ACCESS_KEY_ID_SHARED }}      
-          password: ${{ secrets.AWS_SECRET_ACCESS_KEY_SHARED }}
-
-      - name: Build and push - Mailroom Image
-        id: build
-        uses: docker/build-push-action@v6
-        with:
-          context: .
-          labels: |
-            tag=${{env.TAG}}
-            commit=${{env.COMMIT_SHA}}
-            repository=${{env.IMAGE_SOURCE_URL}}
-          file: docker/Dockerfile
-          platforms: ${{ matrix.platform }}
-          # push: true
-          # tags: "${{env.IMAGE_TAG}}"
-          # no-cache: true
-          outputs: type=image,name=${{ secrets.ECR_SHARED }}/mailroom,push-by-digest=true,name-canonical=true,push=true
-
-      - name: Export digest
-        run: |
-          mkdir -p /tmp/digests
-          digest="${{ steps.build.outputs.digest }}"
-          touch "/tmp/digests/${digest#sha256:}"          
-        
-      - name: Upload digest
-        uses: actions/upload-artifact@v4
-        with:
-          name: digests-${{ env.PLATFORM_PAIR }}
-          path: /tmp/digests/*
-          if-no-files-found: error
-          retention-days: 1
-
-  merge:
-    runs-on: ubuntu-latest
+  call-workflow:
+    uses: weni-ai/actions-workflows/.github/workflows/reusable-workflow.yaml@main
     needs:
       - docker
-    steps:
-      - name: Set variables
-        run: |
-            TAG="$( echo "${GITHUB_REF}" | cut -d'/' -f3 )"
-            if grep -qs -e '^.*.*-develop' <<< "${TAG}" ; then
-              echo "Found environment: DEVELOP - ${TAG}"
-              echo "MANIFESTS_ENVIRONMENT=develop" | tee -a "${GITHUB_ENV}"
-            elif grep -qs -e '^.*.*-staging' <<< "${TAG}" ; then
-              echo "Found environment: STAGING - ${TAG}"
-              echo "MANIFESTS_ENVIRONMENT=staging" | tee -a "${GITHUB_ENV}"
-            elif grep -qs -e '^.*.*' <<< "${TAG}" ; then
-              echo "No environment found, assuming: PRODUCTION - ${TAG}"
-              echo "MANIFESTS_ENVIRONMENT=production" | tee -a "${GITHUB_ENV}"
-            else
-              echo 'Not a valid tag. Skipping...'
-              exit 1
-            fi
-            echo "TAG=$TAG" | tee -a "${GITHUB_ENV}"
-            VERSION="${TAG}"
-            echo "VERSION=${VERSION}" | tee -a "${GITHUB_ENV}"
-            echo "COMMIT_SHA=$GITHUB_SHA" | tee -a "${GITHUB_ENV}"
-            echo "IMAGE_TAG=${{ secrets.ECR_SHARED }}/mailroom:$TAG" | tee -a "${GITHUB_ENV}"
-            echo "MANIFESTS_REPOSITORY=weni-ai/kubernetes-manifests-platform" | tee -a "${GITHUB_ENV}"
-            echo "MANIFESTS_APPLICATION=weni-flows/mailroom" | tee -a "${GITHUB_ENV}"
-            echo "MANIFESTS_PATCH_TARGET=deployment.json" | tee -a "${GITHUB_ENV}"
-      - name: Download digests
-        uses: actions/download-artifact@v4
-        with:
-          path: /tmp/digests
-          pattern: digests-*
-          merge-multiple: true
-  
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
-  
-      - name: Login to ECR
-        uses: docker/login-action@v3
-        if: github.event_name != 'pull_request'
-        with:
-          registry: ${{ secrets.ECR_SHARED }}
-          username: ${{ secrets.AWS_ACCESS_KEY_ID_SHARED }}
-          password: ${{ secrets.AWS_SECRET_ACCESS_KEY_SHARED }}
-
-      - name: Create manifest list and push
-        working-directory: /tmp/digests
-        run: |
-          docker buildx imagetools create -t "${{ env.IMAGE_TAG }}" \
-            $(printf '${{ secrets.ECR_SHARED }}/mailroom@sha256:%s ' *)        
-
-      - name: Check out Kubernetes Manifests
-        uses: actions/checkout@master
-        with:
-          ref: main
-          repository: "${{ env.MANIFESTS_REPOSITORY }}"
-          token: "${{ secrets.DEVOPS_GITHUB_PERMANENT_TOKEN }}"
-          path: ./kubernetes-manifests/
-
-      - name: Update image on deployment
-        run: |
-            which jq > /dev/null 2>&1 || ( sudo apt update ; sudo apt install -y jq )
-            # Dep: coreutils
-            verlte() {
-              [ "$1" = "`echo -e "$1\n$2" | sort -V | head -n1`" ]
-            }
-            verlt(){
-              [ "$1" = "$2" ] && return 1 || verlte $1 $2
-            }
-            export PROJECT_DIR="${{ env.MANIFESTS_APPLICATION }}"
-            ENV_DIR="kubernetes-manifests/${{ env.MANIFESTS_APPLICATION }}/${MANIFESTS_ENVIRONMENT}"
-            for e in ${ENV_DIR}; do
-              echo "Update ${e}:"
-              if [ ! -d "${e}" ] ; then
-                echo "${e}: Does not exist, skipping"
-              elif [ ! -r "${e}/kustomization.yaml" ] ; then
-                echo "${e}/kustomization.yaml: Does not readable, skipping"
-              elif [ ! -r "${e}/${{ env.MANIFESTS_PATCH_TARGET }}" ] ; then
-                echo "${e}/${{ env.MANIFESTS_PATCH_TARGET }}: Does not readable, skipping"
-              else
-                OLD_IMAGE=$(
-                  cat "${e}/${{ env.MANIFESTS_PATCH_TARGET }}" \
-                    | jq '.[] | select(.path == "/spec/template/spec/containers/0/image") | .value'
-                )
-                echo "Old image to replace: ${OLD_IMAGE}"
-                OLD_VERSION=$(
-                  echo "${OLD_IMAGE}" \
-                    | sed s'/^.*[v:]\([0-9]*\.[0-9]*\.[0-9]*\).*$/\1/'g \
-                    | head -n1
-                )
-                echo "Old image version to compare: ${OLD_VERSION}<=${{env.VERSION}}"
-                if verlte "${OLD_VERSION}" "${VERSION}" || [[ ! "${OLD_VERSION}" =~ [0-9]+\.[0-9]+\.[0-9]+ ]] ; then
-                  echo 'New configurations:'
-                  new_configuration=$(
-                    cat "${e}/${{ env.MANIFESTS_PATCH_TARGET }}" \
-                      | jq '(..|select(.path == "/spec/template/spec/containers/0/image")?) += {value: "'"${{env.IMAGE_TAG}}"'"}'
-                  )
-                  echo "${new_configuration}"
-                  echo "${new_configuration}" > "${e}/${{ env.MANIFESTS_PATCH_TARGET }}"
-                else
-                  echo "Version in file is greater than build, skipping update yaml"
-                fi
-              fi
-            done
-
-      - name: Commit & Push changes
-        uses: actions-js/push@master
-        with:
-          github_token: "${{ secrets.DEVOPS_GITHUB_PERMANENT_TOKEN }}"
-          repository: "${{ env.MANIFESTS_REPOSITORY }}"
-          directory: ./kubernetes-manifests/
-          branch: main
-          message: "From Mailroom Build (Push Tag ${{ env.MANIFESTS_ENVIRONMENT }})"
-          
+    with:
+      image_repository: mailroom
+      dockerfile: "docker/Dockerfile"
+      target_repository: weni-ai/kubernetes-manifests-platform
+      target_application: weni-flows/mailroom
+      target_patch_file: deployment.json
+    secrets: inherit
