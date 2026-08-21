@@ -301,12 +301,18 @@ func handleTicketerWebhook(ctx context.Context, rt *runtime.Runtime, r *http.Req
 		switch strings.ToLower(request.Status) {
 		case statusSolved, statusClosed, "resuelto", "cerrado", "resolvido":
 			err = tickets.Close(ctx, rt, oa, ticket, false, l, string(requestJSON))
-			if err == nil && hasClosedByMergeTag(request.Tags) {
-				logrus.WithField("ticket_uuid", ticket.UUID()).
+
+			if err == nil {
+				entry := logrus.WithField("ticket_uuid", ticket.UUID()).
 					WithField("external_id", ticket.ExternalID()).
-					WithField("ticketer", ticketer.UUID()).
-					Info("zendesk ticket closed by merge")
+					WithField("ticketer", ticketer.UUID())
+				if hasClosedByMergeTag(request.Tags) {
+					entry.Info("zendesk ticket closed by merge")
+				} else {
+					entry.Info("zendesk ticket closed")
+				}
 			}
+
 		case statusOpen, "abierto", "aberto":
 			err = tickets.Reopen(ctx, rt, oa, ticket, false, l)
 		}
