@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"fmt"
 	"io"
 	"net/http"
 	"strings"
@@ -130,8 +131,10 @@ func prepareAttachmentFile(m Attachment) (*tickets.File, error) {
 	if err != nil {
 		return nil, errors.Wrapf(err, "error reading ticket file '%s'", m.URL)
 	}
+
 	if bodyReader.(*io.LimitedReader).N <= 0 {
-		return nil, errors.Wrapf(err, "unable to send media type %s because response body exceeds %d bytes limit", file.ContentType, maxBodyBytes)
+		return nil, fmt.Errorf("unable to send media type %s because response body exceeds %d bytes limit", file.ContentType, maxBodyBytes)
+
 	}
 	file.Body = io.NopCloser(bytes.NewReader(bodyBytes))
 	return file, nil
