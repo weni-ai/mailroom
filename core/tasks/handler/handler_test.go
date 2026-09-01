@@ -3,6 +3,9 @@ package handler_test
 import (
 	"encoding/json"
 	"fmt"
+	"io"
+	"net/http"
+	"net/http/httptest"
 	"testing"
 	"time"
 
@@ -318,6 +321,101 @@ func TestBrainOnMsgEventCalculatesDynamicGroups(t *testing.T) {
 	// dynamic group should have been (re)calculated for this contact
 	testsuite.AssertQuery(t, db, `SELECT count(*) FROM contacts_contactgroup_contacts WHERE contactgroup_id = $1 AND contact_id = $2`, group.ID, contact.ID).
 		Returns(1)
+}
+
+// TestBrainOnIGCommentRoutesToRouter verifies Instagram feed comments with ig_comment metadata
+// are routed to Nexus like normal inbound DMs when BrainOn is active. Before the brain-routing
+// fix, these messages fell through to handleAsInbox and never reached the router.
+// Deploy with or after Courier forward_comments gate (002-instagram-feed-comments-v1.1).
+func TestBrainOnIGCommentRoutesToRouter(t *testing.T) {
+	ctx, rt, db, rp := testsuite.Get()
+	rc := rp.Get()
+	defer rc.Close()
+
+	defer testsuite.Reset(testsuite.ResetAll)
+
+	projectUUID := uuids.New()
+
+	db.MustExec(`CREATE TABLE IF NOT EXISTS internal_project (
+		id SERIAL PRIMARY KEY,
+		project_uuid UUID NOT NULL,
+		org_ptr_id INTEGER NOT NULL
+	)`)
+	db.MustExec(`INSERT INTO internal_project (project_uuid, org_ptr_id) VALUES ($1, $2)`, projectUUID, testdata.Org1.ID)
+
+	db.MustExec(`UPDATE orgs_org SET brain_on = TRUE WHERE id = $1`, testdata.Org1.ID)
+
+	channel := testdata.InsertChannel(db, testdata.Org1, "IG", "Instagram Brain", []string{"instagram"}, "SR", map[string]interface{}{})
+
+	contact := testdata.InsertContact(db, testdata.Org1, flows.ContactUUID(uuids.New()), "IG Comment Contact", envs.Language(`eng`))
+	urn := urns.URN("instagram:5678")
+	urnID := testdata.InsertContactURN(db, testdata.Org1, contact, urn, 1000)
+
+	models.FlushCache()
+
+	dbMsg := testdata.InsertIncomingMsg(db, testdata.Org1, channel, contact, "Hello World", models.MsgStatusPending)
+
+	commentMetadata := json.RawMessage(`{"ig_comment": {"id": "30065218", "text": "Hello World", "from": {"id": "5678", "username": "username"}}}`)
+
+	reqCh := make(chan []byte, 1)
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		body, _ := io.ReadAll(r.Body)
+		reqCh <- body
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer server.Close()
+
+	rt.Config.RouterBaseURL = server.URL
+	rt.Config.RouterAuthToken = "router-token"
+
+	event := &handler.MsgEvent{
+		ContactID: contact.ID,
+		OrgID:     testdata.Org1.ID,
+		ChannelID: channel.ID,
+		MsgID:     dbMsg.ID(),
+		MsgUUID:   dbMsg.UUID(),
+		URN:       urn,
+		URNID:     urnID,
+		Text:      "Hello World",
+		Metadata:  commentMetadata,
+	}
+
+	eventJSON, err := json.Marshal(event)
+	require.NoError(t, err)
+
+	task := &queue.Task{
+		Type:  handler.MsgEventType,
+		OrgID: int(testdata.Org1.ID),
+		Task:  eventJSON,
+	}
+
+	err = handler.QueueHandleTask(rc, contact.ID, task)
+	require.NoError(t, err, "error adding task")
+
+	task, err = queue.PopNextTask(rc, queue.HandlerQueue)
+	require.NoError(t, err, "error popping next task")
+
+	err = handler.HandleEvent(ctx, rt, task)
+	require.NoError(t, err, "error when handling event")
+
+	testsuite.AssertQuery(t, db, `SELECT msg_type, status FROM msgs_msg WHERE id = $1`, dbMsg.ID()).
+		Columns(map[string]interface{}{"msg_type": string(models.MsgTypeInbox), "status": "H"})
+
+	body := <-reqCh
+
+	var payload struct {
+		Metadata json.RawMessage `json:"metadata"`
+		Text     string          `json:"text"`
+	}
+	require.NoError(t, json.Unmarshal(body, &payload))
+	assert.Equal(t, "Hello World", payload.Text)
+	assert.JSONEq(t, string(commentMetadata), string(payload.Metadata))
+
+	var metadata map[string]interface{}
+	require.NoError(t, json.Unmarshal(payload.Metadata, &metadata))
+	igComment, ok := metadata["ig_comment"].(map[string]interface{})
+	require.True(t, ok)
+	assert.Equal(t, "30065218", igComment["id"])
 }
 
 func TestChannelEvents(t *testing.T) {

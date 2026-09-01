@@ -1021,3 +1021,43 @@ func TestWppBroadcastCarouselPreservesButtonProperties(t *testing.T) {
 	assert.NotNil(t, msgs[0])
 	assert.NotEmpty(t, msgs[0].UUID())
 }
+
+func TestWppBroadcastIGCommentMetadata(t *testing.T) {
+	ctx, rt, db, _ := testsuite.Get()
+	defer testsuite.Reset(testsuite.ResetData)
+
+	igChannel := testdata.InsertChannel(db, testdata.Org1, "IG", "Instagram", []string{"instagram"}, "SR", map[string]interface{}{"auth_token": "token"})
+	db.MustExec(`UPDATE channels_channel SET address = '12345' WHERE id = $1`, igChannel.ID)
+	testdata.InsertContactURN(db, testdata.Org1, testdata.Cathy, urns.URN("instagram:5678"), 1002)
+
+	oa, err := models.GetOrgAssets(ctx, rt, testdata.Org1.ID)
+	require.NoError(t, err)
+
+	msg := models.WppBroadcastMessage{
+		Text:           "Thanks for your comment!",
+		IGCommentID:    "30065218",
+		IGResponseType: "comment",
+	}
+
+	bcast := models.NewWppBroadcast(
+		oa.OrgID(),
+		models.NilBroadcastID,
+		msg,
+		[]urns.URN{urns.URN("instagram:5678")},
+		nil,
+		nil,
+		igChannel.ID,
+		"",
+	)
+
+	batch := bcast.CreateBatch([]models.ContactID{testdata.Cathy.ID})
+	batch.SetURNs(map[models.ContactID]urns.URN{testdata.Cathy.ID: urns.URN("instagram:5678")})
+
+	msgs, err := models.CreateWppBroadcastMessages(ctx, rt, oa, batch)
+	require.NoError(t, err)
+	require.Len(t, msgs, 1)
+
+	metadata := msgs[0].Metadata()
+	assert.Equal(t, "30065218", metadata["ig_comment_id"])
+	assert.Equal(t, "comment", metadata["ig_response_type"])
+}

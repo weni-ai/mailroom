@@ -1704,6 +1704,8 @@ type WppBroadcastMessage struct {
 	DirectSend             bool                      `json:"direct_send,omitempty"`
 	DirectSendTemplateName string                    `json:"direct_send_template_name,omitempty"`
 	TTLSeconds             int                       `json:"ttl_seconds,omitempty"`
+	IGCommentID            string                    `json:"ig_comment_id,omitempty"`
+	IGResponseType         string                    `json:"ig_response_type,omitempty"`
 }
 
 type WppBroadcast struct {
@@ -2078,6 +2080,15 @@ func CreateWppBroadcastMessages(ctx context.Context, rt *runtime.Runtime, oa *Or
 		}
 		if carousel {
 			extraMetadata["product_carousel"] = carousel
+		}
+		if igCommentID := bcast.Msg().IGCommentID; igCommentID != "" {
+			igCommentID, _ = excellent.EvaluateTemplate(oa.Env(), evaluationCtx, igCommentID, nil)
+			if igCommentID != "" {
+				extraMetadata["ig_comment_id"] = igCommentID
+			}
+		}
+		if igResponseType := bcast.Msg().IGResponseType; igResponseType != "" {
+			extraMetadata["ig_response_type"] = igResponseType
 		}
 
 		msg, err := NewOutgoingWppBroadcastMsg(rt, oa.Org(), channel, c, out, time.Now(), bcast.BroadcastID(), highPriority, extraMetadata)
