@@ -1,3 +1,7 @@
+1.96.2
+----------
+* feat: agent livedesk can reply contact msg on whatsapp with context msg
+
 1.96.1
 ----------
 * feat: log when a ticket as closed by merge on zendesk ticketers
