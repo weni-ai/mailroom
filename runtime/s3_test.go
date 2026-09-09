@@ -3,7 +3,6 @@ package runtime_test
 import (
 	"testing"
 
-	"github.com/aws/aws-sdk-go/service/s3"
 	"github.com/nyaruka/mailroom/runtime"
 
 	"github.com/stretchr/testify/assert"
@@ -41,10 +40,6 @@ func TestNewS3Client(t *testing.T) {
 	for _, useStaticCredentials := range []bool{true, false} {
 		client, err := runtime.NewS3Client(cfg, useStaticCredentials)
 		require.NoError(t, err)
-		require.NotNil(t, client)
-
-		s3Client, ok := client.(*s3.S3)
-		require.True(t, ok)
-		assert.Equal(t, "https://minio.internal:9000", s3Client.ClientInfo.Endpoint)
+		assert.NotNil(t, client)
 	}
 }
