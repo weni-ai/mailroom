@@ -1,10 +1,12 @@
 package runtime
 
 import (
+	"context"
 	"os"
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/credentials"
+	"github.com/aws/aws-sdk-go/aws/request"
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/s3"
 	"github.com/nyaruka/gocommon/storage"
@@ -57,9 +59,36 @@ func NewS3Client(cfg *Config, useStaticCredentials bool) (storage.S3Client, erro
 		return nil, err
 	}
 
-	return s3.New(awsSession, &aws.Config{
+	return withoutACL(s3.New(awsSession, &aws.Config{
 		Endpoint:         aws.String(cfg.S3Endpoint),
 		DisableSSL:       aws.Bool(cfg.S3DisableSSL),
 		S3ForcePathStyle: aws.Bool(cfg.S3ForcePathStyle),
-	}), nil
+	})), nil
+}
+
+// noACLS3Client strips canned ACLs from PutObject. Modern buckets with
+// ObjectOwnership BucketOwnerEnforced reject ACL headers with AccessControlListNotSupported.
+type noACLS3Client struct {
+	inner storage.S3Client
+}
+
+func withoutACL(inner storage.S3Client) storage.S3Client {
+	return &noACLS3Client{inner: inner}
+}
+
+func (c *noACLS3Client) HeadBucketWithContext(ctx context.Context, input *s3.HeadBucketInput, opts ...request.Option) (*s3.HeadBucketOutput, error) {
+	return c.inner.HeadBucketWithContext(ctx, input, opts...)
+}
+
+func (c *noACLS3Client) GetObjectWithContext(ctx context.Context, input *s3.GetObjectInput, opts ...request.Option) (*s3.GetObjectOutput, error) {
+	return c.inner.GetObjectWithContext(ctx, input, opts...)
+}
+
+func (c *noACLS3Client) PutObjectWithContext(ctx context.Context, input *s3.PutObjectInput, opts ...request.Option) (*s3.PutObjectOutput, error) {
+	if input != nil && input.ACL != nil {
+		copied := *input
+		copied.ACL = nil
+		input = &copied
+	}
+	return c.inner.PutObjectWithContext(ctx, input, opts...)
 }
