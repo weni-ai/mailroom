@@ -1,3 +1,7 @@
+1.100.0
+----------
+ * feat: named WhatsApp template variables — load parameter format/names, evaluate batch named values, substitute named placeholders (depends on local goflow)
+
 1.99.0
 ----------
 * feat: Add forward_comments configuration and update Instagram comment routing logic
