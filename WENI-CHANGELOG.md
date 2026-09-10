@@ -1,3 +1,7 @@
+1.97.0
+----------
+ * feat: named WhatsApp template variables — load parameter format/names, evaluate batch named values, substitute named placeholders (depends on local goflow)
+
 1.96.2
 ----------
 * feat: agent livedesk can reply contact msg on whatsapp with context msg
