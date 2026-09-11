@@ -104,12 +104,14 @@ func handleEventCallback(ctx context.Context, rt *runtime.Runtime, r *http.Reque
 				bodyReader := io.LimitReader(file.Body, int64(maxBodyBytes)+1)
 				bodyBytes, err := io.ReadAll(bodyReader)
 				if err != nil {
+
 					logrus.Errorf("error reading body: %v", err)
 					return err, http.StatusBadRequest, nil
 				}
 				if bodyReader.(*io.LimitedReader).N <= 0 {
 					logrus.Errorf("unable to send media type %s because response body exceeds %d bytes limit", file.ContentType, maxBodyBytes)
-					return errors.Wrapf(err, "unable to send media type %s because response body exceeds %d bytes limit", file.ContentType, maxBodyBytes), http.StatusBadRequest, nil
+					return errors.Errorf("unable to send media type %s because response body exceeds %d bytes limit", file.ContentType, maxBodyBytes), http.StatusBadRequest, nil
+
 				}
 				file.Body = io.NopCloser(bytes.NewReader(bodyBytes))
 				_, err = tickets.SendReply(ctx, rt, ticket, "", []*tickets.File{file}, extraMetadata)
