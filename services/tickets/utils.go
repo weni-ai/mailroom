@@ -6,7 +6,6 @@ import (
 	"io"
 	"mime"
 	"net/http"
-	"path/filepath"
 	"time"
 
 	"github.com/nyaruka/gocommon/httpx"
@@ -21,6 +20,7 @@ import (
 	"github.com/nyaruka/mailroom/core/queue"
 	"github.com/nyaruka/mailroom/core/tasks/handler"
 	"github.com/nyaruka/mailroom/runtime"
+	"github.com/nyaruka/mailroom/utils/urlx"
 
 	"github.com/pkg/errors"
 )
@@ -90,7 +90,7 @@ func SendReply(ctx context.Context, rt *runtime.Runtime, ticket *models.Ticket, 
 	// upload files to create message attachments
 	attachments := make([]utils.Attachment, len(files))
 	for i, file := range files {
-		filename := string(uuids.New()) + filepath.Ext(file.URL)
+		filename := string(uuids.New()) + urlx.Ext(file.URL)
 
 		attachments[i], err = oa.Org().StoreAttachment(ctx, rt, filename, file.ContentType, file.Body)
 		if err != nil {
