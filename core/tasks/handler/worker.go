@@ -648,6 +648,8 @@ func handleMsgEvent(ctx context.Context, rt *runtime.Runtime, event *MsgEvent) e
 
 	// if there is a session, resume it
 	if session != nil && flow != nil {
+		fmt.Printf("[wa handover] brain routing skipped: contact_id=%d channel_id=%d msg_id=%d reason=active_session flow_id=%d\n",
+			event.ContactID, event.ChannelID, event.MsgID, session.CurrentFlowID())
 		resume := resumes.NewMsg(oa.Env(), contact, msgIn)
 		_, err = runner.ResumeFlow(ctx, rt, oa, session, resume, flowMsgHook)
 		if err != nil {
@@ -660,6 +662,9 @@ func handleMsgEvent(ctx context.Context, rt *runtime.Runtime, event *MsgEvent) e
 		if err := handleBrainRouting(ctx, rt, oa, contact, event, channel, topupID); err != nil {
 			return err
 		}
+	} else if isBrain {
+		fmt.Printf("[wa handover] brain routing skipped: contact_id=%d channel_id=%d msg_id=%d open_tickets=%d\n",
+			event.ContactID, event.ChannelID, event.MsgID, len(tickets))
 	}
 
 	// this message didn't trigger and new sessions or resume any existing ones, so handle as inbox
@@ -691,6 +696,9 @@ func handleBrainRouting(
 	if err == sql.ErrNoRows {
 		return fmt.Errorf("no project uuid found")
 	}
+
+	fmt.Printf("[wa handover] brain routing: contact_id=%d channel_id=%d msg_id=%d urn=%s original_text=%q\n",
+		event.ContactID, event.ChannelID, event.MsgID, event.URN.Identity(), event.Text)
 
 	routerText, err := consumeHandoverContext(ctx, rt.DB, event)
 	if err != nil {
@@ -1125,20 +1133,31 @@ func consumeHandoverContext(ctx context.Context, db models.QueryerWithTx, event 
 		return event.Text, err
 	}
 	if pending == nil || pending.ContextText == "" {
+		fmt.Printf("[wa handover] no pending context: contact_id=%d channel_id=%d msg_id=%d\n",
+			event.ContactID, event.ChannelID, event.MsgID)
 		return event.Text, nil
 	}
+
+	fmt.Printf("[wa handover] pending found: handover_id=%d contact_id=%d channel_id=%d msg_id=%d context_text=%q\n",
+		pending.ID, event.ContactID, event.ChannelID, event.MsgID, pending.ContextText)
 
 	consumed, err := models.ConsumePendingWAConversationHandover(ctx, tx, pending.ID, event.MsgID)
 	if err != nil {
 		return event.Text, err
 	}
 	if !consumed {
+		fmt.Printf("[wa handover] consume race lost: handover_id=%d contact_id=%d channel_id=%d msg_id=%d\n",
+			pending.ID, event.ContactID, event.ChannelID, event.MsgID)
 		return event.Text, nil
 	}
 	if err := tx.Commit(); err != nil {
 		return event.Text, errors.Wrapf(err, "error committing wa conversation handover consume")
 	}
-	return formatRouterTextWithHandover(event.Text, pending.ContextText), nil
+
+	routerText := formatRouterTextWithHandover(event.Text, pending.ContextText)
+	fmt.Printf("[wa handover] consumed: handover_id=%d contact_id=%d channel_id=%d msg_id=%d router_text=%q\n",
+		pending.ID, event.ContactID, event.ChannelID, event.MsgID, routerText)
+	return routerText, nil
 }
 
 // formatRouterTextWithHandover builds the brain POST text. Empty inbound text
@@ -1193,6 +1212,9 @@ func requestToRouter(event *MsgEvent, rtConfig *runtime.Config, contact *flows.C
 		return err
 	}
 	b = bytes.NewReader(data)
+
+	fmt.Printf("[wa handover] router POST: urn=%s msg_id=%d text=%q metadata=%s\n",
+		event.URN.Identity(), event.MsgID, routerText, string(event.Metadata))
 
 	params := url.Values{}
 	params.Add("token", rtConfig.RouterAuthToken)
