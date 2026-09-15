@@ -115,7 +115,7 @@
     },
     "db_assertions": [
       {
-        "query": "select count(*) from msgs_msg where direction = 'O' and text = 'quoted reply' and metadata ilike '%ca84ab60-8b18-4054-8a97-22edc5fb1d2f%' and metadata not ilike '%response_to_external_id%'",
+        "query": "select count(*) from msgs_msg where direction = 'O' and text = 'quoted reply' and metadata ilike '%ca84ab60-8b18-4054-8a97-22edc5fb1d2f%' and metadata ilike '%response_to_external_id%'",
         "count": 1
       },
       {
