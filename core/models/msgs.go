@@ -435,15 +435,10 @@ func newOutgoingMsg(rt *runtime.Runtime, org *Org, channel *Channel, contactID C
 		if session.IncomingMsgID() != NilMsgID {
 			m.HighPriority = true
 		}
-	} else if replyToID, ok := extraMetadata["response_to_external_id"].(string); ok && replyToID != "" {
-		// ticket replies (no session) can cite a previous message via extraMetadata
-		m.ResponseToExternalID = null.String(replyToID)
 	}
 
-	// response_to_external_id is a top-level courier field, not channel metadata
-	if extraMetadata != nil {
-		delete(extraMetadata, "response_to_external_id")
-	}
+	// response_to_external_id in extraMetadata is kept in channel metadata so courier
+	// handlers (e.g. WAC contextual replies) can read it from msg.Metadata().
 
 	// if we have attachments, add them
 	if len(out.Attachments()) > 0 {
