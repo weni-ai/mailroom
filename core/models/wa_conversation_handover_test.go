@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/nyaruka/gocommon/urns"
+	"github.com/nyaruka/gocommon/uuids"
 	"github.com/nyaruka/goflow/envs"
 	"github.com/nyaruka/goflow/flows"
 	"github.com/nyaruka/mailroom/core/models"
@@ -18,7 +19,7 @@ func TestLookupAndConsumeWAConversationHandover(t *testing.T) {
 	defer testsuite.Reset(testsuite.ResetAll)
 
 	channel := testdata.InsertChannel(db, testdata.Org1, "WA", "Handover Channel", []string{"whatsapp"}, "SR", map[string]interface{}{})
-	contact := testdata.InsertContact(db, testdata.Org1, flows.ContactUUID(testdata.Cathy.UUID), "Handover Contact", envs.Language("eng"))
+	contact := testdata.InsertContact(db, testdata.Org1, flows.ContactUUID(uuids.New()), "Handover Contact", envs.Language("eng"))
 	urn := urns.URN("whatsapp:250700000077")
 	testdata.InsertContactURN(db, testdata.Org1, contact, urn, 1000)
 	contact.URN = urn
