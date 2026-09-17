@@ -1,3 +1,7 @@
+1.97.0
+----------
+* feat: implement WhatsApp conversation handover functionality with database operations and tests
+
 1.96.2
 ----------
 * feat: agent livedesk can reply contact msg on whatsapp with context msg
