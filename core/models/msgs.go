@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"slices"
+	"sort"
 	"strings"
 	"time"
 
@@ -1695,14 +1696,16 @@ func resolveNamedTemplateValues(oa *OrgAssets, evaluationCtx *types.XObject, urn
 	if len(names) == 0 {
 		seen := map[string]bool{}
 		for name := range recipientVals {
-			names = append(names, name)
 			seen[name] = true
 		}
 		for name := range tmpl.NamedVariables {
-			if !seen[name] {
-				names = append(names, name)
-			}
+			seen[name] = true
 		}
+		names = make([]string, 0, len(seen))
+		for name := range seen {
+			names = append(names, name)
+		}
+		sort.Strings(names)
 	}
 
 	resolved := make(map[string]string, len(names))
