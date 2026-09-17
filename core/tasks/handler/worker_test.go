@@ -23,32 +23,6 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func ensureWAConversationHandoverTable(t *testing.T, db *sqlx.DB) {
-	t.Helper()
-	db.MustExec(`
-		CREATE TABLE IF NOT EXISTS wa_conversation_handover (
-			id BIGSERIAL PRIMARY KEY,
-			org_id INTEGER NOT NULL REFERENCES orgs_org(id),
-			channel_id INTEGER NOT NULL REFERENCES channels_channel(id),
-			contact_id INTEGER NOT NULL REFERENCES contacts_contact(id),
-			contact_urn VARCHAR(255) NOT NULL,
-			context_type VARCHAR(16) NOT NULL CHECK (context_type IN ('history', 'summary')),
-			context_text TEXT NOT NULL,
-			context_payload JSONB,
-			previous_owner_app_id VARCHAR(64),
-			previous_owner_app_role VARCHAR(64),
-			previous_owner_business_id VARCHAR(64),
-			handover_metadata VARCHAR(255),
-			occurred_on TIMESTAMP WITH TIME ZONE NOT NULL,
-			created_on TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
-			consumed_on TIMESTAMP WITH TIME ZONE,
-			consumed_msg_id BIGINT
-		)`)
-	db.MustExec(`
-		CREATE UNIQUE INDEX IF NOT EXISTS uq_wa_conv_handover_pending
-		ON wa_conversation_handover (channel_id, contact_id) WHERE consumed_on IS NULL`)
-}
-
 func insertPendingHandover(t *testing.T, db *sqlx.DB, org *testdata.Org, channel *testdata.Channel, contact *testdata.Contact, contextType, contextText string) int64 {
 	t.Helper()
 	db.MustExec(`DELETE FROM wa_conversation_handover WHERE channel_id = $1 AND contact_id = $2`, channel.ID, contact.ID)
@@ -86,8 +60,6 @@ func TestFormatRouterTextWithHandover(t *testing.T) {
 func TestConsumeHandoverContext(t *testing.T) {
 	ctx, rt, db, _ := testsuite.Get()
 	defer testsuite.Reset(testsuite.ResetAll)
-
-	ensureWAConversationHandoverTable(t, db)
 
 	channel := testdata.InsertChannel(db, testdata.Org1, "WA", "Handover WA", []string{"whatsapp"}, "SR", map[string]interface{}{})
 	contact := testdata.InsertContact(db, testdata.Org1, flows.ContactUUID(uuids.New()), "Handover WA Contact", envs.Language("eng"))
@@ -159,8 +131,6 @@ func TestBrainOnWithPendingHandover(t *testing.T) {
 	defer rc.Close()
 	defer testsuite.Reset(testsuite.ResetAll)
 
-	ensureWAConversationHandoverTable(t, db)
-
 	db.MustExec(`CREATE TABLE IF NOT EXISTS internal_project (
 		id SERIAL PRIMARY KEY,
 		project_uuid UUID NOT NULL,
@@ -230,8 +200,6 @@ func TestPendingHandoverNotConsumedWithOpenTicket(t *testing.T) {
 	defer rc.Close()
 	defer testsuite.Reset(testsuite.ResetAll)
 
-	ensureWAConversationHandoverTable(t, db)
-
 	db.MustExec(`CREATE TABLE IF NOT EXISTS internal_project (
 		id SERIAL PRIMARY KEY,
 		project_uuid UUID NOT NULL,
@@ -277,8 +245,6 @@ func TestPendingHandoverNotConsumedWithWaitingSession(t *testing.T) {
 	defer rc.Close()
 	defer testsuite.Reset(testsuite.ResetAll)
 
-	ensureWAConversationHandoverTable(t, db)
-
 	channel := testdata.InsertChannel(db, testdata.Org1, "WA", "Session Handover", []string{"whatsapp"}, "SR", map[string]interface{}{})
 	handoverID := insertPendingHandover(t, db, testdata.Org1, channel, testdata.Cathy, "summary", "should stay pending")
 
@@ -315,8 +281,6 @@ func TestBrainOnWithPendingHandoverMediaOnly(t *testing.T) {
 	rc := rp.Get()
 	defer rc.Close()
 	defer testsuite.Reset(testsuite.ResetAll)
-
-	ensureWAConversationHandoverTable(t, db)
 
 	db.MustExec(`CREATE TABLE IF NOT EXISTS internal_project (
 		id SERIAL PRIMARY KEY,

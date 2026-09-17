@@ -220,6 +220,36 @@ func TestOutgoingMsgs(t *testing.T) {
 	}
 }
 
+func TestOutgoingBroadcastMsgResponseToExternalID(t *testing.T) {
+	ctx, rt, _, _ := testsuite.Get()
+
+	oa, err := models.GetOrgAssets(ctx, rt, testdata.Org1.ID)
+	require.NoError(t, err)
+
+	channel := oa.ChannelByUUID(testdata.TwilioChannel.UUID)
+	urn := urns.URN(fmt.Sprintf("tel:+250700000001?id=%d", testdata.Cathy.URNID))
+	out := flows.NewMsgOut(urn, assets.NewChannelReference(testdata.TwilioChannel.UUID, "Twilio"), "quoted reply", nil, nil, nil, flows.NilMsgTopic, "", "", "")
+
+	extraMetadata := map[string]interface{}{
+		"chats_msg_uuid":          "ba84ab60-8b18-4054-8a97-22edc5fb1d2f",
+		"response_to_external_id": "wamid.HBgLMTY0NjcwNDM1OTUVAgASGBQzQTdCNTg5RjY1MEMyRjlGMjRGNgA=",
+	}
+
+	msg, err := models.NewOutgoingBroadcastMsg(rt, oa.Org(), channel, testdata.Cathy.ID, out, time.Date(2021, 11, 9, 14, 3, 30, 0, time.UTC), models.NilBroadcastID, extraMetadata)
+	require.NoError(t, err)
+
+	marshaled, err := json.Marshal(msg)
+	require.NoError(t, err)
+
+	var payload map[string]interface{}
+	require.NoError(t, json.Unmarshal(marshaled, &payload))
+
+	metadata, ok := payload["metadata"].(map[string]interface{})
+	require.True(t, ok)
+	assert.Equal(t, "ba84ab60-8b18-4054-8a97-22edc5fb1d2f", metadata["chats_msg_uuid"])
+	assert.Equal(t, "wamid.HBgLMTY0NjcwNDM1OTUVAgASGBQzQTdCNTg5RjY1MEMyRjlGMjRGNgA=", metadata["response_to_external_id"])
+}
+
 func TestMarshalMsg(t *testing.T) {
 	ctx, rt, db, _ := testsuite.Get()
 

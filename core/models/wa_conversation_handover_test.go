@@ -3,8 +3,8 @@ package models_test
 import (
 	"testing"
 
-	"github.com/jmoiron/sqlx"
 	"github.com/nyaruka/gocommon/urns"
+	"github.com/nyaruka/gocommon/uuids"
 	"github.com/nyaruka/goflow/envs"
 	"github.com/nyaruka/goflow/flows"
 	"github.com/nyaruka/mailroom/core/models"
@@ -14,40 +14,12 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func ensureWAConversationHandoverTable(t *testing.T, db *sqlx.DB) {
-	t.Helper()
-	db.MustExec(`
-		CREATE TABLE IF NOT EXISTS wa_conversation_handover (
-			id BIGSERIAL PRIMARY KEY,
-			org_id INTEGER NOT NULL REFERENCES orgs_org(id),
-			channel_id INTEGER NOT NULL REFERENCES channels_channel(id),
-			contact_id INTEGER NOT NULL REFERENCES contacts_contact(id),
-			contact_urn VARCHAR(255) NOT NULL,
-			context_type VARCHAR(16) NOT NULL CHECK (context_type IN ('history', 'summary')),
-			context_text TEXT NOT NULL,
-			context_payload JSONB,
-			previous_owner_app_id VARCHAR(64),
-			previous_owner_app_role VARCHAR(64),
-			previous_owner_business_id VARCHAR(64),
-			handover_metadata VARCHAR(255),
-			occurred_on TIMESTAMP WITH TIME ZONE NOT NULL,
-			created_on TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
-			consumed_on TIMESTAMP WITH TIME ZONE,
-			consumed_msg_id BIGINT
-		)`)
-	db.MustExec(`
-		CREATE UNIQUE INDEX IF NOT EXISTS uq_wa_conv_handover_pending
-		ON wa_conversation_handover (channel_id, contact_id) WHERE consumed_on IS NULL`)
-}
-
 func TestLookupAndConsumeWAConversationHandover(t *testing.T) {
 	ctx, _, db, _ := testsuite.Get()
 	defer testsuite.Reset(testsuite.ResetAll)
 
-	ensureWAConversationHandoverTable(t, db)
-
 	channel := testdata.InsertChannel(db, testdata.Org1, "WA", "Handover Channel", []string{"whatsapp"}, "SR", map[string]interface{}{})
-	contact := testdata.InsertContact(db, testdata.Org1, flows.ContactUUID(testdata.Cathy.UUID), "Handover Contact", envs.Language("eng"))
+	contact := testdata.InsertContact(db, testdata.Org1, flows.ContactUUID(uuids.New()), "Handover Contact", envs.Language("eng"))
 	urn := urns.URN("whatsapp:250700000077")
 	testdata.InsertContactURN(db, testdata.Org1, contact, urn, 1000)
 	contact.URN = urn

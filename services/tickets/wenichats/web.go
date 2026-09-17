@@ -82,6 +82,9 @@ func handleEventCallback(ctx context.Context, rt *runtime.Runtime, r *http.Reque
 		extraMetadata := map[string]interface{}{
 			"chats_msg_uuid": eMsg.Content.UUID,
 		}
+		if eMsg.Content.ReplyTo != nil && eMsg.Content.ReplyTo.ExternalID != "" {
+			extraMetadata["response_to_external_id"] = eMsg.Content.ReplyTo.ExternalID
+		}
 
 		attachments := []*tickets.File{}
 		for _, a := range eMsg.Content.Media {
