@@ -1,3 +1,7 @@
+1.97.1
+----------
+* fix: strategy for agent livedesk can reply contact msg on whatsapp with context msg
+
 1.97.0
 ----------
 * feat: implement WhatsApp conversation handover functionality with database operations and tests

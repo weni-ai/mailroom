@@ -244,13 +244,10 @@ func TestOutgoingBroadcastMsgResponseToExternalID(t *testing.T) {
 	var payload map[string]interface{}
 	require.NoError(t, json.Unmarshal(marshaled, &payload))
 
-	assert.Equal(t, "wamid.HBgLMTY0NjcwNDM1OTUVAgASGBQzQTdCNTg5RjY1MEMyRjlGMjRGNgA=", payload["response_to_external_id"])
-
 	metadata, ok := payload["metadata"].(map[string]interface{})
 	require.True(t, ok)
 	assert.Equal(t, "ba84ab60-8b18-4054-8a97-22edc5fb1d2f", metadata["chats_msg_uuid"])
-	_, hasReplyToInMetadata := metadata["response_to_external_id"]
-	assert.False(t, hasReplyToInMetadata)
+	assert.Equal(t, "wamid.HBgLMTY0NjcwNDM1OTUVAgASGBQzQTdCNTg5RjY1MEMyRjlGMjRGNgA=", metadata["response_to_external_id"])
 }
 
 func TestMarshalMsg(t *testing.T) {
