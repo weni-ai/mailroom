@@ -3,6 +3,7 @@ package msgs
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"slices"
 
 	"time"
@@ -35,6 +36,10 @@ func handleSendWppBroadcast(ctx context.Context, rt *runtime.Runtime, task *queu
 	if err != nil {
 		return errors.Wrapf(err, "error unmarshalling broadcast: %s", string(task.Task))
 	}
+
+	fmt.Printf("[wpp broadcast receive] raw_task=%s\n", string(task.Task))
+	fmt.Printf("[wpp broadcast receive] org_id=%d ig_comment_id=%q ig_response_type=%q text=%q\n",
+		broadcast.OrgID(), broadcast.Msg().IGCommentID, broadcast.Msg().IGResponseType, broadcast.Msg().Text)
 
 	return CreateWppBroadcastBatches(ctx, rt, broadcast)
 }
@@ -153,6 +158,9 @@ func handleSendWppBroadcastBatch(ctx context.Context, rt *runtime.Runtime, task 
 	if err != nil {
 		return errors.Wrapf(err, "error unmarshalling broadcast: %s", string(task.Task))
 	}
+
+	fmt.Printf("[wpp broadcast batch] org_id=%d ig_comment_id=%q ig_response_type=%q contact_ids=%v\n",
+		broadcast.OrgID(), broadcast.Msg().IGCommentID, broadcast.Msg().IGResponseType, broadcast.ContactIDs())
 
 	// try to send the batch
 	return SendWppBroadcastBatch(ctx, rt, broadcast)

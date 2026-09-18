@@ -1,6 +1,7 @@
 package msgio
 
 import (
+	"fmt"
 	"strconv"
 	"time"
 
@@ -54,6 +55,10 @@ func PushCourierBatch(rc redis.Conn, ch *models.Channel, batch []*models.Msg, ti
 		priority = highPriority
 	}
 	batchJSON := jsonx.MustMarshal(batch)
+
+	for _, msg := range batch {
+		fmt.Printf("[wpp broadcast queue] msg_id=%d metadata=%v\n", msg.ID(), msg.Metadata())
+	}
 
 	_, err := queuePushScript.Do(rc, "msgs", ch.UUID(), ch.TPS(), priority, batchJSON, timestamp)
 	return err

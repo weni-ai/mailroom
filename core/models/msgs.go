@@ -2161,6 +2161,9 @@ func CreateWppBroadcastMessages(ctx context.Context, rt *runtime.Runtime, oa *Or
 			return nil, errors.Wrapf(err, "error creating outgoing message")
 		}
 
+		fmt.Printf("[wpp broadcast msg] contact_id=%d ig_comment_id=%q ig_response_type=%q extra_metadata=%v metadata=%v\n",
+			c.ID(), bcast.Msg().IGCommentID, bcast.Msg().IGResponseType, extraMetadata, msg.Metadata())
+
 		// set the contact name
 		msg.SetContactName(c.Name())
 
