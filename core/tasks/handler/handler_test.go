@@ -357,6 +357,11 @@ func TestBrainOnIGCommentRoutesToRouter(t *testing.T) {
 
 	commentMetadata := json.RawMessage(`{"ig_comment": {"id": "30065218", "text": "Hello World", "from": {"id": "5678", "username": "username"}}}`)
 
+	// Earlier tests in this package install httpx.MockRequestor; reset so the router POST
+	// reaches the local test server instead of panicking on an unmocked URL.
+	defer httpx.SetRequestor(httpx.DefaultRequestor)
+	httpx.SetRequestor(httpx.DefaultRequestor)
+
 	reqCh := make(chan []byte, 1)
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		body, _ := io.ReadAll(r.Body)
