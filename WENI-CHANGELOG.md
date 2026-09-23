@@ -1,10 +1,18 @@
+1.99.0
+----------
+* feat: Add forward_comments configuration and update Instagram comment routing logic
+
+1.98.0
+----------
+* Implement test for Instagram comment routing to Nexus and update message handling logic
+
 1.97.3
 ----------
 * feat: livedesk unified send reply message
 
 1.97.2
 ----------
-* feat: IRSA for aws s3 bucket access
+* feat: IRSA for aws s3 bucket acces
 
 1.97.1
 ----------
