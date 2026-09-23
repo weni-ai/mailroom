@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"fmt"
 	"io"
 	"net/http"
 	"strings"
@@ -82,38 +83,22 @@ func handleEventCallback(ctx context.Context, rt *runtime.Runtime, r *http.Reque
 		extraMetadata := map[string]interface{}{
 			"chats_msg_uuid": eMsg.Content.UUID,
 		}
-
-		if len(eMsg.Content.Media) > 0 {
-			for _, m := range eMsg.Content.Media {
-				file, err := tickets.FetchFileWithMaxSize(m.URL, nil, 100*1024*1024)
-				if err != nil {
-					return errors.Wrapf(err, "error fetching ticket file '%s'", m.URL), http.StatusInternalServerError, nil
-				}
-				file.ContentType = m.ContentType
-
-				maxBodyBytes := mediaTypeMaxBodyBytes[file.ContentType]
-				if maxBodyBytes == 0 {
-					maxBodyBytes = mb100
-				}
-				bodyReader := io.LimitReader(file.Body, int64(maxBodyBytes)+1)
-				bodyBytes, err := io.ReadAll(bodyReader)
-				if err != nil {
-					return err, http.StatusBadRequest, nil
-				}
-				if bodyReader.(*io.LimitedReader).N <= 0 {
-					return errors.Wrapf(err, "unable to send media type %s because response body exceeds %d bytes limit", file.ContentType, maxBodyBytes), http.StatusBadRequest, nil
-				}
-				file.Body = io.NopCloser(bytes.NewReader(bodyBytes))
-				_, err = tickets.SendReply(ctx, rt, ticket, "", []*tickets.File{file}, extraMetadata)
-				if err != nil {
-					return errors.Wrapf(err, "error on send ticket reply with media '%s'", m.URL), http.StatusInternalServerError, nil
-				}
-			}
+		if eMsg.Content.ReplyTo != nil && eMsg.Content.ReplyTo.ExternalID != "" {
+			extraMetadata["response_to_external_id"] = eMsg.Content.ReplyTo.ExternalID
 		}
 
-		txtMsg := eMsg.Content.Text
-		if strings.TrimSpace(txtMsg) != "" {
-			_, err = tickets.SendReply(ctx, rt, ticket, txtMsg, nil, extraMetadata)
+		attachments := []*tickets.File{}
+		for _, a := range eMsg.Content.Media {
+			file, err := prepareAttachmentFile(a)
+			if err != nil {
+				return errors.Wrapf(err, "error preparing attachment file '%s'", a.URL), http.StatusInternalServerError, nil
+			}
+			attachments = append(attachments, file)
+		}
+
+		txtMsg := strings.TrimSpace(eMsg.Content.Text)
+		if txtMsg != "" || len(attachments) > 0 {
+			_, err = tickets.SendReply(ctx, rt, ticket, txtMsg, attachments, extraMetadata)
 			if err != nil {
 				return errors.Wrapf(err, "error on send ticket reply"), http.StatusBadRequest, nil
 			}
@@ -128,4 +113,29 @@ func handleEventCallback(ctx context.Context, rt *runtime.Runtime, r *http.Reque
 	}
 
 	return map[string]string{"status": "handled"}, http.StatusOK, nil
+}
+
+func prepareAttachmentFile(m Attachment) (*tickets.File, error) {
+	file, err := tickets.FetchFileWithMaxSize(m.URL, nil, 100*1024*1024)
+	if err != nil {
+		return nil, errors.Wrapf(err, "error fetching ticket file '%s'", m.URL)
+	}
+	file.ContentType = m.ContentType
+
+	maxBodyBytes := mediaTypeMaxBodyBytes[file.ContentType]
+	if maxBodyBytes == 0 {
+		maxBodyBytes = mb100
+	}
+	bodyReader := io.LimitReader(file.Body, int64(maxBodyBytes)+1)
+	bodyBytes, err := io.ReadAll(bodyReader)
+	if err != nil {
+		return nil, errors.Wrapf(err, "error reading ticket file '%s'", m.URL)
+	}
+
+	if bodyReader.(*io.LimitedReader).N <= 0 {
+		return nil, fmt.Errorf("unable to send media type %s because response body exceeds %d bytes limit", file.ContentType, maxBodyBytes)
+
+	}
+	file.Body = io.NopCloser(bytes.NewReader(bodyBytes))
+	return file, nil
 }

@@ -1,3 +1,19 @@
+1.97.1
+----------
+* fix: strategy for agent livedesk can reply contact msg on whatsapp with context msg
+
+1.97.0
+----------
+* feat: implement WhatsApp conversation handover functionality with database operations and tests
+
+1.96.2
+----------
+* feat: agent livedesk can reply contact msg on whatsapp with context msg
+
+1.96.1
+----------
+* feat: log when a ticket as closed by merge on zendesk ticketers
+
 1.96.0
 ----------
 * feat: depend on goflow whatsapp_bsuid and whatsapp_phone contact query attributes (goflow v1.20.4)

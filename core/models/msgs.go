@@ -437,6 +437,9 @@ func newOutgoingMsg(rt *runtime.Runtime, org *Org, channel *Channel, contactID C
 		}
 	}
 
+	// response_to_external_id in extraMetadata is kept in channel metadata so courier
+	// handlers (e.g. WAC contextual replies) can read it from msg.Metadata().
+
 	// if we have attachments, add them
 	if len(out.Attachments()) > 0 {
 		for _, a := range out.Attachments() {

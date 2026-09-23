@@ -125,6 +125,8 @@ func resetDB() {
 	defer db.Close()
 
 	db.MustExec("drop owned by mailroom_test cascade")
+	// objects created by weni_dump.sql as postgres are not dropped above
+	db.MustExec("DROP TABLE IF EXISTS wa_conversation_handover CASCADE")
 	dir, _ := os.Getwd()
 
 	// our working directory is set to the directory of the module being tested, we want to get just
