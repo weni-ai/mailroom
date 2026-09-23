@@ -323,10 +323,8 @@ func TestBrainOnMsgEventCalculatesDynamicGroups(t *testing.T) {
 		Returns(1)
 }
 
-// TestBrainOnIGCommentRoutesToRouter verifies Instagram feed comments with ig_comment metadata
-// are routed to Nexus like normal inbound DMs when BrainOn is active. Before the brain-routing
-// fix, these messages fell through to handleAsInbox and never reached the router.
-// Deploy with or after Courier forward_comments gate (002-instagram-feed-comments-v1.1).
+// TestBrainOnIGCommentRoutesToRouter verifies that Instagram feed comments
+// with ig_comment metadata are routed to Nexus when BrainOn is active.
 func TestBrainOnIGCommentRoutesToRouter(t *testing.T) {
 	ctx, rt, db, rp := testsuite.Get()
 	rc := rp.Get()

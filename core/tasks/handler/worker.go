@@ -632,9 +632,7 @@ func handleMsgEvent(ctx context.Context, rt *runtime.Runtime, event *MsgEvent) e
 		return markMsgHandled(ctx, tx, contact, msgIn, models.MsgTypeFlow, topupID, tickets)
 	}
 
-	// Instagram feed comments use the same brain routing as Direct when BrainOn is active.
-	// Comment ingress is gated by Courier channel config forward_comments (default off);
-	// deploy Mailroom with or after that Courier gate to avoid forwarding while opt-in is off.
+	// Instagram feed comments follow the same brain-routing path as direct messages.
 	isBrain := oa.Org().BrainOn()
 
 	// we found a trigger and their session is nil or doesn't ignore keywords
