@@ -25,9 +25,11 @@ func hasIRSA() bool {
 	return os.Getenv("AWS_WEB_IDENTITY_TOKEN_FILE") != "" && os.Getenv("AWS_ROLE_ARN") != ""
 }
 
-// ResolveStorageAuth chooses IRSA, static keys, or filesystem. IRSA wins even if keys are set.
+// ResolveStorageAuth chooses IRSA, static keys, or filesystem. IRSA wins even if keys are set,
+// unless AWSForceStaticCredentials is true.
 func ResolveStorageAuth(cfg *Config) StorageAuth {
-	if hasIRSA() {
+	forceStatic := cfg != nil && cfg.AWSForceStaticCredentials
+	if hasIRSA() && !forceStatic {
 		return StorageAuthIRSA
 	}
 	if cfg != nil && cfg.AWSAccessKeyID != "" && cfg.AWSSecretAccessKey != "" {
