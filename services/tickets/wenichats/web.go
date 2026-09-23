@@ -18,6 +18,7 @@ import (
 	"github.com/nyaruka/mailroom/services/tickets"
 	"github.com/nyaruka/mailroom/web"
 	"github.com/pkg/errors"
+	"github.com/sirupsen/logrus"
 )
 
 var (
@@ -77,6 +78,7 @@ func handleEventCallback(ctx context.Context, rt *runtime.Runtime, r *http.Reque
 	case "msg.create":
 		eMsg := &eventCallbackRequest{}
 		if err := json.Unmarshal([]byte(body), eMsg); err != nil {
+			logrus.Errorf("error unmarshalling event callback request: %v", err)
 			return err, http.StatusInternalServerError, nil
 		}
 
@@ -100,6 +102,7 @@ func handleEventCallback(ctx context.Context, rt *runtime.Runtime, r *http.Reque
 		if txtMsg != "" || len(attachments) > 0 {
 			_, err = tickets.SendReply(ctx, rt, ticket, txtMsg, attachments, extraMetadata)
 			if err != nil {
+				logrus.Errorf("error on send ticket reply: %v", err)
 				return errors.Wrapf(err, "error on send ticket reply"), http.StatusBadRequest, nil
 			}
 		}

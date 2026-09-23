@@ -6,6 +6,14 @@
 ----------
 * Implement test for Instagram comment routing to Nexus and update message handling logic
 
+1.97.3
+----------
+* feat: livedesk unified send reply message
+
+1.97.2
+----------
+* feat: IRSA for aws s3 bucket acces
+
 1.97.1
 ----------
 * fix: strategy for agent livedesk can reply contact msg on whatsapp with context msg

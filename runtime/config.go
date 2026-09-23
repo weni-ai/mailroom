@@ -71,8 +71,9 @@ type Config struct {
 	S3DisableSSL         bool   `help:"whether we disable SSL when accessing S3. Should always be set to False unless you're hosting an S3 compatible service within a secure internal network"`
 	S3ForcePathStyle     bool   `help:"whether we force S3 path style. Should generally need to default to False unless you're hosting an S3 compatible service"`
 
-	AWSAccessKeyID     string `help:"the access key id to use when authenticating S3"`
-	AWSSecretAccessKey string `help:"the secret access key id to use when authenticating S3"`
+	AWSAccessKeyID            string `help:"the access key id to use when authenticating S3"`
+	AWSSecretAccessKey        string `help:"the secret access key id to use when authenticating S3"`
+	AWSForceStaticCredentials bool   `help:"when true, use AWSAccessKeyID and AWSSecretAccessKey instead of IRSA even if web identity env vars are present"`
 
 	LibratoUsername string `help:"the username that will be used to authenticate to Librato"`
 	LibratoToken    string `help:"the token that will be used to authenticate to Librato"`
@@ -182,8 +183,9 @@ func NewDefaultConfig() *Config {
 		S3DisableSSL:     false,
 		S3ForcePathStyle: false,
 
-		AWSAccessKeyID:     "",
-		AWSSecretAccessKey: "",
+		AWSAccessKeyID:            "",
+		AWSSecretAccessKey:        "",
+		AWSForceStaticCredentials: false,
 
 		InstanceName:        hostname,
 		LogLevel:            "error",
