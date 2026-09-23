@@ -1,6 +1,7 @@
 1.98.0
 ----------
 * feat: load CTWA source ids on contacts and evaluate ctwa_source_id queries (goflow v1.20.5)
+* refactor: parse CTWA source id from message metadata with a typed JSON struct
 
 1.97.1
 ----------

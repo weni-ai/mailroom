@@ -1109,22 +1109,23 @@ func ctwaSourceIDFromMetadata(raw json.RawMessage) string {
 		return ""
 	}
 
-	var meta map[string]interface{}
+	var meta struct {
+		Referral *struct {
+			SourceID string `json:"source_id"`
+		} `json:"referral"`
+		SourceID string `json:"source_id"`
+	}
 	if err := json.Unmarshal(raw, &meta); err != nil {
 		return ""
 	}
 
-	if ref, ok := meta["referral"].(map[string]interface{}); ok {
-		if id, ok := ref["source_id"].(string); ok {
-			return strings.TrimSpace(id)
+	if meta.Referral != nil {
+		if id := strings.TrimSpace(meta.Referral.SourceID); id != "" {
+			return id
 		}
 	}
 
-	if id, ok := meta["source_id"].(string); ok {
-		return strings.TrimSpace(id)
-	}
-
-	return ""
+	return strings.TrimSpace(meta.SourceID)
 }
 
 type StopEvent struct {

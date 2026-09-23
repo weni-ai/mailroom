@@ -1033,4 +1033,5 @@ func TestCTWASourceIDFromMetadata(t *testing.T) {
 	assert.Equal(t, "", ctwaSourceIDFromMetadata(json.RawMessage(`{"referral": {"source_id": "  "}}`)))
 	assert.Equal(t, "campaign-a", ctwaSourceIDFromMetadata(json.RawMessage(`{"referral": {"source_id": " campaign-a "}}`)))
 	assert.Equal(t, "SOURCE_ID", ctwaSourceIDFromMetadata(json.RawMessage(`{"source_id": "SOURCE_ID"}`)))
+	assert.Equal(t, "SOURCE_ID", ctwaSourceIDFromMetadata(json.RawMessage(`{"referral": {}, "source_id": "SOURCE_ID"}`)))
 }
