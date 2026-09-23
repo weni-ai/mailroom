@@ -8,6 +8,7 @@ import (
 
 	"github.com/nyaruka/gocommon/urns"
 	"github.com/nyaruka/goflow/assets"
+	"github.com/nyaruka/goflow/contactql"
 	"github.com/nyaruka/goflow/envs"
 	"github.com/nyaruka/goflow/flows"
 	"github.com/nyaruka/mailroom/core/models"
@@ -669,4 +670,32 @@ func TestLoadContactsBasic(t *testing.T) {
 	// While full version may have groups and tickets
 	// (in this test Bob doesn't have groups but has a ticket)
 	assert.Equal(t, 1, fullContact.Tickets().Count())
+}
+
+func TestLoadContactCTWASourceIDs(t *testing.T) {
+	ctx, rt, db, _ := testsuite.Get()
+	defer testsuite.Reset(testsuite.ResetAll)
+
+	org, err := models.GetOrgAssetsWithRefresh(ctx, rt, testdata.Org1.ID, models.RefreshAll)
+	require.NoError(t, err)
+
+	db.MustExec(`INSERT INTO ctwa_referral_sources (org_id, source_id, source_type) VALUES ($1, 'campaign-a', 'ad')`, testdata.Org1.ID)
+	var sourceID int64
+	err = db.Get(&sourceID, `SELECT id FROM ctwa_referral_sources WHERE org_id = $1 AND source_id = 'campaign-a'`, testdata.Org1.ID)
+	require.NoError(t, err)
+	db.MustExec(
+		`INSERT INTO conversion_events_ctwa (ctwa_clid, contact_urn, timestamp, channel_uuid, waba, referral_source_id)
+		 VALUES ('clid-cathy', $1, NOW(), '11111111-1111-1111-1111-111111111111', 'waba', $2)`,
+		string(testdata.Cathy.URN), sourceID,
+	)
+
+	contacts, err := models.LoadContacts(ctx, db, org, []models.ContactID{testdata.Cathy.ID})
+	require.NoError(t, err)
+	require.Len(t, contacts, 1)
+
+	flowContact, err := contacts[0].FlowContact(org)
+	require.NoError(t, err)
+
+	vals := flowContact.QueryProperty(org.Env(), contactql.AttributeCTWASourceID, contactql.PropertyTypeAttribute)
+	assert.Equal(t, []interface{}{"campaign-a"}, vals)
 }

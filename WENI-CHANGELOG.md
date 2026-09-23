@@ -1,3 +1,7 @@
+1.98.0
+----------
+* feat: load CTWA source ids on contacts and evaluate ctwa_source_id queries (goflow v1.20.5)
+
 1.97.1
 ----------
 * fix: strategy for agent livedesk can reply contact msg on whatsapp with context msg

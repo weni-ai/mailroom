@@ -575,6 +575,10 @@ func handleMsgEvent(ctx context.Context, rt *runtime.Runtime, event *MsgEvent) e
 		newContact = true
 	}
 
+	if ctwaSourceIDFromMetadata(event.Metadata) != "" {
+		recalculateDynamicGroups = true
+	}
+
 	// if this is a new contact or fields were updated, we need to calculate dynamic groups
 	if newContact || recalculateDynamicGroups {
 		err = models.CalculateDynamicGroups(ctx, rt.DB, oa, []*flows.Contact{contact})
@@ -781,13 +785,13 @@ func shouldFireTrigger(trigger *models.Trigger, flow *models.Flow, isBrain bool)
 
 // fields that should be auto-created when received but not present in the org
 var autoCreateFieldKeys = map[string]string{
-	"segment":          "Segment",
-	"orderform":        "Orderform",
-	"email":            "Email",
-	"session":          "Session",
-	"vtex_account":     "Vtex account",
-	"marketing_opt_in": "Marketing opt-in",
-	"whatsapp_username": "WhatsApp username",
+	"segment":            "Segment",
+	"orderform":          "Orderform",
+	"email":              "Email",
+	"session":            "Session",
+	"vtex_account":       "Vtex account",
+	"marketing_opt_in":   "Marketing opt-in",
+	"whatsapp_username":  "WhatsApp username",
 	"instagram_username": "Instagram username",
 	"ctwa_clid":          "CTWA CLID",
 }
@@ -1098,6 +1102,29 @@ type MsgEvent struct {
 	CreatedOn        time.Time          `json:"created_on"`
 	Metadata         json.RawMessage    `json:"metadata"`
 	NewContactFields map[string]string  `json:"new_contact_fields"`
+}
+
+func ctwaSourceIDFromMetadata(raw json.RawMessage) string {
+	if len(raw) == 0 {
+		return ""
+	}
+
+	var meta map[string]interface{}
+	if err := json.Unmarshal(raw, &meta); err != nil {
+		return ""
+	}
+
+	if ref, ok := meta["referral"].(map[string]interface{}); ok {
+		if id, ok := ref["source_id"].(string); ok {
+			return strings.TrimSpace(id)
+		}
+	}
+
+	if id, ok := meta["source_id"].(string); ok {
+		return strings.TrimSpace(id)
+	}
+
+	return ""
 }
 
 type StopEvent struct {
