@@ -620,7 +620,7 @@ func handleMsgEvent(ctx context.Context, rt *runtime.Runtime, event *MsgEvent) e
 	msgIn := flows.NewMsgIn(event.MsgUUID, event.URN, channel.ChannelReference(), event.Text, event.Attachments)
 	msgIn.SetExternalID(string(event.MsgExternalID))
 	msgIn.SetID(event.MsgID)
-	_ = parseMsgInMetadata(event, msgIn)
+	isIGComment := parseMsgInMetadata(event, msgIn)
 
 	// build our hook to mark a flow message as handled
 	flowMsgHook := func(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, oa *models.OrgAssets, sessions []*models.Session) error {
@@ -633,7 +633,6 @@ func handleMsgEvent(ctx context.Context, rt *runtime.Runtime, event *MsgEvent) e
 		return markMsgHandled(ctx, tx, contact, msgIn, models.MsgTypeFlow, topupID, tickets)
 	}
 
-	// Instagram feed comments follow the same brain-routing path as direct messages.
 	isBrain := oa.Org().BrainOn()
 
 	// we found a trigger and their session is nil or doesn't ignore keywords
@@ -654,7 +653,7 @@ func handleMsgEvent(ctx context.Context, rt *runtime.Runtime, event *MsgEvent) e
 		return nil
 	}
 
-	if isBrain && len(tickets) == 0 {
+	if isBrain && len(tickets) == 0 && shouldRouteIGCommentToBrain(channel, isIGComment) {
 		if err := handleBrainRouting(ctx, rt, oa, contact, event, channel, topupID); err != nil {
 			return err
 		}
@@ -667,6 +666,16 @@ func handleMsgEvent(ctx context.Context, rt *runtime.Runtime, event *MsgEvent) e
 	}
 
 	return nil
+}
+
+// shouldRouteIGCommentToBrain returns whether an Instagram feed comment should be sent to the
+// external router. Direct messages always route when BrainOn; comments only route when the
+// channel has forward_comments enabled.
+func shouldRouteIGCommentToBrain(channel *models.Channel, isIGComment bool) bool {
+	if !isIGComment {
+		return true
+	}
+	return channel.ConfigBoolValue(models.ChannelConfigForwardComments, false)
 }
 
 // handleBrainRouting sends the incoming message to the external router (brain) when BrainOn is

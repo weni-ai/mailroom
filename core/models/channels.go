@@ -37,6 +37,7 @@ const (
 	ChannelConfigCallbackDomain      = "callback_domain"
 	ChannelConfigMaxConcurrentEvents = "max_concurrent_events"
 	ChannelConfigFCMID               = "FCM_ID"
+	ChannelConfigForwardComments     = "forward_comments"
 )
 
 // Channel is the mailroom struct that represents channels
@@ -116,6 +117,26 @@ func (c *Channel) ConfigValue(key string, def string) string {
 	boolValue, isBool := value.(bool)
 	if isBool {
 		return fmt.Sprintf("%v", boolValue)
+	}
+	return def
+}
+
+// ConfigBoolValue returns the boolean config value for the passed in key.
+func (c *Channel) ConfigBoolValue(key string, def bool) bool {
+	value, ok := c.c.Config[key]
+	if !ok {
+		return def
+	}
+	if boolValue, isBool := value.(bool); isBool {
+		return boolValue
+	}
+	strValue, isString := value.(string)
+	if isString {
+		return strValue == "true" || strValue == "1"
+	}
+	floatValue, isFloat := value.(float64)
+	if isFloat {
+		return floatValue != 0
 	}
 	return def
 }
