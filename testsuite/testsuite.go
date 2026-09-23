@@ -85,7 +85,42 @@ func Get() (context.Context, *runtime.Runtime, *sqlx.DB, *redis.Pool) {
 
 // returns an open test database pool
 func getDB() *sqlx.DB {
-	return sqlx.MustOpen("postgres", "postgres://mailroom_test:temba@localhost/mailroom_test?sslmode=disable&Timezone=UTC")
+	db := sqlx.MustOpen("postgres", "postgres://mailroom_test:temba@localhost/mailroom_test?sslmode=disable&Timezone=UTC")
+	createCTWATables(db)
+	return db
+}
+
+const createCTWATablesSQL = `
+CREATE TABLE IF NOT EXISTS ctwa_referral_sources (
+    id bigserial primary key,
+    org_id integer NOT NULL,
+    source_id character varying(64) NOT NULL,
+    source_type character varying(16) NOT NULL,
+    source_url text NULL,
+    headline text NULL,
+    body text NULL,
+    first_seen_at timestamp with time zone NOT NULL DEFAULT NOW(),
+    last_seen_at timestamp with time zone NOT NULL DEFAULT NOW(),
+    created_at timestamp with time zone NOT NULL DEFAULT NOW(),
+    updated_at timestamp with time zone NOT NULL DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS conversion_events_ctwa (
+    id bigserial primary key,
+    ctwa_clid character varying(512) NULL,
+    contact_urn character varying(255) NOT NULL,
+    timestamp timestamp with time zone NOT NULL DEFAULT NOW(),
+    channel_uuid character varying(36) NOT NULL,
+    waba character varying(255) NOT NULL DEFAULT '',
+    phone_number_id character varying(64) NULL,
+    referral_source_id bigint NOT NULL,
+    message_id character varying(255) NULL,
+    created_at timestamp with time zone NOT NULL DEFAULT NOW()
+);
+`
+
+func createCTWATables(db *sqlx.DB) {
+	db.MustExec(createCTWATablesSQL)
 }
 
 // returns a redis pool to our test database
@@ -136,6 +171,7 @@ func resetDB() {
 	}
 
 	mustExec("pg_restore", "-h", "localhost", "-d", "mailroom_test", "-U", "mailroom_test", path.Join(dir, "./mailroom_test.dump"))
+	createCTWATables(db)
 }
 
 // resets our redis database
