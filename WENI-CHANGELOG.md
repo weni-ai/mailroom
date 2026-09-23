@@ -1,3 +1,7 @@
+1.99.0
+----------
+* feat: Add forward_comments configuration and update Instagram comment routing logic
+
 1.98.0
 ----------
 * Implement test for Instagram comment routing to Nexus and update message handling logic
