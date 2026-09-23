@@ -1,3 +1,7 @@
+1.98.0
+----------
+* Implement test for Instagram comment routing to Nexus and update message handling logic
+
 1.97.1
 ----------
 * fix: strategy for agent livedesk can reply contact msg on whatsapp with context msg

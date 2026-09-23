@@ -620,7 +620,7 @@ func handleMsgEvent(ctx context.Context, rt *runtime.Runtime, event *MsgEvent) e
 	msgIn := flows.NewMsgIn(event.MsgUUID, event.URN, channel.ChannelReference(), event.Text, event.Attachments)
 	msgIn.SetExternalID(string(event.MsgExternalID))
 	msgIn.SetID(event.MsgID)
-	isIGComment := parseMsgInMetadata(event, msgIn)
+	_ = parseMsgInMetadata(event, msgIn)
 
 	// build our hook to mark a flow message as handled
 	flowMsgHook := func(ctx context.Context, tx *sqlx.Tx, rp *redis.Pool, oa *models.OrgAssets, sessions []*models.Session) error {
@@ -633,8 +633,8 @@ func handleMsgEvent(ctx context.Context, rt *runtime.Runtime, event *MsgEvent) e
 		return markMsgHandled(ctx, tx, contact, msgIn, models.MsgTypeFlow, topupID, tickets)
 	}
 
-	// check whether it is to direct to the brain or not
-	isBrain := oa.Org().BrainOn() && !isIGComment
+	// Instagram feed comments follow the same brain-routing path as direct messages.
+	isBrain := oa.Org().BrainOn()
 
 	// we found a trigger and their session is nil or doesn't ignore keywords
 	if shouldFireTrigger(trigger, flow, isBrain) {
