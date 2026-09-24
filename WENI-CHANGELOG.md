@@ -1,6 +1,6 @@
 1.100.0
 ----------
- * feat: named WhatsApp template variables — load parameter format/names, evaluate batch named values, substitute named placeholders (goflow v1.20.5-a1-staging)
+ * feat: named WhatsApp template variables — load parameter format/names, evaluate batch named values, substitute named placeholders (goflow v1.20.5)
 
 1.99.0
 ----------
