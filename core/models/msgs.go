@@ -1678,6 +1678,8 @@ type WppBroadcastTemplate struct {
 	Carousel           []flows.CarouselCard         `json:"carousel,omitempty"`
 }
 
+// namedTemplateFiller is sent when no value is available for a named placeholder.
+// WhatsApp requires a non-empty string, so a single space is used as the minimum valid filler.
 const namedTemplateFiller = " "
 
 func isProvidedNamedValue(value string) bool {
