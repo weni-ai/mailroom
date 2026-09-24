@@ -86,6 +86,18 @@ func handleEventCallback(ctx context.Context, rt *runtime.Runtime, r *http.Reque
 			extraMetadata["response_to_external_id"] = eMsg.Content.ReplyTo.ExternalID
 		}
 
+		if eMsg.Content.Catalog.HasCatalog() {
+			header, footer, catalog, catalogMeta := eMsg.Content.Catalog.BroadcastParts()
+			for k, v := range catalogMeta {
+				extraMetadata[k] = v
+			}
+			_, err = tickets.SendReplyWithCatalog(ctx, rt, ticket, eMsg.Content.Text, nil, extraMetadata, header, footer, catalog)
+			if err != nil {
+				return errors.Wrapf(err, "error on send ticket catalog reply"), http.StatusBadRequest, nil
+			}
+			break
+		}
+
 		if len(eMsg.Content.Media) > 0 {
 			for _, m := range eMsg.Content.Media {
 				file, err := tickets.FetchFileWithMaxSize(m.URL, nil, 100*1024*1024)
