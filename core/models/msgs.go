@@ -1545,6 +1545,8 @@ func CreateBroadcastMessages(ctx context.Context, rt *runtime.Runtime, oa *OrgAs
 
 		products := bcast.CatalogMessage().Products
 		sendCatalog := bcast.CatalogMessage().SendCatalog
+		carousel := bcast.CatalogMessage().Carousel
+		actionButtonText := bcast.CatalogMessage().ActionButtonText
 
 		// build up the minimum viable context for evaluation
 		evaluationCtx := types.NewXObject(map[string]types.XValue{
@@ -1564,6 +1566,9 @@ func CreateBroadcastMessages(ctx context.Context, rt *runtime.Runtime, oa *OrgAs
 
 		// evaluate our footer text
 		footerText, _ = excellent.EvaluateTemplate(oa.Env(), evaluationCtx, footerText, nil)
+
+		// evaluate catalog action button text
+		actionButtonText, _ = excellent.EvaluateTemplate(oa.Env(), evaluationCtx, actionButtonText, nil)
 
 		// evaluate our quick replies
 		for i, qr := range quickReplies {
@@ -1589,6 +1594,12 @@ func CreateBroadcastMessages(ctx context.Context, rt *runtime.Runtime, oa *OrgAs
 		}
 		if sendCatalog {
 			broadcastMetadata["send_catalog"] = sendCatalog
+		}
+		if carousel {
+			broadcastMetadata["product_carousel"] = true
+		}
+		if actionButtonText != "" {
+			broadcastMetadata["action"] = actionButtonText
 		}
 
 		// merge with existing extraMetadata (extraMetadata can override broadcastMetadata)
