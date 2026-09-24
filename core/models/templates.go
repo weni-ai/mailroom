@@ -17,10 +17,11 @@ import (
 
 type Template struct {
 	t struct {
-		Name         string                 `json:"name"          validate:"required"`
-		UUID         assets.TemplateUUID    `json:"uuid"          validate:"required"`
-		Translations []*TemplateTranslation `json:"translations"  validate:"dive"`
-		Category     string                 `json:"category"`
+		Name            string                 `json:"name"          validate:"required"`
+		UUID            assets.TemplateUUID    `json:"uuid"          validate:"required"`
+		Translations    []*TemplateTranslation `json:"translations"  validate:"dive"`
+		Category        string                 `json:"category"`
+		ParameterFormat string                 `json:"parameter_format,omitempty"`
 	}
 }
 
@@ -34,6 +35,9 @@ func (t *Template) Translations() []assets.TemplateTranslation {
 	return trs
 }
 func (t *Template) Category() string { return t.t.Category }
+func (t *Template) ParameterFormat() string {
+	return assets.NormalizeParameterFormat(t.t.ParameterFormat)
+}
 
 // UnmarshalJSON is our unmarshaller for json data
 func (t *Template) UnmarshalJSON(data []byte) error { return json.Unmarshal(data, &t.t) }
@@ -43,12 +47,14 @@ func (t *Template) MarshalJSON() ([]byte, error) { return json.Marshal(t.t) }
 
 type TemplateTranslation struct {
 	t struct {
-		Channel       assets.ChannelReference `json:"channel"         validate:"required"`
-		Language      envs.Language           `json:"language"        validate:"required"`
-		Country       null.String             `json:"country"`
-		Namespace     string                  `json:"namespace"`
-		Content       string                  `json:"content"         validate:"required"`
-		VariableCount int                     `json:"variable_count"`
+		Channel         assets.ChannelReference `json:"channel"         validate:"required"`
+		Language        envs.Language           `json:"language"        validate:"required"`
+		Country         null.String             `json:"country"`
+		Namespace       string                  `json:"namespace"`
+		Content         string                  `json:"content"         validate:"required"`
+		VariableCount   int                     `json:"variable_count"`
+		ParameterFormat string                  `json:"parameter_format,omitempty"`
+		ParameterNames  []string                `json:"parameter_names,omitempty"`
 	}
 }
 
@@ -64,6 +70,10 @@ func (t *TemplateTranslation) Country() envs.Country            { return envs.Co
 func (t *TemplateTranslation) Content() string                  { return t.t.Content }
 func (t *TemplateTranslation) Namespace() string                { return t.t.Namespace }
 func (t *TemplateTranslation) VariableCount() int               { return t.t.VariableCount }
+func (t *TemplateTranslation) ParameterFormat() string {
+	return assets.NormalizeParameterFormat(t.t.ParameterFormat)
+}
+func (t *TemplateTranslation) ParameterNames() []string { return t.t.ParameterNames }
 
 // loads the templates for the passed in org
 func loadTemplates(ctx context.Context, db sqlx.Queryer, orgID OrgID) ([]assets.Template, error) {
@@ -96,6 +106,7 @@ SELECT ROW_TO_JSON(r) FROM (SELECT
 	t.name as name, 
 	t.uuid as uuid,
 	t.category as category,
+	t.parameter_format as parameter_format,
 	(SELECT ARRAY_TO_JSON(ARRAY_AGG(ROW_TO_JSON(tr))) FROM (
 		SELECT
 			tr.language as language,
@@ -103,6 +114,8 @@ SELECT ROW_TO_JSON(r) FROM (SELECT
 			tr.content as content,
 			tr.namespace as namespace,
 			tr.variable_count as variable_count,
+			t.parameter_format as parameter_format,
+			COALESCE(tr.parameter_names, '[]'::jsonb) as parameter_names,
 			JSON_BUILD_OBJECT('uuid', c.uuid, 'name', c.name) as channel
 		FROM
 			templates_templatetranslation tr
