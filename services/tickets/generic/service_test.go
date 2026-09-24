@@ -118,7 +118,16 @@ func TestNewServiceConfigValidation(t *testing.T) {
 		"open_response_template": `{"external_id":"{{.id"`,
 	}), context.Background(), nil)
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "invalid open_response_template")
+
+	_, err = generic.NewService(rt.Config, http.DefaultClient, nil, ticketer, newModelTicketer(map[string]string{
+		"base_url":              svcBaseURL,
+		"api_token":             svcAPIToken,
+		"webhook_secret":        svcWebhookSecret,
+		"token_refresh_enabled": "true",
+		"token_refresh_type":    "custom",
+	}), context.Background(), nil)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "token_refresh_config")
 
 	_, err = generic.NewService(rt.Config, http.DefaultClient, nil, ticketer, newModelTicketer(map[string]string{
 		"base_url":         svcBaseURL,
