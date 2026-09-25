@@ -9,6 +9,7 @@ import (
 	"github.com/nyaruka/gocommon/httpx"
 	"github.com/nyaruka/gocommon/uuids"
 	"github.com/nyaruka/goflow/envs"
+	"github.com/nyaruka/goflow/flows"
 	"github.com/nyaruka/goflow/utils"
 	"github.com/nyaruka/mailroom/core/models"
 	"github.com/nyaruka/mailroom/services/tickets"
@@ -138,6 +139,44 @@ func TestSendReply(t *testing.T) {
 	// try with file that can't be read (i.e. same file again which is already closed)
 	_, err = tickets.SendReply(ctx, rt, modelTicket, "I'll get back to you", []*tickets.File{image}, nil)
 	assert.EqualError(t, err, "error storing attachment http://coolfiles.com/a.jpg for ticket reply: unable to read attachment content: read ../../core/models/testdata/test.jpg: file already closed")
+}
+
+func TestSendReplyWithCatalogCarousel(t *testing.T) {
+	ctx, rt, db, _ := testsuite.Get()
+
+	defer testsuite.Reset(testsuite.ResetAll)
+
+	ticket := testdata.InsertOpenTicket(db, testdata.Org1, testdata.Cathy, testdata.Mailgun, testdata.DefaultTopic, "Have you seen my cookies?", "", nil)
+	modelTicket := ticket.Load(db)
+
+	catalog := models.BroadcastCatalogMessage{
+		Products: []flows.ProductEntry{
+			{
+				Product:            "highlights",
+				ProductRetailerIDs: []string{"5371#1"},
+				ProductRetailerInfo: []flows.ProductRetailerInfo{
+					{RetailerID: "5371#1", Name: "Blusa UV Coyote", Price: "189.90"},
+				},
+			},
+		},
+		ActionButtonText: "View products",
+		Carousel:         true,
+	}
+	header := models.BroadcastMessageHeader{Type: "text", Text: "Weekly highlights"}
+	extra := map[string]interface{}{"chats_msg_uuid": "da84ab60-8b18-4054-8a97-22edc5fb1d2f"}
+
+	msg, err := tickets.SendReplyWithCatalog(ctx, rt, modelTicket, "Check out our carousel", nil, extra, header, "Swipe to see more", catalog)
+	require.NoError(t, err)
+	require.NotNil(t, msg)
+
+	assert.Equal(t, "Check out our carousel", msg.Text())
+	assert.Equal(t, testdata.Cathy.ID, msg.ContactID())
+	assert.Equal(t, true, msg.Metadata()["product_carousel"])
+	assert.Equal(t, "View products", msg.Metadata()["action"])
+	assert.Equal(t, "Weekly highlights", msg.Metadata()["header_text"])
+	assert.Equal(t, "Swipe to see more", msg.Metadata()["footer"])
+	assert.Equal(t, "da84ab60-8b18-4054-8a97-22edc5fb1d2f", msg.Metadata()["chats_msg_uuid"])
+	assert.NotEmpty(t, msg.Metadata()["products"])
 }
 
 func TestCloseTicket(t *testing.T) {
