@@ -38,6 +38,7 @@ const (
 	ChannelConfigMaxConcurrentEvents = "max_concurrent_events"
 	ChannelConfigFCMID               = "FCM_ID"
 	ChannelConfigForwardComments     = "forward_comments"
+	ChannelConfigDisableAIResponse   = "disable_ai_response"
 )
 
 // Channel is the mailroom struct that represents channels
