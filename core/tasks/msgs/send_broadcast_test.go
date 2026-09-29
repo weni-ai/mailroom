@@ -368,6 +368,24 @@ func TestBroadcastWithHeaderFooterAndCatalog(t *testing.T) {
 		SendCatalog:      false,
 	}
 
+	productCarouselMsg := map[envs.Language]*models.BroadcastTranslation{
+		eng: {
+			Text:         "Check out our carousel",
+			Attachments:  nil,
+			QuickReplies: nil,
+		},
+	}
+	productCarouselCatalog := models.BroadcastCatalogMessage{
+		Products: []flows.ProductEntry{
+			{
+				Product:            "highlights",
+				ProductRetailerIDs: []string{"5371#1", "5372#1"},
+			},
+		},
+		ActionButtonText: "View products",
+		Carousel:         true,
+	}
+
 	tcs := []struct {
 		BroadcastID    models.BroadcastID
 		Translations   map[envs.Language]*models.BroadcastTranslation
@@ -431,6 +449,22 @@ func TestBroadcastWithHeaderFooterAndCatalog(t *testing.T) {
 			models.BroadcastMessageHeader{},
 			"",
 			catalogOnlyCatalogMessage,
+		},
+		{
+			models.NilBroadcastID,
+			productCarouselMsg,
+			models.TemplateStateUnevaluated,
+			eng,
+			cathyOnly,
+			nil,
+			queue.HandlerQueue,
+			1,
+			1,
+			"Check out our carousel",
+			events.BroadcastTypeDefault,
+			models.BroadcastMessageHeader{Type: "text", Text: "Weekly highlights"},
+			"Swipe to see more",
+			productCarouselCatalog,
 		},
 	}
 
@@ -513,6 +547,11 @@ func TestBroadcastWithHeaderFooterAndCatalog(t *testing.T) {
 		if len(tc.CatalogMessage.Products) > 0 || tc.CatalogMessage.SendCatalog {
 			testsuite.AssertQuery(t, db, `SELECT count(*) FROM msgs_msg WHERE org_id = 1 AND created_on > $1 AND metadata::jsonb ? 'products'`, lastNow).
 				Returns(1, "%d: unexpected catalog message count", i)
+		}
+
+		if tc.CatalogMessage.Carousel {
+			testsuite.AssertQuery(t, db, `SELECT count(*) FROM msgs_msg WHERE org_id = 1 AND created_on > $1 AND text = $2 AND metadata::jsonb->>'product_carousel' = 'true' AND metadata::jsonb->>'action' = $3`, lastNow, tc.MsgText, tc.CatalogMessage.ActionButtonText).
+				Returns(1, "%d: unexpected product_carousel count", i)
 		}
 
 		// make sure our broadcast is marked as sent

@@ -1,6 +1,7 @@
 package wenichats_test
 
 import (
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"testing"
@@ -336,4 +337,58 @@ func TestSendBatch(t *testing.T) {
 	trace, err := client.SendHistoryBatch(roomUUID, history)
 	assert.NoError(t, err)
 	assert.Equal(t, "HTTP/1.0 201 Created\r\nContent-Length: 2\r\n\r\n", string(trace.ResponseTrace))
+}
+
+func TestCatalogContentProductCarousel(t *testing.T) {
+	payload := `{
+		"uuid": "da84ab60-8b18-4054-8a97-22edc5fb1d2f",
+		"text": "Check out our carousel",
+		"catalog": {
+			"carousel": true,
+			"action": "View products",
+			"header": "Weekly highlights",
+			"footer": "Swipe to see more",
+			"products": [
+				{
+					"product": "highlights",
+					"product_retailer_ids": ["5371#1", "5372#1"],
+					"product_retailer_info": [
+						{
+							"retailer_id": "5371#1",
+							"name": "Blusa UV Coyote",
+							"price": "189.90",
+							"sale_price": "149.90",
+							"currency": "BRL",
+							"image": "https://example.com/blusa.jpg",
+							"description": "Camisa com proteção UV",
+							"seller_id": "1",
+							"product_url": "https://loja.com/blusa-coyote"
+						}
+					]
+				}
+			]
+		}
+	}`
+
+	var msg wenichats.MessageResponse
+	err := json.Unmarshal([]byte(payload), &msg)
+	assert.NoError(t, err)
+	assert.True(t, msg.Catalog.HasCatalog())
+	assert.True(t, msg.Catalog.Carousel)
+	assert.Equal(t, "View products", msg.Catalog.Action)
+	assert.Equal(t, "Weekly highlights", msg.Catalog.Header)
+	assert.Equal(t, "Swipe to see more", msg.Catalog.Footer)
+	assert.Len(t, msg.Catalog.Products, 1)
+	assert.Equal(t, []string{"5371#1", "5372#1"}, msg.Catalog.Products[0].ProductRetailerIDs)
+	assert.Equal(t, "Blusa UV Coyote", msg.Catalog.Products[0].ProductRetailerInfo[0].Name)
+
+	header, footer, catalog, extra := msg.Catalog.BroadcastParts()
+	assert.Equal(t, "text", header.Type)
+	assert.Equal(t, "Weekly highlights", header.Text)
+	assert.Equal(t, "Swipe to see more", footer)
+	assert.True(t, catalog.Carousel)
+	assert.Equal(t, "View products", catalog.ActionButtonText)
+	assert.Equal(t, true, extra["product_carousel"])
+	assert.Equal(t, "View products", extra["action"])
+	assert.False(t, (*wenichats.CatalogContent)(nil).HasCatalog())
 }

@@ -81,6 +81,15 @@ func FromTicketerUUID(ctx context.Context, rt *runtime.Runtime, uuid assets.Tick
 
 // SendReply sends a message reply from the ticket system user to the contact
 func SendReply(ctx context.Context, rt *runtime.Runtime, ticket *models.Ticket, text string, files []*File, extraMetadata map[string]interface{}) (*models.Msg, error) {
+	return sendReply(ctx, rt, ticket, text, files, extraMetadata, models.BroadcastMessageHeader{}, "", models.BroadcastCatalogMessage{})
+}
+
+// SendReplyWithCatalog sends a ticket reply that includes a product catalog (including product carousel).
+func SendReplyWithCatalog(ctx context.Context, rt *runtime.Runtime, ticket *models.Ticket, text string, files []*File, extraMetadata map[string]interface{}, header models.BroadcastMessageHeader, footer string, catalog models.BroadcastCatalogMessage) (*models.Msg, error) {
+	return sendReply(ctx, rt, ticket, text, files, extraMetadata, header, footer, catalog)
+}
+
+func sendReply(ctx context.Context, rt *runtime.Runtime, ticket *models.Ticket, text string, files []*File, extraMetadata map[string]interface{}, header models.BroadcastMessageHeader, footer string, catalog models.BroadcastCatalogMessage) (*models.Msg, error) {
 	// look up our assets
 	oa, err := models.GetOrgAssets(ctx, rt, ticket.OrgID())
 	if err != nil {
@@ -103,7 +112,7 @@ func SendReply(ctx context.Context, rt *runtime.Runtime, ticket *models.Ticket, 
 	translations := map[envs.Language]*models.BroadcastTranslation{envs.Language("base"): base}
 
 	// we'll use a broadcast to send this message
-	bcast := models.NewBroadcast(oa.OrgID(), models.NilBroadcastID, translations, models.TemplateStateEvaluated, envs.Language("base"), nil, nil, nil, ticket.ID(), events.BroadcastTypeDefault, models.BroadcastMessageHeader{}, "", models.BroadcastCatalogMessage{})
+	bcast := models.NewBroadcast(oa.OrgID(), models.NilBroadcastID, translations, models.TemplateStateEvaluated, envs.Language("base"), nil, nil, nil, ticket.ID(), events.BroadcastTypeDefault, header, footer, catalog)
 	batch := bcast.CreateBatch([]models.ContactID{ticket.ContactID()})
 	msgs, err := models.CreateBroadcastMessages(ctx, rt, oa, batch, extraMetadata)
 	if err != nil {
