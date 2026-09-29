@@ -1,3 +1,7 @@
+1.101.0
+----------
+ * feat: add disable_ai_response channel configuration and related routing logic
+
 1.100.0
 ----------
  * feat: named WhatsApp template variables — load parameter format/names, evaluate batch named values, substitute named placeholders (goflow v1.20.5)

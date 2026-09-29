@@ -507,6 +507,171 @@ func TestBrainOnIGCommentWithoutForwardSkipsRouter(t *testing.T) {
 	}
 }
 
+func TestBrainOnWithoutDisableAIResponseRoutesToRouter(t *testing.T) {
+	ctx, rt, db, rp := testsuite.Get()
+	rc := rp.Get()
+	defer rc.Close()
+
+	defer testsuite.Reset(testsuite.ResetAll)
+
+	projectUUID := uuids.New()
+
+	db.MustExec(`CREATE TABLE IF NOT EXISTS internal_project (
+		id SERIAL PRIMARY KEY,
+		project_uuid UUID NOT NULL,
+		org_ptr_id INTEGER NOT NULL
+	)`)
+	db.MustExec(`INSERT INTO internal_project (project_uuid, org_ptr_id) VALUES ($1, $2)`, projectUUID, testdata.Org1.ID)
+
+	db.MustExec(`UPDATE orgs_org SET brain_on = TRUE WHERE id = $1`, testdata.Org1.ID)
+
+	channel := testdata.InsertChannel(db, testdata.Org1, "TW", "Brain Channel", []string{"tel"}, "SR", map[string]interface{}{})
+
+	contact := testdata.InsertContact(db, testdata.Org1, flows.ContactUUID(uuids.New()), "Brain Contact", envs.Language(`eng`))
+	urn := urns.URN("tel:+250700000012")
+	urnID := testdata.InsertContactURN(db, testdata.Org1, contact, urn, 1000)
+
+	models.FlushCache()
+
+	dbMsg := testdata.InsertIncomingMsg(db, testdata.Org1, channel, contact, "route without flag", models.MsgStatusPending)
+
+	defer httpx.SetRequestor(httpx.DefaultRequestor)
+	httpx.SetRequestor(httpx.DefaultRequestor)
+
+	reqCh := make(chan []byte, 1)
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		body, _ := io.ReadAll(r.Body)
+		reqCh <- body
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer server.Close()
+
+	rt.Config.RouterBaseURL = server.URL
+	rt.Config.RouterAuthToken = "router-token"
+
+	event := &handler.MsgEvent{
+		ContactID: contact.ID,
+		OrgID:     testdata.Org1.ID,
+		ChannelID: channel.ID,
+		MsgID:     dbMsg.ID(),
+		MsgUUID:   dbMsg.UUID(),
+		URN:       urn,
+		URNID:     urnID,
+		Text:      "route without flag",
+	}
+
+	eventJSON, err := json.Marshal(event)
+	require.NoError(t, err)
+
+	task := &queue.Task{
+		Type:  handler.MsgEventType,
+		OrgID: int(testdata.Org1.ID),
+		Task:  eventJSON,
+	}
+
+	err = handler.QueueHandleTask(rc, contact.ID, task)
+	require.NoError(t, err, "error adding task")
+
+	task, err = queue.PopNextTask(rc, queue.HandlerQueue)
+	require.NoError(t, err, "error popping next task")
+
+	err = handler.HandleEvent(ctx, rt, task)
+	require.NoError(t, err, "error when handling event")
+
+	testsuite.AssertQuery(t, db, `SELECT msg_type, status FROM msgs_msg WHERE id = $1`, dbMsg.ID()).
+		Columns(map[string]interface{}{"msg_type": string(models.MsgTypeInbox), "status": "H"})
+
+	select {
+	case body := <-reqCh:
+		assert.Contains(t, string(body), "route without flag")
+	case <-time.After(100 * time.Millisecond):
+		t.Fatal("expected router to be called for a channel without disable_ai_response")
+	}
+}
+
+func TestBrainOnDisableAIResponseHandlesAsInbox(t *testing.T) {
+	ctx, rt, db, rp := testsuite.Get()
+	rc := rp.Get()
+	defer rc.Close()
+
+	defer testsuite.Reset(testsuite.ResetAll)
+
+	projectUUID := uuids.New()
+
+	db.MustExec(`CREATE TABLE IF NOT EXISTS internal_project (
+		id SERIAL PRIMARY KEY,
+		project_uuid UUID NOT NULL,
+		org_ptr_id INTEGER NOT NULL
+	)`)
+	db.MustExec(`INSERT INTO internal_project (project_uuid, org_ptr_id) VALUES ($1, $2)`, projectUUID, testdata.Org1.ID)
+
+	db.MustExec(`UPDATE orgs_org SET brain_on = TRUE WHERE id = $1`, testdata.Org1.ID)
+
+	channel := testdata.InsertChannel(db, testdata.Org1, "TW", "Brain Channel", []string{"tel"}, "SR", map[string]interface{}{
+		"disable_ai_response": true,
+	})
+
+	contact := testdata.InsertContact(db, testdata.Org1, flows.ContactUUID(uuids.New()), "Brain Contact", envs.Language(`eng`))
+	urn := urns.URN("tel:+250700000011")
+	urnID := testdata.InsertContactURN(db, testdata.Org1, contact, urn, 1000)
+
+	models.FlushCache()
+
+	dbMsg := testdata.InsertIncomingMsg(db, testdata.Org1, channel, contact, "stay in inbox", models.MsgStatusPending)
+
+	defer httpx.SetRequestor(httpx.DefaultRequestor)
+	httpx.SetRequestor(httpx.DefaultRequestor)
+
+	reqCh := make(chan []byte, 1)
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		body, _ := io.ReadAll(r.Body)
+		reqCh <- body
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer server.Close()
+
+	rt.Config.RouterBaseURL = server.URL
+	rt.Config.RouterAuthToken = "router-token"
+
+	event := &handler.MsgEvent{
+		ContactID: contact.ID,
+		OrgID:     testdata.Org1.ID,
+		ChannelID: channel.ID,
+		MsgID:     dbMsg.ID(),
+		MsgUUID:   dbMsg.UUID(),
+		URN:       urn,
+		URNID:     urnID,
+		Text:      "stay in inbox",
+	}
+
+	eventJSON, err := json.Marshal(event)
+	require.NoError(t, err)
+
+	task := &queue.Task{
+		Type:  handler.MsgEventType,
+		OrgID: int(testdata.Org1.ID),
+		Task:  eventJSON,
+	}
+
+	err = handler.QueueHandleTask(rc, contact.ID, task)
+	require.NoError(t, err, "error adding task")
+
+	task, err = queue.PopNextTask(rc, queue.HandlerQueue)
+	require.NoError(t, err, "error popping next task")
+
+	err = handler.HandleEvent(ctx, rt, task)
+	require.NoError(t, err, "error when handling event")
+
+	testsuite.AssertQuery(t, db, `SELECT msg_type, status FROM msgs_msg WHERE id = $1`, dbMsg.ID()).
+		Columns(map[string]interface{}{"msg_type": string(models.MsgTypeInbox), "status": "H"})
+
+	select {
+	case body := <-reqCh:
+		t.Fatalf("expected router not to be called, got body: %s", string(body))
+	case <-time.After(100 * time.Millisecond):
+	}
+}
+
 func TestChannelEvents(t *testing.T) {
 	ctx, rt, db, rp := testsuite.Get()
 	rc := rp.Get()
