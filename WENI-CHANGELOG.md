@@ -1,3 +1,7 @@
+1.102.0
+----------
+ * feat: livedesk carousel suport from livedesk to contact
+
 1.101.0
 ----------
  * feat: add disable_ai_response channel configuration and related routing logic
