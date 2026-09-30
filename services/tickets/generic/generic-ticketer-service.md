@@ -19,6 +19,7 @@ Before the first traffic, the platform and the partner exchange credentials:
 | Direction | Credential / config | Who defines | Where it lives |
 |-----------|---------------------|-------------|----------------|
 | Platform → Ticketer | `api_token` | Partner | Ticketer `config.api_token` field |
+| Platform → Ticketer | `token_refresh_*` | Partner | Optional OAuth/token renewal (see [Section 1.1.1](#111-token-refresh-optional)) |
 | Ticketer → Platform | `webhook_secret` | Platform | Ticketer `config.webhook_secret` field (shared with the partner during provisioning) |
 | Ticketer → Platform | `skip_webhook_hmac` | Platform | Ticketer `config.skip_webhook_hmac` field (see [Section 1.2](#12-ticketer--platform-hmac)) |
 | Ticketer base URL | — | Partner | `config.base_url` field |
@@ -60,6 +61,49 @@ Content-Type: application/json
 X-Request-Id: 9d81b7e2-5a4e-4fc2-b2e7-4f671e6c7770
 X-API-Version: 1
 ```
+
+#### 1.1.1 Token refresh (optional)
+
+When the partner access token expires, the ticketer can renew it without a custom Mailroom integration.
+
+Top-level config keys (all strings, because ticketer `config` is `map[string]string`):
+
+| Key | Required | Description |
+|-----|----------|-------------|
+| `token_refresh_enabled` | Yes to enable | `"true"`, `"1"`, or `"yes"` |
+| `token_refresh_type` | Yes when enabled | `custom` (literal body) or `refresh` (OAuth `grant_type=refresh_token`) |
+| `token_refresh_config` | Yes when enabled | JSON object serialized as a string (see below) |
+| `refresh_token` | Yes when type is `refresh` | OAuth refresh token |
+| `expires_in` | No | Unix timestamp (seconds) when `api_token` expires |
+| `client_id` / `client_secret` | No | Added to the form body only when type is `refresh` |
+
+`token_refresh_config` example (`custom`, Salesforce password grant):
+
+```json
+{
+  "when": {
+    "match": "any",
+    "status_codes": [401, 403],
+    "body_contains": ["INVALID_SESSION_ID", "token_expired"],
+    "expired": true
+  },
+  "method": "POST",
+  "url": "https://example.my.salesforce.com/services/oauth2/token",
+  "headers": {
+    "Content-Type": "application/x-www-form-urlencoded"
+  },
+  "body": "grant_type=password&client_id=...&client_secret=...&username=...&password=...",
+  "token_field": "access_token",
+  "refresh_token_field": "refresh_token",
+  "expires_in_field": "expires_in",
+  "expires_in_default": 7200
+}
+```
+
+- `when.match` is always `any` (OR): refresh if the ticketer response status is in `status_codes`, **or** the body contains any `body_contains` substring, **or** (`expired` and `now >= expires_in`).
+- `body` is required for `custom` and ignored for `refresh`. Type `refresh` sends `grant_type=refresh_token&refresh_token=<refresh_token>`.
+- After a successful token call, the platform updates `api_token`, `expires_in` (`now + expires_in` seconds from the token response, or `expires_in_default`), and `refresh_token` when present. The original Platform → Ticketer request is retried once with the new Bearer.
+- `expires_in_field` is a duration in seconds. Do not map Salesforce `issued_at` to it.
 
 ### 1.2 Ticketer → Platform (HMAC)
 
@@ -107,7 +151,7 @@ When the flag is active, the platform accepts the webhook after validating the t
 |-------|-------|
 | Bearer Token | Recommended default |
 | API Key in header | Acceptable if sent via a dedicated header (e.g. `X-API-Key`) |
-| OAuth 2.0 | Supported with prior alignment |
+| OAuth 2.0 | Optional via `token_refresh_*` (see [1.1.1](#111-token-refresh-optional)) |
 
 ---
 

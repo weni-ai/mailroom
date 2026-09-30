@@ -11,6 +11,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"strconv"
 	"strings"
 	"text/template"
 	"time"
@@ -24,6 +25,7 @@ import (
 	"github.com/nyaruka/mailroom/runtime"
 	"github.com/nyaruka/null"
 	"github.com/pkg/errors"
+	"github.com/sirupsen/logrus"
 )
 
 const (
@@ -242,10 +244,46 @@ func NewService(rtCfg *runtime.Config, httpClient *http.Client, httpRetries *htt
 		redactArgs = append(redactArgs, webhookSecret)
 	}
 
+	clientOpts := []ClientOption{WithRoutes(routes)}
+	refreshOpts, err := ParseTokenRefreshOptions(config)
+	if err != nil {
+		return nil, err
+	}
+	if refreshOpts != nil {
+		if refreshOpts.RefreshToken != "" {
+			redactArgs = append(redactArgs, refreshOpts.RefreshToken)
+		}
+		if refreshOpts.ClientSecret != "" {
+			redactArgs = append(redactArgs, refreshOpts.ClientSecret)
+		}
+		if refreshOpts.Config.Body != "" {
+			redactArgs = append(redactArgs, refreshOpts.Config.Body)
+		}
+		if db != nil {
+			persistCtx := ctx
+			if persistCtx == nil {
+				persistCtx = context.Background()
+			}
+			refreshOpts.OnUpdate = func(newAccessToken, newRefreshToken string, expiresAt int64) {
+				updates := map[string]string{configAPIToken: newAccessToken}
+				if newRefreshToken != "" {
+					updates[configRefreshToken] = newRefreshToken
+				}
+				if expiresAt > 0 {
+					updates[configExpiresIn] = strconv.FormatInt(expiresAt, 10)
+				}
+				if err := model.UpdateConfig(persistCtx, db, updates, nil); err != nil {
+					logrus.WithError(err).WithField("ticketer_uuid", model.UUID()).Error("failed to persist generic ticketer oauth tokens after refresh")
+				}
+			}
+		}
+		clientOpts = append(clientOpts, WithTokenRefresh(*refreshOpts))
+	}
+
 	return &service{
 		rtConfig:                rtCfg,
 		db:                      db,
-		client:                  NewClient(httpClient, httpRetries, baseURL, apiToken, WithRoutes(routes)),
+		client:                  NewClient(httpClient, httpRetries, baseURL, apiToken, clientOpts...),
 		ticketer:                ticketer,
 		redactor:                utils.NewRedactor(flows.RedactionMask, redactArgs...),
 		projectUUID:             config[configProjectUUID],
