@@ -2345,7 +2345,9 @@ func MarkBroadcastSent(ctx context.Context, db Queryer, id BroadcastID) error {
 	return nil
 }
 
-func CreateOutgoingMessages(ctx context.Context, rt *runtime.Runtime, oa *OrgAssets, URNs []urns.URN, msgText string) ([]*Msg, error) {
+// CreateOutgoingMessages creates outgoing messages for the given URNs.
+// extraMetadata is merged into each message's metadata when it is non-empty.
+func CreateOutgoingMessages(ctx context.Context, rt *runtime.Runtime, oa *OrgAssets, URNs []urns.URN, msgText string, extraMetadata map[string]interface{}) ([]*Msg, error) {
 	// grab our contacts from the passed urns
 	urnContactIDs, err := GetOrCreateContactIDsFromURNs(ctx, rt.DB, oa, URNs)
 	if err != nil {
@@ -2423,7 +2425,7 @@ func CreateOutgoingMessages(ctx context.Context, rt *runtime.Runtime, oa *OrgAss
 
 		// create our outgoing message
 		out := flows.NewMsgOut(urn, channel.ChannelReference(), msgText, nil, nil, nil, flows.NilMsgTopic, "", "", "")
-		msg, err := NewOutgoingMsg(rt, oa.Org(), channel, c.ID(), out, time.Now(), nil)
+		msg, err := NewOutgoingMsg(rt, oa.Org(), channel, c.ID(), out, time.Now(), extraMetadata)
 		if err != nil {
 			return nil, errors.Wrapf(err, "error creating outgoing message")
 		}
