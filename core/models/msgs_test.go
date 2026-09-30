@@ -220,6 +220,28 @@ func TestOutgoingMsgs(t *testing.T) {
 	}
 }
 
+func TestCreateOutgoingMessagesExtraMetadata(t *testing.T) {
+	ctx, rt, _, _ := testsuite.Get()
+
+	defer testsuite.Reset(testsuite.ResetData)
+
+	oa, err := models.GetOrgAssets(ctx, rt, testdata.Org1.ID)
+	require.NoError(t, err)
+
+	plain, err := models.CreateOutgoingMessages(ctx, rt, oa, []urns.URN{testdata.Cathy.URN}, "plain", nil)
+	require.NoError(t, err)
+	require.Len(t, plain, 1)
+	assert.NotContains(t, plain[0].Metadata(), "message_kind")
+
+	withKind, err := models.CreateOutgoingMessages(ctx, rt, oa, []urns.URN{testdata.Cathy.URN}, "Checking your order", map[string]interface{}{
+		"message_kind": "rationale",
+	})
+	require.NoError(t, err)
+	require.Len(t, withKind, 1)
+	assert.Equal(t, "rationale", withKind[0].Metadata()["message_kind"])
+	assert.Equal(t, "Checking your order", withKind[0].Text())
+}
+
 func TestOutgoingBroadcastMsgResponseToExternalID(t *testing.T) {
 	ctx, rt, _, _ := testsuite.Get()
 
