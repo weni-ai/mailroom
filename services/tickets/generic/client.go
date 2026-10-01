@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"net/url"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/nyaruka/gocommon/httpx"
@@ -97,11 +98,13 @@ func WithRoutes(r Routes) ClientOption {
 // Client is the HTTP client used by the generic ticketer service to call the
 // partner endpoints documented in services/tickets/generic/generic-ticketer-service.md.
 type Client struct {
-	httpClient  *http.Client
-	httpRetries *httpx.RetryConfig
-	baseURL     string
-	apiToken    string
-	routes      Routes
+	httpClient   *http.Client
+	httpRetries  *httpx.RetryConfig
+	baseURL      string
+	apiToken     string
+	routes       Routes
+	mu           sync.Mutex
+	tokenRefresh *TokenRefreshOptions
 }
 
 // NewClient builds a Client targeting the given partner base URL using the
@@ -410,8 +413,51 @@ func (c *Client) sendHistoryMessageRequest(externalID string, payload interface{
 func (c *Client) request(method, endpoint string, payload, response interface{}, idempotencyKey string) (*httpx.Trace, error) {
 	fullURL := c.baseURL + endpoint
 
+	if c.refreshEnabled() && c.tokenExpired() {
+		_ = c.refreshAccessToken()
+	}
+
+	trace, err := c.doTrace(method, fullURL, payload, idempotencyKey)
+	if err != nil {
+		return trace, err
+	}
+
+	if c.refreshEnabled() && c.matchesRefreshWhen(trace) {
+		if rerr := c.refreshAccessToken(); rerr == nil {
+			trace, err = c.doTrace(method, fullURL, payload, idempotencyKey)
+			if err != nil {
+				return trace, err
+			}
+		}
+	}
+
+	if trace.Response.StatusCode >= 400 {
+		clientErr := &ClientError{StatusCode: trace.Response.StatusCode}
+		if len(trace.ResponseBody) > 0 {
+			_ = jsonx.Unmarshal(trace.ResponseBody, clientErr)
+		}
+		if clientErr.Code == "" {
+			clientErr.Message = fmt.Sprintf("HTTP %d", trace.Response.StatusCode)
+		}
+		return trace, clientErr
+	}
+
+	if response != nil && len(trace.ResponseBody) > 0 {
+		if err := jsonx.Unmarshal(trace.ResponseBody, response); err != nil {
+			return trace, errors.Wrap(err, "error unmarshalling response")
+		}
+	}
+
+	return trace, nil
+}
+
+func (c *Client) doTrace(method, fullURL string, payload interface{}, idempotencyKey string) (*httpx.Trace, error) {
+	c.mu.Lock()
+	token := c.apiToken
+	c.mu.Unlock()
+
 	headers := map[string]string{
-		"Authorization": "Bearer " + c.apiToken,
+		"Authorization": "Bearer " + token,
 		"Content-Type":  "application/json",
 		"X-API-Version": apiVersion,
 		"X-Request-Id":  string(uuids.New()),
@@ -441,27 +487,5 @@ func (c *Client) request(method, endpoint string, payload, response interface{},
 		return nil, err
 	}
 
-	trace, err := httpx.DoTrace(c.httpClient, req, c.httpRetries, nil, -1)
-	if err != nil {
-		return trace, err
-	}
-
-	if trace.Response.StatusCode >= 400 {
-		clientErr := &ClientError{StatusCode: trace.Response.StatusCode}
-		if len(trace.ResponseBody) > 0 {
-			_ = jsonx.Unmarshal(trace.ResponseBody, clientErr)
-		}
-		if clientErr.Code == "" {
-			clientErr.Message = fmt.Sprintf("HTTP %d", trace.Response.StatusCode)
-		}
-		return trace, clientErr
-	}
-
-	if response != nil && len(trace.ResponseBody) > 0 {
-		if err := jsonx.Unmarshal(trace.ResponseBody, response); err != nil {
-			return trace, errors.Wrap(err, "error unmarshalling response")
-		}
-	}
-
-	return trace, nil
+	return httpx.DoTrace(c.httpClient, req, c.httpRetries, nil, -1)
 }

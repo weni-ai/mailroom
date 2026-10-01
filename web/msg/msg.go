@@ -22,11 +22,10 @@ func init() {
 
 // Request to resend failed messages.
 //
-//   {
-//     "org_id": 1,
-//     "msg_ids": [123456, 345678]
-//   }
-//
+//	{
+//	  "org_id": 1,
+//	  "msg_ids": [123456, 345678]
+//	}
 type resendRequest struct {
 	OrgID  models.OrgID   `json:"org_id"   validate:"required"`
 	MsgIDs []models.MsgID `json:"msg_ids"  validate:"required"`
@@ -37,6 +36,7 @@ type sendRequest struct {
 	ProjectUUID string     `json:"project_uuid" validate:"required"`
 	URNs        []urns.URN `json:"urns" validate:"required"`
 	Text        string     `json:"text" validate:"required"`
+	MessageKind string     `json:"message_kind,omitempty" validate:"omitempty,oneof=rationale final_response"`
 }
 
 // handles a request to resend the given messages
@@ -90,8 +90,13 @@ func handleSend(ctx context.Context, rt *runtime.Runtime, r *http.Request) (inte
 		return nil, http.StatusInternalServerError, errors.Wrapf(err, "unable to load org assets")
 	}
 
+	var extraMetadata map[string]interface{}
+	if request.MessageKind != "" {
+		extraMetadata = map[string]interface{}{"message_kind": request.MessageKind}
+	}
+
 	// create this message fot the given contacts
-	msgs, err := models.CreateOutgoingMessages(ctx, rt, oa, request.URNs, request.Text)
+	msgs, err := models.CreateOutgoingMessages(ctx, rt, oa, request.URNs, request.Text, extraMetadata)
 	if err != nil {
 		return nil, http.StatusInternalServerError, errors.Wrapf(err, "error sending message")
 	}

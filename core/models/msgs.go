@@ -1546,6 +1546,8 @@ func CreateBroadcastMessages(ctx context.Context, rt *runtime.Runtime, oa *OrgAs
 
 		products := bcast.CatalogMessage().Products
 		sendCatalog := bcast.CatalogMessage().SendCatalog
+		carousel := bcast.CatalogMessage().Carousel
+		actionButtonText := bcast.CatalogMessage().ActionButtonText
 
 		// build up the minimum viable context for evaluation
 		evaluationCtx := types.NewXObject(map[string]types.XValue{
@@ -1565,6 +1567,9 @@ func CreateBroadcastMessages(ctx context.Context, rt *runtime.Runtime, oa *OrgAs
 
 		// evaluate our footer text
 		footerText, _ = excellent.EvaluateTemplate(oa.Env(), evaluationCtx, footerText, nil)
+
+		// evaluate catalog action button text
+		actionButtonText, _ = excellent.EvaluateTemplate(oa.Env(), evaluationCtx, actionButtonText, nil)
 
 		// evaluate our quick replies
 		for i, qr := range quickReplies {
@@ -1590,6 +1595,12 @@ func CreateBroadcastMessages(ctx context.Context, rt *runtime.Runtime, oa *OrgAs
 		}
 		if sendCatalog {
 			broadcastMetadata["send_catalog"] = sendCatalog
+		}
+		if carousel {
+			broadcastMetadata["product_carousel"] = true
+		}
+		if actionButtonText != "" {
+			broadcastMetadata["action"] = actionButtonText
 		}
 
 		// merge with existing extraMetadata (extraMetadata can override broadcastMetadata)
@@ -1678,6 +1689,8 @@ type WppBroadcastTemplate struct {
 	Carousel           []flows.CarouselCard         `json:"carousel,omitempty"`
 }
 
+// namedTemplateFiller is sent when no value is available for a named placeholder.
+// WhatsApp requires a non-empty string, so a single space is used as the minimum valid filler.
 const namedTemplateFiller = " "
 
 func isProvidedNamedValue(value string) bool {
@@ -2332,7 +2345,9 @@ func MarkBroadcastSent(ctx context.Context, db Queryer, id BroadcastID) error {
 	return nil
 }
 
-func CreateOutgoingMessages(ctx context.Context, rt *runtime.Runtime, oa *OrgAssets, URNs []urns.URN, msgText string) ([]*Msg, error) {
+// CreateOutgoingMessages creates outgoing messages for the given URNs.
+// extraMetadata is merged into each message's metadata when it is non-empty.
+func CreateOutgoingMessages(ctx context.Context, rt *runtime.Runtime, oa *OrgAssets, URNs []urns.URN, msgText string, extraMetadata map[string]interface{}) ([]*Msg, error) {
 	// grab our contacts from the passed urns
 	urnContactIDs, err := GetOrCreateContactIDsFromURNs(ctx, rt.DB, oa, URNs)
 	if err != nil {
@@ -2410,7 +2425,7 @@ func CreateOutgoingMessages(ctx context.Context, rt *runtime.Runtime, oa *OrgAss
 
 		// create our outgoing message
 		out := flows.NewMsgOut(urn, channel.ChannelReference(), msgText, nil, nil, nil, flows.NilMsgTopic, "", "", "")
-		msg, err := NewOutgoingMsg(rt, oa.Org(), channel, c.ID(), out, time.Now(), nil)
+		msg, err := NewOutgoingMsg(rt, oa.Org(), channel, c.ID(), out, time.Now(), extraMetadata)
 		if err != nil {
 			return nil, errors.Wrapf(err, "error creating outgoing message")
 		}

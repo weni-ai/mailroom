@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"fmt"
 	"io"
 	"net/http"
 	"strings"
@@ -17,6 +18,7 @@ import (
 	"github.com/nyaruka/mailroom/services/tickets"
 	"github.com/nyaruka/mailroom/web"
 	"github.com/pkg/errors"
+	"github.com/sirupsen/logrus"
 )
 
 var (
@@ -76,6 +78,7 @@ func handleEventCallback(ctx context.Context, rt *runtime.Runtime, r *http.Reque
 	case "msg.create":
 		eMsg := &eventCallbackRequest{}
 		if err := json.Unmarshal([]byte(body), eMsg); err != nil {
+			logrus.Errorf("error unmarshalling event callback request: %v", err)
 			return err, http.StatusInternalServerError, nil
 		}
 
@@ -84,6 +87,18 @@ func handleEventCallback(ctx context.Context, rt *runtime.Runtime, r *http.Reque
 		}
 		if eMsg.Content.ReplyTo != nil && eMsg.Content.ReplyTo.ExternalID != "" {
 			extraMetadata["response_to_external_id"] = eMsg.Content.ReplyTo.ExternalID
+		}
+
+		if eMsg.Content.Catalog.HasCatalog() {
+			header, footer, catalog, catalogMeta := eMsg.Content.Catalog.BroadcastParts()
+			for k, v := range catalogMeta {
+				extraMetadata[k] = v
+			}
+			_, err = tickets.SendReplyWithCatalog(ctx, rt, ticket, eMsg.Content.Text, nil, extraMetadata, header, footer, catalog)
+			if err != nil {
+				return errors.Wrapf(err, "error on send ticket catalog reply"), http.StatusBadRequest, nil
+			}
+			break
 		}
 
 		attachments := []*tickets.File{}
@@ -99,6 +114,7 @@ func handleEventCallback(ctx context.Context, rt *runtime.Runtime, r *http.Reque
 		if txtMsg != "" || len(attachments) > 0 {
 			_, err = tickets.SendReply(ctx, rt, ticket, txtMsg, attachments, extraMetadata)
 			if err != nil {
+				logrus.Errorf("error on send ticket reply: %v", err)
 				return errors.Wrapf(err, "error on send ticket reply"), http.StatusBadRequest, nil
 			}
 		}
@@ -130,8 +146,10 @@ func prepareAttachmentFile(m Attachment) (*tickets.File, error) {
 	if err != nil {
 		return nil, errors.Wrapf(err, "error reading ticket file '%s'", m.URL)
 	}
+
 	if bodyReader.(*io.LimitedReader).N <= 0 {
-		return nil, errors.Wrapf(err, "unable to send media type %s because response body exceeds %d bytes limit", file.ContentType, maxBodyBytes)
+		return nil, fmt.Errorf("unable to send media type %s because response body exceeds %d bytes limit", file.ContentType, maxBodyBytes)
+
 	}
 	file.Body = io.NopCloser(bytes.NewReader(bodyBytes))
 	return file, nil
