@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"slices"
+	"sort"
 	"strings"
 	"time"
 
@@ -1545,6 +1546,8 @@ func CreateBroadcastMessages(ctx context.Context, rt *runtime.Runtime, oa *OrgAs
 
 		products := bcast.CatalogMessage().Products
 		sendCatalog := bcast.CatalogMessage().SendCatalog
+		carousel := bcast.CatalogMessage().Carousel
+		actionButtonText := bcast.CatalogMessage().ActionButtonText
 
 		// build up the minimum viable context for evaluation
 		evaluationCtx := types.NewXObject(map[string]types.XValue{
@@ -1564,6 +1567,9 @@ func CreateBroadcastMessages(ctx context.Context, rt *runtime.Runtime, oa *OrgAs
 
 		// evaluate our footer text
 		footerText, _ = excellent.EvaluateTemplate(oa.Env(), evaluationCtx, footerText, nil)
+
+		// evaluate catalog action button text
+		actionButtonText, _ = excellent.EvaluateTemplate(oa.Env(), evaluationCtx, actionButtonText, nil)
 
 		// evaluate our quick replies
 		for i, qr := range quickReplies {
@@ -1589,6 +1595,12 @@ func CreateBroadcastMessages(ctx context.Context, rt *runtime.Runtime, oa *OrgAs
 		}
 		if sendCatalog {
 			broadcastMetadata["send_catalog"] = sendCatalog
+		}
+		if carousel {
+			broadcastMetadata["product_carousel"] = true
+		}
+		if actionButtonText != "" {
+			broadcastMetadata["action"] = actionButtonText
 		}
 
 		// merge with existing extraMetadata (extraMetadata can override broadcastMetadata)
@@ -1667,12 +1679,67 @@ func CreateBroadcastMessages(ctx context.Context, rt *runtime.Runtime, oa *OrgAs
 }
 
 type WppBroadcastTemplate struct {
-	UUID       assets.TemplateUUID  `json:"uuid" validate:"required,uuid"`
-	Name       string               `json:"name" validate:"required"`
-	Variables  []string             `json:"variables,omitempty"`
-	Locale     string               `json:"locale,omitempty" validate:"omitempty,bcp47"`
-	IsCarousel bool                 `json:"is_carousel,omitempty"`
-	Carousel   []flows.CarouselCard `json:"carousel,omitempty"`
+	UUID               assets.TemplateUUID          `json:"uuid" validate:"required,uuid"`
+	Name               string                       `json:"name" validate:"required"`
+	Variables          []string                     `json:"variables,omitempty"`
+	NamedVariables     map[string]string            `json:"named_variables,omitempty"`
+	RecipientVariables map[string]map[string]string `json:"recipient_variables,omitempty"`
+	Locale             string                       `json:"locale,omitempty" validate:"omitempty,bcp47"`
+	IsCarousel         bool                         `json:"is_carousel,omitempty"`
+	Carousel           []flows.CarouselCard         `json:"carousel,omitempty"`
+}
+
+// namedTemplateFiller is sent when no value is available for a named placeholder.
+// WhatsApp requires a non-empty string, so a single space is used as the minimum valid filler.
+const namedTemplateFiller = " "
+
+func isProvidedNamedValue(value string) bool {
+	return strings.TrimSpace(value) != ""
+}
+
+func resolveNamedTemplateValues(oa *OrgAssets, evaluationCtx *types.XObject, urn urns.URN, tmpl WppBroadcastTemplate, translation *flows.TemplateTranslation) (map[string]string, error) {
+	recipientVals := map[string]string{}
+	if tmpl.RecipientVariables != nil && urn != urns.NilURN {
+		if vals, ok := tmpl.RecipientVariables[string(urn.Identity())]; ok && vals != nil {
+			recipientVals = vals
+		}
+	}
+
+	names := translation.ParameterNames()
+	if len(names) == 0 {
+		seen := map[string]bool{}
+		for name := range recipientVals {
+			seen[name] = true
+		}
+		for name := range tmpl.NamedVariables {
+			seen[name] = true
+		}
+		names = make([]string, 0, len(seen))
+		for name := range seen {
+			names = append(names, name)
+		}
+		sort.Strings(names)
+	}
+
+	resolved := make(map[string]string, len(names))
+	for _, name := range names {
+		if value, ok := recipientVals[name]; ok && isProvidedNamedValue(value) {
+			resolved[name] = value
+			continue
+		}
+		if batchValue, ok := tmpl.NamedVariables[name]; ok && isProvidedNamedValue(batchValue) {
+			sub, err := excellent.EvaluateTemplate(oa.Env(), evaluationCtx, batchValue, nil)
+			if err != nil {
+				return nil, errors.Wrapf(err, "failed to evaluate named template variable %s", name)
+			}
+			if isProvidedNamedValue(sub) {
+				resolved[name] = sub
+				continue
+			}
+		}
+		resolved[name] = namedTemplateFiller
+	}
+	return resolved, nil
 }
 
 type BroadcastMessageHeader struct {
@@ -1707,6 +1774,8 @@ type WppBroadcastMessage struct {
 	DirectSend             bool                      `json:"direct_send,omitempty"`
 	DirectSendTemplateName string                    `json:"direct_send_template_name,omitempty"`
 	TTLSeconds             int                       `json:"ttl_seconds,omitempty"`
+	IGCommentID            string                    `json:"ig_comment_id,omitempty"`
+	IGResponseType         string                    `json:"ig_response_type,omitempty"`
 }
 
 type WppBroadcast struct {
@@ -1965,16 +2034,6 @@ func CreateWppBroadcastMessages(ctx context.Context, rt *runtime.Runtime, oa *Or
 
 			translation := oa.SessionAssets().Templates().FindTranslation(bcast.Msg().Template.UUID, channel.ChannelReference(), locales)
 			if translation != nil {
-				// evaluate our variables
-				evaluatedVariables := make([]string, len(templateVariables))
-				for i, variable := range templateVariables {
-					sub, err := excellent.EvaluateTemplate(oa.Env(), evaluationCtx, variable, nil)
-					if err != nil {
-						return nil, errors.Wrapf(err, "failed to evaluate template variable")
-					}
-					evaluatedVariables[i] = sub
-				}
-
 				var evaluatedCarouselCards []flows.CarouselCard
 				if len(templateCarousel) > 0 {
 					evaluatedCarouselCards = make([]flows.CarouselCard, len(templateCarousel))
@@ -2010,9 +2069,27 @@ func CreateWppBroadcastMessages(ctx context.Context, rt *runtime.Runtime, oa *Or
 					}
 				}
 
-				text = translation.Substitute(evaluatedVariables)
 				var templateReference = assets.NewTemplateReference(bcast.Msg().Template.UUID, bcast.Msg().Template.Name, templateMatch.Category())
-				templating = flows.NewMsgTemplating(templateReference, translation.Language(), translation.Country(), evaluatedVariables, translation.Namespace(), evaluatedCarouselCards, templateIsCarousel)
+				if assets.NormalizeParameterFormat(translation.ParameterFormat()) == assets.ParameterFormatNamed {
+					namedValues, err := resolveNamedTemplateValues(oa, evaluationCtx, urn, bcast.Msg().Template, translation)
+					if err != nil {
+						return nil, err
+					}
+					text = translation.SubstituteNamed(namedValues)
+					templating = flows.NewMsgTemplating(templateReference, translation.Language(), translation.Country(), nil, translation.Namespace(), evaluatedCarouselCards, templateIsCarousel).WithNamedVariables(namedValues)
+				} else {
+					evaluatedVariables := make([]string, len(templateVariables))
+					for i, variable := range templateVariables {
+						sub, err := excellent.EvaluateTemplate(oa.Env(), evaluationCtx, variable, nil)
+						if err != nil {
+							return nil, errors.Wrapf(err, "failed to evaluate template variable")
+						}
+						evaluatedVariables[i] = sub
+					}
+
+					text = translation.Substitute(evaluatedVariables)
+					templating = flows.NewMsgTemplating(templateReference, translation.Language(), translation.Country(), evaluatedVariables, translation.Namespace(), evaluatedCarouselCards, templateIsCarousel)
+				}
 			} else {
 				return nil, errors.Errorf("translation not found for template: %s, in channel: %s", bcast.Msg().Template.UUID, channel.UUID())
 			}
@@ -2081,6 +2158,15 @@ func CreateWppBroadcastMessages(ctx context.Context, rt *runtime.Runtime, oa *Or
 		}
 		if carousel {
 			extraMetadata["product_carousel"] = carousel
+		}
+		if igCommentID := bcast.Msg().IGCommentID; igCommentID != "" {
+			igCommentID, _ = excellent.EvaluateTemplate(oa.Env(), evaluationCtx, igCommentID, nil)
+			if igCommentID != "" {
+				extraMetadata["ig_comment_id"] = igCommentID
+			}
+		}
+		if igResponseType := bcast.Msg().IGResponseType; igResponseType != "" {
+			extraMetadata["ig_response_type"] = igResponseType
 		}
 
 		msg, err := NewOutgoingWppBroadcastMsg(rt, oa.Org(), channel, c, out, time.Now(), bcast.BroadcastID(), highPriority, extraMetadata)

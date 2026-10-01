@@ -128,23 +128,24 @@ func (mr *Mailroom) Start() error {
 		log.Info("redis ok")
 	}
 
-	// create our storage (S3 or file system)
-	if mr.rt.Config.AWSAccessKeyID != "" {
-		s3Client, err := storage.NewS3Client(&storage.S3Options{
-			AWSAccessKeyID:     c.AWSAccessKeyID,
-			AWSSecretAccessKey: c.AWSSecretAccessKey,
-			Endpoint:           c.S3Endpoint,
-			Region:             c.S3Region,
-			DisableSSL:         c.S3DisableSSL,
-			ForcePathStyle:     c.S3ForcePathStyle,
-			MaxRetries:         3,
-		})
+	// create our storage (S3 via IRSA, S3 via static keys, or file system)
+	switch runtime.ResolveStorageAuth(c) {
+	case runtime.StorageAuthIRSA:
+		s3Client, err := runtime.NewS3Client(c, false)
 		if err != nil {
 			return err
 		}
 		mr.rt.MediaStorage = storage.NewS3(s3Client, mr.rt.Config.S3MediaBucket, c.S3Region, 32)
 		mr.rt.SessionStorage = storage.NewS3(s3Client, mr.rt.Config.S3SessionBucket, c.S3Region, 32)
-	} else {
+		log.Info("S3 initialized using IRSA")
+	case runtime.StorageAuthStatic:
+		s3Client, err := runtime.NewS3Client(c, true)
+		if err != nil {
+			return err
+		}
+		mr.rt.MediaStorage = storage.NewS3(s3Client, mr.rt.Config.S3MediaBucket, c.S3Region, 32)
+		mr.rt.SessionStorage = storage.NewS3(s3Client, mr.rt.Config.S3SessionBucket, c.S3Region, 32)
+	default:
 		mr.rt.MediaStorage = storage.NewFS("_storage")
 		mr.rt.SessionStorage = storage.NewFS("_storage")
 	}
