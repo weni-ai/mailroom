@@ -329,7 +329,7 @@ func LoadOrgByProjectUUID(ctx context.Context, cfg *runtime.Config, db sqlx.Quer
 
 const selectOrgByProjectUUID = `
 SELECT ROW_TO_JSON(o) FROM (SELECT
-	id,
+	o.id,
 	is_suspended,
 	uses_topups,
 	brain_on,

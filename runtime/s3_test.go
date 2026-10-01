@@ -26,8 +26,14 @@ func TestResolveStorageAuth(t *testing.T) {
 	t.Setenv("AWS_ROLE_ARN", "arn:aws:iam::123456789012:role/mailroom")
 	assert.Equal(t, runtime.StorageAuthIRSA, runtime.ResolveStorageAuth(cfg))
 
+	cfg.AWSForceStaticCredentials = true
+	assert.Equal(t, runtime.StorageAuthStatic, runtime.ResolveStorageAuth(cfg))
+
 	cfg.AWSAccessKeyID = ""
 	cfg.AWSSecretAccessKey = ""
+	assert.Equal(t, runtime.StorageAuthFS, runtime.ResolveStorageAuth(cfg))
+
+	cfg.AWSForceStaticCredentials = false
 	assert.Equal(t, runtime.StorageAuthIRSA, runtime.ResolveStorageAuth(cfg))
 }
 

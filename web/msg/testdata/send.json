@@ -1,0 +1,103 @@
+[
+    {
+        "label": "plain text send leaves metadata null",
+        "method": "POST",
+        "path": "/mr/msg/send",
+        "body": {
+            "user": "admin1@nyaruka.com",
+            "project_uuid": "$project_uuid$",
+            "urns": [
+                "$cathy_urn$"
+            ],
+            "text": "hello"
+        },
+        "status": 200,
+        "response": {
+            "msg_ids": [
+                1
+            ]
+        },
+        "db_assertions": [
+            {
+                "query": "SELECT count(*) FROM msgs_msg WHERE text = 'hello' AND metadata IS NULL",
+                "count": 1
+            }
+        ]
+    },
+    {
+        "label": "rationale is stored on message metadata",
+        "method": "POST",
+        "path": "/mr/msg/send",
+        "body": {
+            "user": "admin1@nyaruka.com",
+            "project_uuid": "$project_uuid$",
+            "urns": [
+                "$cathy_urn$"
+            ],
+            "text": "Checking your order...",
+            "message_kind": "rationale"
+        },
+        "status": 200,
+        "response": {
+            "msg_ids": [
+                2
+            ]
+        },
+        "db_assertions": [
+            {
+                "query": "SELECT count(*) FROM msgs_msg WHERE metadata::jsonb->>'message_kind' = 'rationale'",
+                "count": 1
+            }
+        ]
+    },
+    {
+        "label": "final_response is stored on message metadata",
+        "method": "POST",
+        "path": "/mr/msg/send",
+        "body": {
+            "user": "admin1@nyaruka.com",
+            "project_uuid": "$project_uuid$",
+            "urns": [
+                "$cathy_urn$"
+            ],
+            "text": "Your order has shipped.",
+            "message_kind": "final_response"
+        },
+        "status": 200,
+        "response": {
+            "msg_ids": [
+                3
+            ]
+        },
+        "db_assertions": [
+            {
+                "query": "SELECT count(*) FROM msgs_msg WHERE metadata::jsonb->>'message_kind' = 'final_response'",
+                "count": 1
+            }
+        ]
+    },
+    {
+        "label": "invalid message_kind is rejected",
+        "method": "POST",
+        "path": "/mr/msg/send",
+        "body": {
+            "user": "admin1@nyaruka.com",
+            "project_uuid": "$project_uuid$",
+            "urns": [
+                "$cathy_urn$"
+            ],
+            "text": "nope",
+            "message_kind": "bogus"
+        },
+        "status": 400,
+        "response": {
+            "error": "request failed validation: field 'message_kind' failed tag 'oneof'"
+        },
+        "db_assertions": [
+            {
+                "query": "SELECT count(*) FROM msgs_msg WHERE text = 'nope'",
+                "count": 0
+            }
+        ]
+    }
+]

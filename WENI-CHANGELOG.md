@@ -1,3 +1,31 @@
+1.102.0
+----------
+ * feat: livedesk carousel suport from livedesk to contact
+
+1.101.0
+----------
+ * feat: add disable_ai_response channel configuration and related routing logic
+
+1.100.0
+----------
+ * feat: named WhatsApp template variables — load parameter format/names, evaluate batch named values, substitute named placeholders (goflow v1.20.5)
+
+1.99.0
+----------
+* feat: Add forward_comments configuration and update Instagram comment routing logic
+
+1.98.0
+----------
+* Implement test for Instagram comment routing to Nexus and update message handling logic
+
+1.97.3
+----------
+* feat: livedesk unified send reply message
+
+1.97.2
+----------
+* feat: IRSA for aws s3 bucket acces
+
 1.97.1
 ----------
 * fix: strategy for agent livedesk can reply contact msg on whatsapp with context msg
