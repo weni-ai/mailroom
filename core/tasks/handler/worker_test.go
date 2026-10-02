@@ -915,7 +915,6 @@ func TestApplyContactFieldModifiers(t *testing.T) {
 		assert.Equal(t, assets.FieldTypeText, field.Type())
 	})
 
-
 	fields := []struct {
 		key   string
 		value string
@@ -958,7 +957,6 @@ func TestApplyContactFieldModifiers(t *testing.T) {
 			assert.Equal(t, assets.FieldTypeText, field.Type())
 		})
 	}
-
 
 	t.Run("both whitelisted fields in one event", func(t *testing.T) {
 		db.MustExec(`DELETE FROM contacts_contactfield WHERE org_id = $1 AND key IN ('segment', 'orderform', 'email', 'session', 'vtex_account')`, testdata.Org1.ID)
@@ -1026,4 +1024,14 @@ func TestApplyContactFieldModifiers(t *testing.T) {
 			testdata.Org1.ID,
 		).Returns(0)
 	})
+}
+
+func TestCTWASourceIDFromMetadata(t *testing.T) {
+	assert.Equal(t, "", ctwaSourceIDFromMetadata(nil))
+	assert.Equal(t, "", ctwaSourceIDFromMetadata(json.RawMessage(`{}`)))
+	assert.Equal(t, "", ctwaSourceIDFromMetadata(json.RawMessage(`{"referral": {}}`)))
+	assert.Equal(t, "", ctwaSourceIDFromMetadata(json.RawMessage(`{"referral": {"source_id": "  "}}`)))
+	assert.Equal(t, "campaign-a", ctwaSourceIDFromMetadata(json.RawMessage(`{"referral": {"source_id": " campaign-a "}}`)))
+	assert.Equal(t, "SOURCE_ID", ctwaSourceIDFromMetadata(json.RawMessage(`{"source_id": "SOURCE_ID"}`)))
+	assert.Equal(t, "SOURCE_ID", ctwaSourceIDFromMetadata(json.RawMessage(`{"referral": {}, "source_id": "SOURCE_ID"}`)))
 }

@@ -575,6 +575,10 @@ func handleMsgEvent(ctx context.Context, rt *runtime.Runtime, event *MsgEvent) e
 		newContact = true
 	}
 
+	if ctwaSourceIDFromMetadata(event.Metadata) != "" {
+		recalculateDynamicGroups = true
+	}
+
 	// if this is a new contact or fields were updated, we need to calculate dynamic groups
 	if newContact || recalculateDynamicGroups {
 		err = models.CalculateDynamicGroups(ctx, rt.DB, oa, []*flows.Contact{contact})
@@ -1126,6 +1130,30 @@ type MsgEvent struct {
 	CreatedOn        time.Time          `json:"created_on"`
 	Metadata         json.RawMessage    `json:"metadata"`
 	NewContactFields map[string]string  `json:"new_contact_fields"`
+}
+
+func ctwaSourceIDFromMetadata(raw json.RawMessage) string {
+	if len(raw) == 0 {
+		return ""
+	}
+
+	var meta struct {
+		Referral *struct {
+			SourceID string `json:"source_id"`
+		} `json:"referral"`
+		SourceID string `json:"source_id"`
+	}
+	if err := json.Unmarshal(raw, &meta); err != nil {
+		return ""
+	}
+
+	if meta.Referral != nil {
+		if id := strings.TrimSpace(meta.Referral.SourceID); id != "" {
+			return id
+		}
+	}
+
+	return strings.TrimSpace(meta.SourceID)
 }
 
 type StopEvent struct {

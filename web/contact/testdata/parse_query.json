@@ -259,5 +259,48 @@
                 "allow_as_group": false
             }
         }
+    },
+    {
+        "label": "ctwa_source_id equality query",
+        "method": "POST",
+        "path": "/mr/contact/parse_query",
+        "body": {
+            "org_id": 1,
+            "query": "ctwa_source_id = \"campaign-a\""
+        },
+        "status": 200,
+        "response": {
+            "query": "ctwa_source_id = \"campaign-a\"",
+            "elastic_query": {
+                "bool": {
+                    "must": [
+                        {
+                            "term": {
+                                "org_id": 1
+                            }
+                        },
+                        {
+                            "term": {
+                                "is_active": true
+                            }
+                        },
+                        {
+                            "term": {
+                                "ctwa_source_ids": "campaign-a"
+                            }
+                        }
+                    ]
+                }
+            },
+            "metadata": {
+                "attributes": [
+                    "ctwa_source_id"
+                ],
+                "schemes": [],
+                "fields": [],
+                "groups": [],
+                "allow_as_group": true
+            }
+        }
     }
 ]
