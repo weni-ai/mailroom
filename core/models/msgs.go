@@ -1697,13 +1697,32 @@ func isProvidedNamedValue(value string) bool {
 	return strings.TrimSpace(value) != ""
 }
 
-func resolveNamedTemplateValues(oa *OrgAssets, evaluationCtx *types.XObject, urn urns.URN, tmpl WppBroadcastTemplate, translation *flows.TemplateTranslation) (map[string]string, error) {
-	recipientVals := map[string]string{}
-	if tmpl.RecipientVariables != nil && urn != urns.NilURN {
-		if vals, ok := tmpl.RecipientVariables[string(urn.Identity())]; ok && vals != nil {
-			recipientVals = vals
+// recipientVariablesForURN returns the named values for a recipient URN.
+// Brazilian WhatsApp numbers are looked up with and without the extra ninth digit
+// so a request keyed as 5586981800114 still matches a contact stored as 558681800114.
+func recipientVariablesForURN(recipientVariables map[string]map[string]string, urn urns.URN) map[string]string {
+	if recipientVariables == nil || urn == urns.NilURN {
+		return map[string]string{}
+	}
+
+	identity := string(urn.Identity())
+	if vals, ok := recipientVariables[identity]; ok && vals != nil {
+		return vals
+	}
+
+	variation := generateWhatsAppURNVariation(urn.Identity())
+	variationKey := string(variation.Identity())
+	if variationKey != "" && variationKey != identity {
+		if vals, ok := recipientVariables[variationKey]; ok && vals != nil {
+			return vals
 		}
 	}
+
+	return map[string]string{}
+}
+
+func resolveNamedTemplateValues(oa *OrgAssets, evaluationCtx *types.XObject, urn urns.URN, tmpl WppBroadcastTemplate, translation *flows.TemplateTranslation) (map[string]string, error) {
+	recipientVals := recipientVariablesForURN(tmpl.RecipientVariables, urn)
 
 	names := translation.ParameterNames()
 	if len(names) == 0 {
