@@ -1,3 +1,7 @@
+1.103.0
+----------
+ * fix: resolve named template recipient variables across Brazilian WhatsApp ninth-digit URN variants
+
 1.102.0
 ----------
  * feat: livedesk carousel suport from livedesk to contact
