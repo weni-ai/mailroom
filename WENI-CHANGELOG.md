@@ -3,6 +3,10 @@
 * feat: load CTWA source ids on contacts and evaluate ctwa_source_id queries (goflow v1.21.0-staging)
 * refactor: parse CTWA source id from message metadata with a typed JSON struct
 
+1.102.1
+----------
+ * fix: resolve named template recipient variables across Brazilian WhatsApp ninth-digit URN variants
+
 1.102.0
 ----------
  * feat: livedesk carousel suport from livedesk to contact
