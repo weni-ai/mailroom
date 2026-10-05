@@ -1,4 +1,4 @@
-1.103.0
+1.102.1
 ----------
  * fix: resolve named template recipient variables across Brazilian WhatsApp ninth-digit URN variants
 
