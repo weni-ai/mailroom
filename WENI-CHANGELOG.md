@@ -1,3 +1,7 @@
+1.103.0
+----------
+ * feat: introduce generic ticketer configurable renewal or refresh token funcionality
+
 1.102.0
 ----------
  * feat: livedesk carousel suport from livedesk to contact
