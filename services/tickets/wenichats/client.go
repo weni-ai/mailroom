@@ -12,6 +12,8 @@ import (
 	"github.com/nyaruka/gocommon/httpx"
 	"github.com/nyaruka/gocommon/jsonx"
 	"github.com/nyaruka/goflow/assets"
+	"github.com/nyaruka/goflow/flows"
+	"github.com/nyaruka/mailroom/core/models"
 	"github.com/nyaruka/mailroom/runtime"
 	"github.com/nyaruka/null"
 	"github.com/pkg/errors"
@@ -268,13 +270,54 @@ type MessageResponse struct {
 		} `json:"custom_fields"`
 		CreatedOn time.Time `json:"created_on"`
 	} `json:"contact"`
-	Text      string       `json:"text"`
-	Seen      bool         `json:"seen"`
-	Media     []Attachment `json:"media"`
-	CreatedOn string       `json:"created_on"`
+	Text      string          `json:"text"`
+	Seen      bool            `json:"seen"`
+	Media     []Attachment    `json:"media"`
+	CreatedOn string          `json:"created_on"`
+	Catalog   *CatalogContent `json:"catalog,omitempty"`
 	ReplyTo   *struct {
 		ExternalID string `json:"external_id"`
 	} `json:"reply_to,omitempty"`
+}
+
+// CatalogContent is a product catalog sent by a Chats agent to the contact.
+type CatalogContent struct {
+	Products    []flows.ProductEntry `json:"products,omitempty"`
+	Action      string               `json:"action,omitempty"`
+	SendCatalog bool                 `json:"send_catalog,omitempty"`
+	Carousel    bool                 `json:"carousel,omitempty"`
+	Header      string               `json:"header,omitempty"`
+	Footer      string               `json:"footer,omitempty"`
+}
+
+func (c *CatalogContent) HasCatalog() bool {
+	if c == nil {
+		return false
+	}
+	return c.Carousel || c.SendCatalog || len(c.Products) > 0
+}
+
+func (c *CatalogContent) BroadcastParts() (models.BroadcastMessageHeader, string, models.BroadcastCatalogMessage, map[string]interface{}) {
+	header := models.BroadcastMessageHeader{}
+	if c.Header != "" {
+		header = models.BroadcastMessageHeader{Type: "text", Text: c.Header}
+	}
+
+	catalog := models.BroadcastCatalogMessage{
+		Products:         c.Products,
+		ActionButtonText: c.Action,
+		SendCatalog:      c.SendCatalog,
+		Carousel:         c.Carousel,
+	}
+
+	extra := map[string]interface{}{}
+	if c.Carousel {
+		extra["product_carousel"] = true
+	}
+	if c.Action != "" {
+		extra["action"] = c.Action
+	}
+	return header, c.Footer, catalog, extra
 }
 
 type Attachment struct {

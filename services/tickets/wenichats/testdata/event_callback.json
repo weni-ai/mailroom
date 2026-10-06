@@ -134,7 +134,7 @@
         "text": "1234",
         "media": [
           {
-            "type": "image/jpg",
+            "content_type": "image/jpg",
             "url": "https://link.to/image.jpg"
           }
         ]
@@ -154,7 +154,54 @@
     },
     "db_assertions": [
       {
-        "query": "select count(*) from msgs_msg where direction = 'O' and attachments = '{text/plain:https:///_test_media_storage/media/1/c34b/6c7d/c34b6c7d-fa06-4563-92a3-d648ab64bccb.jpg}'",
+        "query": "select count(*) from msgs_msg where direction = 'O' and text = '1234' and attachments = '{image/jpg:https:///_test_media_storage/media/1/c34b/6c7d/c34b6c7d-fa06-4563-92a3-d648ab64bccb.jpg}'",
+        "count": 1
+      }
+    ]
+  },
+  {
+    "label": "create product carousel catalog message",
+    "method": "POST",
+    "path": "/mr/tickets/types/wenichats/event_callback/006d224e-107f-4e18-afb2-f41fe302abdc/$cathy_ticket_uuid$",
+    "body": {
+      "type": "msg.create",
+      "content": {
+        "uuid": "da84ab60-8b18-4054-8a97-22edc5fb1d2f",
+        "text": "Check out our carousel",
+        "catalog": {
+          "carousel": true,
+          "action": "View products",
+          "header": "Weekly highlights",
+          "footer": "Swipe to see more",
+          "products": [
+            {
+              "product": "highlights",
+              "product_retailer_ids": ["5371#1", "5372#1"],
+              "product_retailer_info": [
+                {
+                  "retailer_id": "5371#1",
+                  "name": "Blusa UV Coyote",
+                  "price": "189.90",
+                  "sale_price": "149.90",
+                  "currency": "BRL",
+                  "image": "https://example.com/blusa.jpg",
+                  "description": "Camisa com proteção UV",
+                  "seller_id": "1",
+                  "product_url": "https://loja.com/blusa-coyote"
+                }
+              ]
+            }
+          ]
+        }
+      }
+    },
+    "status": 200,
+    "response": {
+      "status": "handled"
+    },
+    "db_assertions": [
+      {
+        "query": "select count(*) from msgs_msg where direction = 'O' and text = 'Check out our carousel' and metadata::jsonb->>'product_carousel' = 'true' and metadata::jsonb->>'chats_msg_uuid' = 'da84ab60-8b18-4054-8a97-22edc5fb1d2f' and metadata::jsonb->>'action' = 'View products' and metadata::jsonb->>'header_text' = 'Weekly highlights' and metadata::jsonb->>'footer' = 'Swipe to see more' and metadata::jsonb->'products' @> '[{\"product\":\"highlights\",\"product_retailer_ids\":[\"5371#1\",\"5372#1\"]}]'",
         "count": 1
       }
     ]

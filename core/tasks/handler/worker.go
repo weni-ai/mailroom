@@ -633,8 +633,7 @@ func handleMsgEvent(ctx context.Context, rt *runtime.Runtime, event *MsgEvent) e
 		return markMsgHandled(ctx, tx, contact, msgIn, models.MsgTypeFlow, topupID, tickets)
 	}
 
-	// check whether it is to direct to the brain or not
-	isBrain := oa.Org().BrainOn() && !isIGComment
+	isBrain := oa.Org().BrainOn()
 
 	// we found a trigger and their session is nil or doesn't ignore keywords
 	if shouldFireTrigger(trigger, flow, isBrain) {
@@ -654,7 +653,7 @@ func handleMsgEvent(ctx context.Context, rt *runtime.Runtime, event *MsgEvent) e
 		return nil
 	}
 
-	if isBrain && len(tickets) == 0 {
+	if isBrain && len(tickets) == 0 && shouldRouteToBrain(channel, isIGComment) {
 		if err := handleBrainRouting(ctx, rt, oa, contact, event, channel, topupID); err != nil {
 			return err
 		}
@@ -667,6 +666,27 @@ func handleMsgEvent(ctx context.Context, rt *runtime.Runtime, event *MsgEvent) e
 	}
 
 	return nil
+}
+
+// shouldRouteToBrain reports whether the incoming message should be sent to the
+// external router. disable_ai_response skips routing only when the channel sets
+// it to true. Channels that omit the flag keep routing. Direct messages route
+// when BrainOn; Instagram comments also require forward_comments.
+func shouldRouteToBrain(channel *models.Channel, isIGComment bool) bool {
+	if channel.ConfigBoolValue(models.ChannelConfigDisableAIResponse, false) {
+		return false
+	}
+	return shouldRouteIGCommentToBrain(channel, isIGComment)
+}
+
+// shouldRouteIGCommentToBrain returns whether an Instagram feed comment should be sent to the
+// external router. Direct messages always route when BrainOn; comments only route when the
+// channel has forward_comments enabled.
+func shouldRouteIGCommentToBrain(channel *models.Channel, isIGComment bool) bool {
+	if !isIGComment {
+		return true
+	}
+	return channel.ConfigBoolValue(models.ChannelConfigForwardComments, false)
 }
 
 // handleBrainRouting sends the incoming message to the external router (brain) when BrainOn is
@@ -781,13 +801,13 @@ func shouldFireTrigger(trigger *models.Trigger, flow *models.Flow, isBrain bool)
 
 // fields that should be auto-created when received but not present in the org
 var autoCreateFieldKeys = map[string]string{
-	"segment":          "Segment",
-	"orderform":        "Orderform",
-	"email":            "Email",
-	"session":          "Session",
-	"vtex_account":     "Vtex account",
-	"marketing_opt_in": "Marketing opt-in",
-	"whatsapp_username": "WhatsApp username",
+	"segment":            "Segment",
+	"orderform":          "Orderform",
+	"email":              "Email",
+	"session":            "Session",
+	"vtex_account":       "Vtex account",
+	"marketing_opt_in":   "Marketing opt-in",
+	"whatsapp_username":  "WhatsApp username",
 	"instagram_username": "Instagram username",
 	"ctwa_clid":          "CTWA CLID",
 }

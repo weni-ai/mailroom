@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
-	"path"
 	"strconv"
 	"time"
 
@@ -22,6 +21,7 @@ import (
 	"github.com/nyaruka/mailroom/core/models"
 	"github.com/nyaruka/mailroom/core/runner"
 	"github.com/nyaruka/mailroom/runtime"
+	"github.com/nyaruka/mailroom/utils/urlx"
 	"github.com/nyaruka/null"
 
 	"github.com/gomodule/redigo/redis"
@@ -564,7 +564,7 @@ func buildMsgResume(
 		}
 
 		// filename is based on our org id and msg UUID
-		filename := string(msgUUID) + path.Ext(resume.Attachment.URL())
+		filename := string(msgUUID) + urlx.Ext(resume.Attachment.URL())
 
 		resume.Attachment, err = oa.Org().StoreAttachment(ctx, rt, filename, resume.Attachment.ContentType(), resp.Body)
 		if err != nil {
