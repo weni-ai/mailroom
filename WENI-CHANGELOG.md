@@ -1,3 +1,7 @@
+1.103.1
+----------
+ * fix: resolve named template recipient variables across Brazilian WhatsApp ninth-digit URN variants
+
 1.103.0
 ----------
  * feat: introduce generic ticketer configurable renewal or refresh token funcionality
