@@ -99,6 +99,9 @@ func ResolveProtocol(ctx context.Context, db QueryerWithTx, in ResolveInput) (Re
 			return ResolveOutput{}, err
 		}
 		if hit != nil && hit.State == ProtocolOpen {
+			if err := refreshOpenAIDeadline(ctx, tx, in.OrgID, hit.ID); err != nil {
+				return ResolveOutput{}, err
+			}
 			if err := tx.Commit(); err != nil {
 				return ResolveOutput{}, err
 			}
@@ -114,6 +117,9 @@ func ResolveProtocol(ctx context.Context, db QueryerWithTx, in ResolveInput) (Re
 		return ResolveOutput{}, err
 	}
 	if openHit != nil {
+		if err := refreshOpenAIDeadline(ctx, tx, in.OrgID, openHit.ID); err != nil {
+			return ResolveOutput{}, err
+		}
 		if err := tx.Commit(); err != nil {
 			return ResolveOutput{}, err
 		}
@@ -130,7 +136,10 @@ func ResolveProtocol(ctx context.Context, db QueryerWithTx, in ResolveInput) (Re
 		}
 	}
 
-	hours := inactivityHours(ctx, tx, in.OrgID, "ai_inactivity_hours", defaultAIInactivityHours, 1, 24)
+	hours, err := inactivityHours(ctx, tx, in.OrgID, "ai_inactivity_hours", defaultAIInactivityHours, 1, 24)
+	if err != nil {
+		return ResolveOutput{}, err
+	}
 	var pred interface{}
 	if predecessor != nil {
 		pred = *predecessor
@@ -155,7 +164,7 @@ INSERT INTO msgs_protocol (
 	)
 	if err != nil {
 		if _, rbErr := tx.ExecContext(ctx, `ROLLBACK TO SAVEPOINT protocol_insert`); rbErr != nil {
-			return ResolveOutput{}, errors.Wrap(err, "error opening protocol")
+			return ResolveOutput{}, errors.Wrap(rbErr, "error rolling back protocol insert")
 		}
 		if isUniqueViolation(err) && in.ExternalID != "" {
 			hit, findErr := findProtocol(ctx, tx, `SELECT id, state, predecessor_id FROM msgs_protocol WHERE org_id = $1 AND urn_id = $2 AND external_id = $3`, in.OrgID, in.URNID, in.ExternalID)
@@ -304,10 +313,14 @@ FROM msgs_protocol WHERE id = $1 AND org_id = $2`, protocolID, orgID)
 	if err != nil {
 		return err
 	}
-	if row.State != ProtocolOpen {
+	if row.State != ProtocolOpen || row.TimerKind == nil || *row.TimerKind != ProtocolTimerHuman {
 		return nil
 	}
-	limit := time.Duration(inactivityHours(ctx, db, orgID, "human_inactivity_hours", defaultHumanInactivityHours, 1, 672)) * time.Hour
+	hours, err := inactivityHours(ctx, db, orgID, "human_inactivity_hours", defaultHumanInactivityHours, 1, 672)
+	if err != nil {
+		return err
+	}
+	limit := time.Duration(hours) * time.Hour
 	accumulated := time.Duration(row.IdleAccumulated) * time.Second
 	now := time.Now()
 	if pause {
@@ -318,7 +331,7 @@ FROM msgs_protocol WHERE id = $1 AND org_id = $2`, protocolID, orgID)
 		_, err = db.ExecContext(ctx, `
 UPDATE msgs_protocol
 SET timer_paused = true, timer_deadline = NULL, idle_accumulated = $2
-WHERE id = $1 AND state = 'open' AND timer_paused = false`, protocolID, int(accumulated/time.Second))
+WHERE id = $1 AND state = 'open' AND timer_paused = false AND timer_kind = 'human'`, protocolID, int(accumulated/time.Second))
 		return err
 	}
 	if !row.TimerPaused {
@@ -328,7 +341,7 @@ WHERE id = $1 AND state = 'open' AND timer_paused = false`, protocolID, int(accu
 	_, err = db.ExecContext(ctx, `
 UPDATE msgs_protocol
 SET timer_paused = false, timer_deadline = $2
-WHERE id = $1 AND state = 'open' AND timer_paused = true`, protocolID, deadline)
+WHERE id = $1 AND state = 'open' AND timer_paused = true AND timer_kind = 'human'`, protocolID, deadline)
 	return err
 }
 
@@ -405,17 +418,38 @@ func findProtocol(ctx context.Context, db Queryer, query string, args ...interfa
 	return &hit, nil
 }
 
-func inactivityHours(ctx context.Context, db Queryer, orgID OrgID, key string, def, min, max int) int {
+func inactivityHours(ctx context.Context, db Queryer, orgID OrgID, key string, def, min, max int) (int, error) {
 	var raw sql.NullString
 	err := db.GetContext(ctx, &raw, `SELECT NULLIF(COALESCE(config, '{}')::json->>$2, '') FROM orgs_org WHERE id = $1`, orgID, key)
-	if err != nil || !raw.Valid {
-		return def
+	if err == sql.ErrNoRows || (err == nil && !raw.Valid) {
+		return def, nil
+	}
+	if err != nil {
+		return def, err
 	}
 	hours, err := strconv.Atoi(raw.String)
 	if err != nil {
-		return def
+		return def, nil
 	}
-	return clamp(hours, min, max, def)
+	return clamp(hours, min, max, def), nil
+}
+
+// refreshOpenAIDeadline measures AI inactivity from this shopper message.
+// The human timer starts at handover and is not moved by later messages.
+func refreshOpenAIDeadline(ctx context.Context, db Queryer, orgID OrgID, protocolID int64) error {
+	hours, err := inactivityHours(ctx, db, orgID, "ai_inactivity_hours", defaultAIInactivityHours, 1, 24)
+	if err != nil {
+		return err
+	}
+	_, err = db.ExecContext(ctx, `
+UPDATE msgs_protocol
+SET timer_deadline = NOW() + make_interval(hours => $3)
+WHERE id = $1 AND org_id = $2 AND state = 'open' AND timer_paused = false
+  AND (timer_kind IS NULL OR timer_kind = '' OR timer_kind = 'ai')`, protocolID, orgID, hours)
+	if IsMissingProtocolSchema(err) {
+		return nil
+	}
+	return err
 }
 
 func clamp(value, min, max, def int) int {
