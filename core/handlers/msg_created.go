@@ -114,12 +114,15 @@ func handleMsgCreated(ctx context.Context, rt *runtime.Runtime, tx *sqlx.Tx, oa 
 
 	if protocolID := models.TurnProtocolIDFromContext(ctx); protocolID != 0 {
 		state, err := models.ProtocolState(ctx, tx, protocolID)
-		if err != nil && !models.IsMissingProtocolSchema(err) {
-			return errors.Wrap(err, "error reading protocol")
-		}
-		msg.SetTurnProtocolID(protocolID)
-		if state == models.ProtocolClosed {
-			msg.MarkFailed(models.MsgFailedClosedProtocol)
+		if err != nil {
+			if !models.IsMissingProtocolSchema(err) {
+				return errors.Wrap(err, "error reading protocol")
+			}
+		} else {
+			msg.SetTurnProtocolID(protocolID)
+			if state == models.ProtocolClosed {
+				msg.MarkFailed(models.MsgFailedClosedProtocol)
+			}
 		}
 	}
 

@@ -139,6 +139,9 @@ func ResolveProtocol(ctx context.Context, db QueryerWithTx, in ResolveInput) (Re
 	if in.ExternalID != "" {
 		external = in.ExternalID
 	}
+	if _, err := tx.ExecContext(ctx, `SAVEPOINT protocol_insert`); err != nil {
+		return ResolveOutput{}, errors.Wrap(err, "error opening protocol")
+	}
 	var id int64
 	err = tx.GetContext(ctx, &id, `
 INSERT INTO msgs_protocol (
@@ -151,6 +154,9 @@ INSERT INTO msgs_protocol (
 		string(uuids.New()), in.OrgID, in.ContactID, in.URNID, external, pred, hours,
 	)
 	if err != nil {
+		if _, rbErr := tx.ExecContext(ctx, `ROLLBACK TO SAVEPOINT protocol_insert`); rbErr != nil {
+			return ResolveOutput{}, errors.Wrap(err, "error opening protocol")
+		}
 		if isUniqueViolation(err) && in.ExternalID != "" {
 			hit, findErr := findProtocol(ctx, tx, `SELECT id, state, predecessor_id FROM msgs_protocol WHERE org_id = $1 AND urn_id = $2 AND external_id = $3`, in.OrgID, in.URNID, in.ExternalID)
 			if findErr != nil {
@@ -192,10 +198,15 @@ func ProtocolState(ctx context.Context, db Queryer, protocolID int64) (string, e
 
 // BindMessageProtocol stores protocol_id on a message that was inserted without the column.
 func BindMessageProtocol(ctx context.Context, db Queryer, msgID int64, protocolID int64) error {
-	if protocolID == 0 {
+	return BindMessagesProtocol(ctx, db, []int64{msgID}, protocolID)
+}
+
+// BindMessagesProtocol stores one protocol_id on every listed message.
+func BindMessagesProtocol(ctx context.Context, db Queryer, msgIDs []int64, protocolID int64) error {
+	if protocolID == 0 || len(msgIDs) == 0 {
 		return nil
 	}
-	_, err := db.ExecContext(ctx, `UPDATE msgs_msg SET protocol_id = $2 WHERE id = $1`, msgID, protocolID)
+	_, err := db.ExecContext(ctx, `UPDATE msgs_msg SET protocol_id = $2 WHERE id = ANY($1)`, pq.Array(msgIDs), protocolID)
 	if IsMissingProtocolSchema(err) {
 		return nil
 	}
