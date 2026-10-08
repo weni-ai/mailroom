@@ -3,6 +3,7 @@ package models
 import (
 	"context"
 	"database/sql"
+	"strconv"
 	"time"
 
 	"github.com/lib/pq"
@@ -399,12 +400,9 @@ func inactivityHours(ctx context.Context, db Queryer, orgID OrgID, key string, d
 	if err != nil || !raw.Valid {
 		return def
 	}
-	hours := 0
-	for _, ch := range raw.String {
-		if ch < '0' || ch > '9' {
-			return def
-		}
-		hours = hours*10 + int(ch-'0')
+	hours, err := strconv.Atoi(raw.String)
+	if err != nil {
+		return def
 	}
 	return clamp(hours, min, max, def)
 }
