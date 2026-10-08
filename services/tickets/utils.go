@@ -211,6 +211,10 @@ func Close(ctx context.Context, rt *runtime.Runtime, oa *models.OrgAssets, ticke
 		return errors.Wrap(err, "error closing ticket")
 	}
 
+	if err := models.CloseOpenProtocolsForContact(ctx, rt.DB, ticket.ContactID(), models.ProtocolCloseTicket); err != nil {
+		return errors.Wrap(err, "error closing protocols")
+	}
+
 	if len(events) == 1 {
 		rc := rt.RP.Get()
 		defer rc.Close()

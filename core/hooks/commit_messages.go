@@ -43,5 +43,19 @@ func (h *commitMessagesHook) Apply(ctx context.Context, rt *runtime.Runtime, tx 
 		return errors.Wrapf(err, "error writing messages")
 	}
 
+	byProtocol := map[int64][]int64{}
+	for _, msg := range msgs {
+		protocolID := msg.TurnProtocolID()
+		if protocolID == 0 {
+			continue
+		}
+		byProtocol[protocolID] = append(byProtocol[protocolID], int64(msg.ID()))
+	}
+	for protocolID, ids := range byProtocol {
+		if err := models.BindMessagesProtocol(ctx, tx, ids, protocolID); err != nil {
+			return errors.Wrap(err, "error binding protocol to outgoing messages")
+		}
+	}
+
 	return nil
 }

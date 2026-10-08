@@ -89,6 +89,7 @@ const (
 	MsgFailedNoDestination   = MsgFailedReason("D")
 	MsgFailedSuspendTemplate = MsgFailedReason("T")
 	MsgFailedMarketingOptOut = MsgFailedReason("M")
+	MsgFailedClosedProtocol  = MsgFailedReason("P")
 )
 
 // BroadcastID is our internal type for broadcast ids, which can be null/0
@@ -153,7 +154,8 @@ type Msg struct {
 		SessionTimeout       int        `json:"session_timeout,omitempty"`
 	}
 
-	channel *Channel
+	channel        *Channel
+	turnProtocolID int64
 }
 
 func (m *Msg) ID() flows.MsgID                  { return m.m.ID }
@@ -187,6 +189,14 @@ func (m *Msg) ContactName() string              { return m.m.ContactName }
 func (m *Msg) ContactURNID() *URNID             { return m.m.ContactURNID }
 func (m *Msg) IsResend() bool                   { return m.m.IsResend }
 func (m *Msg) Template() null.String            { return m.m.Template }
+func (m *Msg) TurnProtocolID() int64            { return m.turnProtocolID }
+
+func (m *Msg) SetTurnProtocolID(id int64) { m.turnProtocolID = id }
+
+func (m *Msg) MarkFailed(reason MsgFailedReason) {
+	m.m.Status = MsgStatusFailed
+	m.m.FailedReason = reason
+}
 
 func (m *Msg) SetTopup(topupID TopupID) { m.m.TopupID = topupID }
 
