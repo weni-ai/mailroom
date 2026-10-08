@@ -73,18 +73,19 @@ var contactToFlowStatus = map[ContactStatus]flows.ContactStatus{
 
 // Contact is our mailroom struct that represents a contact
 type Contact struct {
-	id         ContactID
-	uuid       flows.ContactUUID
-	name       string
-	language   envs.Language
-	status     ContactStatus
-	fields     map[string]*flows.Value
-	groups     []*Group
-	urns       []urns.URN
-	tickets    []*Ticket
-	createdOn  time.Time
-	modifiedOn time.Time
-	lastSeenOn *time.Time
+	id            ContactID
+	uuid          flows.ContactUUID
+	name          string
+	language      envs.Language
+	status        ContactStatus
+	fields        map[string]*flows.Value
+	groups        []*Group
+	urns          []urns.URN
+	tickets       []*Ticket
+	ctwaSourceIDs []string
+	createdOn     time.Time
+	modifiedOn    time.Time
+	lastSeenOn    *time.Time
 }
 
 func (c *Contact) ID() ContactID                   { return c.id }
@@ -230,6 +231,7 @@ func (c *Contact) FlowContact(oa *OrgAssets) (*flows.Contact, error) {
 	if err != nil {
 		return nil, errors.Wrapf(err, "error creating flow contact")
 	}
+	contact.SetCTWASourceIDs(c.ctwaSourceIDs)
 
 	return contact, nil
 }
@@ -417,6 +419,8 @@ func LoadContacts(ctx context.Context, db Queryer, org *OrgAssets, ids []Contact
 		}
 		contact.urns = contactURNs
 
+		contact.ctwaSourceIDs = e.CTWASourceIDs
+
 		// initialize our tickets
 		tickets := make([]*Ticket, 0, len(e.Tickets))
 		for _, t := range e.Tickets {
@@ -570,9 +574,10 @@ type contactEnvelope struct {
 		Body       string           `json:"body"`
 		AssigneeID UserID           `json:"assignee_id"`
 	} `json:"tickets"`
-	CreatedOn  time.Time  `json:"created_on"`
-	ModifiedOn time.Time  `json:"modified_on"`
-	LastSeenOn *time.Time `json:"last_seen_on"`
+	CTWASourceIDs []string   `json:"ctwa_source_ids"`
+	CreatedOn     time.Time  `json:"created_on"`
+	ModifiedOn    time.Time  `json:"modified_on"`
+	LastSeenOn    *time.Time `json:"last_seen_on"`
 }
 
 const selectContactSQL = `
@@ -590,7 +595,8 @@ SELECT ROW_TO_JSON(r) FROM (SELECT
 	fields,
 	g.groups AS group_ids,
 	u.urns AS urns,
-	t.tickets AS tickets
+	t.tickets AS tickets,
+	cs.ctwa_source_ids AS ctwa_source_ids
 FROM
 	contacts_contact c
 LEFT JOIN (
@@ -645,6 +651,20 @@ LEFT JOIN (
 	GROUP BY
 		contact_id
 ) t ON c.id = t.contact_id
+LEFT JOIN (
+	SELECT
+		urn.contact_id,
+		array_agg(DISTINCT src.source_id) FILTER (
+			WHERE src.source_id IS NOT NULL
+			  AND btrim(src.source_id) <> ''
+			  AND src.source_id <> 'legacy'
+		) AS ctwa_source_ids
+	FROM conversion_events_ctwa ev
+	JOIN ctwa_referral_sources src ON src.id = ev.referral_source_id
+	JOIN contacts_contacturn urn ON urn.identity = ev.contact_urn
+	WHERE urn.contact_id = ANY($1)
+	GROUP BY urn.contact_id
+) cs ON c.id = cs.contact_id
 WHERE 
 	c.id = ANY($1) AND
 	is_active = TRUE AND
