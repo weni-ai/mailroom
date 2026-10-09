@@ -692,6 +692,85 @@ func TestRequestToRouterStreamSupportByVersion(t *testing.T) {
 	}
 }
 
+func TestRequestToRouterStreamSupportForTPH(t *testing.T) {
+	ctx, rt, db, _ := testsuite.Get()
+	defer testsuite.Reset(testsuite.ResetAll)
+
+	contact := testdata.InsertContact(db, testdata.Org1, flows.ContactUUID(uuids.New()), "TPH Stream Contact", envs.Language("eng"))
+	urn := urns.URN("tel:+250700000021")
+	urnID := testdata.InsertContactURN(db, testdata.Org1, contact, urn, 1000)
+
+	reqCh := make(chan []byte, 1)
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		body, _ := io.ReadAll(r.Body)
+		reqCh <- body
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer server.Close()
+
+	rt.Config.RouterBaseURL = server.URL
+	rt.Config.RouterAuthToken = "router-token"
+
+	tests := []struct {
+		name   string
+		config map[string]interface{}
+	}{
+		{"TPH with empty config enables stream support", map[string]interface{}{}},
+		{"TPH with version 1 still enables stream support", map[string]interface{}{"version": 1}},
+		{"TPH with non-numeric version still enables stream support", map[string]interface{}{"version": "v2.35.2"}},
+	}
+
+	for i, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			channel := testdata.InsertChannel(
+				db, testdata.Org1, "TPH",
+				fmt.Sprintf("TPH Channel %d", i),
+				[]string{"tel"}, "SR",
+				tt.config,
+			)
+
+			models.FlushCache()
+
+			oa, err := models.GetOrgAssets(ctx, rt, testdata.Org1.ID)
+			require.NoError(t, err)
+
+			channelModel := oa.ChannelByID(channel.ID)
+			require.NotNil(t, channelModel)
+			assert.Equal(t, models.ChannelTypeTelephony, channelModel.Type())
+
+			modelContact, err := models.LoadContact(ctx, db, oa, contact.ID)
+			require.NoError(t, err)
+
+			flowContact, err := modelContact.FlowContact(oa)
+			require.NoError(t, err)
+
+			event := &MsgEvent{
+				ContactID: contact.ID,
+				OrgID:     testdata.Org1.ID,
+				ChannelID: channel.ID,
+				MsgID:     flows.MsgID(123),
+				MsgUUID:   flows.MsgUUID(uuids.New()),
+				URN:       urn,
+				URNID:     urnID,
+				Text:      "hello router",
+			}
+
+			err = requestToRouter(event, rt.Config, flowContact, uuids.New(), channelModel, event.Text)
+			require.NoError(t, err)
+
+			body := <-reqCh
+
+			var payload struct {
+				StreamSupport bool   `json:"stream_support"`
+				ChannelType   string `json:"channel_type"`
+			}
+			require.NoError(t, json.Unmarshal(body, &payload))
+			assert.True(t, payload.StreamSupport)
+			assert.Equal(t, "TPH", payload.ChannelType)
+		})
+	}
+}
+
 func TestApplyContactFieldModifiers(t *testing.T) {
 	ctx, rt, db, _ := testsuite.Get()
 	defer testsuite.Reset(testsuite.ResetAll)
@@ -915,7 +994,6 @@ func TestApplyContactFieldModifiers(t *testing.T) {
 		assert.Equal(t, assets.FieldTypeText, field.Type())
 	})
 
-
 	fields := []struct {
 		key   string
 		value string
@@ -958,7 +1036,6 @@ func TestApplyContactFieldModifiers(t *testing.T) {
 			assert.Equal(t, assets.FieldTypeText, field.Type())
 		})
 	}
-
 
 	t.Run("both whitelisted fields in one event", func(t *testing.T) {
 		db.MustExec(`DELETE FROM contacts_contactfield WHERE org_id = $1 AND key IN ('segment', 'orderform', 'email', 'session', 'vtex_account')`, testdata.Org1.ID)

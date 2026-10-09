@@ -1,3 +1,7 @@
+1.104.0
+----------
+ * feat: always send stream_support=true to Nexus for TPH telephony channels
+
 1.103.1
 ----------
  * fix: resolve named template recipient variables across Brazilian WhatsApp ninth-digit URN variants
