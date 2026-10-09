@@ -1171,13 +1171,22 @@ func formatRouterTextWithHandover(msgText, contextText string) string {
 	return msgText + "; Context: " + contextText
 }
 
+// minWWCStreamVersion is the Weni Web Chat config.version that opts a channel into
+// Nexus gRPC streaming. TPH does not use this: voice mode requires streaming.
+const minWWCStreamVersion = 2
+
+func channelStreamSupport(channel *models.Channel) bool {
+	if channel.Type() == models.ChannelTypeTelephony {
+		return true
+	}
+	version, err := strconv.Atoi(fmt.Sprint(channel.Config()["version"]))
+	return err == nil && version >= minWWCStreamVersion
+}
+
 func requestToRouter(event *MsgEvent, rtConfig *runtime.Config, contact *flows.Contact, projectUUID uuids.UUID, channel *models.Channel, routerText string) error {
 	httpClient, httpRetries, _ := goflow.HTTP(rtConfig)
 
-	streamSupport := false
-	if version, err := strconv.Atoi(fmt.Sprint(channel.Config()["version"])); err == nil && version >= 2 {
-		streamSupport = true
-	}
+	streamSupport := channelStreamSupport(channel)
 
 	body := struct {
 		ProjectUUID   uuids.UUID             `json:"project_uuid"`

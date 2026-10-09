@@ -29,7 +29,8 @@ type ChannelType string
 
 // channel type constants
 const (
-	ChannelTypeAndroid = ChannelType("A")
+	ChannelTypeAndroid   = ChannelType("A")
+	ChannelTypeTelephony = ChannelType("TPH")
 )
 
 // config key constants
