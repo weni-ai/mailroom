@@ -1,3 +1,7 @@
+1.103.2
+----------
+ * feat: prefer WhatsApp phone number over BSUID in flow URN expressions (goflow v1.21.1-staging)
+
 1.103.1
 ----------
  * fix: resolve named template recipient variables across Brazilian WhatsApp ninth-digit URN variants
