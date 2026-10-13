@@ -260,3 +260,51 @@ func TestTokenRefreshBeforeRequestWhenExpired(t *testing.T) {
 	assert.Equal(t, 1, tokenCalls)
 	assert.Equal(t, 1, ticketCalls)
 }
+
+func TestTokenRefreshBeforeRequestWhenExpiredRefreshFails(t *testing.T) {
+	resetGlobals(t)
+	httpx.SetRequestor(httpx.DefaultRequestor)
+	defer dates.SetNowSource(dates.DefaultNowSource)
+	now := time.Date(2026, 9, 21, 15, 0, 0, 0, time.UTC)
+	dates.SetNowSource(dates.NewFixedNowSource(now))
+
+	var ticketCalls int
+	mux := http.NewServeMux()
+	mux.HandleFunc("/oauth/token", func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusInternalServerError)
+		_, _ = w.Write([]byte(`{"error":"unavailable"}`))
+	})
+	mux.HandleFunc("/v1/tickets", func(w http.ResponseWriter, r *http.Request) {
+		ticketCalls++
+		w.WriteHeader(http.StatusCreated)
+	})
+	srv := httptest.NewServer(mux)
+	defer srv.Close()
+
+	client := generic.NewClient(http.DefaultClient, nil, srv.URL, "stale", generic.WithTokenRefresh(generic.TokenRefreshOptions{
+		Type:      generic.TokenRefreshTypeCustom,
+		ExpiresAt: now.Add(-time.Minute).Unix(),
+		Config: generic.TokenRefreshConfig{
+			When: generic.TokenRefreshWhen{
+				Match:   generic.TokenRefreshMatchAny,
+				Expired: true,
+			},
+			Method:     http.MethodPost,
+			URL:        srv.URL + "/oauth/token",
+			Body:       "grant_type=password&x=1",
+			TokenField: "access_token",
+		},
+	}))
+
+	resp, trace, err := client.OpenTicket(&generic.OpenRequest{
+		TicketID: sampleTicketUUID,
+		Contact:  generic.Contact{UUID: sampleContactUUID, URN: "whatsapp:+5511999999999"},
+		OpenedAt: openedAt(),
+	}, "")
+	require.Error(t, err)
+	assert.Nil(t, resp)
+	assert.Nil(t, trace)
+	assert.Contains(t, err.Error(), "proactive access token refresh failed")
+	assert.Contains(t, err.Error(), "token refresh returned status 500")
+	assert.Equal(t, 0, ticketCalls)
+}

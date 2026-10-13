@@ -414,7 +414,9 @@ func (c *Client) request(method, endpoint string, payload, response interface{},
 	fullURL := c.baseURL + endpoint
 
 	if c.refreshEnabled() && c.tokenExpired() {
-		_ = c.refreshAccessToken()
+		if err := c.refreshAccessToken(); err != nil {
+			return nil, errors.Wrap(err, "proactive access token refresh failed")
+		}
 	}
 
 	trace, err := c.doTrace(method, fullURL, payload, idempotencyKey)

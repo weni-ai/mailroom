@@ -1,7 +1,12 @@
+1.103.2
+----------
+ * feat: prefer WhatsApp phone number over BSUID in flow URN expressions (goflow v1.21.1-staging)
+
 1.103.0
 ----------
-* feat: load CTWA source ids on contacts and evaluate ctwa_source_id queries (goflow v1.21.0-staging)
-* refactor: parse CTWA source id from message metadata with a typed JSON struct
+ * feat: load CTWA source ids on contacts and evaluate ctwa_source_id queries (goflow v1.21.0-staging)
+ * refactor: parse CTWA source id from message metadata with a typed JSON struct
+ * feat: introduce generic ticketer configurable renewal or refresh token funcionality
 
 1.102.1
 ----------
