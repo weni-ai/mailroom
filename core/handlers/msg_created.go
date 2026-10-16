@@ -112,6 +112,20 @@ func handleMsgCreated(ctx context.Context, rt *runtime.Runtime, tx *sqlx.Tx, oa 
 		return errors.Wrapf(err, "error creating outgoing message to %s", event.Msg.URN())
 	}
 
+	if protocolID := models.TurnProtocolIDFromContext(ctx); protocolID != 0 {
+		state, err := models.ProtocolState(ctx, tx, protocolID)
+		if err != nil {
+			if !models.IsMissingProtocolSchema(err) {
+				return errors.Wrap(err, "error reading protocol")
+			}
+		} else {
+			msg.SetTurnProtocolID(protocolID)
+			if state == models.ProtocolClosed {
+				msg.MarkFailed(models.MsgFailedClosedProtocol)
+			}
+		}
+	}
+
 	// register to have this message committed
 	scene.AppendToEventPreCommitHook(hooks.CommitMessagesHook, msg)
 

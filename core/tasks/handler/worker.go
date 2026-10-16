@@ -500,6 +500,20 @@ func handleMsgEvent(ctx context.Context, rt *runtime.Runtime, event *MsgEvent) e
 		return errors.Wrapf(err, "error loading org")
 	}
 
+	if event.ProtocolID == 0 {
+		id, err := models.EnsureOpenProtocol(ctx, rt.DB, event.OrgID, event.ContactID, event.URNID)
+		if err != nil && !models.IsMissingProtocolSchema(err) {
+			return errors.Wrap(err, "error opening protocol for inbound message")
+		}
+		if id != 0 {
+			event.ProtocolID = id
+			if err := models.BindMessageProtocol(ctx, rt.DB, int64(event.MsgID), id); err != nil {
+				return errors.Wrap(err, "error binding protocol to inbound message")
+			}
+		}
+	}
+	ctx = models.WithTurnProtocolID(ctx, event.ProtocolID)
+
 	// allocate a topup for this message if org uses topups
 	topupID, err := models.AllocateTopups(ctx, rt.DB, rt.RP, oa.Org(), 1)
 	if err != nil {
@@ -1110,6 +1124,7 @@ type MsgEvent struct {
 	MsgID            flows.MsgID        `json:"msg_id"`
 	MsgUUID          flows.MsgUUID      `json:"msg_uuid"`
 	MsgExternalID    null.String        `json:"msg_external_id"`
+	ProtocolID       int64              `json:"protocol_id,omitempty"`
 	URN              urns.URN           `json:"urn"`
 	URNID            models.URNID       `json:"urn_id"`
 	Text             string             `json:"text"`
