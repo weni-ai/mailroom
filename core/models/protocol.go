@@ -155,10 +155,10 @@ func ResolveProtocol(ctx context.Context, db QueryerWithTx, in ResolveInput) (Re
 	err = tx.GetContext(ctx, &id, `
 INSERT INTO msgs_protocol (
 	uuid, org_id, contact_id, urn_id, state, opened_on, external_id,
-	predecessor_id, idle_accumulated, timer_paused, timer_kind, timer_deadline
+	predecessor_id, idle_accumulated, timer_paused, timer_kind, timer_deadline, close_reason
 ) VALUES (
 	$1, $2, $3, $4, 'open', NOW(), $5,
-	$6, 0, false, 'ai', NOW() + make_interval(hours => $7)
+	$6, 0, false, 'ai', NOW() + make_interval(hours => $7), ''
 ) RETURNING id`,
 		string(uuids.New()), in.OrgID, in.ContactID, in.URNID, external, pred, hours,
 	)
