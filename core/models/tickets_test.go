@@ -132,6 +132,17 @@ func TestTickets(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, 1, len(tks))
 	assert.Equal(t, "Where are my cookies?", tks[0].Body())
+
+	zendeskOpen, err := models.LoadOpenTicketsForTicketer(ctx, db, testdata.Zendesk.ID)
+	assert.NoError(t, err)
+	require.Equal(t, 2, len(zendeskOpen))
+	assert.Equal(t, "Where are my trousers?", zendeskOpen[0].Body())
+	assert.Equal(t, "Where are my pants?", zendeskOpen[1].Body())
+
+	mailgunOpen, err := models.LoadOpenTicketsForTicketer(ctx, db, testdata.Mailgun.ID)
+	assert.NoError(t, err)
+	assert.Equal(t, 1, len(mailgunOpen))
+	assert.Equal(t, "Where are my cookies?", mailgunOpen[0].Body())
 }
 
 func TestUpdateTicketConfig(t *testing.T) {

@@ -25,6 +25,15 @@ func hasClosedByMergeTag(tags string) bool {
 	return false
 }
 
+func zendeskStatusIsClosed(status string) bool {
+	switch strings.ToLower(status) {
+	case statusSolved, statusClosed, "resuelto", "cerrado", "resolvido":
+		return true
+	default:
+		return false
+	}
+}
+
 func ParseNumericID(s string) (int64, error) {
 	n, err := strconv.ParseInt(s, 10, 64)
 	if err != nil {
