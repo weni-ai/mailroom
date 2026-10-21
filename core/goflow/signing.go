@@ -69,6 +69,7 @@ func signJSONRequestBody(request *http.Request) error {
 	body, err := io.ReadAll(request.Body)
 	request.Body.Close()
 	if err != nil {
+		request.Body = http.NoBody
 		return err
 	}
 
