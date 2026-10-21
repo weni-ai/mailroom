@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"net/http"
+	"strings"
 	"testing"
 	"time"
 
@@ -389,7 +390,7 @@ func TestForward(t *testing.T) {
 
 	defer httpx.SetRequestor(httpx.DefaultRequestor)
 
-	httpx.SetRequestor(httpx.NewMockRequestor(map[string][]httpx.MockResponse{
+	requestor := testsuite.NewPresignedRequestor(httpx.NewMockRequestor(map[string][]httpx.MockResponse{
 		fmt.Sprintf("%s/v2/users?reference_id=6393abc0-283d-4c9b-a1b3-641a035c34bf", baseURL): {
 			httpx.NewMockResponse(200, nil, `{
 				"users": [
@@ -468,9 +469,6 @@ func TestForward(t *testing.T) {
 				}]
 			}`),
 		},
-		"https://example.com/image.jpg": {
-			httpx.NewMockResponse(200, nil, `fake image data`),
-		},
 		fmt.Sprintf("%s/v2/images/upload", baseURL): {
 			httpx.NewMockResponse(200, nil, `{
 				"url": "https://uploaded.com/image.jpg"
@@ -492,7 +490,8 @@ func TestForward(t *testing.T) {
 				"file_security_status": "safe"
 			}`),
 		},
-	}))
+	}), httpx.NewMockResponse(200, nil, `fake image data`))
+	httpx.SetRequestor(requestor)
 
 	ticketer := flows.NewTicketer(static.NewTicketer(assets.TicketerUUID(uuids.New()), "Support", "freshchat"))
 	svc, err := mustFreshSvc(rt, ticketer,
@@ -529,9 +528,11 @@ func TestForward(t *testing.T) {
 	err = svc.Forward(ticket, flows.MsgUUID("4fa340ae-1fb0-4666-98db-2177fe9bf31c"), "It's urgent", nil, nil, null.NullString, logger.Log)
 	require.NoError(t, err)
 
-	// Test with attachments
+	// Test with attachments, the image is in a private bucket so it must be downloaded with a presigned URL
+	testsuite.UseAttachmentSigner(t, "media-bucket")
+	imageURL := "https://media-bucket.s3.sa-east-1.amazonaws.com/media/image.jpg"
 	attachments := []utils.Attachment{
-		"image/jpeg:https://example.com/image.jpg",
+		utils.Attachment("image/jpeg:" + imageURL),
 		"video/mp4:https://example.com/video.mp4",
 		"application/pdf:https://example.com/file.pdf",
 	}
@@ -539,6 +540,10 @@ func TestForward(t *testing.T) {
 	logger = &flows.HTTPLogger{}
 	err = svc.Forward(ticket, flows.MsgUUID("4fa340ae-1fb0-4666-98db-2177fe9bf31c"), "It's urgent", attachments, nil, null.NullString, logger.Log)
 	require.NoError(t, err)
+
+	downloads := requestor.URLs()
+	require.Len(t, downloads, 1)
+	assert.True(t, strings.HasPrefix(downloads[0], imageURL+"?X-Amz-"), downloads[0])
 }
 
 func TestClose(t *testing.T) {
