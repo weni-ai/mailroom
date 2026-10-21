@@ -6,6 +6,7 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 
 	"github.com/jmoiron/sqlx"
@@ -535,18 +536,22 @@ func TestRequestToRouter(t *testing.T) {
 
 	rt.Config.RouterBaseURL = server.URL
 	rt.Config.RouterAuthToken = "router-token"
+	testsuite.UseAttachmentSigner(t, "courier-media")
 
+	mediaURL := "https://courier-media.s3.sa-east-1.amazonaws.com/media/photo.jpg"
+	externalURL := "https://example.com/photo.jpg"
 	metadata := json.RawMessage(`{"foo":"bar"}`)
 	event := &MsgEvent{
-		ContactID: contact.ID,
-		OrgID:     testdata.Org1.ID,
-		ChannelID: channel.ID,
-		MsgID:     flows.MsgID(123),
-		MsgUUID:   flows.MsgUUID(uuids.New()),
-		URN:       urn,
-		URNID:     urnID,
-		Text:      "hello router",
-		Metadata:  metadata,
+		ContactID:   contact.ID,
+		OrgID:       testdata.Org1.ID,
+		ChannelID:   channel.ID,
+		MsgID:       flows.MsgID(123),
+		MsgUUID:     flows.MsgUUID(uuids.New()),
+		URN:         urn,
+		URNID:       urnID,
+		Text:        "hello router",
+		Attachments: []utils.Attachment{utils.Attachment("image/jpeg:" + mediaURL), utils.Attachment("image/jpeg:" + externalURL)},
+		Metadata:    metadata,
 	}
 
 	projectUUID := uuids.New()
@@ -562,6 +567,7 @@ func TestRequestToRouter(t *testing.T) {
 		ProjectUUID   string                 `json:"project_uuid"`
 		ContactURN    string                 `json:"contact_urn"`
 		Text          string                 `json:"text"`
+		Attachments   []utils.Attachment     `json:"attachments"`
 		Metadata      json.RawMessage        `json:"metadata"`
 		MsgEvent      json.RawMessage        `json:"msg_event"`
 		ContactFields map[string]interface{} `json:"contact_fields"`
@@ -605,6 +611,16 @@ func TestRequestToRouter(t *testing.T) {
 	assert.Equal(t, event.URNID, msgEvent.URNID)
 	assert.Equal(t, event.Text, msgEvent.Text)
 	assert.JSONEq(t, string(metadata), string(msgEvent.Metadata))
+
+	// attachments in our buckets are presigned in both places, without changing the event
+	for _, sent := range [][]utils.Attachment{payload.Attachments, msgEvent.Attachments} {
+		require.Len(t, sent, 2)
+		assert.Equal(t, "image/jpeg", sent[0].ContentType())
+		assert.True(t, strings.HasPrefix(sent[0].URL(), mediaURL+"?"), sent[0].URL())
+		assert.Contains(t, sent[0].URL(), "X-Amz-Signature=")
+		assert.Equal(t, utils.Attachment("image/jpeg:"+externalURL), sent[1])
+	}
+	assert.Equal(t, utils.Attachment("image/jpeg:"+mediaURL), event.Attachments[0])
 }
 
 func TestRequestToRouterStreamSupportByVersion(t *testing.T) {

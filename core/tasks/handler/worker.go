@@ -31,6 +31,7 @@ import (
 	"github.com/nyaruka/mailroom"
 	"github.com/nyaruka/mailroom/core/goflow"
 	"github.com/nyaruka/mailroom/core/models"
+	"github.com/nyaruka/mailroom/core/presign"
 	"github.com/nyaruka/mailroom/core/queue"
 	"github.com/nyaruka/mailroom/core/runner"
 	"github.com/nyaruka/mailroom/runtime"
@@ -1241,6 +1242,9 @@ func requestToRouter(event *MsgEvent, rtConfig *runtime.Config, contact *flows.C
 		streamSupport = true
 	}
 
+	signedEvent := *event
+	signedEvent.Attachments = presign.SignAll(event.Attachments)
+
 	body := struct {
 		ProjectUUID   uuids.UUID             `json:"project_uuid"`
 		ContactURN    urns.URN               `json:"contact_urn"`
@@ -1257,9 +1261,9 @@ func requestToRouter(event *MsgEvent, rtConfig *runtime.Config, contact *flows.C
 		ProjectUUID:   projectUUID,
 		ContactURN:    event.URN.Identity(),
 		Text:          routerText,
-		Attachments:   event.Attachments,
+		Attachments:   signedEvent.Attachments,
 		Metadata:      event.Metadata,
-		MsgEvent:      *event,
+		MsgEvent:      signedEvent,
 		ContactFields: mapContactFields(contact),
 		ChannelUUID:   channel.UUID(),
 		ChannelType:   string(channel.Type()),

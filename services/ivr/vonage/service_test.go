@@ -104,4 +104,11 @@ func TestResponseForSprint(t *testing.T) {
 		assert.NoError(t, err, "%d: unexpected error")
 		assert.Equal(t, tc.Expected, response, "%d: unexpected response", i)
 	}
+
+	// audio in our buckets is streamed from a presigned URL
+	testsuite.UseAttachmentSigner(t, "media-bucket")
+	audio := events.NewIVRCreated(flows.NewMsgOut(urn, channelRef, "hello world", []utils.Attachment{utils.Attachment("audio:https://media-bucket.s3.sa-east-1.amazonaws.com/recordings/foo.wav")}, nil, nil, flows.NilMsgTopic, "", "", ""))
+	response, err := provider.responseForSprint(ctx, rp, channel, nil, resumeURL, nil, []flows.Event{audio})
+	assert.NoError(t, err)
+	assert.Contains(t, response, `"streamUrl":["https://media-bucket.s3.sa-east-1.amazonaws.com/recordings/foo.wav?X-Amz-Algorithm=AWS4-HMAC-SHA256\u0026X-Amz-Credential=`)
 }

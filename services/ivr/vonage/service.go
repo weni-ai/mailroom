@@ -28,6 +28,7 @@ import (
 	"github.com/nyaruka/goflow/utils"
 	"github.com/nyaruka/mailroom/core/ivr"
 	"github.com/nyaruka/mailroom/core/models"
+	"github.com/nyaruka/mailroom/core/presign"
 	"github.com/nyaruka/mailroom/runtime"
 
 	"github.com/buger/jsonparser"
@@ -873,7 +874,7 @@ func (s *service) responseForSprint(ctx context.Context, rp *redis.Pool, channel
 				for _, a := range event.Msg.Attachments() {
 					actions = append(actions, Stream{
 						Action:    "stream",
-						StreamURL: []string{a.URL()},
+						StreamURL: []string{presign.SignURL(a.URL())},
 					})
 				}
 			}

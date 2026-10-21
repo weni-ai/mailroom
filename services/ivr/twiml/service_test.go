@@ -19,6 +19,7 @@ import (
 
 	"github.com/nyaruka/goflow/flows"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestResponseForSprint(t *testing.T) {
@@ -93,6 +94,13 @@ func TestResponseForSprint(t *testing.T) {
 		assert.NoError(t, err, "%d: unexpected error")
 		assert.Equal(t, xml.Header+tc.Expected, response, "%d: unexpected response", i)
 	}
+
+	// audio in our buckets is played from a presigned URL
+	testsuite.UseAttachmentSigner(t, "media-bucket")
+	audio := events.NewIVRCreated(flows.NewMsgOut(urn, channelRef, "hello world", []utils.Attachment{utils.Attachment("audio:https://media-bucket.s3.sa-east-1.amazonaws.com/recordings/foo.wav")}, nil, nil, flows.NilMsgTopic, "", "", ""))
+	response, err := twiml.ResponseForSprint(rt.Config, urn, resumeURL, nil, []flows.Event{audio}, false)
+	require.NoError(t, err)
+	assert.Contains(t, response, "<Play>https://media-bucket.s3.sa-east-1.amazonaws.com/recordings/foo.wav?X-Amz-Algorithm=AWS4-HMAC-SHA256&amp;X-Amz-Credential=")
 }
 
 func TestURNForRequest(t *testing.T) {
