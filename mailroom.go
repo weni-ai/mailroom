@@ -10,6 +10,7 @@ import (
 	"github.com/nyaruka/gocommon/storage"
 	"github.com/nyaruka/goflow/flows"
 	"github.com/nyaruka/goflow/flows/routers"
+	"github.com/nyaruka/mailroom/core/presign"
 	"github.com/nyaruka/mailroom/core/queue"
 	"github.com/nyaruka/mailroom/runtime"
 	"github.com/nyaruka/mailroom/runtime/rmq"
@@ -129,7 +130,8 @@ func (mr *Mailroom) Start() error {
 	}
 
 	// create our storage (S3 via IRSA, S3 via static keys, or file system)
-	switch runtime.ResolveStorageAuth(c) {
+	storageAuth := runtime.ResolveStorageAuth(c)
+	switch storageAuth {
 	case runtime.StorageAuthIRSA:
 		s3Client, err := runtime.NewS3Client(c, false)
 		if err != nil {
@@ -148,6 +150,10 @@ func (mr *Mailroom) Start() error {
 	default:
 		mr.rt.MediaStorage = storage.NewFS("_storage")
 		mr.rt.SessionStorage = storage.NewFS("_storage")
+	}
+
+	if err := presign.Init(c, storageAuth); err != nil {
+		return errors.Wrap(err, "error creating attachment URL signer")
 	}
 
 	// test our media storage
