@@ -149,6 +149,26 @@ func TestSigningWebhookServiceNonJSON(t *testing.T) {
 	assert.Empty(t, recorder.body)
 }
 
+type failingReader struct{}
+
+func (failingReader) Read([]byte) (int, error) { return 0, errors.New("read failed") }
+
+func TestSigningWebhookServiceBodyReadError(t *testing.T) {
+	useTestSigner(t)
+
+	recorder := &recordingWebhookService{}
+	svc, err := signingWebhookServiceFactory(func(flows.Session) (flows.WebhookService, error) { return recorder, nil })(nil)
+	require.NoError(t, err)
+
+	request, err := http.NewRequest("POST", "https://webhook.example.com/", io.NopCloser(failingReader{}))
+	require.NoError(t, err)
+
+	call, err := svc.Call(nil, request)
+	assert.EqualError(t, err, "read failed")
+	assert.Nil(t, call)
+	assert.Equal(t, http.NoBody, request.Body)
+}
+
 func TestSigningWebhookServiceWithoutSigner(t *testing.T) {
 	presign.SetSigner(nil, 0)
 
