@@ -55,6 +55,10 @@ jobs:
         wget --quiet -O - https://www.postgresql.org/media/keys/ACCC4CF8.asc | sudo tee /etc/apt/trusted.gpg.d/postgresql.asc > /dev/null
         sudo apt-get update
         sudo apt-get install -y --no-install-recommends postgresql-client-15
+        # runner images may ship a newer client which pg_wrapper would pick, and pg_restore >= 17
+        # emits SET transaction_timeout which the PostgreSQL 15 server rejects
+        echo "/usr/lib/postgresql/15/bin" >> $GITHUB_PATH
+        /usr/lib/postgresql/15/bin/pg_restore --version
 
     - name: Initialize database
       # we create our test database with a different user so that we can drop everything owned by this user between tests
