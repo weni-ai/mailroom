@@ -131,20 +131,24 @@ func (mr *Mailroom) Start() error {
 	// create our storage (S3 via IRSA, S3 via static keys, or file system)
 	switch runtime.ResolveStorageAuth(c) {
 	case runtime.StorageAuthIRSA:
-		s3Client, err := runtime.NewS3Client(c, false)
+		svc, err := runtime.NewS3Service(c, false)
 		if err != nil {
 			return err
 		}
+		s3Client := runtime.NewS3ClientFromService(svc)
 		mr.rt.MediaStorage = storage.NewS3(s3Client, mr.rt.Config.S3MediaBucket, c.S3Region, 32)
 		mr.rt.SessionStorage = storage.NewS3(s3Client, mr.rt.Config.S3SessionBucket, c.S3Region, 32)
+		mr.rt.MediaSigner = runtime.NewMediaSigner(svc, mr.rt.Config.S3MediaBucket)
 		log.Info("S3 initialized using IRSA")
 	case runtime.StorageAuthStatic:
-		s3Client, err := runtime.NewS3Client(c, true)
+		svc, err := runtime.NewS3Service(c, true)
 		if err != nil {
 			return err
 		}
+		s3Client := runtime.NewS3ClientFromService(svc)
 		mr.rt.MediaStorage = storage.NewS3(s3Client, mr.rt.Config.S3MediaBucket, c.S3Region, 32)
 		mr.rt.SessionStorage = storage.NewS3(s3Client, mr.rt.Config.S3SessionBucket, c.S3Region, 32)
+		mr.rt.MediaSigner = runtime.NewMediaSigner(svc, mr.rt.Config.S3MediaBucket)
 	default:
 		mr.rt.MediaStorage = storage.NewFS("_storage")
 		mr.rt.SessionStorage = storage.NewFS("_storage")
