@@ -498,6 +498,7 @@ func TestNormalizeAttachment(t *testing.T) {
 		{"image/jpeg:test.jpg", "image/jpeg:https://foo.bar.com/test.jpg"},
 		{"image/jpeg:/test.jpg", "image/jpeg:https://foo.bar.com/test.jpg"},
 		{"image/jpeg:https://mailroom-media.s3.us-east-1.amazonaws.com/media/1/a.jpg", "image/jpeg:https://foo.bar.com/media/1/a.jpg"},
+		{"image/jpeg:https://mailroom-media.s3.us-east-1.amazonaws.com/media/1/a%20b.jpg", "image/jpeg:https://foo.bar.com/media/1/a%20b.jpg"},
 		{"image/jpeg:https://mailroom-media.s3.us-east-1.amazonaws.com/sessions/secret", "image/jpeg:https://mailroom-media.s3.us-east-1.amazonaws.com/sessions/secret"},
 	}
 

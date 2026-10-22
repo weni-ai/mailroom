@@ -1039,7 +1039,7 @@ func NormalizeAttachment(cfg *runtime.Config, attachment utils.Attachment) utils
 	storageHost := fmt.Sprintf("%s.s3.%s.amazonaws.com", cfg.S3MediaBucket, cfg.S3Region)
 	prefix := normalizedMediaPrefix(cfg.S3MediaPrefix)
 	if strings.EqualFold(parsed.Host, storageHost) && strings.HasPrefix(parsed.Path, prefix) {
-		rawURL = fmt.Sprintf("https://%s%s", cfg.AttachmentDomain, parsed.Path)
+		rawURL = fmt.Sprintf("https://%s%s", cfg.AttachmentDomain, parsed.EscapedPath())
 	}
 	return utils.Attachment(fmt.Sprintf("%s:%s", attachment.ContentType(), rawURL))
 }
