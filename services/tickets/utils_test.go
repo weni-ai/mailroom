@@ -2,6 +2,7 @@ package tickets_test
 
 import (
 	"os"
+	"strings"
 	"testing"
 	"time"
 
@@ -247,4 +248,37 @@ func TestSendReplyCSAT(t *testing.T) {
 
 	assert.Equal(t, "Satisfaction Survey", msg.Text())
 	assert.Equal(t, testdata.Cathy.ID, msg.ContactID())
+}
+
+func TestFetchFile(t *testing.T) {
+	testsuite.UseAttachmentSigner(t, "media-bucket")
+	defer httpx.SetRequestor(httpx.DefaultRequestor)
+
+	mediaURL := "https://media-bucket.s3.sa-east-1.amazonaws.com/media/photo.jpg"
+	requestor := testsuite.NewPresignedRequestor(httpx.NewMockRequestor(map[string][]httpx.MockResponse{
+		"https://example.com/file.pdf": {httpx.NewMockResponse(200, map[string]string{"Content-Type": "application/pdf"}, "pdf")},
+	}), httpx.NewMockResponse(200, map[string]string{"Content-Type": "image/jpeg"}, "jpeg"))
+	httpx.SetRequestor(requestor)
+
+	// files in our buckets are fetched with a presigned URL, but keep their canonical URL
+	file, err := tickets.FetchFile(mediaURL, nil)
+	require.NoError(t, err)
+	assert.Equal(t, mediaURL, file.URL)
+	assert.Equal(t, "image/jpeg", file.ContentType)
+
+	file, err = tickets.FetchFileWithMaxSize(mediaURL, nil, 1024)
+	require.NoError(t, err)
+	assert.Equal(t, mediaURL, file.URL)
+
+	downloads := requestor.URLs()
+	require.Len(t, downloads, 2)
+	for _, download := range downloads {
+		assert.True(t, strings.HasPrefix(download, mediaURL+"?X-Amz-"), download)
+	}
+
+	// other URLs are fetched as is
+	file, err = tickets.FetchFile("https://example.com/file.pdf", nil)
+	require.NoError(t, err)
+	assert.Equal(t, "application/pdf", file.ContentType)
+	assert.Len(t, requestor.URLs(), 2)
 }

@@ -61,15 +61,18 @@ type Config struct {
 	S3MediaPrefix        string `help:"the prefix that will be added to attachment filenames"`
 	S3MediaPrefixZendesk string `help:"the prefix that will be added to file attachment names for Zendesk tickets"`
 
-	ZendeskMarketplaceName   string `help:"the app name for Zendesk Marketplace API headers"`
-	ZendeskMarketplaceOrgID  string `help:"the organization ID for Zendesk Marketplace API headers"`
-	ZendeskMarketplaceAppID  string `help:"the app ID for Zendesk Marketplace API headers"`
-	ZendeskClientID          string `help:"the OAuth client ID for Zendesk Global OAuth"`
-	ZendeskClientSecret      string `help:"the OAuth client secret for Zendesk Global OAuth"`
-	S3SessionBucket      string `help:"the S3 bucket we will write attachments to"`
-	S3SessionPrefix      string `help:"the prefix that will be added to attachment filenames"`
-	S3DisableSSL         bool   `help:"whether we disable SSL when accessing S3. Should always be set to False unless you're hosting an S3 compatible service within a secure internal network"`
-	S3ForcePathStyle     bool   `help:"whether we force S3 path style. Should generally need to default to False unless you're hosting an S3 compatible service"`
+	ZendeskMarketplaceName  string `help:"the app name for Zendesk Marketplace API headers"`
+	ZendeskMarketplaceOrgID string `help:"the organization ID for Zendesk Marketplace API headers"`
+	ZendeskMarketplaceAppID string `help:"the app ID for Zendesk Marketplace API headers"`
+	ZendeskClientID         string `help:"the OAuth client ID for Zendesk Global OAuth"`
+	ZendeskClientSecret     string `help:"the OAuth client secret for Zendesk Global OAuth"`
+	S3SessionBucket         string `help:"the S3 bucket we will write attachments to"`
+	S3SessionPrefix         string `help:"the prefix that will be added to attachment filenames"`
+	S3DisableSSL            bool   `help:"whether we disable SSL when accessing S3. Should always be set to False unless you're hosting an S3 compatible service within a secure internal network"`
+	S3ForcePathStyle        bool   `help:"whether we force S3 path style. Should generally need to default to False unless you're hosting an S3 compatible service"`
+
+	S3SignedBuckets          string `help:"comma separated list of buckets, besides S3MediaBucket, whose attachment URLs are presigned before being sent to external services"`
+	S3PresignedURLExpiration int    `validate:"min=1,max=168" help:"the number of hours presigned attachment URLs are valid for (1 to 168). With IRSA a URL is only valid until the role session that signed it expires"`
 
 	AWSAccessKeyID            string `help:"the access key id to use when authenticating S3"`
 	AWSSecretAccessKey        string `help:"the secret access key id to use when authenticating S3"`
@@ -182,6 +185,9 @@ func NewDefaultConfig() *Config {
 		S3SessionPrefix:  "/",
 		S3DisableSSL:     false,
 		S3ForcePathStyle: false,
+
+		S3SignedBuckets:          "",
+		S3PresignedURLExpiration: 24,
 
 		AWSAccessKeyID:            "",
 		AWSSecretAccessKey:        "",

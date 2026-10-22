@@ -24,6 +24,7 @@ import (
 	"github.com/nyaruka/goflow/utils"
 	"github.com/nyaruka/mailroom/core/ivr"
 	"github.com/nyaruka/mailroom/core/models"
+	"github.com/nyaruka/mailroom/core/presign"
 	"github.com/nyaruka/mailroom/runtime"
 
 	"github.com/pkg/errors"
@@ -464,7 +465,7 @@ func ResponseForSprint(cfg *runtime.Config, number urns.URN, resumeURL string, w
 			} else {
 				for _, a := range event.Msg.Attachments() {
 					a = models.NormalizeAttachment(cfg, a)
-					commands = append(commands, Play{URL: a.URL()})
+					commands = append(commands, Play{URL: presign.SignURL(a.URL())})
 				}
 			}
 		}

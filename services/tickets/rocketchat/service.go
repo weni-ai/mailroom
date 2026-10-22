@@ -13,6 +13,7 @@ import (
 	"github.com/nyaruka/goflow/flows"
 	"github.com/nyaruka/goflow/utils"
 	"github.com/nyaruka/mailroom/core/models"
+	"github.com/nyaruka/mailroom/core/presign"
 	"github.com/nyaruka/mailroom/runtime"
 	"github.com/nyaruka/null"
 	"github.com/pkg/errors"
@@ -120,7 +121,7 @@ func (s *service) Forward(ticket *models.Ticket, msgUUID flows.MsgUUID, text str
 	}
 	for _, attachment := range attachments {
 		mimeType, url := attachment.ToParts()
-		msg.Attachments = append(msg.Attachments, Attachment{Type: mimeType, URL: url})
+		msg.Attachments = append(msg.Attachments, Attachment{Type: mimeType, URL: presign.SignURL(url)})
 	}
 
 	_, trace, err := s.client.SendMessage(msg)

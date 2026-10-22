@@ -17,6 +17,7 @@ import (
 	"github.com/nyaruka/goflow/utils"
 	"github.com/nyaruka/mailroom/core/models"
 	"github.com/nyaruka/mailroom/core/msgio"
+	"github.com/nyaruka/mailroom/core/presign"
 	"github.com/nyaruka/mailroom/core/queue"
 	"github.com/nyaruka/mailroom/core/tasks/handler"
 	"github.com/nyaruka/mailroom/runtime"
@@ -171,9 +172,9 @@ type File struct {
 	Body        io.ReadCloser
 }
 
-// FetchFile fetches a file from the given URL
+// FetchFile fetches a file from the given URL, presigning it if it's in one of our buckets
 func FetchFile(url string, headers map[string]string) (*File, error) {
-	req, _ := httpx.NewRequest("GET", url, nil, headers)
+	req, _ := httpx.NewRequest("GET", presign.SignURL(url), nil, headers)
 
 	trace, err := httpx.DoTrace(http.DefaultClient, req, retries, nil, 10*1024*1024)
 	if err != nil {
@@ -189,7 +190,7 @@ func FetchFile(url string, headers map[string]string) (*File, error) {
 }
 
 func FetchFileWithMaxSize(url string, headers map[string]string, maxBodyBytes int) (*File, error) {
-	req, _ := httpx.NewRequest("GET", url, nil, headers)
+	req, _ := httpx.NewRequest("GET", presign.SignURL(url), nil, headers)
 
 	trace, err := httpx.DoTrace(http.DefaultClient, req, retries, nil, maxBodyBytes)
 	if err != nil {

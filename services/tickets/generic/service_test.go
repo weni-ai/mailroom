@@ -274,11 +274,13 @@ func TestOpenAndForward(t *testing.T) {
 	assert.Contains(t, fwdLog.Request, `"text":"Hello!"`)
 	assert.NotContains(t, fwdLog.Request, `"attachments":`)
 
-	// Forward: with attachments
+	// Forward: with attachments, those in our buckets are presigned
+	testsuite.UseAttachmentSigner(t, "media-bucket")
 	logger = &flows.HTTPLogger{}
 	attachments := []utils.Attachment{
 		"image/jpg:https://link.to/image.jpg",
 		"audio/ogg:https://link.to/audio.ogg",
+		"image/png:https://media-bucket.s3.sa-east-1.amazonaws.com/media/photo.png",
 	}
 	err = svc.Forward(dbTicket, flows.MsgUUID("c0c0c0c0-d0d0-e0e0-f0f0-010203040506"), "with attach", attachments, nil, null.String("EXT-MSG-99"), logger.Log)
 	require.NoError(t, err)
@@ -289,6 +291,7 @@ func TestOpenAndForward(t *testing.T) {
 	assert.Contains(t, fwdLog.Request, `"url":"https://link.to/image.jpg"`)
 	assert.Contains(t, fwdLog.Request, `"content_type":"image/jpg"`)
 	assert.Contains(t, fwdLog.Request, `"url":"https://link.to/audio.ogg"`)
+	assert.Contains(t, fwdLog.Request, `"url":"https://media-bucket.s3.sa-east-1.amazonaws.com/media/photo.png?X-Amz-Algorithm=`)
 	assert.Contains(t, fwdLog.Request, `"source_message_external_id":"EXT-MSG-99"`)
 }
 

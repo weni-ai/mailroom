@@ -24,6 +24,17 @@ func TestValidate(t *testing.T) {
 	c.DB = "mysql://temba:temba@localhost/temba"
 	c.Redis = "bluedis://localhost:6379/15"
 	assert.EqualError(t, c.Validate(), "field 'DB' must start with 'postgres:', field 'Redis' must start with 'redis:'")
+
+	for _, hours := range []int{1, 168} {
+		c = runtime.NewDefaultConfig()
+		c.S3PresignedURLExpiration = hours
+		assert.NoError(t, c.Validate(), "expiration %d should be valid", hours)
+	}
+	for _, hours := range []int{0, 169} {
+		c = runtime.NewDefaultConfig()
+		c.S3PresignedURLExpiration = hours
+		assert.Error(t, c.Validate(), "expiration %d should be invalid", hours)
+	}
 }
 
 func TestParseDisallowedNetworks(t *testing.T) {

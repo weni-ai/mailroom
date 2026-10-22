@@ -73,9 +73,9 @@ func Engine(c *runtime.Config) flows.Engine {
 		httpClient, httpRetries, httpAccess := HTTP(c)
 
 		eng = engine.NewBuilder().
-			WithWebhookServiceFactory(webhooks.NewServiceFactory(httpClient, httpRetries, httpAccess, webhookHeaders, c.WebhooksMaxBodyBytes)).
+			WithWebhookServiceFactory(signingWebhookServiceFactory(webhooks.NewServiceFactory(httpClient, httpRetries, httpAccess, webhookHeaders, c.WebhooksMaxBodyBytes))).
 			WithWeniGPTServiceFactory(wenigpt.NewServiceFactory(httpClient, httpRetries, httpAccess, webhookHeaders, c.WebhooksMaxBodyBytes, c.WenigptAuthToken, c.WenigptBaseURL)).
-			WithBrainServiceFactory(brain.NewServiceFactory(httpClient, httpRetries, httpAccess, webhookHeaders, c.WebhooksMaxBodyBytes, c.RouterAuthToken, c.RouterBaseURL)).
+			WithBrainServiceFactory(signingBrainServiceFactory(brain.NewServiceFactory(httpClient, httpRetries, httpAccess, webhookHeaders, c.WebhooksMaxBodyBytes, c.RouterAuthToken, c.RouterBaseURL))).
 			WithMetaServiceFactory(meta.NewServiceFactory(httpClient, httpRetries, httpAccess, webhookHeaders, c.WebhooksMaxBodyBytes, c.WhatsappSystemUserToken, c.MetaWebhookURL)).
 			WithClassificationServiceFactory(classificationFactory(c)).
 			WithEmailServiceFactory(emailFactory(c)).
@@ -103,9 +103,9 @@ func Simulator(c *runtime.Config) flows.Engine {
 		httpClient, _, httpAccess := HTTP(c) // don't do retries in simulator
 
 		simulator = engine.NewBuilder().
-			WithWebhookServiceFactory(webhooks.NewServiceFactory(httpClient, nil, httpAccess, webhookHeaders, c.WebhooksMaxBodyBytes)).
+			WithWebhookServiceFactory(signingWebhookServiceFactory(webhooks.NewServiceFactory(httpClient, nil, httpAccess, webhookHeaders, c.WebhooksMaxBodyBytes))).
 			WithWeniGPTServiceFactory(wenigpt.NewServiceFactory(httpClient, nil, httpAccess, webhookHeaders, c.WebhooksMaxBodyBytes, c.WenigptAuthToken, c.WenigptBaseURL)).
-			WithBrainServiceFactory(brain.NewServiceFactory(httpClient, httpRetries, httpAccess, webhookHeaders, c.WebhooksMaxBodyBytes, c.RouterAuthToken, c.RouterBaseURL)).
+			WithBrainServiceFactory(signingBrainServiceFactory(brain.NewServiceFactory(httpClient, httpRetries, httpAccess, webhookHeaders, c.WebhooksMaxBodyBytes, c.RouterAuthToken, c.RouterBaseURL))).
 			WithMetaServiceFactory(meta.NewServiceFactory(httpClient, httpRetries, httpAccess, webhookHeaders, c.WebhooksMaxBodyBytes, c.WhatsappSystemUserToken, c.MetaWebhookURL)).
 			WithClassificationServiceFactory(classificationFactory(c)).     // simulated sessions do real classification
 			WithExternalServiceServiceFactory(externalServiceFactory((c))). // and real external services

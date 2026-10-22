@@ -1,3 +1,9 @@
+1.104.0
+----------
+ * feat: presign S3 attachment URLs sent to the router, brain, webhooks, ticketers and IVR
+ * fix: leave the webhook request without a body when reading it fails
+ * chore: update gocommon dependency to v1.18.0
+
 1.103.1
 ----------
  * fix: resolve named template recipient variables across Brazilian WhatsApp ninth-digit URN variants
