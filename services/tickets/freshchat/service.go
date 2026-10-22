@@ -13,6 +13,7 @@ import (
 	"github.com/nyaruka/goflow/flows"
 	"github.com/nyaruka/goflow/utils"
 	"github.com/nyaruka/mailroom/core/models"
+	"github.com/nyaruka/mailroom/core/presign"
 	"github.com/nyaruka/mailroom/runtime"
 	"github.com/nyaruka/null"
 	"github.com/pkg/errors"
@@ -232,10 +233,11 @@ func (s *service) Forward(ticket *models.Ticket, msgUUID flows.MsgUUID, text str
 	}
 
 	for _, attachment := range attachments {
+		attachmentURL := presign.SignURL(attachment.URL())
 		if attachment.ContentType() == "image/jpeg" || attachment.ContentType() == "image/png" || attachment.ContentType() == "image/gif" || attachment.ContentType() == "image/webp" {
-			imageURL, err := s.restClient.UploadImage(attachment.URL())
+			imageURL, err := s.restClient.UploadImage(attachmentURL)
 			if err != nil {
-				imageURL = attachment.URL()
+				imageURL = attachmentURL
 			}
 			msg.MessageParts = append(msg.MessageParts, MessageParts{
 				Image: &Image{
@@ -245,14 +247,14 @@ func (s *service) Forward(ticket *models.Ticket, msgUUID flows.MsgUUID, text str
 		} else if attachment.ContentType() == "video/mp4" || attachment.ContentType() == "video/quicktime" || attachment.ContentType() == "video/webm" {
 			msg.MessageParts = append(msg.MessageParts, MessageParts{
 				Video: &Video{
-					URL:         attachment.URL(),
+					URL:         attachmentURL,
 					ContentType: attachment.ContentType(),
 				},
 			})
 		} else {
-			file, err := s.restClient.UploadFile(attachment.URL())
+			file, err := s.restClient.UploadFile(attachmentURL)
 			if err != nil {
-				file.URL = attachment.URL()
+				file.URL = attachmentURL
 			}
 			msg.MessageParts = append(msg.MessageParts, MessageParts{
 				File: file,

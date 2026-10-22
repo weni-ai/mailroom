@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"net/http"
+	"strings"
 	"testing"
 	"time"
 
@@ -50,7 +51,7 @@ func TestOpenAndForward(t *testing.T) {
 
 	uuids.SetGenerator(uuids.NewSeededGenerator(12345))
 
-	httpx.SetRequestor(httpx.NewMockRequestor(map[string][]httpx.MockResponse{
+	requestor := testsuite.NewPresignedRequestor(httpx.NewMockRequestor(map[string][]httpx.MockResponse{
 		"https://chat.twilio.com/v2/Services/IS38067ec392f1486bb6e4de4610f26fb3/Users/1234567_e7187099-7d38-4f60-955c-325957214c42": {
 			httpx.NewMockResponse(404, nil, `{
 				"code": 20404,
@@ -189,9 +190,6 @@ func TestOpenAndForward(t *testing.T) {
 				"service_sid": "IS38067ec392f1486bb6e4de4610f26fb3",
 				"was_edited": false
 			}`),
-		},
-		"https://link.to/dummy_image.jpg": {
-			httpx.NewMockResponse(200, map[string]string{"Content-Type": "image/jpeg"}, `imagebytes`),
 		},
 		"https://link.to/dummy_video.mp4": {
 			httpx.NewMockResponse(200, map[string]string{"Content-Type": "video/mp4"}, `videobytes`),
@@ -395,7 +393,8 @@ func TestOpenAndForward(t *testing.T) {
 				}
 			}`),
 		},
-	}))
+	}), httpx.NewMockResponse(200, map[string]string{"Content-Type": "image/jpeg"}, `imagebytes`))
+	httpx.SetRequestor(requestor)
 
 	ticketer := flows.NewTicketer(static.NewTicketer(assets.TicketerUUID(uuids.New()), "Support", "twilioflex"))
 
@@ -455,15 +454,23 @@ func TestOpenAndForward(t *testing.T) {
 		"contact-display": "Cathy",
 	})
 
+	// the image is in a private bucket so it must be downloaded with a presigned URL
+	testsuite.UseAttachmentSigner(t, "media-bucket")
+	imageURL := "https://media-bucket.s3.sa-east-1.amazonaws.com/media/dummy_image.jpg"
+
 	logger = &flows.HTTPLogger{}
 	attachments := []utils.Attachment{
-		"image/jpg:https://link.to/dummy_image.jpg",
+		utils.Attachment("image/jpg:" + imageURL),
 		"video/mp4:https://link.to/dummy_video.mp4",
 		"audio/ogg:https://link.to/dummy_audio.ogg",
 	}
 	err = svc.Forward(dbTicket2, flows.MsgUUID("5ga340ae-1fb0-4666-98db-2177fe9bf31c"), "It's urgent", attachments, nil, null.NullString, logger.Log)
 	assert.NoError(t, err)
 	assert.Equal(t, 8, len(logger.Logs))
+
+	downloads := requestor.URLs()
+	require.Len(t, downloads, 1)
+	assert.True(t, strings.HasPrefix(downloads[0], imageURL+"?X-Amz-"), downloads[0])
 }
 
 func TestCloseAndReopen(t *testing.T) {

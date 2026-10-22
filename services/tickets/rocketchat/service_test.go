@@ -54,6 +54,7 @@ func TestOpenAndForward(t *testing.T) {
 		baseURL + "/visitor-message": {
 			httpx.MockConnectionError,
 			httpx.NewMockResponse(201, nil, `{ "id": "tyLrD97j8TFZmT3Y6" }`),
+			httpx.NewMockResponse(201, nil, `{ "id": "tyLrD97j8TFZmT3Y7" }`),
 		},
 	}))
 
@@ -108,6 +109,14 @@ func TestOpenAndForward(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, 1, len(logger.Logs))
 	test.AssertSnapshot(t, "forward_message", logger.Logs[0].Request)
+
+	// attachments in our buckets are presigned
+	testsuite.UseAttachmentSigner(t, "media-bucket")
+	logger = &flows.HTTPLogger{}
+	err = svc.Forward(dbTicket, flows.MsgUUID("4fa340ae-1fb0-4666-98db-2177fe9bf31c"), "", []utils.Attachment{"image/jpeg:https://media-bucket.s3.sa-east-1.amazonaws.com/media/photo.jpg"}, nil, null.NullString, logger.Log)
+	require.NoError(t, err)
+	require.Equal(t, 1, len(logger.Logs))
+	assert.Contains(t, logger.Logs[0].Request, `"url":"https://media-bucket.s3.sa-east-1.amazonaws.com/media/photo.jpg?X-Amz-Algorithm=`)
 }
 
 func TestCloseAndReopen(t *testing.T) {
