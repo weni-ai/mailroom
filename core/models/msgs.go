@@ -6,6 +6,7 @@ import (
 	"database/sql/driver"
 	"encoding/json"
 	"fmt"
+	"net/url"
 	"slices"
 	"sort"
 	"strings"
@@ -1013,23 +1014,44 @@ func SelectContactMessages(ctx context.Context, db Queryer, contactID int, after
 	return msgs, nil
 }
 
+func normalizedMediaPrefix(prefix string) string {
+	if !strings.HasPrefix(prefix, "/") {
+		prefix = "/" + prefix
+	}
+	if !strings.HasSuffix(prefix, "/") {
+		prefix += "/"
+	}
+	return prefix
+}
+
 // NormalizeAttachment will turn any relative URL in the passed in attachment and normalize it to
-// include the full host for attachment domains
+// include the full host for attachment domains. Legacy S3 virtual-hosted media URLs are rewritten
+// to that same host.
 func NormalizeAttachment(cfg *runtime.Config, attachment utils.Attachment) utils.Attachment {
-	// don't try to modify geo type attachments which are just coordinates
 	if attachment.ContentType() == "geo" {
 		return attachment
 	}
 
-	url := attachment.URL()
-	if !strings.HasPrefix(url, "http") {
-		if strings.HasPrefix(url, "/") {
-			url = fmt.Sprintf("https://%s%s", cfg.AttachmentDomain, url)
+	rawURL := attachment.URL()
+	if !strings.HasPrefix(rawURL, "http") {
+		if strings.HasPrefix(rawURL, "/") {
+			rawURL = fmt.Sprintf("https://%s%s", cfg.AttachmentDomain, rawURL)
 		} else {
-			url = fmt.Sprintf("https://%s/%s", cfg.AttachmentDomain, url)
+			rawURL = fmt.Sprintf("https://%s/%s", cfg.AttachmentDomain, rawURL)
 		}
+		return utils.Attachment(fmt.Sprintf("%s:%s", attachment.ContentType(), rawURL))
 	}
-	return utils.Attachment(fmt.Sprintf("%s:%s", attachment.ContentType(), url))
+
+	parsed, err := url.Parse(rawURL)
+	if err != nil {
+		return attachment
+	}
+	storageHost := fmt.Sprintf("%s.s3.%s.amazonaws.com", cfg.S3MediaBucket, cfg.S3Region)
+	prefix := normalizedMediaPrefix(cfg.S3MediaPrefix)
+	if strings.EqualFold(parsed.Host, storageHost) && strings.HasPrefix(parsed.Path, prefix) {
+		rawURL = fmt.Sprintf("https://%s%s", cfg.AttachmentDomain, parsed.EscapedPath())
+	}
+	return utils.Attachment(fmt.Sprintf("%s:%s", attachment.ContentType(), rawURL))
 }
 
 // SetTimeout sets the timeout for this message

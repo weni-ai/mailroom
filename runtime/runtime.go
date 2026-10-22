@@ -17,6 +17,7 @@ type Runtime struct {
 	RP             *redis.Pool
 	ES             *elastic.Client
 	MediaStorage   storage.Storage
+	MediaSigner    MediaSigner
 	SessionStorage storage.Storage
 	Config         *Config
 	IRP            *redis.Pool
