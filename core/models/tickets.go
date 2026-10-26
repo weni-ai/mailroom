@@ -920,6 +920,43 @@ func LookupTicketerByUUID(ctx context.Context, db Queryer, uuid assets.TicketerU
 	return ticketer, nil
 }
 
+const selectActiveTicketersByTypeSQL = `
+SELECT ROW_TO_JSON(r) FROM (SELECT
+	t.id as id,
+	t.uuid as uuid,
+	t.org_id as org_id,
+	t.name as name,
+	t.ticketer_type as ticketer_type,
+	t.config as config
+FROM
+	tickets_ticketer t
+WHERE
+	t.ticketer_type = $1 AND
+	t.is_active = TRUE
+ORDER BY
+	t.id
+) r;
+`
+
+// LoadActiveTicketersByType loads every active ticketer of the given type.
+func LoadActiveTicketersByType(ctx context.Context, db Queryer, ticketerType string) ([]*Ticketer, error) {
+	rows, err := db.QueryxContext(ctx, selectActiveTicketersByTypeSQL, ticketerType)
+	if err != nil && err != sql.ErrNoRows {
+		return nil, errors.Wrapf(err, "error querying ticketers of type %s", ticketerType)
+	}
+	defer rows.Close()
+
+	ticketers := make([]*Ticketer, 0)
+	for rows.Next() {
+		ticketer := &Ticketer{}
+		if err := dbutil.ReadJSONRow(rows, &ticketer.t); err != nil {
+			return nil, errors.Wrap(err, "error unmarshalling ticketer")
+		}
+		ticketers = append(ticketers, ticketer)
+	}
+	return ticketers, nil
+}
+
 const selectOrgTicketersSQL = `
 SELECT ROW_TO_JSON(r) FROM (SELECT
 	t.id as id,

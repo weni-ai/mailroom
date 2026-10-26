@@ -110,8 +110,15 @@ func handleSync(ctx context.Context, rt *runtime.Runtime, r *http.Request, l *mo
 		return errors.Errorf("no such ticketer %s", ticketerUUID), http.StatusNotFound, nil
 	}
 
-	zd := svc.(*service)
+	zd, ok := svc.(*service)
+	if !ok {
+		return errors.Errorf("no such ticketer %s", ticketerUUID), http.StatusNotFound, nil
+	}
 
+	return syncTicketer(ctx, rt, ticketer, zd, sync, l)
+}
+
+func syncTicketer(ctx context.Context, rt *runtime.Runtime, ticketer *models.Ticketer, zd *service, sync bool, l *models.HTTPLogger) (*syncReport, int, error) {
 	open, err := models.LoadOpenTicketsForTicketer(ctx, rt.DB, ticketer.ID())
 	if err != nil {
 		return nil, http.StatusInternalServerError, errors.Wrap(err, "error loading open tickets")
@@ -139,7 +146,7 @@ func handleSync(ctx context.Context, rt *runtime.Runtime, r *http.Request, l *mo
 			l.Ticketer(ticketer)(flows.NewHTTPLog(trace, flows.HTTPStatusFromCode, zd.redactor))
 		}
 		if fetchErr != nil {
-			return errors.Wrap(fetchErr, "zendesk show_many"), http.StatusBadGateway, nil
+			return nil, http.StatusBadGateway, errors.Wrap(fetchErr, "zendesk show_many")
 		}
 		for _, zt := range fetched {
 			if zt == nil {

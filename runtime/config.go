@@ -61,15 +61,17 @@ type Config struct {
 	S3MediaPrefix        string `help:"the prefix that will be added to attachment filenames"`
 	S3MediaPrefixZendesk string `help:"the prefix that will be added to file attachment names for Zendesk tickets"`
 
-	ZendeskMarketplaceName   string `help:"the app name for Zendesk Marketplace API headers"`
-	ZendeskMarketplaceOrgID  string `help:"the organization ID for Zendesk Marketplace API headers"`
-	ZendeskMarketplaceAppID  string `help:"the app ID for Zendesk Marketplace API headers"`
-	ZendeskClientID          string `help:"the OAuth client ID for Zendesk Global OAuth"`
-	ZendeskClientSecret      string `help:"the OAuth client secret for Zendesk Global OAuth"`
-	S3SessionBucket      string `help:"the S3 bucket we will write attachments to"`
-	S3SessionPrefix      string `help:"the prefix that will be added to attachment filenames"`
-	S3DisableSSL         bool   `help:"whether we disable SSL when accessing S3. Should always be set to False unless you're hosting an S3 compatible service within a secure internal network"`
-	S3ForcePathStyle     bool   `help:"whether we force S3 path style. Should generally need to default to False unless you're hosting an S3 compatible service"`
+	ZendeskMarketplaceName    string `help:"the app name for Zendesk Marketplace API headers"`
+	ZendeskMarketplaceOrgID   string `help:"the organization ID for Zendesk Marketplace API headers"`
+	ZendeskMarketplaceAppID   string `help:"the app ID for Zendesk Marketplace API headers"`
+	ZendeskClientID           string `help:"the OAuth client ID for Zendesk Global OAuth"`
+	ZendeskClientSecret       string `help:"the OAuth client secret for Zendesk Global OAuth"`
+	ZendeskTicketSync         bool   `help:"when true, periodically close open mailroom tickets that are solved or closed in Zendesk"`
+	ZendeskTicketSyncInterval int    `help:"hours between Zendesk ticket sync runs; default 12"`
+	S3SessionBucket           string `help:"the S3 bucket we will write attachments to"`
+	S3SessionPrefix           string `help:"the prefix that will be added to attachment filenames"`
+	S3DisableSSL              bool   `help:"whether we disable SSL when accessing S3. Should always be set to False unless you're hosting an S3 compatible service within a secure internal network"`
+	S3ForcePathStyle          bool   `help:"whether we force S3 path style. Should generally need to default to False unless you're hosting an S3 compatible service"`
 
 	AWSAccessKeyID            string `help:"the access key id to use when authenticating S3"`
 	AWSSecretAccessKey        string `help:"the secret access key id to use when authenticating S3"`
@@ -232,7 +234,8 @@ func NewDefaultConfig() *Config {
 		SqsPublishDelayIntervalMs: 2000,
 		SqsTicketsQueueURL:        "http://sqs.us-east-1.localhost.localstack.cloud:4566/000000000000/flows-tickets",
 
-		ProcessingTTL: 120,
+		ProcessingTTL:             120,
+		ZendeskTicketSyncInterval: 12,
 
 		WenichatsAuthToken: "",
 	}
