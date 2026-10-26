@@ -208,6 +208,37 @@ func LoadOpenTicketsForContact(ctx context.Context, db Queryer, contact *Contact
 	return loadTickets(ctx, db, selectOpenTicketsSQL, contact.ID())
 }
 
+const selectOpenTicketsForTicketerSQL = `
+SELECT
+  t.id AS id,
+  t.uuid AS uuid,
+  t.org_id AS org_id,
+  t.contact_id AS contact_id,
+  t.ticketer_id AS ticketer_id,
+  t.external_id AS external_id,
+  t.status AS status,
+  t.topic_id AS topic_id,
+  t.body AS body,
+  t.assignee_id AS assignee_id,
+  t.config AS config,
+  t.opened_on AS opened_on,
+  t.modified_on AS modified_on,
+  t.closed_on AS closed_on,
+  t.last_activity_on AS last_activity_on
+FROM
+  tickets_ticket t
+WHERE
+  t.ticketer_id = $1 AND
+  t.status = 'O'
+ORDER BY
+  t.id
+`
+
+// LoadOpenTicketsForTicketer looks up the open tickets for the passed in ticketer
+func LoadOpenTicketsForTicketer(ctx context.Context, db Queryer, ticketerID TicketerID) ([]*Ticket, error) {
+	return loadTickets(ctx, db, selectOpenTicketsForTicketerSQL, ticketerID)
+}
+
 const selectTicketsByIDSQL = `
 SELECT
   t.id AS id,
@@ -887,6 +918,43 @@ func LookupTicketerByUUID(ctx context.Context, db Queryer, uuid assets.TicketerU
 	}
 
 	return ticketer, nil
+}
+
+const selectActiveTicketersByTypeSQL = `
+SELECT ROW_TO_JSON(r) FROM (SELECT
+	t.id as id,
+	t.uuid as uuid,
+	t.org_id as org_id,
+	t.name as name,
+	t.ticketer_type as ticketer_type,
+	t.config as config
+FROM
+	tickets_ticketer t
+WHERE
+	t.ticketer_type = $1 AND
+	t.is_active = TRUE
+ORDER BY
+	t.id
+) r;
+`
+
+// LoadActiveTicketersByType loads every active ticketer of the given type.
+func LoadActiveTicketersByType(ctx context.Context, db Queryer, ticketerType string) ([]*Ticketer, error) {
+	rows, err := db.QueryxContext(ctx, selectActiveTicketersByTypeSQL, ticketerType)
+	if err != nil && err != sql.ErrNoRows {
+		return nil, errors.Wrapf(err, "error querying ticketers of type %s", ticketerType)
+	}
+	defer rows.Close()
+
+	ticketers := make([]*Ticketer, 0)
+	for rows.Next() {
+		ticketer := &Ticketer{}
+		if err := dbutil.ReadJSONRow(rows, &ticketer.t); err != nil {
+			return nil, errors.Wrap(err, "error unmarshalling ticketer")
+		}
+		ticketers = append(ticketers, ticketer)
+	}
+	return ticketers, nil
 }
 
 const selectOrgTicketersSQL = `

@@ -28,6 +28,7 @@ func init() {
 	web.RegisterJSONRoute(http.MethodPost, base+"/event_callback", web.WithHTTPLogs(handleEventCallback))
 	web.RegisterJSONRoute(http.MethodPost, base+`/webhook/{ticketer:[a-f0-9\-]+}`, web.WithHTTPLogs(handleTicketerWebhook))
 	web.RegisterJSONRoute(http.MethodPost, base+`/csat`, web.WithHTTPLogs(handleCSAT))
+	web.RegisterJSONRoute(http.MethodPost, base+`/sync/{ticketer:[a-f0-9\-]+}`, web.RequireAuthToken(web.WithHTTPLogs(handleSync)))
 }
 
 type integrationMetadata struct {
@@ -298,8 +299,8 @@ func handleTicketerWebhook(ctx context.Context, rt *runtime.Runtime, r *http.Req
 
 	requestJSON, err := json.Marshal(request)
 	if request.Event == "status_changed" {
-		switch strings.ToLower(request.Status) {
-		case statusSolved, statusClosed, "resuelto", "cerrado", "resolvido":
+		switch {
+		case zendeskStatusIsClosed(request.Status):
 			err = tickets.Close(ctx, rt, oa, ticket, false, l, string(requestJSON))
 
 			if err == nil {
@@ -313,7 +314,7 @@ func handleTicketerWebhook(ctx context.Context, rt *runtime.Runtime, r *http.Req
 				}
 			}
 
-		case statusOpen, "abierto", "aberto":
+		case strings.ToLower(request.Status) == statusOpen || strings.ToLower(request.Status) == "abierto" || strings.ToLower(request.Status) == "aberto":
 			err = tickets.Reopen(ctx, rt, oa, ticket, false, l)
 		}
 

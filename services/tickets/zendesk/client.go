@@ -326,6 +326,24 @@ func (c *RESTClient) UpdateManyTickets(ids []int64, status string) (*JobStatus, 
 	return response.JobStatus, trace, nil
 }
 
+// ShowManyTickets see https://developer.zendesk.com/api-reference/ticketing/tickets/tickets/#show-multiple-tickets
+func (c *RESTClient) ShowManyTickets(ids []int64) ([]*Ticket, *httpx.Trace, error) {
+	if len(ids) == 0 {
+		return []*Ticket{}, nil, nil
+	}
+
+	response := &struct {
+		Tickets []*Ticket `json:"tickets"`
+	}{}
+
+	trace, err := c.get("tickets/show_many.json?ids="+encodeIds(ids), nil, response)
+	if err != nil {
+		return nil, trace, err
+	}
+
+	return response.Tickets, trace, nil
+}
+
 // PushClient is a client for the Zendesk channel push API and requires a special push token
 type PushClient struct {
 	baseClient
