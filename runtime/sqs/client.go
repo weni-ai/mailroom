@@ -129,10 +129,28 @@ func isFIFOQueue(queueURL string) bool {
 	return strings.HasSuffix(queueURL, ".fifo")
 }
 
+// sqsFIFOMessageGroupIDLimit is the maximum length SQS accepts for MessageGroupId.
+// https://docs.aws.amazon.com/AWSSimpleQueueService/latest/APIReference/API_SendMessage.html
+const sqsFIFOMessageGroupIDLimit = 128
+
 // generateDeduplicationID generates a SHA256 hash of the message body for deduplication
 func generateDeduplicationID(body []byte) string {
 	hash := sha256.Sum256(body)
 	return hex.EncodeToString(hash[:])
+}
+
+// fitMessageGroupID returns a MessageGroupId that SQS FIFO will accept.
+// Keys within the 128-character limit are kept so existing conversations stay
+// in the same group. Longer keys (typically a long contact URN) are replaced
+// with their SHA-256 hex digest, which is 64 characters. The same input always
+// maps to the same digest, so messages for that contact remain ordered.
+func fitMessageGroupID(groupID string) string {
+	if len(groupID) <= sqsFIFOMessageGroupIDLimit {
+		return groupID
+	}
+	sum := sha256.Sum256([]byte(groupID))
+	logrus.WithField("message_group_id_length", len(groupID)).Warn("sqs message group id exceeds 128 characters; using sha256 digest")
+	return hex.EncodeToString(sum[:])
 }
 
 func (c *Client) publish(queueURL string, body []byte, contentType string) error {
@@ -209,7 +227,7 @@ func (c *Client) publishWithAttributes(queueURL string, body []byte, contentType
 		if groupId, ok := attributes["MessageGroupId"]; ok {
 			messageGroupId = groupId
 		}
-		input.MessageGroupId = aws.String(messageGroupId)
+		input.MessageGroupId = aws.String(fitMessageGroupID(messageGroupId))
 		input.MessageDeduplicationId = aws.String(generateDeduplicationID(body))
 	}
 
