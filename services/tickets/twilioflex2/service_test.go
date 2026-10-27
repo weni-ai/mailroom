@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"net/http"
+	"strings"
 	"testing"
 	"time"
 
@@ -371,18 +372,17 @@ func TestForwardWithAttachments(t *testing.T) {
 	messageUrl := fmt.Sprintf("https://conversations.twilio.com/v1/Conversations/%s/Messages", conversationSid)
 	mediaUrl := fmt.Sprintf("https://mcs.us1.twilio.com/v1/Services/%s/Media", testConversationServiceSid)
 
-	// Create a mock attachment
+	// Create a mock attachment, stored in a private bucket so it must be downloaded with a presigned URL
+	testsuite.UseAttachmentSigner(t, "media-bucket")
+	attachmentURL := "https://media-bucket.s3.sa-east-1.amazonaws.com/media/test.jpg"
 	attachments := []utils.Attachment{
-		utils.Attachment("image/jpeg:https://example.com/test.jpg"),
+		utils.Attachment("image/jpeg:" + attachmentURL),
 	}
 
 	// Mock file content for attachment
 	fileContent := []byte("fake image content")
 
-	httpx.SetRequestor(httpx.NewMockRequestor(map[string][]httpx.MockResponse{
-		"https://example.com/test.jpg": {
-			httpx.NewMockResponse(200, nil, string(fileContent)),
-		},
+	requestor := testsuite.NewPresignedRequestor(httpx.NewMockRequestor(map[string][]httpx.MockResponse{
 		mediaUrl: {
 			httpx.NewMockResponse(201, nil, `{
 				"sid": "ME34567890123456789012345678901234",
@@ -413,12 +413,18 @@ func TestForwardWithAttachments(t *testing.T) {
 				"index": 2
 			}`),
 		},
-	}))
+	}), httpx.NewMockResponse(200, nil, string(fileContent)))
+	httpx.SetRequestor(requestor)
 
 	logger := &flows.HTTPLogger{}
 	err = svc.Forward(ticket, flows.MsgUUID("msg-uuid"), "Message with attachment", attachments, nil, null.NullString, logger.Log)
 	assert.NoError(t, err)
 	assert.Equal(t, 3, len(logger.Logs)) // attachment download + media creation + message sending
+
+	downloads := requestor.URLs()
+	require.Len(t, downloads, 1)
+	assert.True(t, strings.HasPrefix(downloads[0], attachmentURL+"?X-Amz-"), downloads[0])
+	assert.Contains(t, logger.Logs[0].Request, `filename="test.jpg"`)
 }
 
 func TestSendHistory(t *testing.T) {
@@ -655,20 +661,19 @@ func TestSendHistoryWithAttachments(t *testing.T) {
 	mock.ExpectQuery(`SELECT name FROM contacts_contact`).WithArgs(contactID, testdata.Org1.ID).
 		WillReturnRows(sqlmock.NewRows([]string{"name"}).AddRow(contactName))
 
-	// Mock DB messages with one attachment and non-empty text
+	// Mock DB messages with one attachment, stored in a private bucket, and non-empty text
+	testsuite.UseAttachmentSigner(t, "media-bucket")
+	attachmentURL := "https://media-bucket.s3.sa-east-1.amazonaws.com/media/test.jpg"
 	mock.ExpectQuery(`SELECT (.+) FROM msgs_msg`).
 		WithArgs(123, expectedTime).
 		WillReturnRows(sqlmock.NewRows([]string{"id", "text", "direction", "created_on", "attachments"}).
-			AddRow(1, "Here is the photo", "I", expectedTime.Add(time.Minute), pq.StringArray{"image/jpeg:https://example.com/test.jpg"}))
+			AddRow(1, "Here is the photo", "I", expectedTime.Add(time.Minute), pq.StringArray{"image/jpeg:" + attachmentURL}))
 
 	messageUrl := fmt.Sprintf("https://conversations.twilio.com/v1/Conversations/%s/Messages", conversationSid)
 	mediaUrl := fmt.Sprintf("https://mcs.us1.twilio.com/v1/Services/%s/Media", testConversationServiceSid)
 
 	// Mock HTTP interactions: download attachment, create media, send media msg, send text msg
-	httpx.SetRequestor(httpx.NewMockRequestor(map[string][]httpx.MockResponse{
-		"https://example.com/test.jpg": {
-			httpx.NewMockResponse(200, nil, "fake image content"),
-		},
+	requestor := testsuite.NewPresignedRequestor(httpx.NewMockRequestor(map[string][]httpx.MockResponse{
 		mediaUrl: {
 			httpx.NewMockResponse(201, nil, `{
 				"sid": "ME34567890123456789012345678901234",
@@ -698,13 +703,18 @@ func TestSendHistoryWithAttachments(t *testing.T) {
 				"index": 2
 			}`, identity)),
 		},
-	}))
+	}), httpx.NewMockResponse(200, nil, "fake image content"))
+	httpx.SetRequestor(requestor)
 
 	logger := &flows.HTTPLogger{}
 	err = svc.SendHistory(ticket, contactID, nil, logger.Log)
 	assert.NoError(t, err)
 	// media creation + send media msg + send text msg
 	assert.Equal(t, 3, len(logger.Logs))
+
+	downloads := requestor.URLs()
+	require.Len(t, downloads, 1)
+	assert.True(t, strings.HasPrefix(downloads[0], attachmentURL+"?X-Amz-"), downloads[0])
 
 	// Verify DB expectations
 	assert.NoError(t, mock.ExpectationsWereMet())

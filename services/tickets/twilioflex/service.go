@@ -21,6 +21,7 @@ import (
 	"github.com/nyaruka/goflow/flows"
 	"github.com/nyaruka/goflow/utils"
 	"github.com/nyaruka/mailroom/core/models"
+	"github.com/nyaruka/mailroom/core/presign"
 	"github.com/nyaruka/mailroom/runtime"
 	"github.com/nyaruka/null"
 )
@@ -229,7 +230,7 @@ func (s *service) Forward(ticket *models.Ticket, msgUUID flows.MsgUUID, text str
 	if len(attachments) > 0 {
 		mediaAttachements := []CreateMediaParams{}
 		for _, attachment := range attachments {
-			attUrl := attachment.URL()
+			attUrl := presign.SignURL(attachment.URL())
 			req, err := http.NewRequest("GET", attUrl, nil)
 			if err != nil {
 				return err

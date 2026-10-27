@@ -11,6 +11,7 @@ import (
 	"github.com/buger/jsonparser"
 	"github.com/nyaruka/goflow/utils"
 	"github.com/nyaruka/mailroom/core/models"
+	"github.com/nyaruka/mailroom/core/presign"
 	"github.com/pkg/errors"
 )
 
@@ -76,7 +77,7 @@ func attachmentsFromMsg(attachments []utils.Attachment) []Attachment {
 	for _, att := range attachments {
 		out = append(out, Attachment{
 			ContentType: att.ContentType(),
-			URL:         att.URL(),
+			URL:         presign.SignURL(att.URL()),
 		})
 	}
 	return out

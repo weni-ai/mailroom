@@ -1,9 +1,12 @@
 package generic
 
 import (
+	"strings"
 	"testing"
 	"time"
 
+	"github.com/nyaruka/goflow/utils"
+	"github.com/nyaruka/mailroom/testsuite"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -38,6 +41,19 @@ func TestParseHistoryAfter(t *testing.T) {
 
 	_, err = parseHistoryAfter("not-a-date")
 	require.Error(t, err)
+}
+
+func TestAttachmentsFromMsg(t *testing.T) {
+	testsuite.UseAttachmentSigner(t, "media-bucket")
+
+	atts := attachmentsFromMsg([]utils.Attachment{
+		"image/jpeg:https://media-bucket.s3.sa-east-1.amazonaws.com/media/photo.jpg",
+		"audio/ogg:https://link.to/audio.ogg",
+	})
+	require.Len(t, atts, 2)
+	assert.Equal(t, "image/jpeg", atts[0].ContentType)
+	assert.True(t, strings.HasPrefix(atts[0].URL, "https://media-bucket.s3.sa-east-1.amazonaws.com/media/photo.jpg?X-Amz-"), atts[0].URL)
+	assert.Equal(t, Attachment{ContentType: "audio/ogg", URL: "https://link.to/audio.ogg"}, atts[1])
 }
 
 func TestHistoryOneByOneTemplateContextFrom(t *testing.T) {
