@@ -1,3 +1,7 @@
+1.105.0
+----------
+ * feat: always send stream_support=true to Nexus for TPH telephony channels
+
 1.104.0
 ----------
  * feat: presign S3 attachment URLs sent to the router, brain, webhooks, ticketers and IVR
