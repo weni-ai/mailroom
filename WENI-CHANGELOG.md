@@ -1,3 +1,7 @@
+1.105.1
+----------
+ * feat: prefer WhatsApp phone number over BSUID in flow URN expressions (goflow v1.21.1)
+
 1.105.0
 ----------
  * feat: always send stream_support=true to Nexus for TPH telephony channels
