@@ -4,6 +4,7 @@ import (
 	"context"
 	"io"
 	"net/http"
+	"net/url"
 	"strconv"
 	"strings"
 	"time"
@@ -56,7 +57,11 @@ func handle(ctx context.Context, rt *runtime.Runtime, r *http.Request, w http.Re
 
 	resp, err := fetchSigned(upstream)
 	if err != nil {
-		logrus.WithError(err).WithField("bucket", bucket).WithField("key", key).Error("error fetching attachment")
+		logErr := err
+		if uerr, ok := err.(*url.Error); ok && uerr.Err != nil {
+			logErr = uerr.Err
+		}
+		logrus.WithError(logErr).WithField("bucket", bucket).WithField("key", key).Error("error fetching attachment")
 		w.WriteHeader(http.StatusBadGateway)
 		return nil
 	}

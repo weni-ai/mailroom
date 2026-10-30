@@ -1,10 +1,13 @@
 package media
 
 import (
+	"bytes"
 	"context"
+	"errors"
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"strings"
 	"testing"
 	"time"
@@ -12,6 +15,7 @@ import (
 	"github.com/go-chi/chi"
 	"github.com/nyaruka/mailroom/core/presign"
 	"github.com/nyaruka/mailroom/testsuite"
+	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -111,6 +115,39 @@ func TestMediaHandler(t *testing.T) {
 	rec = call(http.MethodGet, token, "")
 	assert.Equal(t, http.StatusOK, rec.Code)
 	assert.Equal(t, "application/octet-stream", rec.Header().Get("Content-Type"))
+}
+
+func TestFetchErrorOmitsPresignedURL(t *testing.T) {
+	testsuite.UseDurableLinks(t, "mailroom.test", "current-secret", "media-bucket")
+	raw := "https://media-bucket.s3.sa-east-1.amazonaws.com/media/foo.jpg"
+	token := strings.TrimPrefix(presign.DurableURL(raw), "https://mailroom.test/mr/media/")
+
+	fetchSigned = func(req *http.Request) (*http.Response, error) {
+		return nil, &url.Error{
+			Op:  "Get",
+			URL: "https://s3.amazonaws.com/media-bucket/media/foo.jpg?X-Amz-Signature=secret&X-Amz-Security-Token=session",
+			Err: errors.New("connection refused"),
+		}
+	}
+	t.Cleanup(func() {
+		fetchSigned = func(req *http.Request) (*http.Response, error) { return http.DefaultClient.Do(req) }
+	})
+
+	var buf bytes.Buffer
+	orig := logrus.StandardLogger().Out
+	logrus.SetOutput(&buf)
+	t.Cleanup(func() { logrus.SetOutput(orig) })
+
+	rec := call(http.MethodGet, token, "")
+	assert.Equal(t, http.StatusBadGateway, rec.Code)
+	assert.Empty(t, rec.Body.String())
+
+	logged := buf.String()
+	assert.Contains(t, logged, "media-bucket")
+	assert.Contains(t, logged, "media/foo.jpg")
+	assert.NotContains(t, logged, "X-Amz-Signature")
+	assert.NotContains(t, logged, "X-Amz-Security-Token")
+	assert.NotContains(t, logged, "secret")
 }
 
 func call(method, token, rng string) *httptest.ResponseRecorder {
