@@ -116,6 +116,13 @@ func TestDurableURLCustomEndpoint(t *testing.T) {
 	assert.Equal(t, presign.DurableURL(awsURL), presign.DurableURL(minioURL))
 }
 
+func TestDurableURLCustomEndpointLiteralPercent(t *testing.T) {
+	useLinks(t, "current-secret", "", "mailroom.test", "http://localhost:9000", "media-bucket")
+	awsURL := "https://media-bucket.s3.sa-east-1.amazonaws.com/media/100%25.jpg"
+	minioURL := "http://localhost:9000/media-bucket/media/100%25.jpg"
+	assert.Equal(t, presign.DurableURL(awsURL), presign.DurableURL(minioURL))
+}
+
 func TestCanonicalObjectURL(t *testing.T) {
 	useLinks(t, "current-secret", "", "mailroom.test", "", "media-bucket")
 	assert.Equal(t, "https://media-bucket.s3.sa-east-1.amazonaws.com/media/foo.jpg", presign.CanonicalObjectURL("media-bucket", "media/foo.jpg"))

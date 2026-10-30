@@ -174,11 +174,7 @@ func objectIdentity(rawURL string, cfg *linkState) (bucket, key string, ok bool)
 	if len(parts) != 2 || parts[0] == "" || parts[1] == "" {
 		return "", "", false
 	}
-	key, err = url.PathUnescape(parts[1])
-	if err != nil {
-		return "", "", false
-	}
-	return parts[0], key, true
+	return parts[0], parts[1], true
 }
 
 func endpointHost(endpoint string) string {
