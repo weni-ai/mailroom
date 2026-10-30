@@ -21,6 +21,7 @@ import (
 	"github.com/nyaruka/goflow/test"
 	"github.com/nyaruka/goflow/utils"
 	"github.com/nyaruka/mailroom/core/models"
+	"github.com/nyaruka/mailroom/core/presign"
 	"github.com/nyaruka/mailroom/runtime"
 	"github.com/nyaruka/mailroom/services/tickets/wenichats"
 	"github.com/nyaruka/mailroom/testsuite"
@@ -29,8 +30,6 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
-
-
 
 func mustWeniSvc(rt *runtime.Runtime, ft *flows.Ticketer, cfg map[string]string) (models.TicketService, error) {
 	model := models.BuildTicketer(models.TicketerID(0), ft.UUID(), testdata.Org1.ID, "wenichats", "Wenichats", cfg)
@@ -667,6 +666,69 @@ func TestOpenAndForward(t *testing.T) {
 	_, err = svc.Open(session, defaultTopic, "{\"history_after\":\"2019-10-07 15:21:30\"}", nil, logger3.Log)
 
 	assert.Equal(t, "failed to open ticket, no urn found for contact", err.Error())
+}
+
+func TestForwardDurableMedia(t *testing.T) {
+	_, rt, _, _ := testsuite.Get()
+
+	defer httpx.SetRequestor(httpx.DefaultRequestor)
+	httpx.SetRequestor(httpx.NewMockRequestor(map[string][]httpx.MockResponse{
+		fmt.Sprintf("%s/msgs/", baseURL): {
+			httpx.NewMockResponse(201, nil, `{
+				"uuid": "b9312612-c26d-45ec-b9bb-7f116771fdd6",
+				"user": null,
+				"room": "8ecb1e4a-b457-4645-a161-e2b02ddffa88",
+				"contact": {
+					"uuid": "095be615-a8ad-4c33-8e9c-c7612fbf6c9f",
+					"name": "Foo Bar",
+					"email": "FooBar@weni.ai",
+					"status": "string",
+					"phone": "+250788123123",
+					"custom_fields": {},
+					"created_on": "2019-08-24T14:15:22Z"
+				},
+				"text": "photo",
+				"seen": false,
+				"media": [
+					{
+						"content_type": "image/jpeg",
+						"url": "https://media-bucket.s3.sa-east-1.amazonaws.com/media/photo.jpg"
+					}
+				],
+				"created_on": "2022-08-25T02:06:55.885000-03:00"
+			}`),
+		},
+	}))
+
+	ticketer := flows.NewTicketer(static.NewTicketer(assets.TicketerUUID(uuids.New()), "Support", "wenichats"))
+	svc, err := mustWeniSvc(rt, ticketer, map[string]string{
+		"project_auth": authToken,
+		"sector_uuid":  "1a4bae05-993c-4f3b-91b5-80f4e09951f2",
+	})
+	require.NoError(t, err)
+
+	dbTicket := models.NewTicket(
+		flows.TicketUUID("645eee60-7e84-4a9e-ade3-4fce01ae28f1"),
+		testdata.Org1.ID,
+		testdata.Cathy.ID,
+		testdata.Wenichats.ID,
+		"8ecb1e4a-b457-4645-a161-e2b02ddffa88",
+		testdata.DefaultTopic.ID,
+		"Where are my cookies?",
+		models.NilUserID,
+		map[string]interface{}{
+			"contact-uuid":    string(testdata.Cathy.UUID),
+			"contact-display": "Cathy",
+		},
+	)
+
+	logger := &flows.HTTPLogger{}
+	testsuite.UseDurableLinks(t, "mailroom.test", "current-secret", "media-bucket")
+	raw := "https://media-bucket.s3.sa-east-1.amazonaws.com/media/photo.jpg"
+	err = svc.Forward(dbTicket, flows.MsgUUID("5ga340ae-1fb0-4666-98db-2177fe9bf31c"), "photo", []utils.Attachment{utils.Attachment("image/jpeg:" + raw)}, nil, null.NullString, logger.Log)
+	require.NoError(t, err)
+	assert.Contains(t, logger.Logs[0].Request, presign.DurableURL(raw))
+	assert.NotContains(t, logger.Logs[0].Request, "X-Amz-")
 }
 
 func TestOpenFails(t *testing.T) {

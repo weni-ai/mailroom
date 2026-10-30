@@ -24,6 +24,7 @@ import (
 	"github.com/nyaruka/goflow/flows"
 	"github.com/nyaruka/goflow/utils"
 	"github.com/nyaruka/mailroom/core/models"
+	"github.com/nyaruka/mailroom/core/presign"
 	"github.com/nyaruka/mailroom/runtime"
 	"github.com/nyaruka/null"
 )
@@ -252,7 +253,7 @@ func parseMsgAttachments(atts []utils.Attachment) []Attachment {
 	for _, att := range atts {
 		newAtt := Attachment{
 			ContentType: att.ContentType(),
-			URL:         att.URL(),
+			URL:         presign.DurableURL(att.URL()),
 		}
 		msgAtts = append(msgAtts, newAtt)
 	}
@@ -276,7 +277,7 @@ func (s *service) Forward(ticket *models.Ticket, msgUUID flows.MsgUUID, text str
 
 	if len(attachments) != 0 {
 		for _, attachment := range attachments {
-			msg.Attachments = append(msg.Attachments, Attachment{ContentType: attachment.ContentType(), URL: attachment.URL()})
+			msg.Attachments = append(msg.Attachments, Attachment{ContentType: attachment.ContentType(), URL: presign.DurableURL(attachment.URL())})
 		}
 	}
 
