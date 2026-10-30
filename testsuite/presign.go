@@ -26,6 +26,16 @@ func UseAttachmentSigner(t testing.TB, buckets ...string) {
 	t.Cleanup(func() { presign.SetSigner(nil, 0) })
 }
 
+// UseDurableLinks enables signing and durable /mr/media links for buckets until the test ends.
+func UseDurableLinks(t testing.TB, domain, secret string, buckets ...string) {
+	t.Helper()
+	UseAttachmentSigner(t, buckets...)
+	presign.SetLinkConfig(presign.LinkConfig{
+		Domain: domain, Secret: secret, Region: "sa-east-1", Buckets: buckets,
+	})
+	t.Cleanup(presign.ClearLinkConfig)
+}
+
 // PresignedRequestor answers requests for presigned URLs with a fixed response and records their URLs. Other
 // requests are passed to the wrapped requestor. Presigned URLs embed the signing time, so they can't be keyed
 // in a MockRequestor.

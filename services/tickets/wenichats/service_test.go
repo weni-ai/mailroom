@@ -11,6 +11,7 @@ import (
 
 	"github.com/DATA-DOG/go-sqlmock"
 	"github.com/jmoiron/sqlx"
+	"github.com/lib/pq"
 	"github.com/nyaruka/gocommon/dates"
 	"github.com/nyaruka/gocommon/httpx"
 	"github.com/nyaruka/gocommon/uuids"
@@ -21,6 +22,7 @@ import (
 	"github.com/nyaruka/goflow/test"
 	"github.com/nyaruka/goflow/utils"
 	"github.com/nyaruka/mailroom/core/models"
+	"github.com/nyaruka/mailroom/core/presign"
 	"github.com/nyaruka/mailroom/runtime"
 	"github.com/nyaruka/mailroom/services/tickets/wenichats"
 	"github.com/nyaruka/mailroom/testsuite"
@@ -29,8 +31,6 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
-
-
 
 func mustWeniSvc(rt *runtime.Runtime, ft *flows.Ticketer, cfg map[string]string) (models.TicketService, error) {
 	model := models.BuildTicketer(models.TicketerID(0), ft.UUID(), testdata.Org1.ID, "wenichats", "Wenichats", cfg)
@@ -669,6 +669,69 @@ func TestOpenAndForward(t *testing.T) {
 	assert.Equal(t, "failed to open ticket, no urn found for contact", err.Error())
 }
 
+func TestForwardDurableMedia(t *testing.T) {
+	_, rt, _, _ := testsuite.Get()
+
+	defer httpx.SetRequestor(httpx.DefaultRequestor)
+	httpx.SetRequestor(httpx.NewMockRequestor(map[string][]httpx.MockResponse{
+		fmt.Sprintf("%s/msgs/", baseURL): {
+			httpx.NewMockResponse(201, nil, `{
+				"uuid": "b9312612-c26d-45ec-b9bb-7f116771fdd6",
+				"user": null,
+				"room": "8ecb1e4a-b457-4645-a161-e2b02ddffa88",
+				"contact": {
+					"uuid": "095be615-a8ad-4c33-8e9c-c7612fbf6c9f",
+					"name": "Foo Bar",
+					"email": "FooBar@weni.ai",
+					"status": "string",
+					"phone": "+250788123123",
+					"custom_fields": {},
+					"created_on": "2019-08-24T14:15:22Z"
+				},
+				"text": "photo",
+				"seen": false,
+				"media": [
+					{
+						"content_type": "image/jpeg",
+						"url": "https://media-bucket.s3.sa-east-1.amazonaws.com/media/photo.jpg"
+					}
+				],
+				"created_on": "2022-08-25T02:06:55.885000-03:00"
+			}`),
+		},
+	}))
+
+	ticketer := flows.NewTicketer(static.NewTicketer(assets.TicketerUUID(uuids.New()), "Support", "wenichats"))
+	svc, err := mustWeniSvc(rt, ticketer, map[string]string{
+		"project_auth": authToken,
+		"sector_uuid":  "1a4bae05-993c-4f3b-91b5-80f4e09951f2",
+	})
+	require.NoError(t, err)
+
+	dbTicket := models.NewTicket(
+		flows.TicketUUID("645eee60-7e84-4a9e-ade3-4fce01ae28f1"),
+		testdata.Org1.ID,
+		testdata.Cathy.ID,
+		testdata.Wenichats.ID,
+		"8ecb1e4a-b457-4645-a161-e2b02ddffa88",
+		testdata.DefaultTopic.ID,
+		"Where are my cookies?",
+		models.NilUserID,
+		map[string]interface{}{
+			"contact-uuid":    string(testdata.Cathy.UUID),
+			"contact-display": "Cathy",
+		},
+	)
+
+	logger := &flows.HTTPLogger{}
+	testsuite.UseDurableLinks(t, "mailroom.test", "current-secret", "media-bucket")
+	raw := "https://media-bucket.s3.sa-east-1.amazonaws.com/media/photo.jpg"
+	err = svc.Forward(dbTicket, flows.MsgUUID("5ga340ae-1fb0-4666-98db-2177fe9bf31c"), "photo", []utils.Attachment{utils.Attachment("image/jpeg:" + raw)}, nil, null.NullString, logger.Log)
+	require.NoError(t, err)
+	assert.Contains(t, logger.Logs[0].Request, presign.DurableURL(raw))
+	assert.NotContains(t, logger.Logs[0].Request, "X-Amz-")
+}
+
 func TestOpenFails(t *testing.T) {
 	ctx, rt, _, _ := testsuite.Get()
 	testsuite.Reset(testsuite.ResetData | testsuite.ResetStorage)
@@ -1115,5 +1178,67 @@ func TestDefaultSendHistory(t *testing.T) {
 	err = svc.SendHistory(ticket, models.ContactID(testdata.Cathy.ID), nil, logger.Log)
 	assert.NoError(t, err)
 	assert.Equal(t, 1, len(logger.Logs))
+	assert.NoError(t, mock.ExpectationsWereMet())
+}
+
+func TestSendHistoryDurableAttachment(t *testing.T) {
+	_, rt, _, _ := testsuite.Get()
+
+	defer uuids.SetGenerator(uuids.DefaultGenerator)
+	defer httpx.SetRequestor(httpx.DefaultRequestor)
+
+	uuids.SetGenerator(uuids.NewSeededGenerator(12345))
+
+	roomUUID := "8ecb1e4a-b457-4645-a161-e2b02ddffa88"
+
+	httpx.SetRequestor(httpx.NewMockRequestor(map[string][]httpx.MockResponse{
+		"https://auth.weni.ai/oauth/token": {
+			httpx.NewMockResponse(200, nil, `{
+				"access_token": "token",
+				"token_type": "Bearer",
+				"expires_in": 3600
+			}`),
+		},
+		fmt.Sprintf("%s/rooms/%s/history/", baseURL, roomUUID): {
+			httpx.NewMockResponse(200, nil, `{}`),
+		},
+	}))
+
+	ticketer := flows.NewTicketer(static.NewTicketer(assets.TicketerUUID(uuids.New()), "Support", "wenichats"))
+	svc, err := mustWeniSvc(rt, ticketer, map[string]string{
+		"project_auth": authToken,
+		"sector_uuid":  "1a4bae05-993c-4f3b-91b5-80f4e09951f2",
+	})
+	require.NoError(t, err)
+
+	ticket := models.NewTicket("88bfa1dc-be33-45c2-b469-294ecb0eba90", testdata.Org1.ID, testdata.Cathy.ID, testdata.Wenichats.ID, roomUUID, testdata.DefaultTopic.ID, `{"history_after": "2019-10-07 15:21:29"}`, models.NilUserID, nil)
+
+	logger := &flows.HTTPLogger{}
+
+	mockDB, mock, err := sqlmock.New()
+	require.NoError(t, err)
+	defer mockDB.Close()
+	wenichats.SetDB(sqlx.NewDb(mockDB, "sqlmock"))
+	t.Cleanup(func() { wenichats.SetDB(rt.DB) })
+
+	testsuite.UseDurableLinks(t, "mailroom.test", "current-secret", "media-bucket")
+	raw := "https://media-bucket.s3.sa-east-1.amazonaws.com/media/photo.jpg"
+
+	rows := sqlmock.NewRows([]string{
+		"id", "broadcast_id", "uuid", "text", "created_on", "direction", "status", "visibility", "msg_count", "error_count", "next_attempt", "external_id", "attachments", "metadata", "channel_id", "contact_id", "contact_urn_id", "org_id", "topup_id",
+	})
+	msgTime, err := time.Parse(time.RFC3339, "2019-10-07T15:21:30Z")
+	require.NoError(t, err)
+	rows.AddRow(464, nil, "eb234953-38e7-491f-8a50-b03056a7d002", "ahoy", msgTime, "I", "H", "V", 1, 0, msgTime, "1026", pq.StringArray{"image/jpeg:" + raw}, nil, 3, 10000, 1, 1, 1)
+
+	after, err := time.Parse("2006-01-02T15:04:05", "2019-10-07T15:21:29")
+	require.NoError(t, err)
+	mock.ExpectQuery("SELECT").WithArgs(10000, after).WillReturnRows(rows)
+
+	err = svc.SendHistory(ticket, models.ContactID(testdata.Cathy.ID), nil, logger.Log)
+	require.NoError(t, err)
+	require.NotEmpty(t, logger.Logs)
+	assert.Contains(t, logger.Logs[len(logger.Logs)-1].Request, presign.DurableURL(raw))
+	assert.NotContains(t, logger.Logs[len(logger.Logs)-1].Request, "X-Amz-")
 	assert.NoError(t, mock.ExpectationsWereMet())
 }
