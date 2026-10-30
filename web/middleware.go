@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"runtime/debug"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/go-chi/chi/middleware"
@@ -25,7 +26,7 @@ func requestLogger(next http.Handler) http.Handler {
 		}
 
 		elapsed := time.Since(start)
-		uri := fmt.Sprintf("%s://%s%s", scheme, r.Host, r.RequestURI)
+		uri := fmt.Sprintf("%s://%s%s", scheme, r.Host, requestLogPath(r))
 		ww.Header().Set("X-Elapsed-NS", strconv.FormatInt(int64(elapsed), 10))
 
 		if r.RequestURI != "/" {
@@ -54,4 +55,24 @@ func panicRecovery(next http.Handler) http.Handler {
 
 		next.ServeHTTP(w, r)
 	})
+}
+
+func skipPathPrefix(prefix string, mw func(http.Handler) http.Handler) func(http.Handler) http.Handler {
+	return func(next http.Handler) http.Handler {
+		wrapped := mw(next)
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			if strings.HasPrefix(r.URL.Path, prefix) {
+				next.ServeHTTP(w, r)
+				return
+			}
+			wrapped.ServeHTTP(w, r)
+		})
+	}
+}
+
+func requestLogPath(r *http.Request) string {
+	if strings.HasPrefix(r.URL.Path, "/mr/media/") {
+		return "/mr/media/<redacted>"
+	}
+	return r.RequestURI
 }
