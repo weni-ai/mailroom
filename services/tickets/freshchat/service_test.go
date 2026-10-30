@@ -626,6 +626,75 @@ func TestForwardImageUploadFailureUsesDurableURL(t *testing.T) {
 	assert.NotContains(t, createReq, "X-Amz-")
 }
 
+func TestForwardFileUploadFailureUsesDurableURL(t *testing.T) {
+	_, rt, _, _ := testsuite.Get()
+
+	defer httpx.SetRequestor(httpx.DefaultRequestor)
+
+	requestor := testsuite.NewPresignedRequestor(httpx.NewMockRequestor(map[string][]httpx.MockResponse{
+		fmt.Sprintf("%s/v2/users?reference_id=6393abc0-283d-4c9b-a1b3-641a035c34bf", baseURL): {
+			httpx.NewMockResponse(200, nil, `{
+				"users": [
+					{
+						"id": "user123",
+						"reference_id": "6393abc0-283d-4c9b-a1b3-641a035c34bf"
+					}
+				]
+			}`),
+		},
+		fmt.Sprintf("%s/v2/conversations/conv123/messages", baseURL): {
+			httpx.NewMockResponse(201, nil, `{
+				"channel_id": "channel123",
+				"conversation_id": "conv123",
+				"message_parts": [{
+					"text": {
+						"content": "Message sent"
+					}
+				}]
+			}`),
+		},
+	}), httpx.NewMockResponse(500, nil, `error`))
+	httpx.SetRequestor(requestor)
+
+	ticketer := flows.NewTicketer(static.NewTicketer(assets.TicketerUUID(uuids.New()), "Support", "freshchat"))
+	svc, err := mustFreshSvc(rt, ticketer, map[string]string{
+		"freshchat_domain": baseURL,
+		"oauth_token":      apiKey,
+	})
+	require.NoError(t, err)
+
+	ticket := models.NewTicket(
+		flows.TicketUUID("88bfa1dc-be33-45c2-b469-294ecb0eba90"),
+		testdata.Org1.ID,
+		testdata.Cathy.ID,
+		testdata.Freshchats.ID,
+		"conv123",
+		testdata.DefaultTopic.ID,
+		"Where my cookies?",
+		models.NilUserID,
+		map[string]interface{}{
+			"contact-uuid": string(testdata.Cathy.UUID),
+		},
+	)
+
+	testsuite.UseDurableLinks(t, "mailroom.test", "current-secret", "media-bucket")
+	fileURL := "https://media-bucket.s3.sa-east-1.amazonaws.com/media/file.pdf"
+
+	logger := &flows.HTTPLogger{}
+	err = svc.Forward(ticket, flows.MsgUUID("4fa340ae-1fb0-4666-98db-2177fe9bf31c"), "It's urgent", []utils.Attachment{utils.Attachment("application/pdf:" + fileURL)}, nil, null.NullString, logger.Log)
+	require.NoError(t, err)
+
+	downloads := requestor.URLs()
+	require.NotEmpty(t, downloads)
+	assert.True(t, strings.HasPrefix(downloads[0], fileURL+"?X-Amz-"), downloads[0])
+
+	require.NotEmpty(t, logger.Logs)
+	createReq := logger.Logs[len(logger.Logs)-1].Request
+	assert.Contains(t, createReq, "/v2/conversations/conv123/messages")
+	assert.Contains(t, createReq, presign.DurableURL(fileURL))
+	assert.NotContains(t, createReq, "X-Amz-")
+}
+
 func TestClose(t *testing.T) {
 	_, rt, _, _ := testsuite.Get()
 

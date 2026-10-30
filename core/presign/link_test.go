@@ -1,6 +1,9 @@
 package presign_test
 
 import (
+	"crypto/hmac"
+	"crypto/sha256"
+	"encoding/base64"
 	"strings"
 	"testing"
 	"time"
@@ -38,13 +41,14 @@ func TestDurableURLSameObjectOneToken(t *testing.T) {
 	second := presign.DurableURL(expired)
 
 	assert.Equal(t, first, second)
-	assert.True(t, strings.HasPrefix(first, "https://mailroom.test/mr/media/v1."))
+	assert.True(t, strings.HasPrefix(first, "https://mailroom.test/mr/media/v2."))
 	assert.NotContains(t, first, "X-Amz-")
 
-	bucket, key, ok := presign.VerifyMediaToken(strings.TrimPrefix(first, "https://mailroom.test/mr/media/"))
+	bucket, key, region, ok := presign.VerifyMediaToken(strings.TrimPrefix(first, "https://mailroom.test/mr/media/"))
 	assert.True(t, ok)
 	assert.Equal(t, "media-bucket", bucket)
 	assert.Equal(t, "media/foo.jpg", key)
+	assert.Equal(t, "sa-east-1", region)
 
 	other := presign.DurableURL("https://media-bucket.s3.sa-east-1.amazonaws.com/media/other.jpg")
 	assert.NotEqual(t, first, other)
@@ -58,13 +62,13 @@ func TestDurableURLRejectsBadTokens(t *testing.T) {
 	if token[len(token)-1] == 'A' {
 		flipped = token[:len(token)-1] + "B"
 	}
-	_, _, ok := presign.VerifyMediaToken(flipped)
+	_, _, _, ok := presign.VerifyMediaToken(flipped)
 	assert.False(t, ok)
-	_, _, ok = presign.VerifyMediaToken("v1.onlytwo")
+	_, _, _, ok = presign.VerifyMediaToken("v1.onlytwo")
 	assert.False(t, ok)
 
 	presign.SetLinkConfig(presign.LinkConfig{Domain: "mailroom.test", Secret: "someone-else", Region: "sa-east-1", Buckets: []string{"media-bucket"}})
-	_, _, ok = presign.VerifyMediaToken(token)
+	_, _, _, ok = presign.VerifyMediaToken(token)
 	assert.False(t, ok)
 }
 
@@ -75,14 +79,14 @@ func TestDurableURLPreviousSecretVerifiesOnly(t *testing.T) {
 	presign.SetLinkConfig(presign.LinkConfig{
 		Domain: "mailroom.test", Secret: "current-secret", Previous: "old-secret", Region: "sa-east-1", Buckets: []string{"media-bucket"},
 	})
-	_, _, ok := presign.VerifyMediaToken(oldToken)
+	_, _, _, ok := presign.VerifyMediaToken(oldToken)
 	assert.True(t, ok)
 
 	fresh := strings.TrimPrefix(presign.DurableURL("https://media-bucket.s3.sa-east-1.amazonaws.com/media/foo.jpg"), "https://mailroom.test/mr/media/")
 	presign.SetLinkConfig(presign.LinkConfig{
 		Domain: "mailroom.test", Secret: "old-secret", Region: "sa-east-1", Buckets: []string{"media-bucket"},
 	})
-	_, _, ok = presign.VerifyMediaToken(fresh)
+	_, _, _, ok = presign.VerifyMediaToken(fresh)
 	assert.False(t, ok, "new tokens must be signed with the current secret only")
 }
 
@@ -123,16 +127,70 @@ func TestDurableURLCustomEndpointLiteralPercent(t *testing.T) {
 	assert.Equal(t, presign.DurableURL(awsURL), presign.DurableURL(minioURL))
 }
 
+func TestDurableURLRegionInToken(t *testing.T) {
+	useLinks(t, "current-secret", "", "mailroom.test", "", "media-bucket")
+
+	saURL := "https://media-bucket.s3.sa-east-1.amazonaws.com/media/foo.jpg"
+	usURL := "https://media-bucket.s3.us-east-1.amazonaws.com/media/foo.jpg"
+	saToken := strings.TrimPrefix(presign.DurableURL(saURL), "https://mailroom.test/mr/media/")
+	usToken := strings.TrimPrefix(presign.DurableURL(usURL), "https://mailroom.test/mr/media/")
+	assert.NotEqual(t, saToken, usToken)
+	assert.True(t, strings.HasPrefix(saToken, "v2."))
+	assert.True(t, strings.HasPrefix(usToken, "v2."))
+
+	saBucket, saKey, saRegion, ok := presign.VerifyMediaToken(saToken)
+	assert.True(t, ok)
+	assert.Equal(t, "media-bucket", saBucket)
+	assert.Equal(t, "media/foo.jpg", saKey)
+	assert.Equal(t, "sa-east-1", saRegion)
+
+	usBucket, usKey, usRegion, ok := presign.VerifyMediaToken(usToken)
+	assert.True(t, ok)
+	assert.Equal(t, "media-bucket", usBucket)
+	assert.Equal(t, "media/foo.jpg", usKey)
+	assert.Equal(t, "us-east-1", usRegion)
+
+	assert.Equal(t, "https://media-bucket.s3.sa-east-1.amazonaws.com/media/foo.jpg", presign.CanonicalObjectURL(saBucket, saKey, saRegion))
+	assert.Equal(t, "https://media-bucket.s3.us-east-1.amazonaws.com/media/foo.jpg", presign.CanonicalObjectURL(usBucket, usKey, usRegion))
+}
+
+func TestVerifyMediaTokenV1EmptyRegion(t *testing.T) {
+	useLinks(t, "current-secret", "old-secret", "mailroom.test", "", "media-bucket")
+	token := legacyV1Token("media-bucket", "media/foo.jpg", "current-secret")
+	bucket, key, region, ok := presign.VerifyMediaToken(token)
+	assert.True(t, ok)
+	assert.Equal(t, "media-bucket", bucket)
+	assert.Equal(t, "media/foo.jpg", key)
+	assert.Equal(t, "", region)
+
+	old := legacyV1Token("media-bucket", "media/foo.jpg", "old-secret")
+	_, _, region, ok = presign.VerifyMediaToken(old)
+	assert.True(t, ok)
+	assert.Equal(t, "", region)
+}
+
+func legacyV1Token(bucket, key, secret string) string {
+	body := "v1." + base64.RawURLEncoding.EncodeToString([]byte(bucket)) + "." + base64.RawURLEncoding.EncodeToString([]byte(key))
+	mac := hmac.New(sha256.New, []byte(secret))
+	mac.Write([]byte(body))
+	return body + "." + base64.RawURLEncoding.EncodeToString(mac.Sum(nil))
+}
+
 func TestCanonicalObjectURL(t *testing.T) {
 	useLinks(t, "current-secret", "", "mailroom.test", "", "media-bucket")
-	assert.Equal(t, "https://media-bucket.s3.sa-east-1.amazonaws.com/media/foo.jpg", presign.CanonicalObjectURL("media-bucket", "media/foo.jpg"))
+	assert.Equal(t, "https://media-bucket.s3.sa-east-1.amazonaws.com/media/foo.jpg", presign.CanonicalObjectURL("media-bucket", "media/foo.jpg", "sa-east-1"))
 	assert.True(t, presign.BucketAllowed("media-bucket"))
 	assert.False(t, presign.BucketAllowed("other"))
 
 	presign.SetLinkConfig(presign.LinkConfig{
+		Domain: "mailroom.test", Secret: "current-secret", Endpoint: "https://s3.amazonaws.com", Region: "sa-east-1", Buckets: []string{"media-bucket"},
+	})
+	assert.Equal(t, "https://media-bucket.s3.us-west-2.amazonaws.com/media/foo.jpg", presign.CanonicalObjectURL("media-bucket", "media/foo.jpg", "us-west-2"))
+
+	presign.SetLinkConfig(presign.LinkConfig{
 		Domain: "mailroom.test", Secret: "current-secret", Endpoint: "http://localhost:9000", Region: "sa-east-1", Buckets: []string{"media-bucket"},
 	})
-	assert.Equal(t, "http://localhost:9000/media-bucket/media/foo.jpg", presign.CanonicalObjectURL("media-bucket", "media/foo.jpg"))
+	assert.Equal(t, "http://localhost:9000/media-bucket/media/foo.jpg", presign.CanonicalObjectURL("media-bucket", "media/foo.jpg", "us-west-2"))
 }
 
 func TestInitWarnsWhenSecretMissing(t *testing.T) {

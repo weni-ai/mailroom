@@ -11,6 +11,7 @@ import (
 
 	"github.com/DATA-DOG/go-sqlmock"
 	"github.com/jmoiron/sqlx"
+	"github.com/lib/pq"
 	"github.com/nyaruka/gocommon/dates"
 	"github.com/nyaruka/gocommon/httpx"
 	"github.com/nyaruka/gocommon/uuids"
@@ -1177,5 +1178,67 @@ func TestDefaultSendHistory(t *testing.T) {
 	err = svc.SendHistory(ticket, models.ContactID(testdata.Cathy.ID), nil, logger.Log)
 	assert.NoError(t, err)
 	assert.Equal(t, 1, len(logger.Logs))
+	assert.NoError(t, mock.ExpectationsWereMet())
+}
+
+func TestSendHistoryDurableAttachment(t *testing.T) {
+	_, rt, _, _ := testsuite.Get()
+
+	defer uuids.SetGenerator(uuids.DefaultGenerator)
+	defer httpx.SetRequestor(httpx.DefaultRequestor)
+
+	uuids.SetGenerator(uuids.NewSeededGenerator(12345))
+
+	roomUUID := "8ecb1e4a-b457-4645-a161-e2b02ddffa88"
+
+	httpx.SetRequestor(httpx.NewMockRequestor(map[string][]httpx.MockResponse{
+		"https://auth.weni.ai/oauth/token": {
+			httpx.NewMockResponse(200, nil, `{
+				"access_token": "token",
+				"token_type": "Bearer",
+				"expires_in": 3600
+			}`),
+		},
+		fmt.Sprintf("%s/rooms/%s/history/", baseURL, roomUUID): {
+			httpx.NewMockResponse(200, nil, `{}`),
+		},
+	}))
+
+	ticketer := flows.NewTicketer(static.NewTicketer(assets.TicketerUUID(uuids.New()), "Support", "wenichats"))
+	svc, err := mustWeniSvc(rt, ticketer, map[string]string{
+		"project_auth": authToken,
+		"sector_uuid":  "1a4bae05-993c-4f3b-91b5-80f4e09951f2",
+	})
+	require.NoError(t, err)
+
+	ticket := models.NewTicket("88bfa1dc-be33-45c2-b469-294ecb0eba90", testdata.Org1.ID, testdata.Cathy.ID, testdata.Wenichats.ID, roomUUID, testdata.DefaultTopic.ID, `{"history_after": "2019-10-07 15:21:29"}`, models.NilUserID, nil)
+
+	logger := &flows.HTTPLogger{}
+
+	mockDB, mock, err := sqlmock.New()
+	require.NoError(t, err)
+	defer mockDB.Close()
+	wenichats.SetDB(sqlx.NewDb(mockDB, "sqlmock"))
+	t.Cleanup(func() { wenichats.SetDB(rt.DB) })
+
+	testsuite.UseDurableLinks(t, "mailroom.test", "current-secret", "media-bucket")
+	raw := "https://media-bucket.s3.sa-east-1.amazonaws.com/media/photo.jpg"
+
+	rows := sqlmock.NewRows([]string{
+		"id", "broadcast_id", "uuid", "text", "created_on", "direction", "status", "visibility", "msg_count", "error_count", "next_attempt", "external_id", "attachments", "metadata", "channel_id", "contact_id", "contact_urn_id", "org_id", "topup_id",
+	})
+	msgTime, err := time.Parse(time.RFC3339, "2019-10-07T15:21:30Z")
+	require.NoError(t, err)
+	rows.AddRow(464, nil, "eb234953-38e7-491f-8a50-b03056a7d002", "ahoy", msgTime, "I", "H", "V", 1, 0, msgTime, "1026", pq.StringArray{"image/jpeg:" + raw}, nil, 3, 10000, 1, 1, 1)
+
+	after, err := time.Parse("2006-01-02T15:04:05", "2019-10-07T15:21:29")
+	require.NoError(t, err)
+	mock.ExpectQuery("SELECT").WithArgs(10000, after).WillReturnRows(rows)
+
+	err = svc.SendHistory(ticket, models.ContactID(testdata.Cathy.ID), nil, logger.Log)
+	require.NoError(t, err)
+	require.NotEmpty(t, logger.Logs)
+	assert.Contains(t, logger.Logs[len(logger.Logs)-1].Request, presign.DurableURL(raw))
+	assert.NotContains(t, logger.Logs[len(logger.Logs)-1].Request, "X-Amz-")
 	assert.NoError(t, mock.ExpectationsWereMet())
 }

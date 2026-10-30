@@ -30,13 +30,13 @@ var fetchSigned = func(req *http.Request) (*http.Response, error) {
 func handle(ctx context.Context, rt *runtime.Runtime, r *http.Request, w http.ResponseWriter) error {
 	_ = http.NewResponseController(w).SetWriteDeadline(time.Now().Add(writeDeadline))
 
-	bucket, key, ok := presign.VerifyMediaToken(chi.URLParam(r, "token"))
+	bucket, key, region, ok := presign.VerifyMediaToken(chi.URLParam(r, "token"))
 	if !ok || !presign.BucketAllowed(bucket) {
 		w.WriteHeader(http.StatusNotFound)
 		return nil
 	}
 
-	signed := presign.SignURL(presign.CanonicalObjectURL(bucket, key))
+	signed := presign.SignURL(presign.CanonicalObjectURL(bucket, key, region))
 	if signed == "" || !strings.Contains(signed, "X-Amz-Signature=") {
 		w.WriteHeader(http.StatusNotFound)
 		return nil
