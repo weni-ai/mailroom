@@ -1,7 +1,10 @@
 package runtime_test
 
 import (
+	"context"
+	"net/url"
 	"testing"
+	"time"
 
 	"github.com/nyaruka/mailroom/runtime"
 
@@ -48,4 +51,25 @@ func TestNewS3Client(t *testing.T) {
 		require.NoError(t, err)
 		assert.NotNil(t, client)
 	}
+}
+
+func TestPresignGet(t *testing.T) {
+	cfg := runtime.NewDefaultConfig()
+	cfg.S3Region = "us-east-1"
+	cfg.S3Endpoint = "https://s3.amazonaws.com"
+	cfg.AWSAccessKeyID = "AKID"
+	cfg.AWSSecretAccessKey = "secret"
+
+	svc, err := runtime.NewS3Service(cfg, true)
+	require.NoError(t, err)
+
+	signer := runtime.NewMediaSigner(svc, "mailroom-media")
+	signed, err := signer.PresignGet(context.Background(), "/media/1/a.jpg", 15*time.Minute)
+	require.NoError(t, err)
+
+	parsed, err := url.Parse(signed)
+	require.NoError(t, err)
+	assert.Contains(t, parsed.Host, "mailroom-media")
+	assert.Equal(t, "900", parsed.Query().Get("X-Amz-Expires"))
+	assert.Contains(t, parsed.EscapedPath(), "media/1/a.jpg")
 }

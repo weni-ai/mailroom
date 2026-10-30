@@ -3,6 +3,7 @@ package runtime
 import (
 	"context"
 	"os"
+	"time"
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/credentials"
@@ -53,19 +54,61 @@ func newAWSSession(cfg *Config, useStaticCredentials bool) (*session.Session, er
 	return session.NewSession(awsCfg)
 }
 
-// NewS3Client builds an S3 client. When useStaticCredentials is false, the AWS SDK default
-// chain is used (IRSA, env, instance profile).
-func NewS3Client(cfg *Config, useStaticCredentials bool) (storage.S3Client, error) {
+// MediaSigner builds a time-limited GET URL for an object key.
+type MediaSigner interface {
+	PresignGet(ctx context.Context, key string, ttl time.Duration) (string, error)
+}
+
+type s3MediaSigner struct {
+	client *s3.S3
+	bucket string
+}
+
+// NewS3Service returns the concrete S3 client used both for storage and for presigning.
+func NewS3Service(cfg *Config, useStaticCredentials bool) (*s3.S3, error) {
 	awsSession, err := newAWSSession(cfg, useStaticCredentials)
 	if err != nil {
 		return nil, err
 	}
 
-	return withoutACL(s3.New(awsSession, &aws.Config{
+	return s3.New(awsSession, &aws.Config{
 		Endpoint:         aws.String(cfg.S3Endpoint),
 		DisableSSL:       aws.Bool(cfg.S3DisableSSL),
 		S3ForcePathStyle: aws.Bool(cfg.S3ForcePathStyle),
-	})), nil
+	}), nil
+}
+
+// NewS3ClientFromService wraps a concrete client with the ACL-stripping storage client.
+func NewS3ClientFromService(svc *s3.S3) storage.S3Client {
+	return withoutACL(svc)
+}
+
+// NewMediaSigner signs GetObject requests for the media bucket.
+func NewMediaSigner(client *s3.S3, bucket string) MediaSigner {
+	return &s3MediaSigner{client: client, bucket: bucket}
+}
+
+func (s *s3MediaSigner) PresignGet(ctx context.Context, key string, ttl time.Duration) (string, error) {
+	req, _ := s.client.GetObjectRequest(&s3.GetObjectInput{
+		Bucket: aws.String(s.bucket),
+		Key:    aws.String(key),
+	})
+	req.SetContext(ctx)
+	url, err := req.Presign(ttl)
+	if err != nil {
+		return "", err
+	}
+	return url, nil
+}
+
+// NewS3Client builds an S3 client. When useStaticCredentials is false, the AWS SDK default
+// chain is used (IRSA, env, instance profile).
+func NewS3Client(cfg *Config, useStaticCredentials bool) (storage.S3Client, error) {
+	svc, err := NewS3Service(cfg, useStaticCredentials)
+	if err != nil {
+		return nil, err
+	}
+	return NewS3ClientFromService(svc), nil
 }
 
 // noACLS3Client strips canned ACLs from PutObject. Modern buckets with

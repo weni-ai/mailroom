@@ -10,6 +10,7 @@ import (
 
 	"github.com/nyaruka/gocommon/jsonx"
 	"github.com/nyaruka/mailroom/runtime"
+	"github.com/nyaruka/mailroom/web/media"
 
 	"github.com/go-chi/chi"
 	"github.com/go-chi/chi/middleware"
@@ -88,6 +89,8 @@ func NewServer(ctx context.Context, rt *runtime.Runtime, wg *sync.WaitGroup) *Se
 	for _, route := range routes {
 		router.Method(route.method, route.pattern, s.WrapHandler(route.handler))
 	}
+
+	router.Method(http.MethodGet, media.RoutePattern(rt.Config.S3MediaPrefix), s.WrapHandler(media.Handle))
 
 	// configure our http server
 	s.httpServer = &http.Server{
