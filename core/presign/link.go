@@ -56,7 +56,6 @@ func SetLinkConfig(cfg LinkConfig) {
 func ClearLinkConfig() { links.Store(nil) }
 
 // DurableURL returns a stable media URL for an allowed object, or a presigned URL, or rawURL.
-// See docs/superpowers/specs/2026-10-30-durable-media-links-design.md.
 func DurableURL(rawURL string) string {
 	if current.Load() == nil {
 		return rawURL
