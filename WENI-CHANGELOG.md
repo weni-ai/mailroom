@@ -1,3 +1,7 @@
+1.105.2
+----------
+ * feat: stream S3 attachments through durable /mr/media links for generic, Rocket.Chat and Freshchat ticketers. Weni Chats forward and history still receive the attachment URL stored on the message
+
 1.105.1
 ----------
  * feat: prefer WhatsApp phone number over BSUID in flow URN expressions (goflow v1.21.1)

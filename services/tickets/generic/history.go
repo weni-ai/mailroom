@@ -77,7 +77,7 @@ func attachmentsFromMsg(attachments []utils.Attachment) []Attachment {
 	for _, att := range attachments {
 		out = append(out, Attachment{
 			ContentType: att.ContentType(),
-			URL:         presign.SignURL(att.URL()),
+			URL:         presign.DurableURL(att.URL()),
 		})
 	}
 	return out

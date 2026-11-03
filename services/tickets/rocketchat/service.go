@@ -121,7 +121,7 @@ func (s *service) Forward(ticket *models.Ticket, msgUUID flows.MsgUUID, text str
 	}
 	for _, attachment := range attachments {
 		mimeType, url := attachment.ToParts()
-		msg.Attachments = append(msg.Attachments, Attachment{Type: mimeType, URL: presign.SignURL(url)})
+		msg.Attachments = append(msg.Attachments, Attachment{Type: mimeType, URL: presign.DurableURL(url)})
 	}
 
 	_, trace, err := s.client.SendMessage(msg)

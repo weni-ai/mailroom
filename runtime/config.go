@@ -74,6 +74,9 @@ type Config struct {
 	S3SignedBuckets          string `help:"comma separated list of buckets, besides S3MediaBucket, whose attachment URLs are presigned before being sent to external services"`
 	S3PresignedURLExpiration int    `validate:"min=1,max=168" help:"the number of hours presigned attachment URLs are valid for (1 to 168). With IRSA a URL is only valid until the role session that signed it expires"`
 
+	MediaLinkSecret         string `help:"HMAC secret for durable /mr/media links. Empty keeps presigned URLs on ticketer payloads"`
+	MediaLinkSecretPrevious string `help:"previous media-link HMAC secret, still accepted for verification during rotation"`
+
 	AWSAccessKeyID            string `help:"the access key id to use when authenticating S3"`
 	AWSSecretAccessKey        string `help:"the secret access key id to use when authenticating S3"`
 	AWSForceStaticCredentials bool   `help:"when true, use AWSAccessKeyID and AWSSecretAccessKey instead of IRSA even if web identity env vars are present"`

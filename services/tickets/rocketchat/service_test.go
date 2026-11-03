@@ -16,6 +16,7 @@ import (
 	"github.com/nyaruka/goflow/test"
 	"github.com/nyaruka/goflow/utils"
 	"github.com/nyaruka/mailroom/core/models"
+	"github.com/nyaruka/mailroom/core/presign"
 	"github.com/nyaruka/mailroom/runtime"
 	"github.com/nyaruka/mailroom/services/tickets/rocketchat"
 	"github.com/nyaruka/mailroom/testsuite"
@@ -25,8 +26,6 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
-
-
 
 func mustRcSvc(rt *runtime.Runtime, ft *flows.Ticketer, cfg map[string]string) (models.TicketService, error) {
 	model := models.BuildTicketer(models.TicketerID(0), ft.UUID(), testdata.Org1.ID, "rocketchat", "Support", cfg)
@@ -110,13 +109,14 @@ func TestOpenAndForward(t *testing.T) {
 	assert.Equal(t, 1, len(logger.Logs))
 	test.AssertSnapshot(t, "forward_message", logger.Logs[0].Request)
 
-	// attachments in our buckets are presigned
-	testsuite.UseAttachmentSigner(t, "media-bucket")
+	testsuite.UseDurableLinks(t, "mailroom.test", "current-secret", "media-bucket")
+	photo := "https://media-bucket.s3.sa-east-1.amazonaws.com/media/photo.jpg"
 	logger = &flows.HTTPLogger{}
-	err = svc.Forward(dbTicket, flows.MsgUUID("4fa340ae-1fb0-4666-98db-2177fe9bf31c"), "", []utils.Attachment{"image/jpeg:https://media-bucket.s3.sa-east-1.amazonaws.com/media/photo.jpg"}, nil, null.NullString, logger.Log)
+	err = svc.Forward(dbTicket, flows.MsgUUID("4fa340ae-1fb0-4666-98db-2177fe9bf31c"), "", []utils.Attachment{utils.Attachment("image/jpeg:" + photo)}, nil, null.NullString, logger.Log)
 	require.NoError(t, err)
 	require.Equal(t, 1, len(logger.Logs))
-	assert.Contains(t, logger.Logs[0].Request, `"url":"https://media-bucket.s3.sa-east-1.amazonaws.com/media/photo.jpg?X-Amz-Algorithm=`)
+	assert.Contains(t, logger.Logs[0].Request, presign.DurableURL(photo))
+	assert.NotContains(t, logger.Logs[0].Request, "X-Amz-")
 }
 
 func TestCloseAndReopen(t *testing.T) {

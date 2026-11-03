@@ -440,7 +440,7 @@ func (s *service) Forward(ticket *models.Ticket, msgUUID flows.MsgUUID, text str
 	for _, a := range attachments {
 		req.Attachments = append(req.Attachments, Attachment{
 			ContentType: a.ContentType(),
-			URL:         presign.SignURL(a.URL()),
+			URL:         presign.DurableURL(a.URL()),
 		})
 	}
 

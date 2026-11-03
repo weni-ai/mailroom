@@ -233,32 +233,23 @@ func (s *service) Forward(ticket *models.Ticket, msgUUID flows.MsgUUID, text str
 	}
 
 	for _, attachment := range attachments {
-		attachmentURL := presign.SignURL(attachment.URL())
-		if attachment.ContentType() == "image/jpeg" || attachment.ContentType() == "image/png" || attachment.ContentType() == "image/gif" || attachment.ContentType() == "image/webp" {
-			imageURL, err := s.restClient.UploadImage(attachmentURL)
+		signedURL := presign.SignURL(attachment.URL())
+		durableURL := presign.DurableURL(attachment.URL())
+		switch attachment.ContentType() {
+		case "image/jpeg", "image/png", "image/gif", "image/webp":
+			imageURL, err := s.restClient.UploadImage(signedURL)
 			if err != nil {
-				imageURL = attachmentURL
+				imageURL = durableURL
 			}
-			msg.MessageParts = append(msg.MessageParts, MessageParts{
-				Image: &Image{
-					URL: imageURL,
-				},
-			})
-		} else if attachment.ContentType() == "video/mp4" || attachment.ContentType() == "video/quicktime" || attachment.ContentType() == "video/webm" {
-			msg.MessageParts = append(msg.MessageParts, MessageParts{
-				Video: &Video{
-					URL:         attachmentURL,
-					ContentType: attachment.ContentType(),
-				},
-			})
-		} else {
-			file, err := s.restClient.UploadFile(attachmentURL)
-			if err != nil {
-				file.URL = attachmentURL
+			msg.MessageParts = append(msg.MessageParts, MessageParts{Image: &Image{URL: imageURL}})
+		case "video/mp4", "video/quicktime", "video/webm":
+			msg.MessageParts = append(msg.MessageParts, MessageParts{Video: &Video{URL: durableURL, ContentType: attachment.ContentType()}})
+		default:
+			file, err := s.restClient.UploadFile(signedURL)
+			if err != nil || file == nil {
+				file = &File{URL: durableURL}
 			}
-			msg.MessageParts = append(msg.MessageParts, MessageParts{
-				File: file,
-			})
+			msg.MessageParts = append(msg.MessageParts, MessageParts{File: file})
 		}
 	}
 

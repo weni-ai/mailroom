@@ -64,11 +64,11 @@ func NewServer(ctx context.Context, rt *runtime.Runtime, wg *sync.WaitGroup) *Se
 	router := chi.NewRouter()
 
 	//  set up our middlewares
-	router.Use(middleware.Compress(flate.DefaultCompression))
+	router.Use(skipPathPrefix("/mr/media/", middleware.Compress(flate.DefaultCompression)))
 	router.Use(middleware.RequestID)
 	router.Use(middleware.RealIP)
 	router.Use(panicRecovery)
-	router.Use(middleware.Timeout(60 * time.Second))
+	router.Use(skipPathPrefix("/mr/media/", middleware.Timeout(60*time.Second)))
 	router.Use(requestLogger)
 
 	// wire up our main pages

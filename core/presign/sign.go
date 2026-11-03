@@ -23,6 +23,7 @@ var current atomic.Pointer[urlSigner]
 func Init(cfg *runtime.Config, auth runtime.StorageAuth) error {
 	if auth == runtime.StorageAuthFS {
 		SetSigner(nil, 0)
+		ClearLinkConfig()
 		return nil
 	}
 
@@ -45,6 +46,17 @@ func Init(cfg *runtime.Config, auth runtime.StorageAuth) error {
 	}
 
 	SetSigner(signer, time.Duration(cfg.S3PresignedURLExpiration)*time.Hour)
+	SetLinkConfig(LinkConfig{
+		Domain:   cfg.Domain,
+		Secret:   cfg.MediaLinkSecret,
+		Previous: cfg.MediaLinkSecretPrevious,
+		Endpoint: cfg.S3Endpoint,
+		Region:   cfg.S3Region,
+		Buckets:  buckets,
+	})
+	if cfg.MediaLinkSecret == "" {
+		logrus.Warn("media link secret is empty; ticketers will send presigned attachment URLs")
+	}
 	return nil
 }
 

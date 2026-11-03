@@ -30,8 +30,6 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-
-
 func mustWeniSvc(rt *runtime.Runtime, ft *flows.Ticketer, cfg map[string]string) (models.TicketService, error) {
 	model := models.BuildTicketer(models.TicketerID(0), ft.UUID(), testdata.Org1.ID, "wenichats", "Wenichats", cfg)
 	return wenichats.NewService(rt.Config, http.DefaultClient, nil, ft, model, context.Background(), nil)

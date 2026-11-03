@@ -1,11 +1,11 @@
 package generic
 
 import (
-	"strings"
 	"testing"
 	"time"
 
 	"github.com/nyaruka/goflow/utils"
+	"github.com/nyaruka/mailroom/core/presign"
 	"github.com/nyaruka/mailroom/testsuite"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -44,15 +44,17 @@ func TestParseHistoryAfter(t *testing.T) {
 }
 
 func TestAttachmentsFromMsg(t *testing.T) {
-	testsuite.UseAttachmentSigner(t, "media-bucket")
+	testsuite.UseDurableLinks(t, "mailroom.test", "current-secret", "media-bucket")
 
+	raw := "https://media-bucket.s3.sa-east-1.amazonaws.com/media/photo.jpg"
 	atts := attachmentsFromMsg([]utils.Attachment{
 		"image/jpeg:https://media-bucket.s3.sa-east-1.amazonaws.com/media/photo.jpg",
 		"audio/ogg:https://link.to/audio.ogg",
 	})
 	require.Len(t, atts, 2)
 	assert.Equal(t, "image/jpeg", atts[0].ContentType)
-	assert.True(t, strings.HasPrefix(atts[0].URL, "https://media-bucket.s3.sa-east-1.amazonaws.com/media/photo.jpg?X-Amz-"), atts[0].URL)
+	assert.Equal(t, presign.DurableURL(raw), atts[0].URL)
+	assert.NotContains(t, atts[0].URL, "X-Amz-")
 	assert.Equal(t, Attachment{ContentType: "audio/ogg", URL: "https://link.to/audio.ogg"}, atts[1])
 }
 
