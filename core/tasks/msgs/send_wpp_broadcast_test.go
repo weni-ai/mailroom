@@ -548,12 +548,12 @@ func TestWppBroadcastCustomDataTask(t *testing.T) {
 		lastNow := time.Now()
 		time.Sleep(10 * time.Millisecond)
 		runTaskJSON(`{"text":"sem custom"}`)
-		testsuite.AssertQuery(t, db, `SELECT count(*) FROM msgs_msg WHERE org_id = 1 AND created_on > $1 AND text = $2 AND NOT (COALESCE(metadata, '{}'::jsonb) ? 'custom_data')`, lastNow, "sem custom").Returns(1)
+		testsuite.AssertQuery(t, db, `SELECT count(*) FROM msgs_msg WHERE org_id = 1 AND created_on > $1 AND text = $2 AND NOT (COALESCE(metadata::jsonb, '{}'::jsonb) ? 'custom_data')`, lastNow, "sem custom").Returns(1)
 
 		lastNow = time.Now()
 		time.Sleep(10 * time.Millisecond)
 		runTaskJSON(`{"text":"vazio","custom_data":{}}`)
-		testsuite.AssertQuery(t, db, `SELECT count(*) FROM msgs_msg WHERE org_id = 1 AND created_on > $1 AND text = $2 AND NOT (COALESCE(metadata, '{}'::jsonb) ? 'custom_data')`, lastNow, "vazio").Returns(1)
+		testsuite.AssertQuery(t, db, `SELECT count(*) FROM msgs_msg WHERE org_id = 1 AND created_on > $1 AND text = $2 AND NOT (COALESCE(metadata::jsonb, '{}'::jsonb) ? 'custom_data')`, lastNow, "vazio").Returns(1)
 	})
 
 	t.Run("AC-M3 non-object does not fail task", func(t *testing.T) {
@@ -562,6 +562,6 @@ func TestWppBroadcastCustomDataTask(t *testing.T) {
 		for _, custom := range []string{`null`, `"x"`, `[1]`, `2`, `true`} {
 			runTaskJSON(`{"text":"drop custom","custom_data":` + custom + `}`)
 		}
-		testsuite.AssertQuery(t, db, `SELECT count(*) FROM msgs_msg WHERE org_id = 1 AND created_on > $1 AND text = $2 AND NOT (COALESCE(metadata, '{}'::jsonb) ? 'custom_data')`, lastNow, "drop custom").Returns(5)
+		testsuite.AssertQuery(t, db, `SELECT count(*) FROM msgs_msg WHERE org_id = 1 AND created_on > $1 AND text = $2 AND NOT (COALESCE(metadata::jsonb, '{}'::jsonb) ? 'custom_data')`, lastNow, "drop custom").Returns(5)
 	})
 }
