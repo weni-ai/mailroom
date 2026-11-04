@@ -1,3 +1,7 @@
+1.106.0
+----------
+ * feat: copy send_whatsapp_broadcast msg.custom_data onto msgs_msg.metadata for Courier
+
 1.105.2
 ----------
  * feat: stream S3 attachments through durable /mr/media links for generic, Rocket.Chat and Freshchat ticketers. Weni Chats forward and history still receive the attachment URL stored on the message

@@ -17,6 +17,7 @@ import (
 	"github.com/nyaruka/mailroom/testsuite/testdata"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestWppBroadcastTask(t *testing.T) {
@@ -510,4 +511,57 @@ func TestWppBroadcastTask(t *testing.T) {
 		lastNow = time.Now()
 		time.Sleep(10 * time.Millisecond)
 	}
+}
+
+func TestWppBroadcastCustomDataTask(t *testing.T) {
+	ctx, rt, db, rp := testsuite.Get()
+	rc := rp.Get()
+	defer rc.Close()
+	defer testsuite.Reset(testsuite.ResetAll)
+
+	runTaskJSON := func(msgJSON string) {
+		raw := []byte(`{"org_id":1,"msg":` + msgJSON + `,"contact_ids":[10000],"channel_id":30000}`)
+		bcast := &models.WppBroadcast{}
+		require.NoError(t, json.Unmarshal(raw, bcast))
+		require.NoError(t, msgs.CreateWppBroadcastBatches(ctx, rt, bcast))
+
+		for {
+			task, err := queue.PopNextTask(rc, queue.WppBroadcastBatchQueue)
+			require.NoError(t, err)
+			if task == nil {
+				break
+			}
+			batch := &models.WppBroadcastBatch{}
+			require.NoError(t, json.Unmarshal(task.Task, batch))
+			require.NoError(t, msgs.SendWppBroadcastBatch(ctx, rt, batch))
+		}
+	}
+
+	t.Run("AC-M1 task JSON persists custom_data", func(t *testing.T) {
+		lastNow := time.Now()
+		time.Sleep(10 * time.Millisecond)
+		runTaskJSON(`{"text":"pedido ok","custom_data":{"order_id":"1234567890-01","coupon":{"code":"BLACKFRIDAY10"},"tags":["vip","recovery"]}}`)
+		testsuite.AssertQuery(t, db, `SELECT count(*) FROM msgs_msg WHERE org_id = 1 AND created_on > $1 AND text = $2 AND metadata::jsonb -> 'custom_data' ->> 'order_id' = '1234567890-01'`, lastNow, "pedido ok").Returns(1)
+	})
+
+	t.Run("AC-M2 omit and empty", func(t *testing.T) {
+		lastNow := time.Now()
+		time.Sleep(10 * time.Millisecond)
+		runTaskJSON(`{"text":"sem custom"}`)
+		testsuite.AssertQuery(t, db, `SELECT count(*) FROM msgs_msg WHERE org_id = 1 AND created_on > $1 AND text = $2 AND NOT (COALESCE(metadata, '{}'::jsonb) ? 'custom_data')`, lastNow, "sem custom").Returns(1)
+
+		lastNow = time.Now()
+		time.Sleep(10 * time.Millisecond)
+		runTaskJSON(`{"text":"vazio","custom_data":{}}`)
+		testsuite.AssertQuery(t, db, `SELECT count(*) FROM msgs_msg WHERE org_id = 1 AND created_on > $1 AND text = $2 AND NOT (COALESCE(metadata, '{}'::jsonb) ? 'custom_data')`, lastNow, "vazio").Returns(1)
+	})
+
+	t.Run("AC-M3 non-object does not fail task", func(t *testing.T) {
+		lastNow := time.Now()
+		time.Sleep(10 * time.Millisecond)
+		for _, custom := range []string{`null`, `"x"`, `[1]`, `2`, `true`} {
+			runTaskJSON(`{"text":"drop custom","custom_data":` + custom + `}`)
+		}
+		testsuite.AssertQuery(t, db, `SELECT count(*) FROM msgs_msg WHERE org_id = 1 AND created_on > $1 AND text = $2 AND NOT (COALESCE(metadata, '{}'::jsonb) ? 'custom_data')`, lastNow, "drop custom").Returns(5)
+	})
 }
