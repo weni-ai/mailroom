@@ -244,6 +244,9 @@ func (s *service) Open(session flows.Session, topic *flows.Topic, body string, a
 	}
 
 	ticket.SetExternalID(newRoom.UUID)
+	if err := models.StartHumanTimer(cx, db, string(contact.UUID())); err != nil {
+		logrus.WithError(err).WithField("contact_uuid", contact.UUID()).Error("failed to start human protocol timer")
+	}
 	return ticket, nil
 }
 
