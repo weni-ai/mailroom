@@ -1,3 +1,7 @@
+1.106.0
+----------
+ * feat: copy send_whatsapp_broadcast msg.custom_data onto msgs_msg.metadata for Courier
+
 1.105.3
 ----------
  * feat: replace known-location file addresses in webhook JSON and form bodies with stable /mr/media links. Query strings, multipart bodies and addresses outside known locations stay unchanged

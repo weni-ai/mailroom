@@ -1091,3 +1091,144 @@ func TestWppBroadcastIGCommentMetadata(t *testing.T) {
 	assert.Equal(t, "30065218", metadata["ig_comment_id"])
 	assert.Equal(t, "comment", metadata["ig_response_type"])
 }
+
+func TestCustomDataUnmarshalJSON(t *testing.T) {
+	tcs := []struct {
+		raw     string
+		wantLen int
+		wantNil bool
+		wantKey string
+		wantVal string
+	}{
+		{`{"order_id":"1234567890-01"}`, 1, false, "order_id", "1234567890-01"},
+		{`{}`, 0, true, "", ""},
+		{`null`, 0, true, "", ""},
+		{`"x"`, 0, true, "", ""},
+		{`[1,2]`, 0, true, "", ""},
+		{`1`, 0, true, "", ""},
+		{`true`, 0, true, "", ""},
+	}
+	for _, tc := range tcs {
+		var msg models.WppBroadcastMessage
+		require.NoError(t, json.Unmarshal([]byte(`{"text":"hi","custom_data":`+tc.raw+`}`), &msg), tc.raw)
+		if tc.wantNil {
+			assert.Empty(t, msg.CustomData, tc.raw)
+			continue
+		}
+		assert.Equal(t, tc.wantLen, len(msg.CustomData), tc.raw)
+		assert.Equal(t, tc.wantVal, msg.CustomData[tc.wantKey])
+	}
+
+	var parent models.WppBroadcast
+	require.NoError(t, json.Unmarshal([]byte(`{"org_id":1,"msg":{"text":"hi","custom_data":"bad"}}`), &parent))
+	assert.Empty(t, parent.Msg().CustomData)
+}
+
+func contractCustomData() models.CustomData {
+	return models.CustomData{
+		"order_id": "1234567890-01",
+		"coupon": map[string]interface{}{
+			"code":       "BLACKFRIDAY10",
+			"expires_at": "2026-11-30T23:59:59Z",
+		},
+		"tags": []interface{}{"vip", "recovery"},
+	}
+}
+
+func TestWppBroadcastCustomData(t *testing.T) {
+	ctx, rt, db, rp := testsuite.Get()
+	defer testsuite.Reset(testsuite.ResetData)
+
+	wwc := testdata.InsertChannel(db, testdata.Org1, "WWC", "Weni Web Chat", []string{"ext"}, "SR", nil)
+	testdata.InsertContactURN(db, testdata.Org1, testdata.Cathy, urns.URN("ext:4f7a0c1e-0b9e-4d33-8a5b-9b6a2f1d8c11"), 1)
+	models.FlushCache()
+
+	oa, err := models.GetOrgAssets(ctx, rt, testdata.Org1.ID)
+	require.NoError(t, err)
+
+	create := func(channelID models.ChannelID, data models.CustomData, contacts []models.ContactID) []*models.Msg {
+		msg := models.WppBroadcastMessage{Text: "Seu pedido foi confirmado!", CustomData: data}
+		bcast := models.NewWppBroadcast(oa.OrgID(), models.NilBroadcastID, msg, nil, contacts, nil, channelID, "wpp_broadcast_batch")
+		batch := bcast.CreateBatch(contacts)
+		out, err := models.CreateWppBroadcastMessages(ctx, rt, oa, batch)
+		require.NoError(t, err)
+		return out
+	}
+
+	t.Run("AC-M1 valid object on WWC and non-WWC", func(t *testing.T) {
+		expected := contractCustomData()
+		for _, channelID := range []models.ChannelID{wwc.ID, testdata.WhatsAppCloudChannel.ID} {
+			out := create(channelID, expected, []models.ContactID{testdata.Cathy.ID, testdata.Bob.ID})
+			require.GreaterOrEqual(t, len(out), 1)
+			for _, m := range out {
+				got, ok := m.Metadata()["custom_data"].(map[string]interface{})
+				require.True(t, ok, "custom_data must be map[string]interface{}")
+				assert.Equal(t, expected, models.CustomData(got))
+				assert.Equal(t, "wpp_broadcast_batch", m.Metadata()["queue"])
+			}
+		}
+	})
+
+	t.Run("AC-M2 omit and empty object", func(t *testing.T) {
+		out := create(testdata.WhatsAppCloudChannel.ID, nil, []models.ContactID{testdata.Cathy.ID})
+		require.Len(t, out, 1)
+		_, present := out[0].Metadata()["custom_data"]
+		assert.False(t, present)
+
+		out = create(testdata.WhatsAppCloudChannel.ID, models.CustomData{}, []models.ContactID{testdata.Cathy.ID})
+		require.Len(t, out, 1)
+		_, present = out[0].Metadata()["custom_data"]
+		assert.False(t, present)
+	})
+
+	t.Run("AC-M3 non-object dropped without failing unmarshal", func(t *testing.T) {
+		for _, payload := range []string{
+			`{"text":"hi","custom_data":null}`,
+			`{"text":"hi","custom_data":"x"}`,
+			`{"text":"hi","custom_data":[1,2]}`,
+			`{"text":"hi","custom_data":1}`,
+			`{"text":"hi","custom_data":true}`,
+			`{"text":"hi","custom_data":{}}`,
+		} {
+			var decoded models.WppBroadcastMessage
+			require.NoError(t, json.Unmarshal([]byte(payload), &decoded), payload)
+			assert.Empty(t, decoded.CustomData, payload)
+
+			out := create(testdata.WhatsAppCloudChannel.ID, decoded.CustomData, []models.ContactID{testdata.Cathy.ID})
+			require.Len(t, out, 1, payload)
+			_, present := out[0].Metadata()["custom_data"]
+			assert.False(t, present, payload)
+		}
+
+		var batch models.WppBroadcastBatch
+		require.NoError(t, json.Unmarshal([]byte(`{"org_id":1,"msg":{"text":"hi","custom_data":"nope"},"contact_ids":[10000],"is_last":true}`), &batch))
+		assert.Empty(t, batch.Msg().CustomData)
+	})
+
+	t.Run("AC-M4 expression strings stored verbatim", func(t *testing.T) {
+		data := models.CustomData{"label": "@contact.name", "nested": map[string]interface{}{"field": "@fields.age"}}
+		out := create(testdata.WhatsAppCloudChannel.ID, data, []models.ContactID{testdata.Cathy.ID})
+		require.Len(t, out, 1)
+		got, ok := out[0].Metadata()["custom_data"].(map[string]interface{})
+		require.True(t, ok, "custom_data must be map[string]interface{}")
+		assert.Equal(t, "@contact.name", got["label"])
+		assert.Equal(t, "@fields.age", got["nested"].(map[string]interface{})["field"])
+	})
+
+	t.Run("AC-M5 resend keeps persisted custom_data", func(t *testing.T) {
+		out := create(testdata.WhatsAppCloudChannel.ID, contractCustomData(), []models.ContactID{testdata.Cathy.ID})
+		require.Len(t, out, 1)
+
+		loaded, err := models.GetMessagesByID(ctx, db, testdata.Org1.ID, models.DirectionOut, []models.MsgID{models.MsgID(out[0].ID())})
+		require.NoError(t, err)
+		require.Len(t, loaded, 1)
+		got, ok := loaded[0].Metadata()["custom_data"].(map[string]interface{})
+		require.True(t, ok, "custom_data must be map[string]interface{}")
+		assert.Equal(t, contractCustomData(), models.CustomData(got))
+
+		require.NoError(t, models.ResendMessages(ctx, db, rp, oa, loaded))
+		got, ok = loaded[0].Metadata()["custom_data"].(map[string]interface{})
+		require.True(t, ok, "custom_data must be map[string]interface{}")
+		assert.Equal(t, contractCustomData(), models.CustomData(got))
+	})
+}
