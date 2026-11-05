@@ -5,6 +5,7 @@ import (
 	"errors"
 	"io"
 	"net/http"
+	"net/url"
 	"strings"
 	"testing"
 	"time"
@@ -26,6 +27,17 @@ func useTestSigner(t *testing.T) {
 	require.NoError(t, err)
 	presign.SetSigner(signer, time.Hour)
 	t.Cleanup(func() { presign.SetSigner(nil, 0) })
+}
+
+// useDurableLinks matches testsuite.UseDurableLinks. This package cannot import testsuite:
+// testsuite imports models, and models imports goflow.
+func useDurableLinks(t *testing.T) {
+	t.Helper()
+	useTestSigner(t)
+	presign.SetLinkConfig(presign.LinkConfig{
+		Domain: "mailroom.test", Secret: "current-secret", Region: "sa-east-1", Buckets: []string{"media-bucket"},
+	})
+	t.Cleanup(presign.ClearLinkConfig)
 }
 
 type recordingBrainService struct {
@@ -99,54 +111,99 @@ func callSigningWebhook(t *testing.T, method, contentType, body string) *recordi
 }
 
 func TestSigningWebhookServiceJSON(t *testing.T) {
-	useTestSigner(t)
+	useDurableLinks(t)
+	stable := presign.DurableURL(testMediaURL)
+	expired := testMediaURL + "?X-Amz-Signature=old&X-Amz-Expires=60"
 
 	body := `{
   "attachments": ["image/jpeg:` + testMediaURL + `", "image/png:https://example.com/a.png"],
-  "photo": "` + testMediaURL + `?X-Amz-Signature=old",
+  "nested": {"photo": "` + expired + `"},
   "text": "[image/jpeg:` + testMediaURL + `, image/png:https://example.com/a.png]"
 }`
 
 	for _, contentType := range []string{"application/json", "application/json; charset=utf-8", ""} {
 		recorder := callSigningWebhook(t, "POST", contentType, body)
 
-		require.True(t, json.Valid(recorder.body), "signed body must still be valid JSON: %s", recorder.body)
-		assert.Equal(t, recorder.body, recorder.resentBody, "GetBody must return the signed body")
+		require.True(t, json.Valid(recorder.body), "rewritten body must still be valid JSON: %s", recorder.body)
+		assert.Equal(t, recorder.body, recorder.resentBody, "GetBody must return the rewritten body")
 		assert.Equal(t, int64(len(recorder.body)), recorder.length)
 
 		var payload struct {
 			Attachments []utils.Attachment `json:"attachments"`
-			Photo       string             `json:"photo"`
-			Text        string             `json:"text"`
+			Nested      struct {
+				Photo string `json:"photo"`
+			} `json:"nested"`
+			Text string `json:"text"`
 		}
 		require.NoError(t, json.Unmarshal(recorder.body, &payload))
 
-		assert.True(t, strings.HasPrefix(payload.Attachments[0].URL(), testMediaURL+"?X-Amz-"), payload.Attachments[0].URL())
+		assert.Equal(t, stable, payload.Attachments[0].URL())
 		assert.Equal(t, utils.Attachment("image/png:https://example.com/a.png"), payload.Attachments[1])
-		assert.True(t, strings.HasPrefix(payload.Photo, testMediaURL+"?X-Amz-"), payload.Photo)
-		assert.NotContains(t, payload.Photo, "Signature=old")
-		assert.Contains(t, payload.Text, testMediaURL+"?X-Amz-")
+		assert.Equal(t, stable, payload.Nested.Photo)
+		assert.NotContains(t, payload.Nested.Photo, "X-Amz-")
+		assert.Contains(t, payload.Text, stable)
 		assert.Contains(t, payload.Text, ", image/png:https://example.com/a.png]")
 	}
 }
 
 func TestSigningWebhookServiceNonJSON(t *testing.T) {
-	useTestSigner(t)
+	useDurableLinks(t)
+	stable := presign.DurableURL(testMediaURL)
 
-	formBody := "photo=" + testMediaURL
+	formBody := "note=hello&photo=" + testMediaURL
 	recorder := callSigningWebhook(t, "POST", "application/x-www-form-urlencoded", formBody)
-	assert.Equal(t, formBody, string(recorder.body))
+	values, err := url.ParseQuery(string(recorder.body))
+	require.NoError(t, err)
+	assert.Equal(t, stable, values.Get("photo"))
+	assert.Equal(t, "hello", values.Get("note"))
+	assert.NotContains(t, values.Get("photo"), "&")
+	assert.NotContains(t, string(recorder.body), "X-Amz-")
+	assert.Equal(t, recorder.body, recorder.resentBody)
 
-	// a JSON looking body sent as form is still left alone
-	recorder = callSigningWebhook(t, "POST", "application/x-www-form-urlencoded", `{"photo":"`+testMediaURL+`"}`)
-	assert.Equal(t, `{"photo":"`+testMediaURL+`"}`, string(recorder.body))
+	// a value that is not a form field is left alone
+	rawJSON := `{"photo":"` + testMediaURL + `"}`
+	recorder = callSigningWebhook(t, "POST", "application/x-www-form-urlencoded", rawJSON)
+	assert.Equal(t, rawJSON, string(recorder.body))
 
 	textBody := "photo: " + testMediaURL
 	recorder = callSigningWebhook(t, "POST", "", textBody)
 	assert.Equal(t, textBody, string(recorder.body))
 
+	multipartBody := "--bound\r\nContent-Disposition: form-data; name=\"file\"; filename=\"a.jpg\"\r\n\r\n" + testMediaURL + "\r\n--bound--\r\n"
+	recorder = callSigningWebhook(t, "POST", "multipart/form-data; boundary=bound", multipartBody)
+	assert.Equal(t, multipartBody, string(recorder.body))
+
 	recorder = callSigningWebhook(t, "GET", "", "")
 	assert.Empty(t, recorder.body)
+}
+
+func TestSigningWebhookQueryStringUnchanged(t *testing.T) {
+	useDurableLinks(t)
+
+	recorder := &recordingWebhookService{}
+	svc, err := signingWebhookServiceFactory(func(flows.Session) (flows.WebhookService, error) { return recorder, nil })(nil)
+	require.NoError(t, err)
+
+	request, err := http.NewRequest("POST", "https://webhook.example.com/?file="+url.QueryEscape(testMediaURL), strings.NewReader(`{"note":"hi"}`))
+	require.NoError(t, err)
+	request.Header.Set("Content-Type", "application/json")
+	rawQuery := request.URL.RawQuery
+
+	_, err = svc.Call(nil, request)
+	require.NoError(t, err)
+	assert.Equal(t, rawQuery, request.URL.RawQuery)
+	assert.Contains(t, request.URL.RawQuery, "media-bucket")
+	assert.Equal(t, `{"note":"hi"}`, string(recorder.body))
+	assert.NotContains(t, request.URL.RawQuery, "/mr/media/")
+}
+
+func TestSigningWebhookFormLeavesPresignedFallback(t *testing.T) {
+	useTestSigner(t)
+
+	formBody := "photo=" + testMediaURL
+	recorder := callSigningWebhook(t, "POST", "application/x-www-form-urlencoded", formBody)
+	assert.Equal(t, formBody, string(recorder.body))
+	assert.NotContains(t, string(recorder.body), "X-Amz-")
 }
 
 type failingReader struct{}

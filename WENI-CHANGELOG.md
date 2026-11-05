@@ -2,6 +2,11 @@
 ----------
  * feat: copy send_whatsapp_broadcast msg.custom_data onto msgs_msg.metadata for Courier
 
+1.105.3
+----------
+ * feat: replace known-location file addresses in webhook JSON and form bodies with stable /mr/media links. Query strings, multipart bodies and addresses outside known locations stay unchanged
+ * fix: hash SQS FIFO MessageGroupId with SHA-256 when it exceeds the 128-character limit, so long contact URNs (e.g. mailto) are accepted instead of failing to publish
+
 1.105.2
 ----------
  * feat: stream S3 attachments through durable /mr/media links for generic, Rocket.Chat and Freshchat ticketers. Weni Chats forward and history still receive the attachment URL stored on the message
