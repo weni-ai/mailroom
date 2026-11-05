@@ -1773,6 +1773,27 @@ type BroadcastCatalogMessage struct {
 	Carousel         bool                 `json:"carousel,omitempty"`
 }
 
+// CustomData is an optional opaque JSON object on send_whatsapp_broadcast msg.
+// Flows validates size, depth, and keys (AD-002). Mailroom only checks type:
+// a non-object is dropped so json.Unmarshal of the task still succeeds.
+type CustomData map[string]interface{}
+
+func (c *CustomData) UnmarshalJSON(data []byte) error {
+	*c = nil
+	if len(data) == 0 || string(data) == "null" {
+		return nil
+	}
+	var obj map[string]interface{}
+	if err := json.Unmarshal(data, &obj); err != nil {
+		return nil
+	}
+	if len(obj) == 0 {
+		return nil
+	}
+	*c = obj
+	return nil
+}
+
 type WppBroadcastMessage struct {
 	Text                   string                    `json:"text,omitempty"`
 	Header                 BroadcastMessageHeader    `json:"header,omitempty"`
@@ -1795,6 +1816,7 @@ type WppBroadcastMessage struct {
 	TTLSeconds             int                       `json:"ttl_seconds,omitempty"`
 	IGCommentID            string                    `json:"ig_comment_id,omitempty"`
 	IGResponseType         string                    `json:"ig_response_type,omitempty"`
+	CustomData             CustomData                `json:"custom_data,omitempty"`
 }
 
 type WppBroadcast struct {
@@ -2186,6 +2208,10 @@ func CreateWppBroadcastMessages(ctx context.Context, rt *runtime.Runtime, oa *Or
 		}
 		if igResponseType := bcast.Msg().IGResponseType; igResponseType != "" {
 			extraMetadata["ig_response_type"] = igResponseType
+		}
+		// AD-004: copy custom_data verbatim; do not evaluate @contact.* / @fields.*.
+		if customData := bcast.Msg().CustomData; len(customData) > 0 {
+			extraMetadata["custom_data"] = map[string]interface{}(customData)
 		}
 
 		msg, err := NewOutgoingWppBroadcastMsg(rt, oa.Org(), channel, c, out, time.Now(), bcast.BroadcastID(), highPriority, extraMetadata)
