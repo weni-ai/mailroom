@@ -6,6 +6,7 @@ import (
 	"io"
 	"mime"
 	"net/http"
+	"net/url"
 	"regexp"
 	"strings"
 
@@ -43,14 +44,15 @@ type signingWebhookService struct {
 }
 
 func (s *signingWebhookService) Call(session flows.Session, request *http.Request) (*flows.WebhookCall, error) {
-	if err := signJSONRequestBody(request); err != nil {
+	if err := rewriteWebhookBody(request); err != nil {
 		return nil, err
 	}
 	return s.WebhookService.Call(session, request)
 }
 
-// signingWebhookServiceFactory presigns attachment URLs in JSON webhook bodies. Query strings and form bodies
-// are left alone because the & of a signed URL would break their encoding.
+// signingWebhookServiceFactory replaces known-location file addresses in JSON and form bodies with stable
+// links. Query strings and multipart bodies are left alone. A form field keeps its original address when the
+// replacement would contain &, which a short-lived signed URL does.
 func signingWebhookServiceFactory(factory engine.WebhookServiceFactory) engine.WebhookServiceFactory {
 	return func(session flows.Session) (flows.WebhookService, error) {
 		svc, err := factory(session)
@@ -61,7 +63,7 @@ func signingWebhookServiceFactory(factory engine.WebhookServiceFactory) engine.W
 	}
 }
 
-func signJSONRequestBody(request *http.Request) error {
+func rewriteWebhookBody(request *http.Request) error {
 	if !presign.Enabled() || request.Body == nil || request.Body == http.NoBody {
 		return nil
 	}
@@ -73,16 +75,52 @@ func signJSONRequestBody(request *http.Request) error {
 		return err
 	}
 
-	if isJSONBody(request, body) {
+	switch {
+	case isJSONBody(request, body):
 		body = bodyURLRegex.ReplaceAllFunc(body, func(u []byte) []byte {
-			return []byte(presign.SignURL(string(u)))
+			return []byte(presign.DurableURL(string(u)))
 		})
+	case isFormBody(request):
+		body = rewriteFormBody(body)
 	}
 
 	request.Body = io.NopCloser(bytes.NewReader(body))
 	request.GetBody = func() (io.ReadCloser, error) { return io.NopCloser(bytes.NewReader(body)), nil }
 	request.ContentLength = int64(len(body))
 	return nil
+}
+
+func isFormBody(request *http.Request) bool {
+	mediaType, _, err := mime.ParseMediaType(request.Header.Get("Content-Type"))
+	return err == nil && mediaType == "application/x-www-form-urlencoded"
+}
+
+func rewriteFormBody(body []byte) []byte {
+	values, err := url.ParseQuery(string(body))
+	if err != nil {
+		return body
+	}
+
+	changed := false
+	for key, vals := range values {
+		for i, val := range vals {
+			next := bodyURLRegex.ReplaceAllStringFunc(val, func(raw string) string {
+				rewritten := presign.DurableURL(raw)
+				if strings.Contains(rewritten, "&") {
+					return raw
+				}
+				return rewritten
+			})
+			if next != val {
+				values[key][i] = next
+				changed = true
+			}
+		}
+	}
+	if !changed {
+		return body
+	}
+	return []byte(values.Encode())
 }
 
 func isJSONBody(request *http.Request, body []byte) bool {
