@@ -193,6 +193,35 @@ func TestUpdateManyTickets(t *testing.T) {
 	assert.Equal(t, "HTTP/1.0 201 Created\r\nContent-Length: 114\r\n\r\n", string(trace.ResponseTrace))
 }
 
+func TestShowManyTickets(t *testing.T) {
+	defer httpx.SetRequestor(httpx.DefaultRequestor)
+	httpx.SetRequestor(httpx.NewMockRequestor(map[string][]httpx.MockResponse{
+		"https://nyaruka.zendesk.com/api/v2/tickets/show_many.json?ids=1,2": {
+			httpx.NewMockResponse(500, nil, `{"description": "boom", "error": "ServerError"}`),
+			httpx.NewMockResponse(200, nil, `{"tickets":[{"id":1,"status":"open"},{"id":2,"status":"solved"}]}`),
+		},
+	}))
+
+	client := zendesk.NewRESTClient(http.DefaultClient, nil, "nyaruka", "123456789", nil, nil)
+
+	tickets, trace, err := client.ShowManyTickets(nil)
+	assert.NoError(t, err)
+	assert.Nil(t, trace)
+	assert.Empty(t, tickets)
+
+	_, _, err = client.ShowManyTickets([]int64{1, 2})
+	assert.EqualError(t, err, "boom")
+
+	tickets, trace, err = client.ShowManyTickets([]int64{1, 2})
+	assert.NoError(t, err)
+	assert.Equal(t, 2, len(tickets))
+	assert.Equal(t, int64(1), tickets[0].ID)
+	assert.Equal(t, "open", tickets[0].Status)
+	assert.Equal(t, int64(2), tickets[1].ID)
+	assert.Equal(t, "solved", tickets[1].Status)
+	assert.NotNil(t, trace)
+}
+
 func TestPush(t *testing.T) {
 	defer httpx.SetRequestor(httpx.DefaultRequestor)
 	httpx.SetRequestor(httpx.NewMockRequestor(map[string][]httpx.MockResponse{
