@@ -1,3 +1,7 @@
+1.106.1
+----------
+ * fix: replace known-bucket media addresses with durable links when opening a Zendesk ticket
+
 1.106.0
 ----------
  * feat: copy send_whatsapp_broadcast msg.custom_data onto msgs_msg.metadata for Courier
