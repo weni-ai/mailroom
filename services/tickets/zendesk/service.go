@@ -158,9 +158,11 @@ func (s *service) Open(session flows.Session, topic *flows.Topic, body string, a
 		AllowChannelback: true,
 	}
 
+	outbound := rewriteMediaLinks(body)
+
 	fieldsValue := []FieldValue{}
-	if !strings.HasPrefix(body, "{") {
-		msg.Message = body
+	if !strings.HasPrefix(outbound, "{") {
+		msg.Message = outbound
 	} else {
 		extra := &struct {
 			Message      string       `json:"message"`
@@ -172,7 +174,7 @@ func (s *service) Open(session flows.Session, topic *flows.Topic, body string, a
 			ID           int64        `json:"id"`
 		}{}
 
-		err := jsonx.Unmarshal([]byte(body), extra)
+		err := jsonx.Unmarshal([]byte(outbound), extra)
 		if err != nil {
 			return nil, err
 		}

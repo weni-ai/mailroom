@@ -16,6 +16,7 @@ import (
 	"github.com/nyaruka/goflow/test"
 	"github.com/nyaruka/goflow/utils"
 	"github.com/nyaruka/mailroom/core/models"
+	"github.com/nyaruka/mailroom/core/presign"
 	"github.com/nyaruka/mailroom/services/tickets/zendesk"
 	"github.com/nyaruka/mailroom/testsuite"
 	"github.com/nyaruka/mailroom/testsuite/testdata"
@@ -163,6 +164,137 @@ func TestOpenAndForward(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, 1, len(logger.Logs))
 	test.AssertSnapshot(t, "open", logger.Logs[0].Request)
+}
+
+const bucketPhoto = "https://media-bucket.s3.sa-east-1.amazonaws.com/media/photo.jpg"
+
+func TestOpenRewritesBucketMediaLinks(t *testing.T) {
+	testsuite.UseDurableLinks(t, "mailroom.test", "current-secret", "media-bucket")
+	body := "history file " + bucketPhoto
+	svc, session, topic := newZendeskOpen(t, pushOK())
+
+	logger := &flows.HTTPLogger{}
+	ticket, err := svc.Open(session, topic, body, nil, logger.Log)
+	require.NoError(t, err)
+	require.Len(t, logger.Logs, 1)
+
+	durable := presign.DurableURL(bucketPhoto)
+	assert.Contains(t, logger.Logs[0].Request, durable)
+	assert.NotContains(t, logger.Logs[0].Request, "media-bucket.s3.")
+	assert.Equal(t, body, ticket.Body())
+}
+
+func TestOpenRewritesJSONFields(t *testing.T) {
+	testsuite.UseDurableLinks(t, "mailroom.test", "current-secret", "media-bucket")
+	public := "https://example.com/a.jpg"
+	body := `{"message":"hist ` + bucketPhoto + `","priority":"high","subject":"See ` + public + `","description":"file ` + bucketPhoto + `","custom_fields":[{"id":"21938362","value":"cf ` + bucketPhoto + `"}]}`
+	svc, session, topic := newZendeskOpen(t, pushOK())
+
+	logger := &flows.HTTPLogger{}
+	ticket, err := svc.Open(session, topic, body, nil, logger.Log)
+	require.NoError(t, err)
+	require.Len(t, logger.Logs, 1)
+
+	request := logger.Logs[0].Request
+	assert.Contains(t, request, presign.DurableURL(bucketPhoto))
+	assert.Contains(t, request, public)
+	assert.NotContains(t, request, "media-bucket.s3.")
+	assert.Contains(t, request, `"id":"message"`)
+	assert.Contains(t, request, `"id":"description"`)
+	assert.Contains(t, request, `"id":"21938362"`)
+	assert.Equal(t, body, ticket.Body())
+}
+
+func TestOpenFallbackAndReopen(t *testing.T) {
+	body := "history file " + bucketPhoto
+
+	t.Run("signed fallback", func(t *testing.T) {
+		testsuite.UseAttachmentSigner(t, "media-bucket")
+		presign.ClearLinkConfig()
+		svc, session, topic := newZendeskOpen(t, pushOK())
+
+		logger := &flows.HTTPLogger{}
+		ticket, err := svc.Open(session, topic, body, nil, logger.Log)
+		require.NoError(t, err)
+		require.NotNil(t, ticket)
+		require.Len(t, logger.Logs, 1)
+		assert.Contains(t, logger.Logs[0].Request, "X-Amz-Algorithm")
+	})
+
+	t.Run("original when nothing can sign", func(t *testing.T) {
+		presign.SetSigner(nil, 0)
+		presign.ClearLinkConfig()
+		svc, session, topic := newZendeskOpen(t, pushOK())
+
+		logger := &flows.HTTPLogger{}
+		ticket, err := svc.Open(session, topic, body, nil, logger.Log)
+		require.NoError(t, err)
+		require.NotNil(t, ticket)
+		require.Len(t, logger.Logs, 1)
+		assert.Contains(t, logger.Logs[0].Request, bucketPhoto)
+		assert.NotContains(t, logger.Logs[0].Request, "X-Amz-Algorithm")
+	})
+
+	t.Run("reopen by id does not push opening text", func(t *testing.T) {
+		svc, session, topic := newZendeskOpen(t, map[string][]httpx.MockResponse{
+			"https://nyaruka.zendesk.com/api/v2/tickets/update_many.json?ids=10": {
+				httpx.NewMockResponse(200, nil, `{"job_status":{"id":"1234-abcd","url":"http://zendesk.com","status":"queued"}}`),
+			},
+		})
+
+		logger := &flows.HTTPLogger{}
+		_, err := svc.Open(session, topic, fieldTicket1, nil, logger.Log)
+		require.NoError(t, err)
+		require.Len(t, logger.Logs, 1)
+		assert.Contains(t, logger.Logs[0].Request, "update_many.json")
+		assert.NotContains(t, logger.Logs[0].Request, "external_resources")
+		assert.NotContains(t, logger.Logs[0].Request, bucketPhoto)
+	})
+}
+
+func pushOK() map[string][]httpx.MockResponse {
+	return map[string][]httpx.MockResponse{
+		"https://nyaruka.zendesk.com/api/v2/any_channel/push.json": {
+			httpx.NewMockResponse(201, nil, `{"results":[{"external_resource_id":"123","status":{"code":"success"}}]}`),
+		},
+	}
+}
+
+func newZendeskOpen(t *testing.T, mocks map[string][]httpx.MockResponse) (models.TicketService, flows.Session, *flows.Topic) {
+	t.Helper()
+	ctx, rt, _, _ := testsuite.Get()
+	session, _, err := test.CreateTestSession("", envs.RedactionPolicyNone)
+	require.NoError(t, err)
+
+	uuids.SetGenerator(uuids.NewSeededGenerator(12345))
+	t.Cleanup(func() { uuids.SetGenerator(uuids.DefaultGenerator) })
+	dates.SetNowSource(dates.NewSequentialNowSource(time.Date(2019, 10, 7, 15, 21, 30, 0, time.UTC)))
+	t.Cleanup(func() { dates.SetNowSource(dates.DefaultNowSource) })
+	httpx.SetRequestor(httpx.NewMockRequestor(mocks))
+	t.Cleanup(func() { httpx.SetRequestor(httpx.DefaultRequestor) })
+
+	tickUUID := assets.TicketerUUID(uuids.New())
+	flowTicketer := flows.NewTicketer(static.NewTicketer(tickUUID, "Support", "zendesk"))
+	svc, err := zendesk.NewService(
+		rt.Config,
+		http.DefaultClient,
+		nil,
+		flowTicketer,
+		models.BuildTicketer(models.TicketerID(0), tickUUID, testdata.Org1.ID, "zendesk", "Support", map[string]string{
+			"subdomain":   "nyaruka",
+			"secret":      "sesame",
+			"oauth_token": "987654321",
+			"push_id":     "1234-abcd",
+			"push_token":  "123456789",
+		}),
+		ctx,
+		nil,
+	)
+	require.NoError(t, err)
+
+	oa, err := models.GetOrgAssets(ctx, rt, testdata.Org1.ID)
+	require.NoError(t, err)
+	return svc, session, oa.SessionAssets().Topics().FindByName("General")
 }
 
 func TestCloseAndReopen(t *testing.T) {

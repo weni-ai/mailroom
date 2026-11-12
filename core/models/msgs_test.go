@@ -1161,7 +1161,9 @@ func TestWppBroadcastCustomData(t *testing.T) {
 			out := create(channelID, expected, []models.ContactID{testdata.Cathy.ID, testdata.Bob.ID})
 			require.GreaterOrEqual(t, len(out), 1)
 			for _, m := range out {
-				assert.Equal(t, expected, models.CustomData(m.Metadata()["custom_data"].(map[string]interface{})))
+				got, ok := m.Metadata()["custom_data"].(map[string]interface{})
+				require.True(t, ok, "custom_data must be map[string]interface{}")
+				assert.Equal(t, expected, models.CustomData(got))
 				assert.Equal(t, "wpp_broadcast_batch", m.Metadata()["queue"])
 			}
 		}
@@ -1207,7 +1209,8 @@ func TestWppBroadcastCustomData(t *testing.T) {
 		data := models.CustomData{"label": "@contact.name", "nested": map[string]interface{}{"field": "@fields.age"}}
 		out := create(testdata.WhatsAppCloudChannel.ID, data, []models.ContactID{testdata.Cathy.ID})
 		require.Len(t, out, 1)
-		got := out[0].Metadata()["custom_data"].(map[string]interface{})
+		got, ok := out[0].Metadata()["custom_data"].(map[string]interface{})
+		require.True(t, ok, "custom_data must be map[string]interface{}")
 		assert.Equal(t, "@contact.name", got["label"])
 		assert.Equal(t, "@fields.age", got["nested"].(map[string]interface{})["field"])
 	})
@@ -1219,9 +1222,13 @@ func TestWppBroadcastCustomData(t *testing.T) {
 		loaded, err := models.GetMessagesByID(ctx, db, testdata.Org1.ID, models.DirectionOut, []models.MsgID{models.MsgID(out[0].ID())})
 		require.NoError(t, err)
 		require.Len(t, loaded, 1)
-		assert.Equal(t, contractCustomData(), models.CustomData(loaded[0].Metadata()["custom_data"].(map[string]interface{})))
+		got, ok := loaded[0].Metadata()["custom_data"].(map[string]interface{})
+		require.True(t, ok, "custom_data must be map[string]interface{}")
+		assert.Equal(t, contractCustomData(), models.CustomData(got))
 
 		require.NoError(t, models.ResendMessages(ctx, db, rp, oa, loaded))
-		assert.Equal(t, contractCustomData(), models.CustomData(loaded[0].Metadata()["custom_data"].(map[string]interface{})))
+		got, ok = loaded[0].Metadata()["custom_data"].(map[string]interface{})
+		require.True(t, ok, "custom_data must be map[string]interface{}")
+		assert.Equal(t, contractCustomData(), models.CustomData(got))
 	})
 }

@@ -29,6 +29,21 @@ type failingMessage struct{}
 func (f failingMessage) Marshal() ([]byte, error) { return nil, errors.New("boom") }
 func (f failingMessage) ContentType() string      { return "application/json" }
 
+func TestFitMessageGroupID(t *testing.T) {
+	shortID := "f06a5496-b00b-4f79-877b-511fd549ebc8:8b3d29f3-3ac5-49d3-a6a8-43c44ee7fc55:whatsapp:5511999999999"
+	assert.LessOrEqual(t, len(shortID), 128)
+	assert.Equal(t, shortID, fitMessageGroupID(shortID))
+
+	// Real case: mailto URN pushed project:channel:urn past the FIFO limit (134).
+	longID := "f06a5496-b00b-4f79-877b-511fd549ebc8:8b3d29f3-3ac5-49d3-a6a8-43c44ee7fc55:mailto:vinicius.conceicao+wt-8aae20dc@funchalnegocios.com.br"
+	assert.Greater(t, len(longID), 128)
+
+	fitted := fitMessageGroupID(longID)
+	assert.Len(t, fitted, 64)
+	assert.Equal(t, fitted, fitMessageGroupID(longID))
+	assert.NotEqual(t, fitted, fitMessageGroupID(longID+"x"))
+}
+
 func TestRawMessage(t *testing.T) {
 	body := []byte(`{"hello":"world"}`)
 	m := RawMessage{Body: body, Type: "application/json"}

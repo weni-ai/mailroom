@@ -3,6 +3,7 @@ package wenichats_test
 import (
 	"testing"
 
+	"github.com/nyaruka/mailroom/core/presign"
 	"github.com/nyaruka/mailroom/testsuite"
 	"github.com/nyaruka/mailroom/testsuite/testdata"
 	"github.com/nyaruka/mailroom/web"
@@ -25,5 +26,11 @@ func TestEventCallback(t *testing.T) {
 		nil,
 	)
 
-	web.RunWebTests(t, ctx, rt, "testdata/event_callback.json", map[string]string{"cathy_ticket_uuid": string(ticket.UUID)})
+	testsuite.UseDurableLinks(t, "mailroom.test", "current-secret", "media-bucket")
+	photo := presign.DurableURL("https://media-bucket.s3.sa-east-1.amazonaws.com/media/photo.jpg")
+
+	web.RunWebTests(t, ctx, rt, "testdata/event_callback.json", map[string]string{
+		"cathy_ticket_uuid": string(ticket.UUID),
+		"durable_photo":     photo,
+	})
 }

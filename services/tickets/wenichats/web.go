@@ -82,6 +82,8 @@ func handleEventCallback(ctx context.Context, rt *runtime.Runtime, r *http.Reque
 			return err, http.StatusInternalServerError, nil
 		}
 
+		eMsg.Content.Text = rewriteMediaLinks(eMsg.Content.Text)
+
 		extraMetadata := map[string]interface{}{
 			"chats_msg_uuid": eMsg.Content.UUID,
 		}

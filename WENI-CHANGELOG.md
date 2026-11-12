@@ -1,6 +1,16 @@
+1.106.1
+----------
+ * fix: replace known-bucket media addresses with durable links when opening a Zendesk ticket
+ * fix: replace known-bucket media addresses in Weni Chats message text with durable links in both directions
+
 1.106.0
 ----------
  * feat: copy send_whatsapp_broadcast msg.custom_data onto msgs_msg.metadata for Courier
+
+1.105.3
+----------
+ * feat: replace known-location file addresses in webhook JSON and form bodies with stable /mr/media links. Query strings, multipart bodies and addresses outside known locations stay unchanged
+ * fix: hash SQS FIFO MessageGroupId with SHA-256 when it exceeds the 128-character limit, so long contact URNs (e.g. mailto) are accepted instead of failing to publish
 
 1.105.2
 ----------
