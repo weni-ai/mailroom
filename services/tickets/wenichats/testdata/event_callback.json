@@ -207,6 +207,27 @@
     ]
   },
   {
+    "label": "create message rewriting known-bucket media links",
+    "method": "POST",
+    "path": "/mr/tickets/types/wenichats/event_callback/006d224e-107f-4e18-afb2-f41fe302abdc/$cathy_ticket_uuid$",
+    "body": {
+      "type": "msg.create",
+      "content": {
+        "text": "see https://media-bucket.s3.sa-east-1.amazonaws.com/media/photo.jpg and https://example.com/a.jpg"
+      }
+    },
+    "status": 200,
+    "response": {
+      "status": "handled"
+    },
+    "db_assertions": [
+      {
+        "query": "select count(*) from msgs_msg where direction = 'O' and text = 'see $durable_photo$ and https://example.com/a.jpg'",
+        "count": 1
+      }
+    ]
+  },
+  {
     "label": "close room if everything is correct",
     "method": "POST",
     "path": "/mr/tickets/types/wenichats/event_callback/006d224e-107f-4e18-afb2-f41fe302abdc/$cathy_ticket_uuid$",

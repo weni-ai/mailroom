@@ -1,7 +1,7 @@
 1.106.1
 ----------
  * fix: replace known-bucket media addresses with durable links when opening a Zendesk ticket
- * fix: replace known-bucket media addresses in Weni Chats forwarded message text with durable links
+ * fix: replace known-bucket media addresses in Weni Chats message text with durable links in both directions
 
 1.106.0
 ----------
