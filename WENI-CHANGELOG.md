@@ -1,3 +1,7 @@
+1.106.2
+----------
+ * feat: close Mailroom tickets that Zendesk has already solved or closed. A cron runs when MAILROOM_ZENDESK_TICKET_SYNC is set; the ticketer sync route can report or apply the same close
+
 1.106.1
 ----------
  * fix: replace known-bucket media addresses with durable links when opening a Zendesk ticket
