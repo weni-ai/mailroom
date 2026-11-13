@@ -281,7 +281,7 @@ func (s *service) Forward(ticket *models.Ticket, msgUUID flows.MsgUUID, text str
 	}
 
 	if strings.TrimSpace(text) != "" {
-		msg.Text = text
+		msg.Text = rewriteMediaLinks(text)
 	}
 
 	_, trace, err := s.restClient.CreateMessage(msg)
