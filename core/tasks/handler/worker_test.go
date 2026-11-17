@@ -498,6 +498,7 @@ func TestRequestToRouter(t *testing.T) {
 	contact := testdata.InsertContact(db, testdata.Org1, flows.ContactUUID(uuids.New()), "Router Contact", envs.Language("eng"))
 	urn := urns.URN("tel:+250700000010")
 	urnID := testdata.InsertContactURN(db, testdata.Org1, contact, urn, 1000)
+	db.MustExec(`UPDATE channels_channel SET address = $1 WHERE id = $2`, "+250785551212", channel.ID)
 
 	models.FlushCache()
 
@@ -573,6 +574,7 @@ func TestRequestToRouter(t *testing.T) {
 		ContactFields map[string]interface{} `json:"contact_fields"`
 		ChannelUUID   string                 `json:"channel_uuid"`
 		ChannelType   string                 `json:"channel_type"`
+		Channel       map[string]string      `json:"channel"`
 		ContactName   string                 `json:"contact_name"`
 		StreamSupport bool                   `json:"stream_support"`
 	}
@@ -583,6 +585,14 @@ func TestRequestToRouter(t *testing.T) {
 	assert.Equal(t, event.Text, payload.Text)
 	assert.Equal(t, string(channelModel.UUID()), payload.ChannelUUID)
 	assert.Equal(t, string(channelModel.Type()), payload.ChannelType)
+	assert.Equal(t, map[string]string{
+		"channel_uuid": string(channel.UUID),
+		"type":         "TW",
+		"name":         "Router Channel",
+		"address":      "+250785551212",
+	}, payload.Channel)
+	assert.Equal(t, payload.ChannelUUID, payload.Channel["channel_uuid"])
+	assert.Equal(t, payload.ChannelType, payload.Channel["type"])
 	assert.Equal(t, flowContact.Name(), payload.ContactName)
 	assert.True(t, payload.StreamSupport)
 	require.NotNil(t, payload.ContactFields)
@@ -777,12 +787,14 @@ func TestRequestToRouterStreamSupportForTPH(t *testing.T) {
 			body := <-reqCh
 
 			var payload struct {
-				StreamSupport bool   `json:"stream_support"`
-				ChannelType   string `json:"channel_type"`
+				StreamSupport bool              `json:"stream_support"`
+				ChannelType   string            `json:"channel_type"`
+				Channel       map[string]string `json:"channel"`
 			}
 			require.NoError(t, json.Unmarshal(body, &payload))
 			assert.True(t, payload.StreamSupport)
 			assert.Equal(t, "TPH", payload.ChannelType)
+			assert.Equal(t, "TPH", payload.Channel["type"])
 		})
 	}
 }
