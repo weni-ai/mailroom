@@ -409,12 +409,21 @@ func TestBrainOnIGCommentRoutesToRouter(t *testing.T) {
 	body := <-reqCh
 
 	var payload struct {
-		Metadata json.RawMessage `json:"metadata"`
-		Text     string          `json:"text"`
+		Metadata json.RawMessage   `json:"metadata"`
+		Text     string            `json:"text"`
+		Channel  map[string]string `json:"channel"`
 	}
 	require.NoError(t, json.Unmarshal(body, &payload))
 	assert.Equal(t, "Hello World", payload.Text)
 	assert.JSONEq(t, string(commentMetadata), string(payload.Metadata))
+
+	// channels without an address still send the key, as an empty string
+	assert.Equal(t, map[string]string{
+		"channel_uuid": string(channel.UUID),
+		"type":         "IG",
+		"name":         "Instagram Brain",
+		"address":      "",
+	}, payload.Channel)
 
 	var metadata map[string]interface{}
 	require.NoError(t, json.Unmarshal(payload.Metadata, &metadata))
@@ -526,6 +535,7 @@ func TestBrainOnWithoutDisableAIResponseRoutesToRouter(t *testing.T) {
 	db.MustExec(`UPDATE orgs_org SET brain_on = TRUE WHERE id = $1`, testdata.Org1.ID)
 
 	channel := testdata.InsertChannel(db, testdata.Org1, "TW", "Brain Channel", []string{"tel"}, "SR", map[string]interface{}{})
+	db.MustExec(`UPDATE channels_channel SET address = $1 WHERE id = $2`, "+250785551313", channel.ID)
 
 	contact := testdata.InsertContact(db, testdata.Org1, flows.ContactUUID(uuids.New()), "Brain Contact", envs.Language(`eng`))
 	urn := urns.URN("tel:+250700000012")
@@ -584,6 +594,17 @@ func TestBrainOnWithoutDisableAIResponseRoutesToRouter(t *testing.T) {
 	select {
 	case body := <-reqCh:
 		assert.Contains(t, string(body), "route without flag")
+
+		var payload struct {
+			Channel map[string]string `json:"channel"`
+		}
+		require.NoError(t, json.Unmarshal(body, &payload))
+		assert.Equal(t, map[string]string{
+			"channel_uuid": string(channel.UUID),
+			"type":         "TW",
+			"name":         "Brain Channel",
+			"address":      "+250785551313",
+		}, payload.Channel)
 	case <-time.After(100 * time.Millisecond):
 		t.Fatal("expected router to be called for a channel without disable_ai_response")
 	}
