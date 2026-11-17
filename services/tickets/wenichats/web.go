@@ -96,11 +96,28 @@ func handleEventCallback(ctx context.Context, rt *runtime.Runtime, r *http.Reque
 			for k, v := range catalogMeta {
 				extraMetadata[k] = v
 			}
-			_, err = tickets.SendReplyWithCatalog(ctx, rt, ticket, eMsg.Content.Text, nil, extraMetadata, header, footer, catalog)
+
+			// Delivery reads the catalog wording from metadata and sends msg.Text as a separate plain message.
+			catalogBody, headerText, bodyErr := catalogReplyBody(eMsg.Content.Text, header.Text)
+			if bodyErr != nil {
+				return errors.New("catalog reply requires body text"), http.StatusBadRequest, nil
+			}
+			extraMetadata["body"] = catalogBody
+			if headerText != "" {
+				extraMetadata["header"] = headerText
+				header.Text = headerText
+			} else {
+				header = models.BroadcastMessageHeader{}
+			}
+
+			msg, err := tickets.SendReplyWithCatalog(ctx, rt, ticket, "", nil, extraMetadata, header, footer, catalog)
 			if err != nil {
 				return errors.Wrapf(err, "error on send ticket catalog reply"), http.StatusBadRequest, nil
 			}
-			break
+			if msg == nil {
+				return errors.New("catalog reply was not created"), http.StatusBadRequest, nil
+			}
+			return map[string]string{"status": "handled"}, http.StatusOK, nil
 		}
 
 		attachments := []*tickets.File{}
