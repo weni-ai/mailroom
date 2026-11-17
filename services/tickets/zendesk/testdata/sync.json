@@ -1,0 +1,193 @@
+[
+    {
+        "label": "401 if authorization header is missing",
+        "method": "POST",
+        "path": "/mr/tickets/types/zendesk/sync/4ee6d4f3-f92b-439b-9718-8da90c05490b",
+        "body": {},
+        "status": 401,
+        "response": {
+            "error": "invalid or missing authorization header, denying"
+        }
+    },
+    {
+        "label": "404 if ticketer does not exist",
+        "method": "POST",
+        "path": "/mr/tickets/types/zendesk/sync/122a91d5-cfc0-4777-88ef-d5b1e013e031",
+        "headers": {
+            "Authorization": "Token sesame"
+        },
+        "body": {},
+        "status": 404,
+        "response": {
+            "error": "no such ticketer 122a91d5-cfc0-4777-88ef-d5b1e013e031"
+        }
+    },
+    {
+        "label": "404 if ticketer is not zendesk",
+        "method": "POST",
+        "path": "/mr/tickets/types/zendesk/sync/f9c9447f-a291-4f3c-8c79-c089bbd4e713",
+        "headers": {
+            "Authorization": "Token sesame"
+        },
+        "body": {},
+        "status": 404,
+        "response": {
+            "error": "no such ticketer f9c9447f-a291-4f3c-8c79-c089bbd4e713"
+        }
+    },
+    {
+        "label": "compare open tickets without closing",
+        "method": "POST",
+        "path": "/mr/tickets/types/zendesk/sync/4ee6d4f3-f92b-439b-9718-8da90c05490b",
+        "headers": {
+            "Authorization": "Token sesame"
+        },
+        "body": {},
+        "http_mocks": {
+            "https://nyaruka.zendesk.com/api/v2/tickets/show_many.json?ids=101,102,103": [
+                {
+                    "status": 200,
+                    "body": "{\"tickets\":[{\"id\":101,\"status\":\"open\"},{\"id\":102,\"status\":\"solved\"}]}"
+                }
+            ]
+        },
+        "status": 200,
+        "response": {
+            "ticketer": "4ee6d4f3-f92b-439b-9718-8da90c05490b",
+            "sync": false,
+            "counts": {
+                "open_in_mailroom": 4,
+                "in_sync": 1,
+                "would_close": 1,
+                "closed": 0,
+                "missing_external_id": 1,
+                "not_found": 1
+            },
+            "in_sync": [
+                {
+                    "uuid": "$open_uuid$",
+                    "external_id": "101",
+                    "zendesk_status": "open"
+                }
+            ],
+            "would_close": [
+                {
+                    "uuid": "$solved_uuid$",
+                    "external_id": "102",
+                    "zendesk_status": "solved"
+                }
+            ],
+            "closed": [],
+            "missing_external_id": [
+                {
+                    "uuid": "$missing_uuid$"
+                }
+            ],
+            "not_found": [
+                {
+                    "uuid": "$gone_uuid$",
+                    "external_id": "103"
+                }
+            ]
+        },
+        "db_assertions": [
+            {
+                "query": "SELECT count(*) FROM tickets_ticket WHERE ticketer_id = 3 AND status = 'O'",
+                "count": 4
+            }
+        ]
+    },
+    {
+        "label": "502 if zendesk show_many fails and closes nobody",
+        "method": "POST",
+        "path": "/mr/tickets/types/zendesk/sync/4ee6d4f3-f92b-439b-9718-8da90c05490b",
+        "headers": {
+            "Authorization": "Token sesame"
+        },
+        "body": {},
+        "http_mocks": {
+            "https://nyaruka.zendesk.com/api/v2/tickets/show_many.json?ids=101,102,103": [
+                {
+                    "status": 500,
+                    "body": "{\"description\":\"boom\",\"error\":\"ServerError\"}"
+                }
+            ]
+        },
+        "status": 502,
+        "response": {
+            "error": "zendesk show_many: boom"
+        },
+        "db_assertions": [
+            {
+                "query": "SELECT count(*) FROM tickets_ticket WHERE ticketer_id = 3 AND status = 'O'",
+                "count": 4
+            }
+        ]
+    },
+    {
+        "label": "sync=true closes solved tickets locally",
+        "method": "POST",
+        "path": "/mr/tickets/types/zendesk/sync/4ee6d4f3-f92b-439b-9718-8da90c05490b?sync=true",
+        "headers": {
+            "Authorization": "Token sesame"
+        },
+        "body": {},
+        "http_mocks": {
+            "https://nyaruka.zendesk.com/api/v2/tickets/show_many.json?ids=101,102,103": [
+                {
+                    "status": 200,
+                    "body": "{\"tickets\":[{\"id\":101,\"status\":\"open\"},{\"id\":102,\"status\":\"solved\"}]}"
+                }
+            ]
+        },
+        "status": 200,
+        "response": {
+            "ticketer": "4ee6d4f3-f92b-439b-9718-8da90c05490b",
+            "sync": true,
+            "counts": {
+                "open_in_mailroom": 4,
+                "in_sync": 1,
+                "would_close": 0,
+                "closed": 1,
+                "missing_external_id": 1,
+                "not_found": 1
+            },
+            "in_sync": [
+                {
+                    "uuid": "$open_uuid$",
+                    "external_id": "101",
+                    "zendesk_status": "open"
+                }
+            ],
+            "would_close": [],
+            "closed": [
+                {
+                    "uuid": "$solved_uuid$",
+                    "external_id": "102",
+                    "zendesk_status": "solved"
+                }
+            ],
+            "missing_external_id": [
+                {
+                    "uuid": "$missing_uuid$"
+                }
+            ],
+            "not_found": [
+                {
+                    "uuid": "$gone_uuid$",
+                    "external_id": "103"
+                }
+            ]
+        },
+        "db_assertions": [
+            {
+                "query": "SELECT count(*) FROM tickets_ticket WHERE ticketer_id = 3 AND status = 'O'",
+                "count": 3
+            },
+            {
+                "query": "SELECT count(*) FROM tickets_ticket WHERE ticketer_id = 3 AND status = 'C'",
+                "count": 2
+            }
+        ]
+    }
+]
