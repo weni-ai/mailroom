@@ -1171,6 +1171,7 @@ func logWACHandoverDebug(event *MsgEvent, contextText, routerText, outcome strin
 	}
 	logrus.WithFields(logrus.Fields{
 		"event":        "wac_handover_consume_debug",
+		"debug_build":  "2026-11-18-2",
 		"outcome":      outcome,
 		"msg_id":       event.MsgID,
 		"msg_uuid":     event.MsgUUID,
