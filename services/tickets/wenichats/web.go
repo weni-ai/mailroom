@@ -99,9 +99,11 @@ func handleEventCallback(ctx context.Context, rt *runtime.Runtime, r *http.Reque
 
 			// Delivery reads the catalog wording from metadata and sends msg.Text as a separate plain message.
 			catalogBody, headerText, bodyErr := catalogReplyBody(eMsg.Content.Text, header.Text)
+
 			if bodyErr != nil {
-				return errors.New("catalog reply requires body text"), http.StatusBadRequest, nil
+				return bodyErr, http.StatusBadRequest, nil
 			}
+
 			extraMetadata["body"] = catalogBody
 			if headerText != "" {
 				extraMetadata["header"] = headerText
