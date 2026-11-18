@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"io"
 	"net/url"
+	"os"
 	"strconv"
 	"strings"
 	"time"
@@ -1144,6 +1145,7 @@ func consumeHandoverContext(ctx context.Context, db models.QueryerWithTx, event 
 		return event.Text, err
 	}
 	if pending == nil || pending.ContextText == "" {
+		logWACHandoverDebug(event, "", event.Text, "no_pending")
 		return event.Text, nil
 	}
 
@@ -1152,12 +1154,32 @@ func consumeHandoverContext(ctx context.Context, db models.QueryerWithTx, event 
 		return event.Text, err
 	}
 	if !consumed {
+		logWACHandoverDebug(event, pending.ContextText, event.Text, "not_consumed")
 		return event.Text, nil
 	}
 	if err := tx.Commit(); err != nil {
 		return event.Text, errors.Wrapf(err, "error committing wa conversation handover consume")
 	}
-	return formatRouterTextWithHandover(event.Text, pending.ContextText), nil
+	routerText := formatRouterTextWithHandover(event.Text, pending.ContextText)
+	logWACHandoverDebug(event, pending.ContextText, routerText, "consumed")
+	return routerText, nil
+}
+
+func logWACHandoverDebug(event *MsgEvent, contextText, routerText, outcome string) {
+	if os.Getenv("MAILROOM_DEBUG_WAC_HANDOVER") != "true" {
+		return
+	}
+	logrus.WithFields(logrus.Fields{
+		"event":        "wac_handover_consume_debug",
+		"outcome":      outcome,
+		"msg_id":       event.MsgID,
+		"msg_uuid":     event.MsgUUID,
+		"channel_id":   event.ChannelID,
+		"contact_id":   event.ContactID,
+		"urn":          event.URN.Identity(),
+		"context_text": contextText,
+		"router_text":  routerText,
+	}).Info("wac handover consume debug")
 }
 
 // formatRouterTextWithHandover builds the brain POST text. Empty inbound text
@@ -1244,6 +1266,17 @@ func requestToRouter(event *MsgEvent, rtConfig *runtime.Config, contact *flows.C
 		return err
 	}
 	b = bytes.NewReader(data)
+
+	if os.Getenv("MAILROOM_DEBUG_WAC_HANDOVER") == "true" {
+		logrus.WithFields(logrus.Fields{
+			"event":        "wac_handover_nexus_debug",
+			"msg_id":       event.MsgID,
+			"msg_uuid":     event.MsgUUID,
+			"channel_uuid": channel.UUID(),
+			"router_base":  rtConfig.RouterBaseURL,
+			"router_text":  routerText,
+		}).Info("wac handover sent to nexus")
+	}
 
 	params := url.Values{}
 	params.Add("token", rtConfig.RouterAuthToken)
