@@ -1,3 +1,7 @@
+1.106.3
+----------
+ * fix: deliver a Live Desk catalog reply as one catalog message whose body is the agent text. A title stays on that message when set, text longer than 1024 characters is cut, blank text falls back to the title, and a reply with no usable text is not confirmed as delivered
+
 1.106.2
 ----------
  * feat: close Mailroom tickets that Zendesk has already solved or closed. A cron runs when MAILROOM_ZENDESK_TICKET_SYNC is set; the ticketer sync route can report or apply the same close
