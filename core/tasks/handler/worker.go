@@ -1184,6 +1184,24 @@ func channelStreamSupport(channel *models.Channel) bool {
 	return err == nil && version >= minWWCStreamVersion
 }
 
+// routerChannel describes to the router the channel a message arrived on, so it can
+// classify conversations by channel type.
+type routerChannel struct {
+	ChannelUUID assets.ChannelUUID `json:"channel_uuid"`
+	Type        string             `json:"type"`
+	Name        string             `json:"name"`
+	Address     string             `json:"address"`
+}
+
+func newRouterChannel(channel *models.Channel) routerChannel {
+	return routerChannel{
+		ChannelUUID: channel.UUID(),
+		Type:        string(channel.Type()),
+		Name:        channel.Name(),
+		Address:     channel.Address(),
+	}
+}
+
 func requestToRouter(event *MsgEvent, rtConfig *runtime.Config, contact *flows.Contact, projectUUID uuids.UUID, channel *models.Channel, routerText string) error {
 	httpClient, httpRetries, _ := goflow.HTTP(rtConfig)
 
@@ -1202,6 +1220,7 @@ func requestToRouter(event *MsgEvent, rtConfig *runtime.Config, contact *flows.C
 		ContactFields map[string]interface{} `json:"contact_fields"`
 		ChannelUUID   assets.ChannelUUID     `json:"channel_uuid"`
 		ChannelType   string                 `json:"channel_type"`
+		Channel       routerChannel          `json:"channel"`
 		ContactName   string                 `json:"contact_name"`
 		StreamSupport bool                   `json:"stream_support"`
 	}{
@@ -1214,6 +1233,7 @@ func requestToRouter(event *MsgEvent, rtConfig *runtime.Config, contact *flows.C
 		ContactFields: mapContactFields(contact),
 		ChannelUUID:   channel.UUID(),
 		ChannelType:   string(channel.Type()),
+		Channel:       newRouterChannel(channel),
 		ContactName:   contact.Name(),
 		StreamSupport: streamSupport,
 	}
