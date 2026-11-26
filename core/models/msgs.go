@@ -1576,8 +1576,9 @@ func CreateBroadcastMessages(ctx context.Context, rt *runtime.Runtime, oa *OrgAs
 			quickReplies[i], _ = excellent.EvaluateTemplate(oa.Env(), evaluationCtx, qr, nil)
 		}
 
-		// don't do anything if we have no text or attachments
-		if text == "" && len(attachments) == 0 && len(products) == 0 {
+		// A whole-shop catalog sets send_catalog and has no product rows. Ticket replies
+		// leave plain text empty so delivery does not emit a second text message.
+		if text == "" && len(attachments) == 0 && len(products) == 0 && !sendCatalog {
 			return nil, nil
 		}
 

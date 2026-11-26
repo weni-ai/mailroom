@@ -1,0 +1,32 @@
+[
+  {
+    "label": "blocked contact catalog is not delivered",
+    "method": "POST",
+    "path": "/mr/tickets/types/wenichats/event_callback/006d224e-107f-4e18-afb2-f41fe302abdc/$cathy_ticket_uuid$",
+    "body": {
+      "type": "msg.create",
+      "content": {
+        "uuid": "6a84ab60-8b18-4054-8a97-22edc5fb1d2f",
+        "text": "Still here",
+        "catalog": {
+          "products": [
+            {
+              "product": "ring",
+              "product_retailer_ids": ["blocked-1"]
+            }
+          ]
+        }
+      }
+    },
+    "status": 400,
+    "response": {
+      "error": "catalog reply was not created"
+    },
+    "db_assertions": [
+      {
+        "query": "select count(*) from msgs_msg where metadata::jsonb->>'chats_msg_uuid' = '6a84ab60-8b18-4054-8a97-22edc5fb1d2f'",
+        "count": 0
+      }
+    ]
+  }
+]

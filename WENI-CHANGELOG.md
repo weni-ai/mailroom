@@ -1,6 +1,10 @@
-1.107.0
+1.106.4
 ----------
- * feat: send a channel object (channel_uuid, type, name, address) to Nexus on routed inbound messages
+* feat: send a channel object (channel_uuid, type, name, address) to Nexus on routed inbound messages
+
+1.106.3
+----------
+ * fix: deliver a Live Desk catalog reply as one catalog message whose body is the agent text. A title stays on that message when set, text longer than 1024 characters is cut, blank text falls back to the title, and a reply with no usable text is not confirmed as delivered
 
 1.106.2
 ----------
