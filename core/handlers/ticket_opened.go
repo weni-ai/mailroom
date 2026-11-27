@@ -84,7 +84,7 @@ func handleTicketOpened(ctx context.Context, rt *runtime.Runtime, tx *sqlx.Tx, o
 			ProjectUUID: oa.Org().ProjectUUID(),
 			ChannelUUID: uuids.UUID(scene.Session().Contact().PreferredChannel().UUID()),
 			CreatedOn:   event.CreatedOn(),
-		})
+		}, sqsPublishers.OriginFlow)
 	}
 
 	logrus.WithFields(logrus.Fields{
