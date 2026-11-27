@@ -16,7 +16,7 @@ Este contrato é a interface de **consulta operacional**: equipes de operação 
 
 | Campo | Tipo | Presente em | Descrição |
 |-------|------|-------------|-----------|
-| `event` | string | todos | `enqueued`, `attempt`, `sent`, `slow_delivery`, `retry_scheduled`, `retry_persist_failed`, `dead_lettered`, `recovered` |
+| `event` | string | todos | `enqueued`, `attempt`, `sent`, `slow_delivery`, `retry_scheduled`, `retry_persist_failed`, `dead_lettered`, `recovered`, `ack_failed`, `reclaim_dropped` |
 | `result` | string | tentativa, sucesso, falha, desistência | `sent`, `failed`, `rescheduled`, `dead_lettered` |
 | `ticket_uuid` | UUID | todos | Chave de consulta 1 |
 | `correlation_id` | UUID | todos | Chave de consulta 2 |
@@ -84,7 +84,16 @@ A gravação do reagendamento no Redis falhou. A mensagem permanece em voo até 
 ### `dead_lettered` (nível error, vai ao Sentry)
 
 Limite atingido. Campos: `event`, `result = "dead_lettered"`, `ticket_uuid`, `correlation_id`, `org_id`, `queue_url`, `attempt`, `attempted_at`, `error`.
+Quando a desistência vem da recuperação de um lease expirado (o worker nunca respondeu), `attempted_at` é omitido, porque o instante da tentativa perdida é desconhecido, e `error` é `lease expired and attempts exhausted`.
 Sentry (Principle V): apenas identificadores opacos e erro; sem URN, sem corpo. Não há armazenamento extra: o reenvio manual é feito a partir do banco com `ticket_uuid` e `org_id` (Q2 = não).
+
+### `ack_failed` (nível error)
+
+Acrescentado na implementação (não estava no plano): a confirmação de uma mensagem já enviada (ou desistida) falhou no Redis. O lease permanece e a recuperação reenvia a mensagem depois de `ProcessingTTL`, o que pode gerar uma duplicata (at-least-once). Campos: `event`, `ticket_uuid`, `correlation_id`, `org_id`, `queue_url`, `origin`, `attempt`, `error`. Sem esse evento a falha de confirmação seria silenciosa.
+
+### `reclaim_dropped` (nível error)
+
+Acrescentado na implementação: a recuperação encontrou um lease ou um retry cuja tarefa armazenada está ausente ou ilegível e o descartou, porque reenviá-lo falharia do mesmo jeito. Campos: `event`, `org_id` (0 quando desconhecido), `error`. Não há identificadores do ticket porque a tarefa não pôde ser lida.
 
 ### `recovered` (nível warn)
 

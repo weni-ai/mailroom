@@ -31,10 +31,10 @@ JSON produzido por `TicketSQSMessage.Marshal()` (`core/tasks/sqs/publishers/tick
 | Atributo | Tipo de dado | Valor | Obrigatório |
 |----------|--------------|-------|-------------|
 | `ContentType` | String | `application/json` | sim (enviado por `publishWithAttributes`) |
-| `MessageGroupId` | String | `<project_uuid>:<channel_uuid>:<contact_urn>` | somente em fila FIFO |
+| `MessageGroupId` | String | `<project_uuid>:<channel_uuid>:<contact_urn>` | enviado como atributo de mensagem em **qualquer** fila (verificado no fixture capturado antes da mudança); só vira o parâmetro `MessageGroupId` do SQS em fila FIFO |
 | `CorrelationID` | String | UUID v4 gerado no enfileiramento | sim |
 
-- `MessageDeduplicationId` (somente FIFO) = SHA-256 hex do corpo. Não muda.
+- O parâmetro `MessageGroupId` do SQS e o `MessageDeduplicationId` só são enviados em fila `.fifo`. `MessageDeduplicationId` = SHA-256 hex do corpo. Não muda.
 - `MessageGroupId` > 128 caracteres é substituído pelo SHA-256 hex, como hoje (`fitMessageGroupID`).
 
 ## Garantias de entrega

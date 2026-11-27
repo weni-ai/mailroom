@@ -42,7 +42,7 @@ Payload JSON dentro de `queue.Task.Task`. Continua compatível com o formato atu
 | zset | `sqs_publish:inflight` | member = `lease_token`, score = deadline (ms, relógio Redis) | criado no pop; removido por ack, reschedule ou reclaim (somente se `ZREM` retornar 1) |
 | hash | `sqs_publish:inflight:payload` | field = `lease_token`, value = JSON da `Task` | criado no pop; removido junto com o zset |
 
-- `lease_token`: UUID v4 gerado pelo script ou pelo Go antes do pop. Não é hash de conteúdo (diferente de `taskFingerprint`), para que duas tarefas idênticas não colidam.
+- `lease_token`: 16 bytes aleatórios (`crypto/rand`) em hexadecimal, gerados pelo Go antes do pop. Não é hash de conteúdo (diferente de `taskFingerprint`), para que duas tarefas idênticas não colidam.
 - Deadline = `now + ProcessingTTL` (s). Invariante: `ProcessingTTL` > pior caso de envio (~20 s).
 
 ### Fila elegível (por org)
@@ -59,7 +59,7 @@ Payload JSON dentro de `queue.Task.Task`. Continua compatível com o formato atu
 
 | Estrutura | Chave | Score | Member |
 |-----------|-------|-------|--------|
-| zset (global) | `sqs_publish:delayed` | `next_attempt_at` (epoch s, relógio Redis) | JSON da `Task` com `attempt` já incrementado; `queued_on` original |
+| zset (global) | `sqs_publish:delayed` | `next_attempt_at` (epoch ms, relógio Redis) | JSON da `Task` com `attempt` já incrementado; `queued_on` original |
 
 - Promovido para a elegível do org quando `score <= now`, preservando `queued_on` como score.
 
