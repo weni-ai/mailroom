@@ -2,7 +2,11 @@ package mailroom
 
 import (
 	"context"
+	"encoding/json"
+	"errors"
+	"fmt"
 	"strconv"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -11,6 +15,8 @@ import (
 	"github.com/nyaruka/mailroom/core/queue"
 	"github.com/nyaruka/mailroom/runtime"
 	"github.com/nyaruka/mailroom/testsuite"
+	"github.com/sirupsen/logrus"
+	logtest "github.com/sirupsen/logrus/hooks/test"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -123,4 +129,82 @@ func TestWorkerProcessingOnlyForSendHistory(t *testing.T) {
 
 func itoa(i int) string {
 	return strconv.Itoa(i)
+}
+
+// sqsTaskBody is a sqs_publish task body as it travels in the queue: it carries the contact URN
+const sqsTaskBody = `{"queue_url":"http://sqs/q","body":{"contact_urn":"whatsapp:5511999999999"},"attributes":{"MessageGroupId":"p:c:whatsapp:5511999999999"}}`
+
+// Q-06: whatever happens to a sqs_publish task in the foreman (panic, error, long run), its body, with the URN in it,
+// never reaches the logs, while other task types keep logging theirs
+func TestWorkerNeverLogsSqsPublishBody(t *testing.T) {
+	_, rt, _, _ := testsuite.Get()
+	rc := rt.RP.Get()
+	defer rc.Close()
+
+	q := "unitq_sqs_redaction"
+	org := 2002
+	rc.Do("del", q+":active", q+":"+itoa(org))
+
+	hook := logtest.NewGlobal()
+	defer logrus.StandardLogger().ReplaceHooks(make(logrus.LevelHooks))
+
+	// handler of the sqs type: panics on the first task, fails on the second
+	calls := 0
+	done := make(chan struct{}, 4)
+	prev, hadPrev := taskFunctions[queue.SqsPublish]
+	AddTaskFunction(queue.SqsPublish, func(ctx context.Context, rt *runtime.Runtime, task *queue.Task) error {
+		defer func() { done <- struct{}{} }()
+		calls++
+		if calls == 1 {
+			panic("handler exploded")
+		}
+		return errors.New("send failed")
+	})
+	defer func() {
+		if hadPrev {
+			AddTaskFunction(queue.SqsPublish, prev)
+		} else {
+			delete(taskFunctions, queue.SqsPublish)
+		}
+	}()
+
+	wg := &sync.WaitGroup{}
+	foreman := NewForeman(rt, wg, q, 1)
+	foreman.Start()
+	defer foreman.Stop()
+
+	for i := 0; i < 2; i++ {
+		assert.NoError(t, queue.AddTask(rc, q, queue.SqsPublish, org, json.RawMessage(sqsTaskBody), queue.DefaultPriority))
+		select {
+		case <-done:
+		case <-time.After(3 * time.Second):
+			t.Fatal("sqs task was not handled in time")
+		}
+		time.Sleep(100 * time.Millisecond) // let the worker log and release
+	}
+
+	// the long running path logs through the same helper
+	entry := taskLog(logrus.WithField("queue", q), &queue.Task{Type: queue.SqsPublish, OrgID: org, Task: json.RawMessage(sqsTaskBody)})
+	entry.Warn("long running task")
+
+	var sawPanic, sawError bool
+	for _, e := range hook.AllEntries() {
+		dump := e.Message
+		for k, v := range e.Data {
+			dump += fmt.Sprintf(" %s=%v", k, v)
+		}
+		assert.NotContains(t, e.Data, "task", e.Message)
+		assert.False(t, strings.Contains(dump, "5511999999999"), "URN leaked: %s", e.Message)
+		assert.False(t, strings.Contains(strings.ToLower(dump), "messagegroupid"), "message group id leaked: %s", e.Message)
+		assert.False(t, strings.Contains(dump, "message_group_id"), "message group id leaked: %s", e.Message)
+
+		sawPanic = sawPanic || strings.Contains(e.Message, "panic handling task")
+		sawError = sawError || e.Message == "error running task"
+	}
+	assert.True(t, sawPanic, "the panic must still be logged")
+	assert.True(t, sawError, "the error must still be logged")
+
+	// tasks of other types keep their body in the logs
+	other := taskLog(logrus.WithField("queue", q), &queue.Task{Type: "some_other_task", Task: json.RawMessage(`{"k":"v"}`)})
+	assert.Equal(t, `{"k":"v"}`, other.Data["task"])
 }

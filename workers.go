@@ -39,6 +39,15 @@ func (s defaultTaskSource) Release(rt *runtime.Runtime, rc redis.Conn, task *que
 	return queue.MarkTaskComplete(rc, s.queue, task.OrgID)
 }
 
+// taskLog adds the raw task body to a log entry, except for queues whose bodies carry personal data (the sqs_publish
+// body has the contact URN), which must never reach logs or Sentry.
+func taskLog(log *logrus.Entry, task *queue.Task) *logrus.Entry {
+	if task.Type == queue.SqsPublish {
+		return log
+	}
+	return log.WithField("task", string(task.Task))
+}
+
 // Foreman takes care of managing our set of workers and assigns msgs for each to send
 type Foreman struct {
 	rt               *runtime.Runtime
@@ -269,7 +278,7 @@ func (w *Worker) handleTask(task *queue.Task) {
 		panicLog := recover()
 		if panicLog != nil {
 			debug.PrintStack()
-			log.WithField("task", string(task.Task)).WithField("task_type", task.Type).WithField("org_id", task.OrgID).Errorf("panic handling task: %s", panicLog)
+			taskLog(log, task).WithField("task_type", task.Type).WithField("org_id", task.OrgID).Errorf("panic handling task: %s", panicLog)
 		}
 
 		// clear our current task snapshot
@@ -309,7 +318,7 @@ func (w *Worker) handleTask(task *queue.Task) {
 	if found {
 		err := taskFunc(context.Background(), w.foreman.rt, task)
 		if err != nil {
-			log.WithError(err).WithField("task", string(task.Task)).Error("error running task")
+			taskLog(log, task).WithError(err).Error("error running task")
 		}
 	} else {
 		log.Error("unable to find function for task type")
@@ -321,7 +330,7 @@ func (w *Worker) handleTask(task *queue.Task) {
 
 	// additionally if any task took longer than 1 minute, log as warning
 	if elapsed > time.Minute {
-		log.WithField("task", string(task.Task)).WithField("elapsed", elapsed).Warn("long running task")
+		taskLog(log, task).WithField("elapsed", elapsed).Warn("long running task")
 	}
 }
 
