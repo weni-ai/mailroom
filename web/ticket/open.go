@@ -133,7 +133,7 @@ func handleOpen(ctx context.Context, rt *runtime.Runtime, r *http.Request, l *mo
 			ProjectUUID: oa.Org().ProjectUUID(),
 			ChannelUUID: uuids.UUID(contact.PreferredChannel().UUID()),
 			CreatedOn:   evt.CreatedOn(),
-		})
+		}, sqsPublishers.OriginHTTP)
 	}
 
 	rc := rt.RP.Get()

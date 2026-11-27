@@ -19,6 +19,10 @@ type Task struct {
 	Task       json.RawMessage `json:"task"`
 	QueuedOn   time.Time       `json:"queued_on"`
 	ErrorCount int             `json:"error_count,omitempty"`
+
+	// LeaseToken identifies the lease of a task popped from a queue that leases its tasks (sqs_publish). It is
+	// filled in when the task is popped and never persisted.
+	LeaseToken string `json:"-"`
 }
 
 // Priority is the priority for the task

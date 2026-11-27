@@ -85,7 +85,7 @@ func TestEnqueuePublishWithAttributes_EnqueuesTask(t *testing.T) {
 		"EventType":  "ticket.created",
 	}
 
-	require.NoError(t, EnqueuePublishWithAttributes(rt, 8, queueURL, msg, attrs))
+	require.NoError(t, EnqueuePublishWithAttributes(rt, 8, queueURL, msg, attrs, nil))
 
 	rc := rp.Get()
 	defer rc.Close()
@@ -126,16 +126,16 @@ func TestEnqueuePublish_MarshalError(t *testing.T) {
 
 func TestEnqueuePublishWithAttributes_NilGuards(t *testing.T) {
 	// nil runtime
-	assert.NoError(t, EnqueuePublishWithAttributes(nil, 1, "http://localhost:4566/000000000000/test-queue", sqsclient.RawMessage{Body: []byte("{}"), Type: "application/json"}, nil))
+	assert.NoError(t, EnqueuePublishWithAttributes(nil, 1, "http://localhost:4566/000000000000/test-queue", sqsclient.RawMessage{Body: []byte("{}"), Type: "application/json"}, nil, nil))
 
 	// runtime without RP
 	_, rt, _, _ := testsuite.Get()
 	rt.RP = nil
-	assert.NoError(t, EnqueuePublishWithAttributes(rt, 1, "http://localhost:4566/000000000000/test-queue", sqsclient.RawMessage{Body: []byte("{}"), Type: "application/json"}, nil))
+	assert.NoError(t, EnqueuePublishWithAttributes(rt, 1, "http://localhost:4566/000000000000/test-queue", sqsclient.RawMessage{Body: []byte("{}"), Type: "application/json"}, nil, nil))
 
 	// nil message
 	_, rt2, _, _ := testsuite.Get()
-	assert.NoError(t, EnqueuePublishWithAttributes(rt2, 1, "http://localhost:4566/000000000000/test-queue", nil, nil))
+	assert.NoError(t, EnqueuePublishWithAttributes(rt2, 1, "http://localhost:4566/000000000000/test-queue", nil, nil, nil))
 }
 
 func TestEnqueuePublishWithAttributes_MarshalError(t *testing.T) {
@@ -143,7 +143,7 @@ func TestEnqueuePublishWithAttributes_MarshalError(t *testing.T) {
 	_, rt, _, rp := testsuite.Get()
 
 	// returns error, nothing enqueued
-	err := EnqueuePublishWithAttributes(rt, 1, "http://localhost:4566/000000000000/test-queue", badMessage{}, nil)
+	err := EnqueuePublishWithAttributes(rt, 1, "http://localhost:4566/000000000000/test-queue", badMessage{}, nil, nil)
 	assert.EqualError(t, err, "boom")
 
 	rc := rp.Get()

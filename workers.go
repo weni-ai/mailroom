@@ -10,14 +10,50 @@ import (
 	"github.com/nyaruka/mailroom/runtime"
 	"github.com/nyaruka/mailroom/runtime/metrics"
 
+	"github.com/gomodule/redigo/redis"
 	"github.com/sirupsen/logrus"
 )
+
+// TaskSource is where a foreman gets the tasks of its queue and how it hands them back once handled. Most queues use
+// the default source. A queue whose tasks must survive a crash while being handled (sqs_publish) registers its own
+// with RegisterTaskSource, because it leases the task on pop and the task function confirms it, so the foreman must
+// not mark the task complete itself.
+type TaskSource interface {
+	// Pop returns the next task of the queue, or nil if there is none
+	Pop(rt *runtime.Runtime, rc redis.Conn) (*queue.Task, error)
+
+	// Release is called when a worker is done with a popped task, whether it succeeded, failed or panicked
+	Release(rt *runtime.Runtime, rc redis.Conn, task *queue.Task) error
+}
+
+// defaultTaskSource pops with queue.PopNextTask and marks the task complete to keep workers fair across orgs
+type defaultTaskSource struct {
+	queue string
+}
+
+func (s defaultTaskSource) Pop(rt *runtime.Runtime, rc redis.Conn) (*queue.Task, error) {
+	return queue.PopNextTask(rc, s.queue)
+}
+
+func (s defaultTaskSource) Release(rt *runtime.Runtime, rc redis.Conn, task *queue.Task) error {
+	return queue.MarkTaskComplete(rc, s.queue, task.OrgID)
+}
+
+// taskLog adds the raw task body to a log entry, except for queues whose bodies carry personal data (the sqs_publish
+// body has the contact URN), which must never reach logs or Sentry.
+func taskLog(log *logrus.Entry, task *queue.Task) *logrus.Entry {
+	if task.Type == queue.SqsPublish {
+		return log
+	}
+	return log.WithField("task", string(task.Task))
+}
 
 // Foreman takes care of managing our set of workers and assigns msgs for each to send
 type Foreman struct {
 	rt               *runtime.Runtime
 	wg               *sync.WaitGroup
 	queue            string
+	source           TaskSource
 	workers          []*Worker
 	availableWorkers chan *Worker
 	quit             chan bool
@@ -37,6 +73,7 @@ func NewForeman(rt *runtime.Runtime, wg *sync.WaitGroup, queue string, maxWorker
 		rt:               rt,
 		wg:               wg,
 		queue:            queue,
+		source:           taskSourceFor(queue),
 		workers:          make([]*Worker, maxWorkers),
 		availableWorkers: make(chan *Worker, maxWorkers),
 		quit:             make(chan bool),
@@ -123,7 +160,7 @@ func (f *Foreman) Assign() {
 		case worker := <-f.availableWorkers:
 			// see if we have a task to work on
 			rc := f.rt.RP.Get()
-			task, err := queue.PopNextTask(rc, f.queue)
+			task, err := f.source.Pop(f.rt, rc)
 			rc.Close()
 
 			if err == nil && task != nil {
@@ -241,7 +278,7 @@ func (w *Worker) handleTask(task *queue.Task) {
 		panicLog := recover()
 		if panicLog != nil {
 			debug.PrintStack()
-			log.WithField("task", string(task.Task)).WithField("task_type", task.Type).WithField("org_id", task.OrgID).Errorf("panic handling task: %s", panicLog)
+			taskLog(log, task).WithField("task_type", task.Type).WithField("org_id", task.OrgID).Errorf("panic handling task: %s", panicLog)
 		}
 
 		// clear our current task snapshot
@@ -252,9 +289,9 @@ func (w *Worker) handleTask(task *queue.Task) {
 		if task.Type == queue.SendHistory && taskKey != "" {
 			_ = queue.EndProcessing(rc, w.foreman.queue, task.OrgID, taskKey)
 		}
-		err := queue.MarkTaskComplete(rc, w.foreman.queue, task.OrgID)
+		err := w.foreman.source.Release(w.foreman.rt, rc, task)
 		if err != nil {
-			log.WithError(err)
+			log.WithError(err).Error("error releasing task")
 		}
 		rc.Close()
 	}()
@@ -281,7 +318,7 @@ func (w *Worker) handleTask(task *queue.Task) {
 	if found {
 		err := taskFunc(context.Background(), w.foreman.rt, task)
 		if err != nil {
-			log.WithError(err).WithField("task", string(task.Task)).Error("error running task")
+			taskLog(log, task).WithError(err).Error("error running task")
 		}
 	} else {
 		log.Error("unable to find function for task type")
@@ -293,7 +330,7 @@ func (w *Worker) handleTask(task *queue.Task) {
 
 	// additionally if any task took longer than 1 minute, log as warning
 	if elapsed > time.Minute {
-		log.WithField("task", string(task.Task)).WithField("elapsed", elapsed).Warn("long running task")
+		taskLog(log, task).WithField("elapsed", elapsed).Warn("long running task")
 	}
 }
 

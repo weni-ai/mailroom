@@ -1,0 +1,32 @@
+{
+  "standard": {
+    "body": {
+      "ticket_uuid": "1ae96956-4b34-433e-8d1a-f05fe6923d6d",
+      "contact_urn": "whatsapp:5511999999999",
+      "project_uuid": "e7187099-7d38-4f60-955c-325957214c42",
+      "channel_uuid": "59d74b86-3e2f-4a93-aece-b05d2fdcde0c",
+      "created_on": "2024-10-30T12:00:00Z"
+    },
+    "message_attributes": {
+      "ContentType": "application/json",
+      "CorrelationID": "9688d21d-95aa-4bed-afc7-f31b35731a3d",
+      "MessageGroupId": "e7187099-7d38-4f60-955c-325957214c42:59d74b86-3e2f-4a93-aece-b05d2fdcde0c:whatsapp:5511999999999"
+    }
+  },
+  "fifo": {
+    "body": {
+      "ticket_uuid": "1ae96956-4b34-433e-8d1a-f05fe6923d6d",
+      "contact_urn": "whatsapp:5511999999999",
+      "project_uuid": "e7187099-7d38-4f60-955c-325957214c42",
+      "channel_uuid": "59d74b86-3e2f-4a93-aece-b05d2fdcde0c",
+      "created_on": "2024-10-30T12:00:00Z"
+    },
+    "message_attributes": {
+      "ContentType": "application/json",
+      "CorrelationID": "9688d21d-95aa-4bed-afc7-f31b35731a3d",
+      "MessageGroupId": "e7187099-7d38-4f60-955c-325957214c42:59d74b86-3e2f-4a93-aece-b05d2fdcde0c:whatsapp:5511999999999"
+    },
+    "message_group_id": "e7187099-7d38-4f60-955c-325957214c42:59d74b86-3e2f-4a93-aece-b05d2fdcde0c:whatsapp:5511999999999",
+    "message_deduplication_id": "53eacc5b2fdd784662397cc39fe4db37f047775f086978888017cb20de7d1a5d"
+  }
+}

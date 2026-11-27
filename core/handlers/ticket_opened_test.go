@@ -2,8 +2,10 @@ package handlers_test
 
 import (
 	"encoding/json"
+	"regexp"
 	"testing"
 
+	"github.com/gomodule/redigo/redis"
 	"github.com/nyaruka/gocommon/httpx"
 	"github.com/nyaruka/gocommon/uuids"
 	"github.com/nyaruka/goflow/assets"
@@ -12,6 +14,8 @@ import (
 	"github.com/nyaruka/goflow/utils"
 	"github.com/nyaruka/mailroom/core/handlers"
 	"github.com/nyaruka/mailroom/core/models"
+	"github.com/nyaruka/mailroom/core/queue"
+	"github.com/nyaruka/mailroom/core/tasks/sqs"
 	"github.com/nyaruka/mailroom/testsuite"
 	"github.com/nyaruka/mailroom/testsuite/testdata"
 	"github.com/nyaruka/null"
@@ -19,13 +23,22 @@ import (
 	_ "github.com/nyaruka/mailroom/services/tickets/mailgun"
 	_ "github.com/nyaruka/mailroom/services/tickets/zendesk"
 
+	"github.com/sirupsen/logrus"
+	logtest "github.com/sirupsen/logrus/hooks/test"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
+var sqsLogTimeRegex = regexp.MustCompile(`^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$`)
+
 func TestTicketOpened(t *testing.T) {
-	ctx, rt, db, _ := testsuite.Get()
+	ctx, rt, db, rp := testsuite.Get()
 
 	defer testsuite.Reset(testsuite.ResetAll)
+	testsuite.Reset(testsuite.ResetRedis)
+
+	hook := logtest.NewGlobal()
+	defer logrus.StandardLogger().ReplaceHooks(make(logrus.LevelHooks))
 	defer httpx.SetRequestor(httpx.DefaultRequestor)
 
 	httpx.SetRequestor(httpx.NewMockRequestor(map[string][]httpx.MockResponse{
@@ -153,6 +166,49 @@ func TestTicketOpened(t *testing.T) {
 	require.True(t, oa.Org().ConfigBoolValue("is_multi_agents", false))
 
 	handlers.RunTestCases(t, ctx, rt, tcs)
+
+	// Q-01 (flow path): the two tickets of a multi-agent org were queued for SQS with origin "flow" and logged
+	rc := rp.Get()
+	defer rc.Close()
+
+	members, err := redis.ByteSlices(rc.Do("zrange", "sqs_publish:1", 0, -1))
+	require.NoError(t, err)
+	require.Len(t, members, 2)
+
+	corrIDs := map[string]bool{}
+	for _, member := range members {
+		task := &queue.Task{}
+		require.NoError(t, json.Unmarshal(member, task))
+
+		p := &sqs.PublishTask{}
+		require.NoError(t, json.Unmarshal(task.Task, p))
+		require.NotNil(t, p.Meta)
+		assert.Equal(t, "flow", p.Meta.Origin)
+		assert.NotEmpty(t, p.Meta.TicketUUID)
+		assert.NotEmpty(t, p.Meta.CorrelationID)
+		assert.False(t, p.Meta.CreatedOn.IsZero())
+		corrIDs[p.Meta.CorrelationID] = true
+	}
+
+	var enqueued []*logrus.Entry
+	for _, e := range hook.AllEntries() {
+		if e.Data["event"] == "enqueued" {
+			enqueued = append(enqueued, e)
+		}
+	}
+	require.Len(t, enqueued, 2)
+
+	for _, e := range enqueued {
+		assert.Equal(t, logrus.InfoLevel, e.Level)
+		assert.NotEmpty(t, e.Data["ticket_uuid"])
+		assert.True(t, corrIDs[e.Data["correlation_id"].(string)])
+		assert.Equal(t, int(testdata.Org1.ID), e.Data["org_id"])
+		assert.NotEmpty(t, e.Data["queue_url"])
+		assert.Equal(t, "flow", e.Data["origin"])
+		for _, field := range []string{"created_on", "queued_on", "enqueued_at"} {
+			assert.Regexp(t, sqsLogTimeRegex, e.Data[field], field)
+		}
+	}
 }
 
 type mockTicketService struct {

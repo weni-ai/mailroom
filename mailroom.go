@@ -45,6 +45,21 @@ func AddTaskFunction(taskType string, taskFunc TaskFunction) {
 	taskFunctions[taskType] = taskFunc
 }
 
+var taskSources = make(map[string]TaskSource)
+
+// RegisterTaskSource sets the source a foreman uses to pop and release the tasks of the named queue, replacing the default one
+func RegisterTaskSource(queueName string, src TaskSource) {
+	taskSources[queueName] = src
+}
+
+// taskSourceFor returns the registered source of a queue, or the default one
+func taskSourceFor(queueName string) TaskSource {
+	if src, found := taskSources[queueName]; found {
+		return src
+	}
+	return defaultTaskSource{queue: queueName}
+}
+
 // Mailroom is a service for handling RapidPro events
 type Mailroom struct {
 	ctx    context.Context

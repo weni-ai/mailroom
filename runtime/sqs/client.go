@@ -41,8 +41,17 @@ type Client struct {
 	secretAccessKey string
 	endpoint        string
 
-	mu  sync.Mutex
+	// mu only guards the pointer to the current service and its generation, it is never held during a network call,
+	// so a send never waits for another send or for a reconnect.
+	mu  sync.RWMutex
 	svc *sqs.Client
+	gen uint64 // incremented every time svc is replaced, tells a failing send whether somebody already reconnected
+
+	// connectMu serializes reconnects only
+	connectMu sync.Mutex
+
+	// newService builds a service; nil means buildService. Replaced in tests.
+	newService func() (*sqs.Client, error)
 }
 
 // ClientConfig holds the configuration for creating an SQS client.
@@ -61,7 +70,7 @@ func New(cfg ClientConfig) (*Client, error) {
 		secretAccessKey: cfg.SecretAccessKey,
 		endpoint:        cfg.Endpoint,
 	}
-	if err := c.connect(); err != nil {
+	if _, err := c.reconnect(0); err != nil {
 		return nil, err
 	}
 	return c, nil
@@ -81,14 +90,7 @@ func (c *Client) SendTo(queueURL string, msg Message) error {
 		return err
 	}
 
-	if err := c.publish(queueURL, body, msg.ContentType()); err != nil {
-		logrus.WithError(err).Warn("sqs publish failed, attempting reconnect")
-		if rerr := c.reconnect(); rerr != nil {
-			return rerr
-		}
-		return c.publish(queueURL, body, msg.ContentType())
-	}
-	return nil
+	return c.send(buildInput(queueURL, body, msg.ContentType(), nil))
 }
 
 // SendToWithAttributes publishes a message to the specified SQS queue URL with message attributes.
@@ -105,20 +107,15 @@ func (c *Client) SendToWithAttributes(queueURL string, msg Message, attributes m
 		return err
 	}
 
-	if err := c.publishWithAttributes(queueURL, body, msg.ContentType(), attributes); err != nil {
-		logrus.WithError(err).Warn("sqs publish failed, attempting reconnect")
-		if rerr := c.reconnect(); rerr != nil {
-			return rerr
-		}
-		return c.publishWithAttributes(queueURL, body, msg.ContentType(), attributes)
-	}
-	return nil
+	return c.send(buildInput(queueURL, body, msg.ContentType(), attributes))
 }
 
 // Close releases the SQS client resources.
 func (c *Client) Close() {
 	c.mu.Lock()
 	defer c.mu.Unlock()
+
+	// sends already in flight keep their own reference to the service and finish normally
 	c.svc = nil
 }
 
@@ -153,53 +150,11 @@ func fitMessageGroupID(groupID string) string {
 	return hex.EncodeToString(sum[:])
 }
 
-func (c *Client) publish(queueURL string, body []byte, contentType string) error {
-	c.mu.Lock()
-	defer c.mu.Unlock()
+// sendTimeout bounds every SendMessage call
+const sendTimeout = 5 * time.Second
 
-	if c.svc == nil {
-		if err := c.connectLocked(); err != nil {
-			return err
-		}
-	}
-
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-
-	input := &sqs.SendMessageInput{
-		QueueUrl:    aws.String(queueURL),
-		MessageBody: aws.String(string(body)),
-		MessageAttributes: map[string]types.MessageAttributeValue{
-			"ContentType": {
-				DataType:    aws.String("String"),
-				StringValue: aws.String(contentType),
-			},
-		},
-	}
-
-	// Add FIFO-specific parameters if this is a FIFO queue
-	if isFIFOQueue(queueURL) {
-		input.MessageGroupId = aws.String("default")
-		input.MessageDeduplicationId = aws.String(generateDeduplicationID(body))
-	}
-
-	_, err := c.svc.SendMessage(ctx, input)
-	return err
-}
-
-func (c *Client) publishWithAttributes(queueURL string, body []byte, contentType string, attributes map[string]string) error {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-
-	if c.svc == nil {
-		if err := c.connectLocked(); err != nil {
-			return err
-		}
-	}
-
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-
+// buildInput builds the SendMessage request. The same request is used for the retry after a reconnect.
+func buildInput(queueURL string, body []byte, contentType string, attributes map[string]string) *sqs.SendMessageInput {
 	msgAttrs := map[string]types.MessageAttributeValue{
 		"ContentType": {
 			DataType:    aws.String("String"),
@@ -231,26 +186,79 @@ func (c *Client) publishWithAttributes(queueURL string, body []byte, contentType
 		input.MessageDeduplicationId = aws.String(generateDeduplicationID(body))
 	}
 
-	_, err := c.svc.SendMessage(ctx, input)
+	return input
+}
+
+// send sends the message and, if that fails, reconnects and tries once more.
+//
+// The service is read under a short lock and then used without any lock, so a slow or hanging send never holds
+// back the others. When several sends fail together they all see the same generation, and only the first one to
+// reach reconnect rebuilds the client; the others just pick up the new one.
+func (c *Client) send(input *sqs.SendMessageInput) error {
+	svc, gen := c.snapshot()
+
+	var err error
+	if svc == nil {
+		err = errors.New("sqs client not connected")
+	} else {
+		err = sendOnce(svc, input)
+	}
+	if err == nil {
+		return nil
+	}
+
+	logrus.WithError(err).Warn("sqs publish failed, attempting reconnect")
+	svc, rerr := c.reconnect(gen)
+	if rerr != nil {
+		return rerr
+	}
+	return sendOnce(svc, input)
+}
+
+func sendOnce(svc *sqs.Client, input *sqs.SendMessageInput) error {
+	ctx, cancel := context.WithTimeout(context.Background(), sendTimeout)
+	defer cancel()
+
+	_, err := svc.SendMessage(ctx, input)
 	return err
 }
 
-func (c *Client) reconnect() error {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-	return c.connectLocked()
+// snapshot returns the current service and its generation
+func (c *Client) snapshot() (*sqs.Client, uint64) {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+	return c.svc, c.gen
 }
 
-func (c *Client) connect() error {
+// reconnect returns a service newer than the generation the caller saw failing. If somebody already replaced it, that
+// one is returned and nothing is rebuilt; otherwise a new one is built (outside mu, it may reach the metadata
+// service) and swapped in.
+func (c *Client) reconnect(seen uint64) (*sqs.Client, error) {
+	c.connectMu.Lock()
+	defer c.connectMu.Unlock()
+
+	if svc, gen := c.snapshot(); svc != nil && gen != seen {
+		return svc, nil
+	}
+
+	build := c.newService
+	if build == nil {
+		build = c.buildService
+	}
+	svc, err := build()
+	if err != nil {
+		return nil, err
+	}
+
 	c.mu.Lock()
-	defer c.mu.Unlock()
-	return c.connectLocked()
+	c.svc = svc
+	c.gen++
+	c.mu.Unlock()
+	return svc, nil
 }
 
-func (c *Client) connectLocked() error {
-	// close any existing
-	c.svc = nil
-
+// buildService creates the SQS service from the client configuration
+func (c *Client) buildService() (*sqs.Client, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
@@ -272,7 +280,7 @@ func (c *Client) connectLocked() error {
 	// Load default config with options (supports IRSA, EC2 metadata, env vars, etc.)
 	cfg, err := config.LoadDefaultConfig(ctx, opts...)
 	if err != nil {
-		return errors.Wrap(err, "failed to load AWS config")
+		return nil, errors.Wrap(err, "failed to load AWS config")
 	}
 
 	// Create SQS client with optional custom endpoint
@@ -283,8 +291,7 @@ func (c *Client) connectLocked() error {
 		})
 	}
 
-	c.svc = sqs.NewFromConfig(cfg, sqsOpts...)
-	return nil
+	return sqs.NewFromConfig(cfg, sqsOpts...), nil
 }
 
 // JSONMessage is a helper struct for JSON messages.
