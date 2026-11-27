@@ -27,8 +27,8 @@
 
 **Purpose**: baseline e esqueleto de constantes internas
 
-- [ ] T001 Registrar baseline verde antes de qualquer alteração: `go test ./runtime/sqs/... ./core/tasks/sqs/... ./core/queue/... ./web/ticket/... ./core/handlers/... -p=1 -count=1`
-- [ ] T002 Criar `core/tasks/sqs/maintenance.go` com as constantes internas nomeadas `sqsPublishMaintenanceTick = time.Second` e `sqsPublishMaintenanceBatch = 100` (sem novos nomes de configuração em `runtime/config.go`)
+- [X] T001 Registrar baseline verde antes de qualquer alteração: `go test ./runtime/sqs/... ./core/tasks/sqs/... ./core/queue/... ./web/ticket/... ./core/handlers/... -p=1 -count=1`
+- [X] T002 Criar `core/tasks/sqs/maintenance.go` com as constantes internas nomeadas `sqsPublishMaintenanceTick = time.Second` e `sqsPublishMaintenanceBatch = 100` (sem novos nomes de configuração em `runtime/config.go`)
 
 ---
 
@@ -38,18 +38,18 @@
 
 **⚠️ CRITICAL**: nenhuma tarefa de user story começa antes desta fase.
 
-- [ ] T003 Capturar fixture do contrato SQS **antes de qualquer mudança**: corpo JSON, `ContentType`, `MessageGroupId` (FIFO), `CorrelationID` e `MessageDeduplicationId` gerados pelo código atual, em `core/tasks/sqs/publishers/testdata/ticket_sqs_contract.json` (cenário Q-03; base para T016)
-- [ ] T004 [P] Criar `core/tasks/sqs/logs.go`: constantes de campo (`event`, `ticket_uuid`, `correlation_id`, `org_id`, `queue_url`, `origin`, `attempt`, `result`, `created_on`, `queued_on`, `enqueued_at`, `attempted_at`, `sent_at`, `next_attempt_at`, `created_to_sent_ms`, `queued_to_sent_ms`, `recovered_count`, `recovered`, `error`), valores de `event` e `result`, formato de tempo `2006-01-02T15:04:05.000Z` em UTC, constante `sqsSlowDeliveryThreshold = 5 * time.Minute`, mensagem fixa `sqs ticket delivery exceeded threshold` e uma função por evento (único ponto de log de SQS). Não incluir `contact_urn`, `message_group_id` nem corpo bruto (contracts/publish-logs.md, R12)
-- [ ] T005 [P] Criar `core/tasks/sqs/store.go`: chaves Redis (`sqs_publish:<org_id>`, `sqs_publish:active`, `sqs_publish:delayed`, `sqs_publish:inflight`, `sqs_publish:inflight:payload`) e scripts Lua nomeados para `enqueue`, `pop`, `ack`, `reschedule`, `promote` e `reclaim`, com guard por `ZREM == 1`, `active` com clamp em zero e `TIME` do Redis para deadlines (data-model.md, R3, R4, R5)
-- [ ] T006 [P] Em `core/queue/queue.go`, adicionar ao struct `Task` o campo `LeaseToken string` com tag `json:"-"` (não persistido; preenchido no pop). Mudança não-quebrante; os demais campos e funções permanecem iguais (ver nota de divergência no plan.md, "Complexity Tracking")
-- [ ] T007 Criar `core/tasks/sqs/store_test.go`: atomicidade de cada script, guard por `ZREM` (dois atores não consomem o mesmo token), `active` nunca negativo, `enqueue` atômico (item e org em `active` juntos) (depende de T005)
-- [ ] T008 Modificar `workers.go`: introduzir a interface `TaskSource` (`Pop(rc) (*queue.Task, error)` e `Release(rc, task) error`) e a fonte padrão que reproduz o comportamento atual (`PopNextTask` + `EndProcessing` + `MarkTaskComplete`); o foreman usa a fonte registrada para sua fila (depende de T006; R8)
-- [ ] T009 Modificar `mailroom.go`: adicionar `RegisterTaskSource(queueName string, src TaskSource)` no mesmo estilo de `AddTaskFunction` (depende de T008)
-- [ ] T010 Criar `core/tasks/sqs/source.go`: implementação de `TaskSource` para `sqs_publish` (pop atômico via script de T005, preenche `LeaseToken`, `Release` é no-op) e registro em `init` via `mailroom.RegisterTaskSource` (depende de T005, T008, T009; R8)
-- [ ] T011 Modificar `core/tasks/sqs/producer.go`: adicionar `Meta *PublishMeta` (`json:"meta,omitempty"`) em `PublishTask` com `ticket_uuid`, `created_on`, `origin`, `correlation_id` e `first_attempt_at`; `EnqueuePublishWithAttributes` passa a usar o `enqueue` atômico de T005 e aceita `meta` (depende de T004, T005; data-model.md, R13)
-- [ ] T012 Modificar `core/tasks/sqs/publishers/tickets.go`: assinatura `PublishTicketCreated(rt, orgID, msg, origin)`, gera `correlation_id`, monta `meta`, e remove `message_group_id` dos logs existentes (A7); corpo e atributos SQS permanecem iguais (depende de T011, T003)
-- [ ] T013 Atualizar os dois chamadores para passar a origem: `web/ticket/open.go` com `origin = "http"` e `core/handlers/ticket_opened.go` com `origin = "flow"` (depende de T012)
-- [ ] T014 Verificar regressão de outras filas: `TestWorkerProcessingOnlyForSendHistory` em `workers_processing_test.go` continua verde sem alteração de expectativa (`send_history`, `handler` e `rabbitmq_publish` usam a fonte padrão) (depende de T008, T009; Q-12)
+- [X] T003 Capturar fixture do contrato SQS **antes de qualquer mudança**: corpo JSON, `ContentType`, `MessageGroupId` (FIFO), `CorrelationID` e `MessageDeduplicationId` gerados pelo código atual, em `core/tasks/sqs/publishers/testdata/ticket_sqs_contract.json` (cenário Q-03; base para T016)
+- [X] T004 [P] Criar `core/tasks/sqs/logs.go`: constantes de campo (`event`, `ticket_uuid`, `correlation_id`, `org_id`, `queue_url`, `origin`, `attempt`, `result`, `created_on`, `queued_on`, `enqueued_at`, `attempted_at`, `sent_at`, `next_attempt_at`, `created_to_sent_ms`, `queued_to_sent_ms`, `recovered_count`, `recovered`, `error`), valores de `event` e `result`, formato de tempo `2006-01-02T15:04:05.000Z` em UTC, constante `sqsSlowDeliveryThreshold = 5 * time.Minute`, mensagem fixa `sqs ticket delivery exceeded threshold` e uma função por evento (único ponto de log de SQS). Não incluir `contact_urn`, `message_group_id` nem corpo bruto (contracts/publish-logs.md, R12)
+- [X] T005 [P] Criar `core/tasks/sqs/store.go`: chaves Redis (`sqs_publish:<org_id>`, `sqs_publish:active`, `sqs_publish:delayed`, `sqs_publish:inflight`, `sqs_publish:inflight:payload`) e scripts Lua nomeados para `enqueue`, `pop`, `ack`, `reschedule`, `promote` e `reclaim`, com guard por `ZREM == 1`, `active` com clamp em zero e `TIME` do Redis para deadlines (data-model.md, R3, R4, R5)
+- [X] T006 [P] Em `core/queue/queue.go`, adicionar ao struct `Task` o campo `LeaseToken string` com tag `json:"-"` (não persistido; preenchido no pop). Mudança não-quebrante; os demais campos e funções permanecem iguais (ver nota de divergência no plan.md, "Complexity Tracking")
+- [X] T007 Criar `core/tasks/sqs/store_test.go`: atomicidade de cada script, guard por `ZREM` (dois atores não consomem o mesmo token), `active` nunca negativo, `enqueue` atômico (item e org em `active` juntos) (depende de T005)
+- [X] T008 Modificar `workers.go`: introduzir a interface `TaskSource` (`Pop(rc) (*queue.Task, error)` e `Release(rc, task) error`) e a fonte padrão que reproduz o comportamento atual (`PopNextTask` + `EndProcessing` + `MarkTaskComplete`); o foreman usa a fonte registrada para sua fila (depende de T006; R8)
+- [X] T009 Modificar `mailroom.go`: adicionar `RegisterTaskSource(queueName string, src TaskSource)` no mesmo estilo de `AddTaskFunction` (depende de T008)
+- [X] T010 Criar `core/tasks/sqs/source.go`: implementação de `TaskSource` para `sqs_publish` (pop atômico via script de T005, preenche `LeaseToken`, `Release` é no-op) e registro em `init` via `mailroom.RegisterTaskSource` (depende de T005, T008, T009; R8)
+- [X] T011 Modificar `core/tasks/sqs/producer.go`: adicionar `Meta *PublishMeta` (`json:"meta,omitempty"`) em `PublishTask` com `ticket_uuid`, `created_on`, `origin`, `correlation_id` e `first_attempt_at`; `EnqueuePublishWithAttributes` passa a usar o `enqueue` atômico de T005 e aceita `meta` (depende de T004, T005; data-model.md, R13)
+- [X] T012 Modificar `core/tasks/sqs/publishers/tickets.go`: assinatura `PublishTicketCreated(rt, orgID, msg, origin)`, gera `correlation_id`, monta `meta`, e remove `message_group_id` dos logs existentes (A7); corpo e atributos SQS permanecem iguais (depende de T011, T003)
+- [X] T013 Atualizar os dois chamadores para passar a origem: `web/ticket/open.go` com `origin = "http"` e `core/handlers/ticket_opened.go` com `origin = "flow"` (depende de T012)
+- [X] T014 Verificar regressão de outras filas: `TestWorkerProcessingOnlyForSendHistory` em `workers_processing_test.go` continua verde sem alteração de expectativa (`send_history`, `handler` e `rabbitmq_publish` usam a fonte padrão) (depende de T008, T009; Q-12)
 
 **Checkpoint**: fundação pronta. Estado no Redis, fonte de tarefas, envelope com `meta` e logs centralizados existem. User stories podem começar.
 
@@ -65,16 +65,16 @@
 
 > **Escrever estes testes antes da implementação (T020, T021) e confirmar que falham.**
 
-- [ ] T015 [P] [US1] Criar `core/tasks/sqs/maintenance_test.go`: Q-08 — (a) lease ainda válido não é recuperado; (b) lease expirado é recuperado com `attempt + 1`, mesmo corpo e mesmos atributos. Q-04 — `promote` devolve o retry à elegível na posição de `queued_on` original, à frente de tarefa enfileirada depois dela no mesmo org
-- [ ] T016 [P] [US1] Modificar `core/tasks/sqs/publishers/tickets_test.go`: Q-03 — corpo comparado com `JSONEq` ao fixture de T003; atributos iguais; para a fila de produção (padrão, não FIFO) os atributos enviados são só `ContentType` e `CorrelationID`, sem `MessageGroupId` nem `MessageDeduplicationId`; os atributos FIFO continuam cobertos para filas `.fifo` (FR-008, US1 cenário 6)
-- [ ] T017 [US1] Modificar `core/tasks/sqs/worker_test.go`: Q-04 — falha com reenvio restante sai de `inflight` e entra em `delayed` com `attempt = 1` e `queued_on` original; segundo envio termina em `sent` com `attempt = 2`. Q-11 — tarefa antiga sem `meta` é enviada normalmente
-- [ ] T018 [US1] Modificar `core/tasks/sqs/worker_test.go`: Q-05 — falha ao persistir o reagendamento (Redis falha no script de reschedule) não confirma a tarefa, mantém o lease e emite `retry_persist_failed` em `error`
-- [ ] T019 [US1] Modificar `core/tasks/sqs/worker_test.go`: Q-07 — com `SqsPublishMaxAttempts = 1` e SQS sempre 500, a tarefa é desistida após 2 envios, `inflight` fica vazio, `active` não fica negativo e nenhuma estrutura Redis extra é criada. Substitui `TestHandleSqsPublish_MaxRetriesReached`
+- [X] T015 [P] [US1] Criar `core/tasks/sqs/maintenance_test.go`: Q-08 — (a) lease ainda válido não é recuperado; (b) lease expirado é recuperado com `attempt + 1`, mesmo corpo e mesmos atributos. Q-04 — `promote` devolve o retry à elegível na posição de `queued_on` original, à frente de tarefa enfileirada depois dela no mesmo org
+- [X] T016 [P] [US1] Modificar `core/tasks/sqs/publishers/tickets_test.go`: Q-03 — corpo comparado com `JSONEq` ao fixture de T003; atributos iguais; para a fila de produção (padrão, não FIFO) os atributos enviados são só `ContentType` e `CorrelationID`, sem `MessageGroupId` nem `MessageDeduplicationId`; os atributos FIFO continuam cobertos para filas `.fifo` (FR-008, US1 cenário 6)
+- [X] T017 [US1] Modificar `core/tasks/sqs/worker_test.go`: Q-04 — falha com reenvio restante sai de `inflight` e entra em `delayed` com `attempt = 1` e `queued_on` original; segundo envio termina em `sent` com `attempt = 2`. Q-11 — tarefa antiga sem `meta` é enviada normalmente
+- [X] T018 [US1] Modificar `core/tasks/sqs/worker_test.go`: Q-05 — falha ao persistir o reagendamento (Redis falha no script de reschedule) não confirma a tarefa, mantém o lease e emite `retry_persist_failed` em `error`
+- [X] T019 [US1] Modificar `core/tasks/sqs/worker_test.go`: Q-07 — com `SqsPublishMaxAttempts = 1` e SQS sempre 500, a tarefa é desistida após 2 envios, `inflight` fica vazio, `active` não fica negativo e nenhuma estrutura Redis extra é criada. Substitui `TestHandleSqsPublish_MaxRetriesReached`
 
 ### Implementation for User Story 1
 
-- [ ] T020 [US1] Modificar `core/tasks/sqs/worker.go` (`handleSqsPublish`): remover a goroutine com `time.Sleep` e a chamada a `queue.AddTask`; sucesso → `store.ack`; falha com `attempt < SqsPublishMaxAttempts` → `store.reschedule` com `attempt + 1`; falha de persistência → não confirma; `attempt >= SqsPublishMaxAttempts` → `store.ack` com desistência (depende de T010; ver plan.md, "Fluxo de envio")
-- [ ] T021 [P] [US1] Implementar em `core/tasks/sqs/maintenance.go`: `InitFunction` com `reclaim` síncrono antes de os foremen iniciarem e loop a cada `sqsPublishMaintenanceTick` com `promote` e `reclaim` em lotes de `sqsPublishMaintenanceBatch`; registrar com `mailroom.AddInitFunction`; executa só se `SqsPublishEnabled` e `rt.SQS != nil` (depende de T002, T005; R10, R11)
+- [X] T020 [US1] Modificar `core/tasks/sqs/worker.go` (`handleSqsPublish`): remover a goroutine com `time.Sleep` e a chamada a `queue.AddTask`; sucesso → `store.ack`; falha com `attempt < SqsPublishMaxAttempts` → `store.reschedule` com `attempt + 1`; falha de persistência → não confirma; `attempt >= SqsPublishMaxAttempts` → `store.ack` com desistência (depende de T010; ver plan.md, "Fluxo de envio")
+- [X] T021 [P] [US1] Implementar em `core/tasks/sqs/maintenance.go`: `InitFunction` com `reclaim` síncrono antes de os foremen iniciarem e loop a cada `sqsPublishMaintenanceTick` com `promote` e `reclaim` em lotes de `sqsPublishMaintenanceBatch`; registrar com `mailroom.AddInitFunction`; executa só se `SqsPublishEnabled` e `rt.SQS != nil` (depende de T002, T005; R10, R11)
 
 **Checkpoint**: US1 funcional e testável de forma independente (Q-03, Q-04, Q-05, Q-07, Q-08, Q-11 passam).
 
@@ -88,13 +88,13 @@
 
 ### Tests for User Story 2 ⚠️
 
-- [ ] T022 [P] [US2] Modificar `runtime/sqs/client_test.go`: Q-10 — 10 envios falham ao mesmo tempo → exatamente uma reconstrução (`gen` incrementa uma vez); envios que não falharam não esperam a reconstrução; nenhum envio bloqueado por mutex de rede; `Close()` com envio em voo não quebra o envio
+- [X] T022 [P] [US2] Modificar `runtime/sqs/client_test.go`: Q-10 — 10 envios falham ao mesmo tempo → exatamente uma reconstrução (`gen` incrementa uma vez); envios que não falharam não esperam a reconstrução; nenhum envio bloqueado por mutex de rede; `Close()` com envio em voo não quebra o envio
 
 ### Implementation for User Story 2
 
-- [ ] T023 [US2] Modificar `runtime/sqs/client.go`: `mu sync.RWMutex` protege apenas `svc` e `gen`; `connectMu sync.Mutex` serializa somente reconexões; `publish` lê `(svc, gen)` sob `RLock`, solta e chama `SendMessage` com timeout de 5 s; `reconnect(gen)` constrói o cliente com `config.LoadDefaultConfig` fora de `mu` e troca sob `Lock` com `gen++`; `Close()` troca por nil sob `Lock` (depende de T022; R1)
-- [ ] T024 [P] [US2] Modificar `core/tasks/sqs/store_test.go`: ordem de despacho dentro do org — pop devolve a menor `queued_on` primeiro; orgs distintos são independentes (US2 cenário 4; SC-005)
-- [ ] T025 [US2] Modificar `core/tasks/sqs/worker_test.go`: Q-09 — `SqsPublishWorkers = 2`, `httptest` segura uma requisição por 3 s; a tarefa saudável de outra org termina em menos de 1 s enquanto a lenta continua em andamento (depende de T017–T019; SC-003)
+- [X] T023 [US2] Modificar `runtime/sqs/client.go`: `mu sync.RWMutex` protege apenas `svc` e `gen`; `connectMu sync.Mutex` serializa somente reconexões; `publish` lê `(svc, gen)` sob `RLock`, solta e chama `SendMessage` com timeout de 5 s; `reconnect(gen)` constrói o cliente com `config.LoadDefaultConfig` fora de `mu` e troca sob `Lock` com `gen++`; `Close()` troca por nil sob `Lock` (depende de T022; R1)
+- [X] T024 [P] [US2] Modificar `core/tasks/sqs/store_test.go`: ordem de despacho dentro do org — pop devolve a menor `queued_on` primeiro; orgs distintos são independentes (US2 cenário 4; SC-005)
+- [X] T025 [US2] Modificar `core/tasks/sqs/worker_test.go`: Q-09 — `SqsPublishWorkers = 2`, `httptest` segura uma requisição por 3 s; a tarefa saudável de outra org termina em menos de 1 s enquanto a lenta continua em andamento (depende de T017–T019; SC-003)
 
 **Checkpoint**: US1 e US2 funcionam de forma independente (Q-09 e Q-10 passam).
 
@@ -108,20 +108,20 @@
 
 ### Tests for User Story 3 ⚠️
 
-- [ ] T026 [P] [US3] Criar `core/tasks/sqs/logs_test.go`: formato de tempo (UTC com milissegundos), duração em inteiro de milissegundos, nomes de campo fixos e ausência de `contact_urn` e `message_group_id` em todos os eventos de `logs.go` (Q-06, FR-015, FR-016)
-- [ ] T027 [P] [US3] Modificar `web/ticket/open_test.go`: Q-01 pela via HTTP — o enfileiramento tem `meta.origin = "http"` e o log `enqueued` contém `ticket_uuid`, `correlation_id`, `org_id`, `queue_url`, `origin`, `created_on`, `queued_on`, `enqueued_at` (FR-009)
-- [ ] T028 [P] [US3] Modificar `core/handlers/ticket_opened_test.go`: Q-01 pela via flow — mesmo conjunto de campos com `origin = "flow"` (FR-009)
-- [ ] T029 [P] [US3] Modificar `workers_processing_test.go`: Q-06 — nos caminhos de pânico no handler, tarefa longa e erro de enfileiramento, nenhum registro capturado contém a URN de teste (`whatsapp:5511999999999`) nem `message_group_id`
-- [ ] T030 [US3] Modificar `core/tasks/sqs/worker_test.go`: Q-13 — (a) 4 min 59 s e (b) exatamente 5 min não geram `slow_delivery`; (c) 5 min 1 s com `attempt = 3` e `first_attempt_at` gera exatamente um registro `error` com `event = "slow_delivery"`, mensagem fixa e campos `created_to_queued_ms`, `queued_to_sent_ms`, `created_to_sent_ms`, `slow_threshold_ms = 300000`, `queued_to_first_attempt_ms`, `first_attempt_to_sent_ms`; sem `first_attempt_at`, os dois últimos são omitidos e o registro ainda sai; nenhum registro contém a URN (sequencial no arquivo após T017–T019 e T025)
-- [ ] T031 [US3] Modificar `core/tasks/sqs/worker_test.go`: Q-06 — varredura de logs nos caminhos de sucesso, retry, desistência e reclaim; nenhum registro contém a URN nem o corpo bruto (depende de T030)
+- [X] T026 [P] [US3] Criar `core/tasks/sqs/logs_test.go`: formato de tempo (UTC com milissegundos), duração em inteiro de milissegundos, nomes de campo fixos e ausência de `contact_urn` e `message_group_id` em todos os eventos de `logs.go` (Q-06, FR-015, FR-016)
+- [X] T027 [P] [US3] Modificar `web/ticket/open_test.go`: Q-01 pela via HTTP — o enfileiramento tem `meta.origin = "http"` e o log `enqueued` contém `ticket_uuid`, `correlation_id`, `org_id`, `queue_url`, `origin`, `created_on`, `queued_on`, `enqueued_at` (FR-009)
+- [X] T028 [P] [US3] Modificar `core/handlers/ticket_opened_test.go`: Q-01 pela via flow — mesmo conjunto de campos com `origin = "flow"` (FR-009)
+- [X] T029 [P] [US3] Modificar `workers_processing_test.go`: Q-06 — nos caminhos de pânico no handler, tarefa longa e erro de enfileiramento, nenhum registro capturado contém a URN de teste (`whatsapp:5511999999999`) nem `message_group_id`
+- [X] T030 [US3] Modificar `core/tasks/sqs/worker_test.go`: Q-13 — (a) 4 min 59 s e (b) exatamente 5 min não geram `slow_delivery`; (c) 5 min 1 s com `attempt = 3` e `first_attempt_at` gera exatamente um registro `error` com `event = "slow_delivery"`, mensagem fixa e campos `created_to_queued_ms`, `queued_to_sent_ms`, `created_to_sent_ms`, `slow_threshold_ms = 300000`, `queued_to_first_attempt_ms`, `first_attempt_to_sent_ms`; sem `first_attempt_at`, os dois últimos são omitidos e o registro ainda sai; nenhum registro contém a URN (sequencial no arquivo após T017–T019 e T025)
+- [X] T031 [US3] Modificar `core/tasks/sqs/worker_test.go`: Q-06 — varredura de logs nos caminhos de sucesso, retry, desistência e reclaim; nenhum registro contém a URN nem o corpo bruto (depende de T030)
 
 ### Implementation for User Story 3
 
-- [ ] T032 [P] [US3] Modificar `core/tasks/sqs/producer.go`: emitir o log `enqueued` (nível info) após a confirmação do script, ou `enqueued` com `result = "failed"` em nível `error` quando o enfileiramento falhar; usar apenas funções de `logs.go` (depende de T004, T011; FR-009)
-- [ ] T033 [US3] Modificar `core/tasks/sqs/worker.go`: emitir `attempt` antes de cada `SendMessage` (com `attempted_at`), `sent` (com `sent_at`, `created_to_sent_ms`, `queued_to_sent_ms`), `retry_scheduled` (com `attempted_at`, `next_attempt_at`, `error`), `retry_persist_failed` e `dead_lettered` (nível `error`, com `error` e `attempted_at`), usando apenas `logs.go` (depende de T020; FR-010 a FR-013)
-- [ ] T034 [US3] Modificar `core/tasks/sqs/worker.go`: gravar `meta.first_attempt_at` no início da primeira tentativa, carregá-lo em `reschedule` e `reclaim`, e após `sent` emitir `slow_delivery` (nível `error`, uma vez) quando `sent_at - created_on > sqsSlowDeliveryThreshold`, com a decomposição de tempo de FR-017 (depende de T033; FR-017, R16)
-- [ ] T035 [P] [US3] Modificar `core/tasks/sqs/maintenance.go`: emitir `recovered` (nível warn) com `recovered_count` e a lista `ticket_uuid`, `correlation_id`, `org_id`, `queue_url` por item, somente quando a contagem é maior que zero, tanto na inicialização quanto no loop (depende de T021; FR-014)
-- [ ] T036 [P] [US3] Modificar `workers.go`: para tarefas `sqs_publish`, remover o campo `task` (corpo bruto) dos logs de erro, pânico e tarefa longa (A8; FR-016) (depende de T008, T009)
+- [X] T032 [P] [US3] Modificar `core/tasks/sqs/producer.go`: emitir o log `enqueued` (nível info) após a confirmação do script, ou `enqueued` com `result = "failed"` em nível `error` quando o enfileiramento falhar; usar apenas funções de `logs.go` (depende de T004, T011; FR-009)
+- [X] T033 [US3] Modificar `core/tasks/sqs/worker.go`: emitir `attempt` antes de cada `SendMessage` (com `attempted_at`), `sent` (com `sent_at`, `created_to_sent_ms`, `queued_to_sent_ms`), `retry_scheduled` (com `attempted_at`, `next_attempt_at`, `error`), `retry_persist_failed` e `dead_lettered` (nível `error`, com `error` e `attempted_at`), usando apenas `logs.go` (depende de T020; FR-010 a FR-013)
+- [X] T034 [US3] Modificar `core/tasks/sqs/worker.go`: gravar `meta.first_attempt_at` no início da primeira tentativa, carregá-lo em `reschedule` e `reclaim`, e após `sent` emitir `slow_delivery` (nível `error`, uma vez) quando `sent_at - created_on > sqsSlowDeliveryThreshold`, com a decomposição de tempo de FR-017 (depende de T033; FR-017, R16)
+- [X] T035 [P] [US3] Modificar `core/tasks/sqs/maintenance.go`: emitir `recovered` (nível warn) com `recovered_count` e a lista `ticket_uuid`, `correlation_id`, `org_id`, `queue_url` por item, somente quando a contagem é maior que zero, tanto na inicialização quanto no loop (depende de T021; FR-014)
+- [X] T036 [P] [US3] Modificar `workers.go`: para tarefas `sqs_publish`, remover o campo `task` (corpo bruto) dos logs de erro, pânico e tarefa longa (A8; FR-016) (depende de T008, T009)
 
 **Checkpoint**: US1, US2 e US3 funcionam de forma independente (Q-01, Q-06, Q-13 passam; `ticket_uuid` e `correlation_id` reconstroem a linha do tempo).
 
@@ -131,8 +131,8 @@
 
 **Purpose**: documentação, validação completa e fechamento
 
-- [ ] T037 [P] Atualizar `WENI-CHANGELOG.md` com a entrada da versão de release: novo envelope (`meta` opcional), comportamento de entrega (paralelismo, retry persistido, recuperação) e contrato de campos de log (Principle XVI)
-- [ ] T038 [P] Revisar `core/tasks/sqs/logs.go` e `core/tasks/sqs/worker.go` contra `specs/005-fix-sqs-ticket-publish/contracts/publish-logs.md`: nomes de campo, valores de `event`/`result` e níveis de log conferem com o contrato
+- [X] T037 [P] Atualizar `WENI-CHANGELOG.md` com a entrada da versão de release: novo envelope (`meta` opcional), comportamento de entrega (paralelismo, retry persistido, recuperação) e contrato de campos de log (Principle XVI)
+- [X] T038 [P] Revisar `core/tasks/sqs/logs.go` e `core/tasks/sqs/worker.go` contra `specs/005-fix-sqs-ticket-publish/contracts/publish-logs.md`: nomes de campo, valores de `event`/`result` e níveis de log conferem com o contrato
 - [ ] T039 Executar `gofmt -l . && go vet ./...` e `go test ./... -p=1`; todos verdes (quickstart.md, Critérios de aceite)
 - [ ] T040 Executar os comandos dos pacotes afetados do quickstart.md (`go test ./runtime/sqs/... ./core/tasks/sqs/... ./core/queue/... -p=1 -count=1 -v` e `go test ./web/ticket/... ./core/handlers/... -p=1 -count=1 -run TicketOpened -v`) e confirmar que `runtime/config.go` não recebeu novos nomes de configuração
 
@@ -209,3 +209,29 @@ Task: "Implementar loop de manutenção em core/tasks/sqs/maintenance.go" # T021
 - Commit após cada tarefa ou grupo lógico (Principle XV, Conventional Commits).
 - Pare em cada checkpoint para validar a story de forma independente.
 - Evite: tarefas vagas, dois agentes editando o mesmo arquivo em paralelo, e dependências cruzadas entre stories.
+
+## Notas da implementação
+
+Desvios e fatos descobertos durante a execução (a especificação e os contratos foram ajustados onde indicado):
+
+- **T016 / contrato SQS**: o fixture capturado do código anterior à mudança mostra que `MessageGroupId` já era enviado como *atributo de mensagem* também em fila padrão (não FIFO). O comportamento real foi mantido e o contrato `sqs-ticket-message.md` foi corrigido. O parâmetro `MessageGroupId` do SQS e o `MessageDeduplicationId` continuam exclusivos de fila `.fifo`.
+- **T008 / `TaskSource`**: a assinatura final é `Pop(rt, rc)` e `Release(rt, rc, task)` (recebe o runtime). O `Release` do `sqs_publish` é vazio; o foreman não chama `MarkTaskComplete` para essa fila. O `EndProcessing` do `send_history` continua em `handleTask`.
+- **Scores em epoch ms**: `sqs_publish:delayed` e `sqs_publish:inflight` usam milissegundos do relógio Redis (`TIME`); `data-model.md` ajustado. O token de lease é hexadecimal aleatório gerado no Go.
+- **Eventos extras**: `ack_failed` (confirmação falhou) e `reclaim_dropped` (tarefa ilegível descartada na recuperação) foram acrescentados a `contracts/publish-logs.md`.
+- **T034**: `first_attempt_at` só é gravado quando `attempt == 0`; um item recuperado com `attempt > 0` não o redefine.
+- **T038**: `retry_persist_failed` passou a incluir `next_attempt_at` (relógio do processo, pois o Redis falhou), conforme o contrato.
+- **Arquivos de teste novos**: `web/ticket/open_test.go` (não existia), `core/tasks/sqs/helpers_test.go`, `testsuite/sqs.go` (SQS falso via `httptest`).
+- **Gates (T039)**: `go vet ./...` mostra apenas avisos preexistentes em arquivos não alterados (`cmd/mailroom/main.go`, `core/tasks/tickets/send_ticket_history_test.go`, `web/server.go`).
+
+## Notas da implementação
+
+Desvios e fatos descobertos durante a execução (a especificação e os contratos foram ajustados onde indicado):
+
+- **T016 / contrato SQS**: o fixture capturado do código anterior à mudança mostra que `MessageGroupId` já era enviado como *atributo de mensagem* também em fila padrão (não FIFO). O comportamento real foi mantido e o contrato `sqs-ticket-message.md` foi corrigido. O parâmetro `MessageGroupId` do SQS e o `MessageDeduplicationId` continuam exclusivos de fila `.fifo`.
+- **T008 / `TaskSource`**: a assinatura final é `Pop(rt, rc)` e `Release(rt, rc, task)` (recebe o runtime). O `Release` do `sqs_publish` é vazio; o foreman não chama `MarkTaskComplete` para essa fila. O `EndProcessing` do `send_history` continua em `handleTask`.
+- **Scores em epoch ms**: `sqs_publish:delayed` e `sqs_publish:inflight` usam milissegundos do relógio Redis (`TIME`); `data-model.md` ajustado. O token de lease é hexadecimal aleatório gerado no Go.
+- **Eventos extras**: `ack_failed` (confirmação falhou) e `reclaim_dropped` (tarefa ilegível descartada na recuperação) foram acrescentados a `contracts/publish-logs.md`.
+- **T034**: `first_attempt_at` só é gravado quando `attempt == 0`; um item recuperado com `attempt > 0` não o redefine.
+- **T038**: `retry_persist_failed` passou a incluir `next_attempt_at` (relógio do processo, pois o Redis falhou), conforme o contrato.
+- **Arquivos de teste novos**: `web/ticket/open_test.go` (não existia), `core/tasks/sqs/helpers_test.go`, `testsuite/sqs.go` (SQS falso via `httptest`).
+- **Gates (T039)**: `go vet ./...` mostra apenas avisos preexistentes em arquivos não alterados (`cmd/mailroom/main.go`, `core/tasks/tickets/send_ticket_history_test.go`, `web/server.go`).
