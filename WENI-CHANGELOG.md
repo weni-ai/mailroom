@@ -1,3 +1,10 @@
+1.107.0
+----------
+ * fix: ticket created messages published to SQS are no longer lost on a send failure, a restart or a crash. A failed send is stored in Redis as a retry that keeps its original place in the org queue, and a message taken by a worker that dies is recovered when its lease (MAILROOM_PROCESSING_TTL) expires, which can resend a message already delivered (delivery is at-least-once, the consumer deduplicates by ticket_uuid)
+ * fix: SQS publish workers no longer wait for each other. A slow send or a reconnect does not hold back the others, and several failures at once rebuild the SQS client only once
+ * feat: ticket created SQS publishing is traceable by logs. Every step (enqueued, attempt, sent, retry_scheduled, retry_persist_failed, dead_lettered, recovered) is logged with the same fields (event, ticket_uuid, correlation_id, org_id, queue_url, origin, attempt and UTC times with milliseconds), never with the contact URN, the message group id or the raw task body. Queries by ticket_uuid or correlation_id show the whole timeline. A message delivered more than 5 minutes after the ticket was created is reported once as an error (slow_delivery) that goes to Sentry, with the time spent before the queue, waiting in the queue and retrying. The foreman no longer logs the raw body of sqs_publish tasks on errors, panics and long runs
+ * feat: the Redis task envelope of sqs_publish gains an optional "meta" (ticket_uuid, created_on, origin, correlation_id, first_attempt_at) that is never sent to SQS. Tasks queued without it are still processed. The SQS body and message attributes are unchanged. No new configuration names; MAILROOM_SQS_PUBLISH_MAX_ATTEMPTS keeps meaning the number of resends after the first send
+
 1.106.4
 ----------
 * feat: send a channel object (channel_uuid, type, name, address) to Nexus on routed inbound messages
